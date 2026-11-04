@@ -10,37 +10,60 @@
   <nav id="nav">
     <div class="brand" title="Wicked Skins"><img src="../icons/icon-48.png" alt="" /><span>Wicked<br>Skins</span></div>
     <button data-tab="skins" class="on">Skins</button>
-    <button data-tab="candles">Candles</button>
-    <button data-tab="media">My media</button>
-    <button data-tab="loadouts">Loadouts</button>
-    <button data-tab="tune">Tune</button>
+    <button data-tab="candles">Style</button>
+    <button data-tab="media">Uploads</button>
+    <button data-tab="loadouts">Saved</button>
+    <button data-tab="tune">Adjust</button>
   </nav>
 
   <main>
+    <div id="siteBar" class="sitebar" hidden>
+      <div><b id="siteTitle"></b><p class="hint" id="siteHint"></p></div>
+      <button id="siteBtn" class="primary"></button>
+    </div>
     <div class="top">
       <span id="status"></span>
       <label class="switch"><input type="checkbox" id="enabled" /><span></span></label>
     </div>
 
     <section id="tab-skins">
+      <h4 style="margin-top:0">One-click looks</h4>
+      <div class="quick" id="quickLooks"></div>
+      <h4>Skins</h4>
       <div class="chips" id="chips"></div>
       <div class="cards" id="skinCards"></div>
     </section>
 
     <section id="tab-candles" hidden>
-      <div class="box">
-        <div class="inline" style="justify-content:space-between;align-items:center">
-          <b>Candle colours</b>
-          <label class="switch"><input type="checkbox" id="candleOn" /><span></span></label>
-        </div>
-        <p class="hint">Changes how candles look, never what they show. Works with TradingView's default candle colours.</p>
-      </div>
-      <div class="row"><span>Glow</span><input type="range" id="candleGlow" min="0" max="1" step="0.05" /><output id="candleGlowOut"></output></div>
-      <div class="row"><span>Custom</span>
-        <input type="color" id="candleUp" title="Up candles" /> <input type="color" id="candleDown" title="Down candles" />
-        <small class="hint" style="margin:0">up · down</small></div>
-      <h4>Presets</h4>
-      <div class="cards" id="candleCards"></div>
+      <details class="grp" data-grp="candles" open>
+        <summary>Candles <label class="switch" title="Candle colours on/off"><input type="checkbox" id="candleOn" /><span></span></label></summary>
+        <p class="hint">Purely visual: prices and chart data are untouched. Works with your own TradingView candle colours and chart types.</p>
+        <div class="row"><span>Style</span><div class="seg" id="candleLook"></div></div>
+        <div class="row" id="shiftRow" hidden><span>Cycle</span><input type="range" id="shiftSpeed" min="2" max="40" step="1" /><output id="shiftSpeedOut"></output></div>
+        <p class="hint" id="lookHint"></p>
+        <div class="row"><span>Colours</span>
+          <input type="color" id="candleUp" title="Up candles" /> <input type="color" id="candleDown" title="Down candles" />
+          <small class="hint" style="margin:0">up · down</small></div>
+        <div class="cards" id="candleCards"></div>
+      </details>
+
+      <details class="grp" data-grp="glow" open>
+        <summary>Glow</summary>
+        <div class="row"><span>Candles</span><input type="range" id="candleGlow" min="0" max="1" step="0.05" /><output id="candleGlowOut"></output></div>
+        <div class="row"><span>Lines &amp; P&amp;L</span><input type="range" id="lineGlow" min="0" max="1" step="0.05" /><output id="lineGlowOut"></output></div>
+        <p class="hint">Lines = indicators, drawings, the price line, position lines and your P&amp;L pill. Grid and crosshair never glow.</p>
+      </details>
+
+      <details class="grp" data-grp="scale">
+        <summary>Price scale</summary>
+        <div class="row"><span>Text</span><input type="color" id="scaleText" /><label class="btn" style="padding:5px 10px"><input type="checkbox" id="scaleTextOn" /> custom colour</label></div>
+        <div class="row"><span>Glow</span><input type="range" id="scaleGlow" min="0" max="1" step="0.05" /><output id="scaleGlowOut"></output></div>
+        <div class="row"><span>Weight</span><div class="seg" id="scaleBold"></div></div>
+        <div class="row"><span>Backing</span><div class="seg" id="scaleBg"></div></div>
+        <div class="row"><span>Price tags</span><div class="seg" id="scaleLabels"></div></div>
+        <p class="hint">Text automatically turns light or dark to stay readable on any wallpaper (unless you pick a colour). "Auto" backing adds a glass strip only behind busy wallpapers. Price tags are the coloured price boxes; "Candle" paints them in your candle colours.</p>
+      </details>
+      <button id="resetStyle" class="link">Reset style</button>
     </section>
 
     <section id="tab-media" hidden>
@@ -56,10 +79,10 @@
     <section id="tab-loadouts" hidden>
       <div class="box">
         <div class="inline">
-          <input id="loName" placeholder="Name your loadout" maxlength="40" />
+          <input id="loName" placeholder="Name this look" maxlength="40" />
           <button class="primary" id="loSave">Save</button>
         </div>
-        <p class="hint">Saves your skin and Tune settings together. Stored locally.</p>
+        <p class="hint">Saves your skin, style and adjustments as one look. Stored on this computer.</p>
       </div>
       <div class="cards one" id="loCards"></div>
       <div class="inline" style="margin-top:10px">
@@ -69,45 +92,55 @@
     </section>
 
     <section id="tab-tune" hidden>
-      <h4>Look</h4>
-      <div id="sliders"></div>
-      <div class="row"><span>Frame rate</span><div class="seg" id="fps"></div></div>
-      <div class="row"><span>Fit</span><div class="seg" id="fit"></div></div>
-      <p class="hint">Fit and position apply to images and videos.</p>
-      <h4>Behaviour</h4>
-      <div class="row"><span>Reacts to</span><div class="seg" id="react"></div></div>
-      <div id="reactOpts" hidden>
-        <div class="row"><span>Strength</span><input type="range" id="reactStrength" min="0.1" max="1" step="0.05" /><output id="reactStrengthOut"></output></div>
-        <p class="hint" id="reactHint"></p>
-        <div id="pnlOpts" hidden>
-          <div class="row"><span>Side</span><div class="seg" id="pnlSide"></div></div>
-          <div class="row"><span>Entry</span><input id="pnlEntry" type="number" step="any" min="0" placeholder="Your entry price" class="field" /></div>
-          <div class="row"><span>Symbol</span><input id="pnlSymbol" placeholder="Any (or e.g. BTCUSDT)" class="field" maxlength="20" /></div>
+      <details class="grp" data-grp="picture" open>
+        <summary>Picture</summary>
+        <div id="sliders"></div>
+        <div class="row"><span>Frame rate</span><div class="seg" id="fps"></div></div>
+        <div class="row"><span>Fit</span><div class="seg" id="fit"></div></div>
+        <p class="hint">Fit and position apply to images and videos.</p>
+      </details>
+      <details class="grp" data-grp="motion">
+        <summary>Motion &amp; mood</summary>
+        <div class="row"><span>Live mood</span><div class="seg" id="react"></div></div>
+        <div id="reactOpts" hidden>
+          <div class="row"><span>Strength</span><input type="range" id="reactStrength" min="0.1" max="1" step="0.05" /><output id="reactStrengthOut"></output></div>
+          <p class="hint" id="reactHint"></p>
+          <div id="pnlOpts" hidden>
+            <div class="row"><span>Side</span><div class="seg" id="pnlSide"></div></div>
+            <div class="row"><span>Entry</span><input id="pnlEntry" type="number" step="any" min="0" placeholder="Your entry price" class="field" /></div>
+            <div class="row"><span>Symbol</span><input id="pnlSymbol" placeholder="Any (or e.g. BTCUSDT)" class="field" maxlength="20" /></div>
+          </div>
         </div>
-      </div>
-      <div class="row"><span>Power saver</span><div class="seg" id="powerSaver"></div></div>
-      <div class="row"><span>Motion</span><div class="seg" id="motion"></div></div>
-      <h4>Chart</h4>
-      <div class="row"><span>Layer</span><div class="seg" id="layer"></div></div>
-      <h4>Watermark</h4>
-      <div class="row"><span>Show</span><label class="switch"><input type="checkbox" id="wmOn" /><span></span></label>
-        <small class="hint" style="margin:0">your name / logo on the chart</small></div>
-      <div class="row"><span>Text</span><input id="wmText" class="field" maxlength="60" placeholder="e.g. @yourname" /></div>
-      <div class="row"><span>Logo</span>
-        <label class="btn" style="flex:1;text-align:center">Choose image<input type="file" id="wmFile" accept="image/*,.svg" hidden /></label>
-        <img id="wmPreview" alt="" style="height:28px;max-width:60px;object-fit:contain;display:none" />
-        <button id="wmClear" title="Remove logo" style="display:none"><svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
-      <div class="row"><span>Position</span><div class="seg" id="wmPos"></div></div>
-      <div class="row"><span>Size</span><input type="range" id="wmSize" min="0.5" max="3" step="0.1" /><output id="wmSizeOut"></output></div>
-      <div class="row"><span>Opacity</span><input type="range" id="wmOpacity" min="0.05" max="1" step="0.05" /><output id="wmOpacityOut"></output></div>
-      <div class="row"><span>Colour</span><input type="color" id="wmColor" /></div>
-      <p class="hint" id="wmHint">Shows on top of the chart, so it appears in screen recordings and screenshots of your screen. TradingView's own camera snapshot won't include it.</p>
+        <div class="row"><span>Eco mode</span><div class="seg" id="powerSaver"></div></div>
+        <div class="row"><span>Motion</span><div class="seg" id="motion"></div></div>
+      </details>
+      <details class="grp" data-grp="placement">
+        <summary>Placement</summary>
+        <div class="row"><span>Layer</span><div class="seg" id="layer"></div></div>
+      </details>
+      <details class="grp" data-grp="watermark">
+        <summary>Watermark</summary>
+        <div class="row"><span>Show</span><label class="switch"><input type="checkbox" id="wmOn" /><span></span></label>
+          <small class="hint" style="margin:0">your name / logo on the chart</small></div>
+        <div class="row"><span>Text</span><input id="wmText" class="field" maxlength="60" placeholder="e.g. @yourname" /></div>
+        <div class="row"><span>Logo</span>
+          <label class="btn" style="flex:1;text-align:center">Choose image<input type="file" id="wmFile" accept="image/*,.svg" hidden /></label>
+          <img id="wmPreview" alt="" style="height:28px;max-width:60px;object-fit:contain;display:none" />
+          <button id="wmClear" title="Remove logo" style="display:none"><svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+        <div class="row"><span>Position</span><div class="seg" id="wmPos"></div></div>
+        <div class="row"><span>Size</span><input type="range" id="wmSize" min="0.5" max="3" step="0.1" /><output id="wmSizeOut"></output></div>
+        <div class="row"><span>Opacity</span><input type="range" id="wmOpacity" min="0.05" max="1" step="0.05" /><output id="wmOpacityOut"></output></div>
+        <div class="row"><span>Colour</span><input type="color" id="wmColor" /></div>
+        <p class="hint" id="wmHint">Shows on top of the chart, so it appears in screen recordings and screenshots of your screen. TradingView's own camera snapshot won't include it.</p>
+          </details>
       <button id="reset" class="link">Reset look</button>
     </section>
 
-    <p class="legal">Cosmetic only. Not affiliated with TradingView, Inc.</p>
+    <div id="toast" hidden><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
+    <p class="legal">Tip: <b>Alt+Shift+W</b> on the chart turns everything on/off. Cosmetic only. Not affiliated with TradingView, Inc.</p>
   </main>
 
+  <script src="../src/sites.js"></script>
   <script src="../src/mediadb.js"></script>
   <script src="../src/skins.js"></script>
   <script src="popup.js"></script>

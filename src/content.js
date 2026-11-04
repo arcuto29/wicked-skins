@@ -12,6 +12,7 @@
     layer: "behind",       // "behind" | "over"
     // Candles
     candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
+    candleLook: "solid", shiftSpeed: 10, // solid | neon | prism | shift
     // Behaviour: react to the market / your own P&L (entry typed in by the user; never reads the account)
     react: "off",          // "off" | "market" | "pnl"
     reactStrength: 0.6,
@@ -20,6 +21,8 @@
     pnlSymbol: "",         // optional: only react on this symbol (e.g. "BTCUSDT")
     // Watermark: your own text and/or logo on the chart (for screenshots / streams)
     wmOn: false, wmText: "", wmImage: null, wmPos: "br", wmSize: 1, wmOpacity: 0.6, wmColor: "#ffffff",
+    // Glow on indicators / lines / P&L, and price scale styling
+    lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleLabels: false,
   };
 
   let cfg = { ...DEFAULTS };
@@ -109,23 +112,13 @@
   };
   watchTitle();
 
-  // TradingView caches its candle layer and ignores window "resize" or 1px nudges.
-  // Hiding the chart for two frames makes it rebuild every canvas (tested live).
-  // Debounced so dragging a slider redraws once at the end, not on every tick.
+  // Redraws are done by hook.js (page world): it uses TradingView's own redraw when available.
   let repaintTimer;
-  const repaint = () => {
-    clearTimeout(repaintTimer);
-    repaintTimer = setTimeout(() => {
-      document.querySelectorAll(".chart-container").forEach((el) => {
-        const prev = el.style.display;
-        el.style.display = "none";
-        requestAnimationFrame(() => requestAnimationFrame(() => { el.style.display = prev; }));
-      });
-    }, 150);
-  };
+  const repaint = () => { clearTimeout(repaintTimer); repaintTimer = setTimeout(() => document.dispatchEvent(new Event("bd-repaint")), 60); };
 
   function applyLook() {
     if (!layer) return;
+    setTimeout(measureBackdrop, 300);
     layer.classList.toggle("bd-over", cfg.layer === "over");
     document.documentElement.classList.toggle("bd-over-mode", cfg.layer === "over");
     clipToChart();
@@ -201,6 +194,7 @@
     layer.appendChild(reactEl);
     pillEl = document.createElement("div");
     pillEl.className = "bd-pill"; pillEl.hidden = true;
+    pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     layer.appendChild(pillEl);
     document.documentElement.appendChild(layer);
     applyLook();
@@ -249,9 +243,61 @@
   // Candle colours are drawn by hook.js (page world); hand it the config via an attribute.
   function pushCandles() {
     const h = document.documentElement;
-    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-bd-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow }));
+    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-bd-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow, look: cfg.candleLook }));
     else h.removeAttribute("data-bd-candles");
+    // "Shift" look: colours cycle over time via a GPU hue animation on the chart layer (no redraws needed)
+    const shift = cfg.enabled && cfg.candleOn && cfg.candleLook === "shift";
+    h.classList.toggle("bd-shift", shift);
+    h.style.setProperty("--bd-shift-dur", Math.max(2, Math.min(60, +cfg.shiftSpeed || 10)) + "s");
     repaint();
+  }
+
+  // Line glow + price scale styling, also drawn by hook.js
+  const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleLabels"];
+  // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
+  let backdrop = { bg: null, busy: false, prof: [] };
+  const sampler = document.createElement("canvas"); sampler.width = 32; sampler.height = 18;
+  const sctx = sampler.getContext("2d", { willReadFrequently: true });
+  function statsOf(source) {
+    try {
+      sctx.clearRect(0, 0, 32, 18); sctx.drawImage(source, 0, 0, 32, 18);
+      const d = sctx.getImageData(0, 0, 32, 18).data; let sum = 0, sq = 0, n = 0; const prof = new Array(18).fill(0);
+      for (let i = 0; i < d.length; i += 4) {
+        const l = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255 * (d[i + 3] / 255); sum += l; sq += l * l; n++;
+        const px = (i / 4) % 32, row = Math.floor(i / 4 / 32); if (px >= 27) prof[row] += l / 5;   // right-edge strip
+      }
+      const mean = sum / n; return { mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), prof };
+    } catch { return null; }                    // cross-origin media: the player iframe reports instead
+  }
+  function setBackdrop(st) {
+    if (!st) return;
+    const vis = (cfg.layer === "over" ? cfg.overOpacity : cfg.opacity) * (1 - cfg.dim);   // what actually reaches your eyes
+    const mean = st.mean * vis, std = st.std * vis;
+    // hysteresis so a moving video near the threshold doesn't flip the text back and forth
+    const bg = backdrop.bg === "light" ? (mean < 0.37 ? "dark" : "light") : (mean > 0.47 ? "light" : "dark");
+    const busy = backdrop.busy ? std > 0.12 : std > 0.17;
+    const prof = (st.prof || []).map((v) => Math.round(v * vis * 100) / 100);
+    const h = document.documentElement;
+    h.classList.toggle("bd-bg-dark", bg === "dark"); h.classList.toggle("bd-bg-light", bg === "light");
+    const profMoved = prof.length !== (backdrop.prof || []).length || prof.some((v, i) => Math.abs(v - backdrop.prof[i]) > 0.08);
+    if (bg !== backdrop.bg || busy !== backdrop.busy || profMoved) { backdrop = { bg, busy, prof }; pushFx(); }
+  }
+  function measureBackdrop() {
+    if (!layer || !content || !cfg.enabled) return;
+    if (content.tagName === "IFRAME") return;   // player posts { __wicked: "lum" }
+    setBackdrop(statsOf(content));
+  }
+  setInterval(measureBackdrop, 1500);
+  addEventListener("message", (e) => {
+    if (!e.data || e.data.__wicked !== "lum" || !content || e.source !== content.contentWindow) return;
+    setBackdrop({ mean: +e.data.mean || 0, std: +e.data.std || 0, prof: Array.isArray(e.data.prof) ? e.data.prof.slice(0, 18).map(Number) : [] });
+  });
+
+  function pushFx() {
+    const h = document.documentElement;
+    if (cfg.enabled) h.setAttribute("data-bd-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [] }));
+    else h.removeAttribute("data-bd-fx");
+    if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
   }
 
   // Keys that need a rebuild vs. ones we can apply live.
@@ -298,15 +344,42 @@
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm"));
+    if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled")) pushFx();
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && cfg.skin === "media");
     needsRebuild ? build() : applyLook();
   }
 
+  // ---------- Alt+Shift+W: everything on/off, right on the chart ----------
+  function flash(msg) {
+    const t = document.createElement("div"); t.className = "bd-flash"; t.textContent = msg;
+    document.documentElement.appendChild(t); setTimeout(() => t.remove(), 1400);
+  }
+  addEventListener("keydown", (e) => {
+    if (!(e.altKey && e.shiftKey && e.code === "KeyW") || e.repeat) return;
+    const tag = (e.target && e.target.tagName) || "";
+    if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
+    e.preventDefault(); e.stopPropagation();
+    const next = !cfg.enabled;
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) chrome.storage.local.set({ enabled: next });
+    else if (window.__bdUpdate) window.__bdUpdate({ enabled: next });
+    flash(next ? "Wicked Skins on" : "Wicked Skins off");
+  }, true);
+
+  // Only switch on in a frame that actually contains a TradingView-style chart (tradingview.com, or a
+  // platform's embedded chart iframe). Other frames / pages of an enabled site are left untouched.
+  const CHART_SEL = ".chart-markup-table, .chart-container";
+  function whenChart(start) {
+    if (document.querySelector(CHART_SEL)) return start();
+    const mo = new MutationObserver(() => { if (document.querySelector(CHART_SEL)) { mo.disconnect(); clearTimeout(t); start(); } });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+    const t = setTimeout(() => mo.disconnect(), 180000); // charts that load later than 3 min: reload the page
+  }
+
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); renderWatermark(); });
+    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); pushFx(); renderWatermark(); }));
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       for (const k in changes) cfg[k] = changes[k].newValue;
@@ -317,6 +390,7 @@
     cfg = { ...DEFAULTS, ...(window.__BD_CFG || {}) };
     build();
     pushCandles();
+    pushFx();
     renderWatermark();
     window.__bdUpdate = (next) => {
       const keys = Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(cfg[k]));
