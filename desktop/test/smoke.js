@@ -35,7 +35,10 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
   const settings = app.windows().find((w) => w.url().includes("popup.html"));
   ok("settings window opens", !!settings);
   if (settings) {
-    await settings.click("#skinCards .card >> text=Cyber Grid");
+    settings.on("pageerror", (e) => errors.push("settings: " + e.message));
+    settings.on("console", (m) => { if (m.type() === "error") console.log("settings console:", m.text().slice(0, 200)); });
+    await settings.waitForSelector("#skinCards .card", { timeout: 30000 });
+    await settings.click("#skinCards .card:has-text('Cyber Grid')", { timeout: 30000 });
     await tv.waitForTimeout(2500);
     const saved = JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf8"));
     ok("settings change saved", saved.skin === "cybergrid");

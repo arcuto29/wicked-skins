@@ -13,11 +13,13 @@
   if (window.__bdHooked) return;
   window.__bdHooked = true;
 
-  const html = document.documentElement;
+  // <html> can be missing when this runs very early (desktop app preload), so always look it up lazily.
+  const EMPTY = { classList: { contains: () => false }, getAttribute: () => null };
+  const htmlEl = () => document.documentElement || EMPTY;
   const proto = CanvasRenderingContext2D.prototype;
 
   // ---------- settings ----------
-  let on = html.classList.contains("bd-on");
+  let on = htmlEl().classList.contains("bd-on");
   let candles = null; // { up:[r,g,b], down:[r,g,b], upHex, downHex, glow }
   const remapCache = new Map();
 
@@ -26,7 +28,7 @@
   function readCandles() {
     remapCache.clear();
     try {
-      const raw = html.getAttribute("data-bd-candles");
+      const raw = htmlEl().getAttribute("data-bd-candles");
       const c = raw ? JSON.parse(raw) : null;
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
         candles = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
@@ -40,7 +42,7 @@
   let fx = { lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleLabels: false, bg: null, busy: false };
   function readFx() {
     try {
-      const raw = html.getAttribute("data-bd-fx"), f = raw ? JSON.parse(raw) : {};
+      const raw = htmlEl().getAttribute("data-bd-fx"), f = raw ? JSON.parse(raw) : {};
       fx = {
         lineGlow: Math.max(0, Math.min(1, +f.lineGlow || 0)),
         scaleText: /^#[0-9a-f]{6}$/i.test(f.scaleText || "") ? f.scaleText : "",
@@ -61,16 +63,22 @@
   let fxSig = "";
   readFx();
 
-  new MutationObserver((muts) => {
+  const settingsObserver = new MutationObserver((muts) => {
     let repaint = false, soft = false;
     for (const m of muts) {
-      if (m.attributeName === "class") on = html.classList.contains("bd-on");
+      if (m.attributeName === "class") on = htmlEl().classList.contains("bd-on");
       if (m.attributeName === "data-bd-candles") readCandles();
       if (m.attributeName === "data-bd-fx") { if (readFx()) repaint = true; else soft = true; }
     }
     if (repaint) forceRepaint(false);
     else if (soft) forceRepaint(true);   // brightness-only update: redraw only if it can be done without a blink
-  }).observe(html, { attributes: true, attributeFilter: ["class", "data-bd-candles", "data-bd-fx"] });
+  });
+  (function watchSettings() {
+    const el = document.documentElement;
+    if (!el) return setTimeout(watchSettings, 5);            // wait for the page's <html>
+    settingsObserver.observe(el, { attributes: true, attributeFilter: ["class", "data-bd-candles", "data-bd-fx"] });
+    on = el.classList.contains("bd-on"); readCandles(); readFx();
+  })();
 
   // ---------- candle colour remap (fillStyle / strokeStyle setters) ----------
   // We recolour the candles TradingView actually draws. To know WHICH colours are candles we
@@ -336,7 +344,7 @@
   }
   const paCache = new WeakMap();
   function isPriceAxis(c) { let v = paCache.get(c); if (v === undefined) { v = !!(c.closest && c.closest(".price-axis, [class*='price-axis']")); paCache.set(c, v); } return v; }
-  const autoOn = () => !html.classList.contains("bd-over-mode") && !!fx.bg;
+  const autoOn = () => !htmlEl().classList.contains("bd-over-mode") && !!fx.bg;
   const scaleStyled = () => fx.scaleText || fx.scaleGlow > 0 || fx.scaleBold || autoOn();
   function isScaleLabel(style) {           // tick labels, not text on coloured price badges
     const r = rgbKey(style);
@@ -358,8 +366,8 @@
       this.fillStyle = pF; this.font = pFont; this.shadowBlur = pSB; this.shadowColor = pSC;
       return;
     }
-    const bgDark = fx.bg ? fx.bg === "dark" : html.classList.contains("theme-light"); // before 1st measurement: old behaviour
-    if (on && !html.classList.contains("bd-over-mode") && this.canvas && inChart(this.canvas) && isScaleLabel(this.fillStyle) &&
+    const bgDark = fx.bg ? fx.bg === "dark" : htmlEl().classList.contains("theme-light"); // before 1st measurement: old behaviour
+    if (on && !htmlEl().classList.contains("bd-over-mode") && this.canvas && inChart(this.canvas) && isScaleLabel(this.fillStyle) &&
         (bgDark ? isDark(this.fillStyle) : !isDark(this.fillStyle))) {
       const prev = this.fillStyle;
       this.fillStyle = bgDark ? AUTO_TEXT.dark : AUTO_TEXT.light;
