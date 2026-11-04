@@ -106,3 +106,41 @@ html.bd-on.bd-scale-glass .chart-markup-table.time-axis { box-shadow: inset 0 1p
   font: 800 72px system-ui, sans-serif; color: rgba(255,255,255,.9); text-shadow: 0 2px 14px rgba(0,0,0,.8);
   background: rgba(8,11,18,.35); outline: 2px solid rgba(46,242,176,.55); outline-offset: -2px; animation: bd-flash 1.8s ease-out forwards; }
 .bd-num.bd-num-on { color: #c6ff3d; background: rgba(46,242,176,.16); outline: 3px solid #2ef2b0; }
+
+/* --- Sides: let the wallpaper flow across the panels around the chart --- */
+/* Make the surrounding panels (watchlist, detail, tabs rail, toolbars, bottom panel) see-through. */
+html.bd-sides .widgetbar-pages,
+html.bd-sides [class*="widgetbar-widget"],
+html.bd-sides .widgetbar-tabs,
+html.bd-sides [class*="layout__area--left"],
+html.bd-sides [class*="layout__area--right"],
+html.bd-sides [class*="layout__area--top"],
+html.bd-sides [class*="layout__area--bottom"],
+html.bd-sides [class*="toolbar-"],
+html.bd-sides [class*="-toolbar"],
+html.bd-sides [class*="widgetbar"] [class*="wrap-"],
+html.bd-sides [class*="widgetbar"] [class*="list-"],
+html.bd-sides [class*="watchlist"] [class*="symbol-"],
+html.bd-sides [class*="account-manager"],
+html.bd-sides [class*="pane-legend"],
+html.bd-sides [class*="chart-controls-bar"] {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+/* Glass: a frosted tint over the panels so text stays readable on busy wallpapers. */
+html.bd-sides-glass .widgetbar-pages,
+html.bd-sides-glass .widgetbar-tabs,
+html.bd-sides-glass [class*="layout__area--left"] [class*="toolbar"],
+html.bd-sides-glass [class*="chart-controls-bar"] {
+  background: var(--bd-scale-tint, rgba(8,11,18,.42)) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.2); backdrop-filter: blur(12px) saturate(1.2);
+}
+/* Keep rows legible: faint divider lines, readable text, no opaque row stripes. */
+html.bd-sides [class*="widgetbar"] [class*="row-"],
+html.bd-sides [class*="watchlist"] [class*="row"],
+html.bd-sides [class*="listRow"] { background: transparent !important; }
+html.bd-sides.bd-bg-dark [class*="widgetbar"],
+html.bd-sides.bd-bg-dark .widgetbar-tabs { color: #e9ebf2; }
+html.bd-sides [class*="widgetbar"] [class*="apply-common-tooltip"] { text-shadow: 0 0 3px rgba(0,0,0,.6); }
+/* The hairline borders TradingView draws between panels look odd over art; soften them. */
+html.bd-sides [class*="layout__area"] { border-color: rgba(255,255,255,.08) !important; }

@@ -17,6 +17,9 @@
     react: "off",          // "off" | "market" | "pnl"
     reactStrength: 0.6,
     // Watermark: your own text and/or logo on the chart (for screenshots / streams)
+    // Sides: let the wallpaper flow across the panels around the chart (watchlist, toolbars, the grey areas).
+    // "off" = only the chart; "glass" = frosted panels; "clear" = fully see-through panels.
+    sides: "off",
     // Watermark: the Priism Skins logo + your name/handle, for recordings and streams.
     // style: "corner" (clean logo + text in a corner) or "tiled" (faint repeated mark across the chart, hard to crop out)
     wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false,
@@ -302,6 +305,15 @@
     return el;
   }
 
+  // Sides: wallpaper flows across the panels around the chart. "glass" frosts them; "clear" is see-through.
+  function applySides() {
+    const h = document.documentElement, mode = ["glass", "clear"].includes(cfg.sides) ? cfg.sides : "off";
+    const on = cfg.enabled && mode !== "off" && cfg.layer !== "over";
+    h.classList.toggle("bd-sides", on);
+    h.classList.toggle("bd-sides-glass", on && mode === "glass");
+    h.classList.toggle("bd-sides-clear", on && mode === "clear");
+  }
+
   function build() {
     teardown();
     const was = document.documentElement.classList.contains("bd-on");
@@ -311,6 +323,7 @@
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
     document.documentElement.classList.toggle("bd-on", cfg.enabled);
+    applySides();
     if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
@@ -616,6 +629,7 @@
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
+    if (keys.includes("sides") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !FX_KEYS.includes(k));
     if (!keys.length) return;
