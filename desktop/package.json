@@ -1,8 +1,8 @@
 {
-  "name": "wicked-skins-desktop",
-  "productName": "Wicked Skins",
+  "name": "priism-skins-desktop",
+  "productName": "Priism Skins",
   "version": "0.1.0",
-  "description": "Wicked Skins desktop app: TradingView with live wallpapers (Windows, macOS, Linux)",
+  "description": "Priism Skins desktop app: TradingView with live wallpapers (Windows, macOS, Linux)",
   "author": "arcuto29",
   "main": "main.js",
   "scripts": {
@@ -18,8 +18,8 @@
     "electron-builder": "^26.0.0"
   },
   "build": {
-    "appId": "com.wickedskins.desktop",
-    "productName": "Wicked Skins",
+    "appId": "com.priism.skins",
+    "productName": "Priism Skins",
     "directories": {
       "output": "dist"
     },

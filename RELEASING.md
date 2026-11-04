@@ -19,7 +19,7 @@ git commit -am "Release v0.2.0" && git tag v0.2.0 && git push --follow-tags
 ```
 GitHub Actions (`.github/workflows/release.yml`) then:
 1. checks the code and that the tag matches the version,
-2. builds `wicked-skins-0.2.0.zip` and creates the GitHub Release with your changelog,
+2. builds `priism-skins-0.2.0.zip` and creates the GitHub Release with your changelog,
 3. uploads and publishes it to the Chrome Web Store (once the secrets below are set),
 4. builds the Windows installer, macOS `.dmg`/`.zip` and Linux `.AppImage` and attaches them; installed apps update from these.
 

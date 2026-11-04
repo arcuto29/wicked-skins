@@ -1,11 +1,11 @@
-// Builds the store-ready extension zip: dist/wicked-skins-<version>.zip
+// Builds the store-ready extension zip: dist/priism-skins-<version>.zip
 // Only the files the extension actually uses go in (no desktop app, docs, scripts or git files).
 const fs = require("fs"), path = require("path"), { execFileSync } = require("child_process");
 const ROOT = path.join(__dirname, "..");
 const { version } = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
 const INCLUDE = ["manifest.json", "src", "popup", "player", "icons", "vendor"];
 const OUT_DIR = path.join(ROOT, "dist"), STAGE = path.join(OUT_DIR, "extension");
-const ZIP = path.join(OUT_DIR, `wicked-skins-${version}.zip`);
+const ZIP = path.join(OUT_DIR, `priism-skins-${version}.zip`);
 
 fs.rmSync(STAGE, { recursive: true, force: true });
 fs.mkdirSync(STAGE, { recursive: true });

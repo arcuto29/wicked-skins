@@ -1,20 +1,20 @@
 # Chrome Web Store submission (copy-paste)
 
-**Before you submit:** decide the final name (Wicked Skins / Priism Skins); the listing name is hard to change once people install it.
+**Name:** Priism Skins (decided). The listing name is hard to change once people install it, so keep it.
 Fill `contactEmail` in `site/site-config.js` and publish the website (Privacy policy URL is required).
 
 ## 1. Upload
-Chrome Web Store Developer Dashboard → **New item** → upload `wicked-skins-<version>.zip`
+Chrome Web Store Developer Dashboard → **New item** → upload `priism-skins-<version>.zip`
 (from the latest GitHub Release, or run `npm run build:ext`).
 
 ## 2. Store listing
-**Name:** Wicked Skins: Live Wallpapers for TradingView
+**Name:** Priism Skins: Live Wallpapers for TradingView
 **Summary (132 chars max):**
 Live wallpapers, your own videos, candle colours, glow and a readable price scale behind your TradingView charts.
 
 **Description:**
 ```
-Make your charts wicked. Wicked Skins puts live wallpapers behind your TradingView candles and lets you restyle the chart, without touching your data.
+Your charts, in full spectrum. Priism Skins puts live wallpapers behind your TradingView candles and lets you restyle the chart, without touching your data.
 
 LIVE WALLPAPERS
 • 24 animated skins: Spiral Galaxy, Cyber Grid, Skyline, Thunderstorm, Tide, Cinders and more
@@ -35,12 +35,12 @@ READABLE & CALM
 MORE
 • One-click looks with Undo, saved looks you can share
 • Live mood: the chart glows with the day's move or with the open P&L on your position lines
-• Watermark with the Wicked Skins logo for recordings
+• Watermark with the Priism Skins logo for recordings
 • Works on TopstepX and other platforms that embed TradingView charts ("Turn on here")
 • Alt+Shift+W toggles everything
 
 PRIVACY
-Purely cosmetic. Wicked Skins never reads your orders, positions or account and sends nothing from the chart anywhere. The Workshop account (optional) only stores your email and what you share.
+Purely cosmetic. Priism Skins never reads your orders, positions or account and sends nothing from the chart anywhere. The Workshop account (optional) only stores your email and what you share.
 
 Not affiliated with, endorsed or sponsored by TradingView, Inc. Not financial advice.
 ```

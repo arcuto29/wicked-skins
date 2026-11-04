@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins"];
+const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","parallax","priceLight","tradeFx"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -21,6 +21,8 @@ const DEFAULTS = {
   candleLook: "solid", shiftSpeed: 10,
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
+  multi: "span", chartSkins: {},
+  parallax: "subtle", priceLight: true, tradeFx: true,
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -52,14 +54,14 @@ function renderSkins() {
   for (const [id, s] of Object.entries(WickedSkins)) {
     if (activeCat !== "All" && s.cat !== activeCat) continue;
     const card = document.createElement("button");
-    card.className = "card" + (cfg.skin === id ? " on" : "");
+    card.className = "card" + (currentSrc() === id ? " on" : "");
     const cv = document.createElement("canvas");
     cv.width = 160; cv.height = 76;
     const skin = s.create(cv.getContext("2d")); skin.resize(160, 76);
     previews.push({ skin, t: 0 });
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span><div class="label">${esc(s.name)}</div>`);
-    card.onclick = () => { set({ skin: id }); renderSkins(); renderMedia(); syncTune(); };
+    card.onclick = () => pickSource(id);
     $("skinCards").appendChild(card);
   }
 }
@@ -179,7 +181,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); }
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncCharts(); syncEffects(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 const QUICK_LOOKS = [
@@ -233,7 +235,7 @@ function renderMedia() {
   const box = $("mediaCards"); box.innerHTML = "";
   cfg.media.forEach((m) => {
     const card = document.createElement("div");
-    card.className = "card" + (cfg.skin === "media" && cfg.mediaId === m.id ? " on" : "");
+    card.className = "card" + (currentSrc() === "media:" + m.id ? " on" : "");
     if (m.thumb || m.pending) {
       const img = document.createElement("img");
       if (m.thumb) img.src = m.thumb; else img.alt = "";
@@ -254,8 +256,9 @@ function renderMedia() {
         const media = cfg.media.filter((x) => x.id !== m.id);
         const wasActive = cfg.skin === "media" && cfg.mediaId === m.id;
         if (m.file && window.WickedMediaDB) WickedMediaDB.del(m.id).catch(() => {});
-        set(wasActive ? { media, skin: "aurora", mediaId: null } : { media });
-      } else if (!m.pending) set({ skin: "media", mediaId: m.id });
+        const chartSkins = Object.fromEntries(Object.entries(cfg.chartSkins || {}).filter(([, v]) => v !== "media:" + m.id));
+        set(wasActive ? { media, chartSkins, skin: "aurora", mediaId: null } : { media, chartSkins });
+      } else if (!m.pending) return pickSource("media:" + m.id);
       renderMedia(); renderSkins(); syncTune();
     };
     box.appendChild(card);
@@ -547,7 +550,7 @@ $("shareGo").onclick = async () => {
     const thumb = m.thumb ? await (await fetch(m.thumb)).blob() : null;
     const r = await W().share({ blob, thumb, title: $("shareTitle").value.trim() || m.name, kind: m.type });
     $("shareDlg").hidden = true;
-    toast(r.status === "approved" ? "Shared: it's live in the Workshop." : "Shared: it'll appear after review. See Workshop → Mine.");
+    toast(r.status === "approved" ? "Shared: it's live in the Workshop." : "Shared: it'll appear after review. See Workshop › Mine.");
   } catch (e) { $("shareMsg").textContent = "Couldn't share: " + e.message; $("shareGo").disabled = false; }
 };
 // accounts
@@ -557,7 +560,7 @@ $("wsSignBtn").onclick = async () => {
 };
 const authMsg = (t) => ($("wsAuthMsg").textContent = t);
 const creds = () => ({ email: $("wsEmail").value.trim(), password: $("wsPass").value });
-async function afterSignIn() { wsAuthOpen = false; $("wsPass").value = ""; $("wsCodeBox").hidden = true; await wsLoad(true); toast(`Signed in as ${W().me().name}.`); }
+async function afterSignIn() { wsAuthOpen = false; $("wsPass").value = ""; await wsLoad(true); toast(`Signed in as ${W().me().name}.`); }
 $("wsSignIn").onclick = async () => { const c = creds(); if (!c.email || !c.password) return authMsg("Enter your email and password.");
   try { authMsg("Signing in…"); await W().signIn(c.email, c.password); await afterSignIn(); } catch (e) { authMsg(e.message); } };
 $("wsSignUp").onclick = async () => { const c = creds(); if (!c.email || c.password.length < 8) return authMsg("Use your email and a password of at least 8 characters.");
@@ -565,9 +568,7 @@ $("wsSignUp").onclick = async () => { const c = creds(); if (!c.email || c.passw
     if (r.needsConfirm) authMsg("Check your email to confirm your account, then sign in here."); else await afterSignIn(); } catch (e) { authMsg(e.message); } };
 $("wsGoogle").onclick = async () => { try { authMsg("Opening Google…"); await W().signInGoogle(); await afterSignIn(); } catch (e) { authMsg(e.message); } };
 $("wsForgot").onclick = async () => { const email = $("wsEmail").value.trim(); if (!email) return authMsg("Enter your email first.");
-  try { await W().sendCode(email); $("wsCodeBox").hidden = false; authMsg("We emailed you a sign-in code."); } catch (e) { authMsg(e.message); } };
-$("wsVerify").onclick = async () => { try { await W().verifyCode($("wsEmail").value.trim(), $("wsCode").value.trim()); await afterSignIn();
-  const pw = prompt("Set a new password? (leave empty to skip)", ""); if (pw && pw.length >= 8) { await W().setPassword(pw); toast("Password updated."); } } catch (e) { authMsg(e.message); } };
+  try { await W().resetPassword(email); authMsg("Check your email for a link to set a new password, then sign in here."); } catch (e) { authMsg(e.message); } };
 $("wsMore").onclick = () => { wsPage++; wsLoad(false); };
 function initWorkshop() {
   const on = !!(window.Workshop && Workshop.configured);
@@ -646,7 +647,7 @@ function renderLoadouts() {
         inp.onkeydown = (k) => { if (k.key === "Enter") done(); if (k.key === "Escape") renderLoadouts(); };
         inp.onblur = done; inp.onclick = (k) => k.stopPropagation();
       } else if (act === "share") {
-        download(`${lo.name.replace(/[^\w-]+/g, "-").toLowerCase() || "look"}.wicked.json`, [exportable(lo)]);
+        download(`${lo.name.replace(/[^\w-]+/g, "-").toLowerCase() || "look"}.priism.json`, [exportable(lo)]);
       }
     };
     box.appendChild(card);
@@ -660,7 +661,7 @@ const saveLook = () => {
 };
 $("loSave").onclick = saveLook;
 $("loName").onkeydown = (e) => { if (e.key === "Enter") saveLook(); };
-$("loExport").onclick = () => download("wicked-skins-looks.json", cfg.loadouts.map(exportable));
+$("loExport").onclick = () => download("priism-skins-looks.json", cfg.loadouts.map(exportable));
 $("loImport").onchange = async (e) => {
   try {
     const arr = JSON.parse(await e.target.files[0].text());
@@ -757,6 +758,102 @@ function syncSessions() {
 }
 $("sessionOn").onchange = (e) => set({ sessionOn: e.target.checked });
 
+// ---------- multi-chart layouts ----------
+// "Stretch" = one wallpaper across the layout, "Each chart" = a copy per chart, "Mix" = a skin per chart.
+// Chart 1 is top-left, then left to right, row by row. Chart 1 always shows your main skin.
+let chartCount = 0;          // charts on the current tab (0 = unknown)
+let target = "all";          // where a skin goes when you click it: "all" or a chart number
+const MULTI_HINT = {
+  span: "One wallpaper stretched across your whole layout.",
+  each: "Every chart gets its own copy of your skin.",
+  mix: "A different skin on each chart. Pick a chart, then click a skin.",
+};
+const mainSrc = () => (cfg.skin === "media" ? "media:" + cfg.mediaId : cfg.skin);
+const chartN = () => Math.min(16, Math.max(chartCount, 2, ...Object.keys(cfg.chartSkins || {}).map(Number).filter((n) => n > 0)));
+function currentSrc() {
+  if (typeof target === "number" && target > 1) return (cfg.chartSkins || {})[target] || mainSrc();
+  return mainSrc();
+}
+function srcName(src) {
+  if (!src) return "";
+  if (src.startsWith("media:")) { const m = cfg.media.find((x) => x.id === src.slice(6)); return m ? m.name : "Upload"; }
+  return WickedSkins[src] ? WickedSkins[src].name : src;
+}
+function pickSource(src) {
+  const asMain = src.startsWith("media:") ? { skin: "media", mediaId: src.slice(6) } : { skin: src };
+  if (target === "all") set({ ...asMain, chartSkins: {}, ...(cfg.multi === "mix" ? { multi: "each" } : {}) });
+  else if (target === 1) {
+    // only chart 1 should change: charts still following chart 1 keep the skin they show now
+    const keep = { ...(cfg.chartSkins || {}) };
+    for (let n = 2; n <= chartN(); n++) if (!keep[n]) keep[n] = mainSrc();
+    set({ ...asMain, chartSkins: keep, multi: "mix" });
+  } else set({ chartSkins: { ...(cfg.chartSkins || {}), [target]: src }, multi: "mix" });
+  renderSkins(); renderMedia(); syncTune(); syncCharts();
+}
+async function activeTab() {
+  if (!EXT_MODE || IS_TAB || !chrome.tabs) return null;
+  try { const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); return tab && /^https?:/.test(tab.url || "") ? tab : null; } catch { return null; }
+}
+async function tabMsg(msg) {
+  const tab = await activeTab(); if (!tab) return null;
+  return new Promise((res) => { try { chrome.tabs.sendMessage(tab.id, msg, { frameId: 0 }, (r) => { void chrome.runtime.lastError; res(r || null); }); } catch { res(null); } });
+}
+async function detectCharts() {
+  const r = await tabMsg({ ws: "layout" });
+  if (r && r.count !== chartCount) { chartCount = r.count | 0; syncCharts(); }
+}
+const flashNumbers = (n) => tabMsg({ ws: "numbers", n }).then((r) => { if (r && r.count !== chartCount) { chartCount = r.count | 0; syncCharts(); } });
+function renderPickers() {
+  const show = chartCount > 1 || cfg.multi === "mix";
+  document.querySelectorAll(".chartpick").forEach((box) => {
+    box.hidden = !show; box.innerHTML = "";
+    if (!show) return;
+    box.insertAdjacentHTML("beforeend", `<span>Apply to</span>`);
+    for (const t of ["all", ...Array.from({ length: chartN() }, (_, i) => i + 1)]) {
+      const b = document.createElement("button");
+      b.className = "chip" + (target === t ? " on" : "");
+      b.textContent = t === "all" ? "All charts" : "Chart " + t;
+      if (t !== "all") b.title = t === 1 ? "Top-left chart: " + srcName(mainSrc()) : srcName((cfg.chartSkins || {})[t] || mainSrc());
+      b.onclick = () => { target = t; if (t !== "all") flashNumbers(t); renderSkins(); renderMedia(); renderPickers(); };
+      box.appendChild(b);
+    }
+  });
+}
+function syncCharts() {
+  seg("multi", [["span", "Stretch"], ["each", "Each chart"], ["mix", "Mix"]], () => cfg.multi || "span", (v) => {
+    set({ multi: v }); if (v !== "mix" && typeof target === "number") target = "all"; syncCharts(); renderSkins(); renderMedia();
+  });
+  $("multiHint").textContent = MULTI_HINT[cfg.multi] || MULTI_HINT.span;
+  $("chartsFound").textContent = chartCount > 1 ? `${chartCount} charts on this tab.` : chartCount === 1 ? "1 chart on this tab. Open a multi-chart layout to use these." : "";
+  const rows = $("chartRows"); rows.innerHTML = "";
+  if (cfg.multi === "mix") {
+    const opts = `<option value="">Same as chart 1</option><optgroup label="Skins">` +
+      Object.entries(WickedSkins).map(([id, sk]) => `<option value="${id}">${esc(sk.name)}</option>`).join("") + `</optgroup>` +
+      (cfg.media.filter((m) => !m.pending).length ? `<optgroup label="Your uploads">` + cfg.media.filter((m) => !m.pending).map((m) => `<option value="media:${m.id}">${esc(m.name)}</option>`).join("") + `</optgroup>` : "");
+    for (let n = 1; n <= chartN(); n++) {
+      const row = document.createElement("div"); row.className = "row";
+      if (n === 1) { row.innerHTML = `<span>Chart 1</span><small class="hint" style="margin:0">${esc(srcName(mainSrc()))} (your main skin)</small>`; rows.appendChild(row); continue; }
+      row.innerHTML = `<span>Chart ${n}</span><select class="field">${opts}</select>`;
+      const sel = row.querySelector("select"); sel.value = (cfg.chartSkins || {})[n] || "";
+      sel.onchange = () => {
+        const next = { ...(cfg.chartSkins || {}) }; if (sel.value) next[n] = sel.value; else delete next[n];
+        set({ chartSkins: next }); renderPickers();
+      };
+      sel.onfocus = () => flashNumbers(n);
+      rows.appendChild(row);
+    }
+  }
+  renderPickers();
+}
+$("showNums").onclick = () => flashNumbers(typeof target === "number" ? target : 0);
+
+// ---------- effects ----------
+function syncEffects() {
+  seg("parallax", [["off", "Off"], ["subtle", "Subtle"], ["deep", "Deep"]], () => cfg.parallax, (v) => set({ parallax: v }));
+  seg("priceLight", [[false, "Off"], [true, "On"]], () => cfg.priceLight, (v) => set({ priceLight: v }));
+  seg("tradeFx", [[false, "Off"], [true, "On"]], () => cfg.tradeFx, (v) => set({ tradeFx: v }));
+}
+
 // ---------- watermark (logo + name) ----------
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
@@ -765,7 +862,7 @@ function syncWatermark() {
 }
 $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
 
-const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength","vignette","calm"];
+const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength","vignette","calm","parallax","priceLight","tradeFx"];
 const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
@@ -818,7 +915,7 @@ async function siteBar() {
     chrome.tabs.reload(tab.id); window.close();
   };
   if (found.chart) {
-    show("", `Chart found on ${host}`, "Chrome will ask to let Wicked Skins \u201cread and change\u201d this site. That's Chrome's standard wording for drawing on a page; it only paints the chart and never reads your account or orders.", "Turn on here", turnOn);
+    show("", `Chart found on ${host}`, "Chrome will ask to let Priism Skins \u201cread and change\u201d this site. That's Chrome's standard wording for drawing on a page; it only paints the chart and never reads your account or orders.", "Turn on here", turnOn);
   } else {
     show("", `No TradingView chart found on ${host}`, "Open a chart on this site first, or turn it on anyway if the chart loads later.", "Turn on anyway", turnOn);
   }
@@ -844,7 +941,7 @@ async function updates() {
   // Another copy of the extension drew on a chart recently (content.js reports it).
   const { dupSeen } = await chrome.storage.local.get("dupSeen");
   if (dupSeen && Date.now() - dupSeen < 3 * 86400e3) {
-    notice("Two copies of Wicked Skins are installed", `Remove the older one so they don't fight (keep version ${me}). It's under chrome://extensions.`,
+    notice("Two copies of Priism Skins are installed", `Remove the older one so they don't fight (keep version ${me}). It's under chrome://extensions.`,
       "Open extensions", "#", () => chrome.storage.local.remove("dupSeen"));
     $("noticeLink").onclick = (e) => { e.preventDefault(); chrome.tabs.create({ url: "chrome://extensions" }); };
     return;
@@ -866,7 +963,7 @@ async function updates() {
     if (latest) chrome.storage.local.set({ updCheck: { at: Date.now(), latest } });
   }
   if (latest && newer(latest, me)) {
-    notice(`Update available: ${latest}`, "Download it, replace the files in your Wicked Skins folder, then click the reload arrow on its card in chrome://extensions. Your settings are kept.",
+    notice(`Update available: ${latest}`, "Download it, replace the files in your Priism Skins folder, then click the reload arrow on its card in chrome://extensions. Your settings are kept.",
       "Download", `${RELEASES}/latest`);
   }
 }
@@ -876,8 +973,9 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncCharts(); syncEffects();
   siteBar();
+  detectCharts();
   updates();
   const q = new URLSearchParams(location.search);
   if (q.get("page")) {

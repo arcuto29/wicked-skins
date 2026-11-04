@@ -37,13 +37,15 @@
     setInterval(() => {
       try {
         g.clearRect(0, 0, 32, 18); g.drawImage(el, 0, 0, 32, 18);
-        const d = g.getImageData(0, 0, 32, 18).data; let sum = 0, sq = 0, n = 0; const prof = new Array(18).fill(0);
+        const d = g.getImageData(0, 0, 32, 18).data; let sum = 0, sq = 0, n = 0; const prof = new Array(18).fill(0), grid = [];
         for (let i = 0; i < d.length; i += 4) {
           const l = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; sum += l; sq += l * l; n++;
+          grid.push(Math.round(l * 1000) / 1000);
           if ((i / 4) % 32 >= 27) prof[Math.floor(i / 4 / 32)] += l / 5;
         }
         const mean = sum / n;
-        parent.postMessage({ __wicked: "lum", mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), prof }, "*");
+        // grid = 32x18 brightness map, so the page can work out what's behind each chart's price scale
+        parent.postMessage({ __wicked: "lum", mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), prof, grid }, "*");
       } catch {}
     }, 1500);
   } catch (err) {

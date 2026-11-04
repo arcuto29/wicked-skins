@@ -1,4 +1,4 @@
--- Wicked Skins Workshop: community wallpapers.
+-- Priism Skins Workshop: community wallpapers.
 -- Run once in your Supabase project: Dashboard -> SQL Editor -> paste this file -> Run.
 -- Safe to re-run (uses "if not exists" / "or replace").
 --

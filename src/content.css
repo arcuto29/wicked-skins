@@ -9,6 +9,12 @@
   background: #000;
 }
 #bd-layer.bd-over { z-index: 2147483000; background: transparent; }
+/* One tile per wallpaper: the whole screen, or one per chart in a multi-chart layout */
+#bd-layer .bd-tile { position: absolute; overflow: hidden; }
+#bd-layer.bd-tiled { background: var(--bd-page-bg, #131722); }
+#bd-layer.bd-tiled.bd-over { background: transparent; }
+#bd-layer.bd-tiled .bd-tile { background: #000; }
+#bd-layer.bd-tiled.bd-over .bd-tile { background: transparent; }
 #bd-layer.bd-over .bd-dim { display: none; }
 #bd-layer canvas,
 #bd-layer video,
@@ -92,3 +98,26 @@ html.bd-on.bd-scale-glass .chart-markup-table.time-axis {
 }
 html.bd-on.bd-scale-glass .chart-markup-table.price-axis-container { box-shadow: inset 1px 0 0 rgba(255,255,255,.07); }
 html.bd-on.bd-scale-glass .chart-markup-table.time-axis { box-shadow: inset 0 1px 0 rgba(255,255,255,.07); }
+
+/* "Show chart numbers" */
+.bd-num { position: fixed; z-index: 2147483002; pointer-events: none; display: flex; align-items: center; justify-content: center;
+  font: 800 72px system-ui, sans-serif; color: rgba(255,255,255,.9); text-shadow: 0 2px 14px rgba(0,0,0,.8);
+  background: rgba(8,11,18,.35); outline: 2px solid rgba(46,242,176,.55); outline-offset: -2px; animation: bd-flash 1.8s ease-out forwards; }
+.bd-num.bd-num-on { color: #c6ff3d; background: rgba(46,242,176,.16); outline: 3px solid #2ef2b0; }
+
+/* Price light: a soft glow in the wallpaper behind the live price */
+#bd-layer .bd-plight { position: absolute; overflow: hidden; pointer-events: none; mix-blend-mode: screen; }
+#bd-layer .bd-plight i { position: absolute; left: -10%; right: -10%; top: var(--y); height: var(--h); transform: translateY(-50%);
+  background: radial-gradient(ellipse 55% 50% at 70% 50%, color-mix(in srgb, var(--c) 26%, transparent), transparent 72%);
+  transition: top .9s cubic-bezier(.2,.7,.2,1), background 1.2s ease; }
+/* Trade effects: behind the candles, gone in under 2s */
+#bd-layer .bd-tradefx { position: absolute; overflow: hidden; pointer-events: none; }
+#bd-layer .bd-tradefx canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#bd-layer .bd-tradefx::before { content: ""; position: absolute; inset: 0; opacity: 0; animation: bd-tradeglow var(--dur) ease-out forwards; }
+#bd-layer .bd-win::before { background: radial-gradient(ellipse 80% 55% at 50% 100%, color-mix(in srgb, var(--c) 34%, transparent), transparent 70%); }
+#bd-layer .bd-loss::before { background: radial-gradient(ellipse at center, transparent 55%, color-mix(in srgb, var(--c) 22%, transparent) 100%); }
+#bd-layer .bd-tradefx b { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font: 800 46px system-ui, sans-serif;
+  letter-spacing: .01em; color: var(--c); opacity: 0; text-shadow: 0 0 24px var(--c); animation: bd-tradelbl var(--dur) ease-out forwards; }
+#bd-layer .bd-loss b { color: rgba(220,225,235,.75); text-shadow: none; font-size: 38px; }
+@keyframes bd-tradeglow { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes bd-tradelbl { 0% { opacity: 0; transform: translate(-50%, -30%); } 18% { opacity: .9; } 100% { opacity: 0; transform: translate(-50%, -95%); } }

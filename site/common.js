@@ -11,6 +11,15 @@
     ${S.contactEmail ? `<a href="mailto:${S.contactEmail}">Contact</a>` : ""}
     <span style="margin-left:auto">Cosmetic only. Not affiliated with, endorsed or sponsored by TradingView, Inc. Not financial advice.</span>
   </div></footer>`);
+  // Arriving from the "confirm your email" link: say so, and clean the address bar.
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("type") === "signup" || h.get("type") === "email_change" || (h.get("access_token") && !/reset\.html$/.test(location.pathname))) {
+    document.querySelector("header.top").insertAdjacentHTML("afterend", `<div style="background:#0f2b26;color:#2ef2b0;text-align:center;padding:12px;font-weight:700">Email confirmed. Now sign in from the extension: Workshop › Sign in.</div>`);
+    history.replaceState(null, "", location.pathname);
+  } else if (h.get("error_description")) {
+    document.querySelector("header.top").insertAdjacentHTML("afterend", `<div style="background:#2b0f14;color:#ff8a9a;text-align:center;padding:12px">${h.get("error_description").replace(/[<>&]/g, "")}</div>`);
+    history.replaceState(null, "", location.pathname);
+  }
   document.querySelectorAll("[data-chrome]").forEach((a) => { a.href = S.chromeStoreUrl || S.releasesUrl; if (!S.chromeStoreUrl) a.querySelector("small") && (a.querySelector("small").textContent = "Coming to the Chrome Web Store. Download the zip for now"); });
   document.querySelectorAll("[data-releases]").forEach((a) => (a.href = S.releasesUrl));
   document.querySelectorAll("[data-contact]").forEach((el) => (el.textContent = S.contactEmail || "the contact email listed on this site"));

@@ -33,7 +33,7 @@ async function inject() {
 
 function createTV() {
   tvWin = new BrowserWindow({
-    width: 1440, height: 900, backgroundColor: "#000000", icon: ICON, title: "Wicked Skins",
+    width: 1440, height: 900, backgroundColor: "#000000", icon: ICON, title: "Priism Skins",
     webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, "tv-preload.js") }, // no node access for remote content
   });
   tvWin.loadURL("https://www.tradingview.com/chart/");
@@ -46,7 +46,7 @@ function createTV() {
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) return settingsWin.focus();
   settingsWin = new BrowserWindow({
-    width: 420, height: 640, title: "Wicked Skins", icon: ICON, autoHideMenuBar: true, resizable: false,
+    width: 420, height: 640, title: "Priism Skins", icon: ICON, autoHideMenuBar: true, resizable: false,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: false },
   });
   settingsWin.loadFile(POPUP);
@@ -72,7 +72,7 @@ function setupUpdates() {
   updater.autoInstallOnAppQuit = true;
   updater.on("update-downloaded", (info) => {
     dialog.showMessageBox({ type: "info", buttons: ["Restart now", "Later"], defaultId: 0,
-      message: `Wicked Skins ${info.version} is ready`, detail: "It will be installed when you restart the app." })
+      message: `Priism Skins ${info.version} is ready`, detail: "It will be installed when you restart the app." })
       .then(({ response }) => { if (response === 0) updater.quitAndInstall(); });
   });
   updater.on("error", () => {}); // offline etc.: try again next time
@@ -98,7 +98,7 @@ app.whenReady().then(() => {
     cb({ responseHeaders: h });
   });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    { label: "Wicked Skins", submenu: [
+    { label: "Priism Skins", submenu: [
       { label: "Skins & wallpapers…", accelerator: "CmdOrCtrl+,", click: openSettings },
       { label: "Check for updates…", click: checkNow },
       { label: `Version ${app.getVersion()}`, enabled: false },
