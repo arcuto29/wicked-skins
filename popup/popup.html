@@ -93,24 +93,12 @@
         <p class="hint">Add your Supabase project to <code>src/workshop-config.js</code> (see WORKSHOP.md).</p>
       </div>
       <div id="wsOn">
-        <div class="box ws-account">
-          <div id="wsWho"></div>
-          <button id="wsSignBtn"></button>
-        </div>
-        <div id="wsAuth" class="box" hidden>
-          <button id="wsGoogle" class="google"><svg viewBox="0 0 18 18" width="16" height="16" aria-hidden="true"><path fill="#4285F4" d="M17.6 9.2c0-.6-.1-1.2-.2-1.7H9v3.3h4.8a4.1 4.1 0 0 1-1.8 2.7v2.2h2.9c1.7-1.6 2.7-3.9 2.7-6.5z"/><path fill="#34A853" d="M9 18c2.4 0 4.5-.8 6-2.2l-2.9-2.2c-.8.5-1.8.9-3.1.9-2.4 0-4.4-1.6-5.1-3.8H.9v2.3A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.9 10.7a5.4 5.4 0 0 1 0-3.4V5H.9a9 9 0 0 0 0 8z"/><path fill="#EA4335" d="M9 3.6c1.3 0 2.5.5 3.5 1.4l2.6-2.6A9 9 0 0 0 .9 5l3 2.3C4.6 5.2 6.6 3.6 9 3.6z"/></svg> Continue with Google</button>
-          <div class="ws-or">or</div>
-          <input id="wsEmail" class="field" type="email" placeholder="Email" autocomplete="email" />
-          <input id="wsPass" class="field" type="password" placeholder="Password (8+ characters)" autocomplete="current-password" />
-          <div class="inline"><button id="wsSignIn" class="primary">Sign in</button><button id="wsSignUp">Create account</button></div>
-          <button id="wsForgot" class="link">Forgot password? Email me a reset link</button>
-          <p class="hint" id="wsAuthMsg"></p>
-        </div>
         <div class="chips" id="wsTabs"></div>
         <p class="hint" id="wsMsg"></p>
         <div class="cards" id="wsCards"></div>
         <button id="wsMore" class="link" hidden>Load more</button>
-        <p class="hint">Community wallpapers. Uploads are reviewed before they appear. Report anything that breaks the rules or isn't the uploader's to share.</p>
+        <a id="wsSubmit" class="btn block" target="_blank" rel="noopener">Submit your wallpaper on the website ›</a>
+        <p class="hint">Browse and use community wallpapers, no account needed. To <b>share</b> your own, sign in on the website — uploads are reviewed before they appear. Spot something that breaks the rules? <a id="wsReportLink" href="#" target="_blank" rel="noopener">Report it</a>.</p>
       </div>
     </section>
 
@@ -173,16 +161,6 @@
       <button id="reset" class="link">Reset adjustments</button>
     </section>
 
-    <div id="shareDlg" class="modal" hidden>
-      <div class="box">
-        <b>Share to the Workshop</b>
-        <p class="hint" id="shareWhat"></p>
-        <input id="shareTitle" class="field" maxlength="60" placeholder="Title" />
-        <label class="hint"><input type="checkbox" id="shareRights" /> I made this, or I have the rights to share it.</label>
-        <div class="inline"><button id="shareGo" class="primary" disabled>Share</button><button id="shareCancel">Cancel</button></div>
-        <p class="hint" id="shareMsg"></p>
-      </div>
-    </div>
     <div id="toast" hidden><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
     <p class="legal">Tip: <b>Alt+Shift+W</b> on the chart turns everything on/off. Cosmetic only. Not affiliated with TradingView, Inc.</p>
   </main>

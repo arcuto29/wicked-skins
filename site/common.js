@@ -14,7 +14,7 @@
   // Arriving from the "confirm your email" link: say so, and clean the address bar.
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get("type") === "signup" || h.get("type") === "email_change" || (h.get("access_token") && !/reset\.html$/.test(location.pathname))) {
-    document.querySelector("header.top").insertAdjacentHTML("afterend", `<div style="background:#0f2b26;color:#2ef2b0;text-align:center;padding:12px;font-weight:700">Email confirmed. Now sign in from the extension: Workshop › Sign in.</div>`);
+    document.querySelector("header.top").insertAdjacentHTML("afterend", `<div style="background:#0f2b26;color:#2ef2b0;text-align:center;padding:12px;font-weight:700">Email confirmed — you're signed in. Head to the <a href="workshop.html#submit" style="color:#fff">Workshop</a> to share a wallpaper.</div>`);
     history.replaceState(null, "", location.pathname);
   } else if (h.get("error_description")) {
     document.querySelector("header.top").insertAdjacentHTML("afterend", `<div style="background:#2b0f14;color:#ff8a9a;text-align:center;padding:12px">${h.get("error_description").replace(/[<>&]/g, "")}</div>`);
