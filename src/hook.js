@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 2;
+  const HOOK_VERSION = 3;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -24,7 +24,7 @@
       const f = document.createElement("iframe"); f.style.display = "none";
       (document.documentElement || document.head || document.body).appendChild(f);
       const N = f.contentWindow.CanvasRenderingContext2D.prototype, P = CanvasRenderingContext2D.prototype;
-      for (const m of ["fillText", "fillRect", "stroke", "beginPath", "moveTo", "lineTo", "strokeRect"]) P[m] = N[m];
+      for (const m of ["fillText", "fillRect", "fill", "stroke", "beginPath", "moveTo", "lineTo", "strokeRect"]) P[m] = N[m];
       for (const prop of ["fillStyle", "strokeStyle"]) Object.defineProperty(P, prop, Object.getOwnPropertyDescriptor(N, prop));
       f.remove();
     } catch {}
@@ -336,6 +336,7 @@
 
   // ---------- light theme: lighten dark text on dark skins ----------
   const origText = proto.fillText;
+  const origMeasure = proto.measureText;
   const darkCache = new Map();
   const scratch = document.createElement("canvas").getContext("2d");
   function isDark(style) {
@@ -407,9 +408,32 @@
   proto.fillText = function (...a) {
     const c = this.canvas;
     notePnl(a[0], c);
+    // Live-price tags (and other price boxes): same font/weight/size as the scale, text kept inside its box.
+    const tagsRecoloured = candles && fx.scaleLabels;
+    if (on && c && isAxis(c) && !isScaleLabel(this.fillStyle) && (tagsRecoloured || fx.scaleFont !== "default" || fx.scaleSize > 0 || fx.scaleBold)) {
+      const pFont = this.font, pF = this.fillStyle, w0 = origMeasure.call(this, String(a[0])).width;
+      const nf = styledFont(pFont);
+      if (nf !== pFont) { this.font = nf; if (a[3] === undefined && w0 > 0) a[3] = w0 * 1.06; }
+      // text on a recoloured tag: dark on bright tags, white on dark ones
+      const tag = tagsRecoloured && lastTag.get(this), r = tag && rgbKey(tag);
+      if (r) {
+        const [R, G, B] = r.key.split(",").map((n) => { n /= 255; return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); });
+        const L = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+        this.fillStyle = L > 0.36 ? "#06110d" : "#ffffff";
+      }
+      origText.apply(this, a);
+      this.font = pFont; this.fillStyle = pF;
+      return;
+    }
     if (on && c && isAxis(c) && scaleStyled() && isScaleLabel(this.fillStyle)) {
       const pF = this.fillStyle, pFont = this.font, pSB = this.shadowBlur, pSC = this.shadowColor;
       const tone = autoOn() ? toneAt(this, a[2]) : null;
+      // a bigger or wider font must still fit the scale: give the text the room that's actually there
+      if (a[3] === undefined && (fx.scaleSize > 0 || fx.scaleFont !== "default" || fx.scaleBold)) {
+        const w0 = origMeasure.call(this, String(a[0])).width, sx = this.getTransform().a || 1;
+        const room = this.textAlign === "left" || this.textAlign === "start" ? c.width / sx - (a[1] || 0) - 3 : w0 * 1.06;
+        a[3] = Math.max(w0, room);
+      }
       if (fx.scaleText) this.fillStyle = fx.scaleText;
       else if (tone) this.fillStyle = AUTO_TEXT[tone];
       const nf = styledFont(pFont); if (nf !== pFont) this.font = nf;
@@ -454,6 +478,25 @@
     return v;
   }
 
+  // ---------- price tags glow with the scale glow ----------
+  const origFillPath = proto.fill;
+  const lastTag = new WeakMap();   // colour of the last price box drawn on each scale canvas
+  proto.fill = function (...a) {
+    const c = this.canvas;
+    if (on && c && isAxis(c)) lastTag.set(this, this.fillStyle);
+    if (on && c && fx.scaleGlow > 0 && isAxis(c)) {
+      const col = this.fillStyle;
+      if (typeof col === "string" && glowable(col)) {
+        const sb = this.shadowBlur, sc = this.shadowColor;
+        this.shadowColor = col; this.shadowBlur = 3 + fx.scaleGlow * 16;
+        origFillPath.apply(this, a);
+        this.shadowBlur = sb; this.shadowColor = sc;
+        return;
+      }
+    }
+    return origFillPath.apply(this, a);
+  };
+
   // ---------- fillRect: transparent pane background + candle looks / glow ----------
   const origFill = proto.fillRect;
   proto.fillRect = function (x, y, w, h) {
@@ -463,18 +506,7 @@
       const s = this.getTransform().a || 1;
       // covers (nearly) the whole canvas => it's the pane background
       if (w * s >= c.width * 0.98 && h * s >= c.height * 0.98 && inChart(c)) {
-        if (isAxis(c)) {
-          if (fx.scaleBg === "default") return origFill.call(this, x, y, w, h);   // TradingView's own background
-          this.clearRect(x, y, w, h);
-          const glass = fx.scaleBg === "glass" || (fx.scaleBg === "auto" && fx.busy && autoOn());
-          if (glass || fx.scaleBg === "color") {                                  // frosted strip, or your colour
-            const pf = this.fillStyle;
-            if (fx.scaleBg === "color") { const [r, g, b] = hexToRgb(fx.scaleBgColor); this.fillStyle = `rgba(${r},${g},${b},0.82)`; }
-            else this.fillStyle = fx.bg === "light" && !fx.scaleText ? "rgba(255,255,255,0.55)" : "rgba(8,10,18,0.55)";
-            origFill.call(this, x, y, w, h); this.fillStyle = pf;
-          }
-          return;
-        }
+        if (isAxis(c)) return this.clearRect(x, y, w, h);   // backing is drawn by CSS (frosted glass) behind the scale
         return this.clearRect(x, y, w, h);
       }
     }
