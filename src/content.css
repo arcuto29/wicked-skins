@@ -20,7 +20,8 @@
   height: 100%;
   object-fit: cover;
 }
-#bd-layer .bd-dim { position: absolute; inset: 0; background: #000; }
+#bd-layer .bd-dim { position: absolute; inset: 0; background: #000; transition: opacity .5s; }
+#bd-layer .bd-vignette { position: absolute; inset: 0; pointer-events: none; }
 #bd-layer .bd-react { position: absolute; inset: 0; opacity: 0; transition: opacity .8s, box-shadow .8s, background .8s; pointer-events: none; }
 #bd-layer .bd-react.bd-pulse::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 90px 30px var(--bd-pulse); animation: bd-pulse .9s ease-out forwards; }
 @keyframes bd-pulse { from { opacity: .9; } to { opacity: 0; } }
@@ -65,11 +66,14 @@ html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="valueValue
 html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="valueTitle"] { text-shadow: 0 0 3px rgba(255,255,255,.9); }
 #bd-layer iframe { border: 0; background: transparent; }
 
-/* User watermark (over the chart, click-through) */
-#bd-wm { position: fixed; z-index: 2147483001; pointer-events: none; display: flex; align-items: center; gap: .45em;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight: 800; letter-spacing: .02em; white-space: nowrap;
-  text-shadow: 0 1px 3px rgba(0,0,0,.55); user-select: none; }
-#bd-wm img { display: block; width: auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+/* Watermark: logo + name, over the chart, click-through */
+#bd-wm { position: fixed; z-index: 2147483001; pointer-events: none; display: flex; align-items: center; gap: 7px; opacity: .85;
+  font: 800 15px system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .02em; white-space: nowrap; user-select: none;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+#bd-wm img { display: block; width: 22px; height: 22px; }
+#bd-wm span { background: linear-gradient(90deg, #19d3ff, #2ef2b0 55%, #c6ff3d); -webkit-background-clip: text; background-clip: text; color: transparent; }
+#bd-wm.bd-wm-center { font-size: 34px; gap: 14px; opacity: .55; }
+#bd-wm.bd-wm-center img { width: 48px; height: 48px; }
 
 /* "Shift" candle look: the chart's main canvas (candles, volume, indicators) cycles through colours.
    First canvas in each pane is the main layer; the second (crosshair) is left alone. */

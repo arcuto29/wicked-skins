@@ -8,17 +8,18 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleLabels","react","reactStrength"];
+const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
   fps: "auto", fit: "cover", posX: 50, posY: 50,
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
-  react: "off", reactStrength: 0.6, pnlSide: "long", pnlEntry: 0, pnlSymbol: "",
-  wmOn: false, wmText: "", wmImage: null, wmPos: "br", wmSize: 1, wmOpacity: 0.6, wmColor: "#ffffff",
+  react: "off", reactStrength: 0.6,
+  wmOn: false, wmPos: "br", vignette: 0, calm: false,
   candleLook: "solid", shiftSpeed: 10,
-  lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleLabels: false,
+  lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
+  scaleSize: 0, scaleFont: "default",
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -57,7 +58,7 @@ function renderSkins() {
     previews.push({ skin, t: 0 });
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span><div class="label">${esc(s.name)}</div>`);
-    card.onclick = () => { set({ skin: id }); renderSkins(); renderMedia(); };
+    card.onclick = () => { set({ skin: id }); renderSkins(); renderMedia(); syncTune(); };
     $("skinCards").appendChild(card);
   }
 }
@@ -116,10 +117,15 @@ function renderCandles() {
   $("shiftSpeed").value = cfg.shiftSpeed; $("shiftSpeedOut").textContent = cfg.shiftSpeed + "s";
   $("lookHint").textContent = LOOK_HINT[cfg.candleLook] || "";
   $("lineGlow").value = cfg.lineGlow; $("lineGlowOut").textContent = Math.round(cfg.lineGlow * 100) + "%";
-  $("scaleTextOn").checked = !!cfg.scaleText; $("scaleText").value = cfg.scaleText || "#e8eaf0";
+  seg("scaleTextMode", [["auto", "Auto"], ["custom", "Custom"]], () => (cfg.scaleText ? "custom" : "auto"),
+    (v) => { set({ scaleText: v === "custom" ? $("scaleText").value : "" }); renderCandles(); });
+  $("scaleText").value = cfg.scaleText || "#e9ebf2"; $("scaleText").hidden = !cfg.scaleText;
+  seg("scaleSize", [[0, "Normal"], [1, "Large"], [2, "XL"]], () => cfg.scaleSize, (v) => set({ scaleSize: v }));
+  seg("scaleFont", [["default", "Default"], ["mono", "Mono"], ["rounded", "Rounded"]], () => cfg.scaleFont, (v) => set({ scaleFont: v }));
+  $("scaleBgColor").value = cfg.scaleBgColor || "#0b1320"; $("scaleBgColor").hidden = cfg.scaleBg !== "color";
   $("scaleGlow").value = cfg.scaleGlow; $("scaleGlowOut").textContent = Math.round(cfg.scaleGlow * 100) + "%";
   seg("scaleBold", [[false, "Regular"], [true, "Bold"]], () => cfg.scaleBold, (v) => set({ scaleBold: v }));
-  seg("scaleBg", [["auto", "Auto"], ["clear", "Clear"], ["glass", "Glass"], ["default", "TV"]], () => cfg.scaleBg, (v) => set({ scaleBg: v }));
+  seg("scaleBg", [["auto", "Auto"], ["glass", "Glass"], ["color", "Colour"], ["default", "TV"]], () => (cfg.scaleBg === "clear" ? "auto" : cfg.scaleBg), (v) => { set({ scaleBg: v }); renderCandles(); });
   seg("scaleLabels", [[false, "Original"], [true, "Candle"]], () => cfg.scaleLabels, (v) => set({ scaleLabels: v }));
   $("candleGlow").value = cfg.candleGlow; $("candleGlowOut").textContent = Math.round(cfg.candleGlow * 100) + "%";
   $("candleUp").value = cfg.candleUp; $("candleDown").value = cfg.candleDown;
@@ -151,8 +157,8 @@ $("candleOn").onchange = (e) => set({ candleOn: e.target.checked });
 $("shiftSpeed").oninput = (e) => { set({ shiftSpeed: +e.target.value }); $("shiftSpeedOut").textContent = e.target.value + "s"; };
 $("lineGlow").oninput = (e) => { set({ lineGlow: +e.target.value }); $("lineGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("scaleGlow").oninput = (e) => { set({ scaleGlow: +e.target.value }); $("scaleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
-$("scaleText").oninput = (e) => { set({ scaleText: e.target.value }); $("scaleTextOn").checked = true; };
-$("scaleTextOn").onchange = (e) => set({ scaleText: e.target.checked ? $("scaleText").value : "" });
+$("scaleText").oninput = (e) => set({ scaleText: e.target.value });
+$("scaleBgColor").oninput = (e) => set({ scaleBgColor: e.target.value });
 $("candleGlow").oninput = (e) => { set({ candleGlow: +e.target.value }); $("candleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("candleUp").oninput = (e) => { set({ candleUp: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
 $("candleDown").oninput = (e) => { set({ candleDown: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
@@ -247,7 +253,7 @@ function renderMedia() {
         if (m.file && window.WickedMediaDB) WickedMediaDB.del(m.id).catch(() => {});
         set(wasActive ? { media, skin: "aurora", mediaId: null } : { media });
       } else if (!m.pending) set({ skin: "media", mediaId: m.id });
-      renderMedia(); renderSkins();
+      renderMedia(); renderSkins(); syncTune();
     };
     box.appendChild(card);
   });
@@ -527,6 +533,7 @@ const SLIDERS = [
   ["vividness", "Saturation", 0, 2, 0.05, (v) => Math.round(v * 100) + "%"],
   ["tint", "Hue", 0, 360, 5, (v) => (v ? v + "°" : "Off")],
   ["speed", "Speed", 0.25, 3, 0.05, (v) => v.toFixed(1) + "×"],
+  ["vignette", "Vignette", 0, 1, 0.05, (v) => (v ? Math.round(v * 100) + "%" : "Off")],
   ["posX", "Horizontal", 0, 100, 1, (v) => (v === 50 ? "Middle" : v + "%")],
   ["posY", "Vertical", 0, 100, 1, (v) => (v === 50 ? "Middle" : v + "%")],
 ];
@@ -543,6 +550,10 @@ function seg(id, options, get, onPick) {
 function syncTune() {
   $("sliders").innerHTML = "";
   SLIDERS.forEach(([key, label, min, max, step, fmt]) => {
+    // only show what matters right now
+    if ((key === "posX" || key === "posY") && cfg.skin !== "media") return;
+    if (key === "overOpacity" && cfg.layer !== "over") return;
+    if (key === "opacity" && cfg.layer === "over") return;
     const row = document.createElement("div"); row.className = "row";
     row.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
     const inp = row.querySelector("input"), out = row.querySelector("output");
@@ -551,60 +562,39 @@ function syncTune() {
     inp.ondblclick = () => { inp.value = DEFAULTS[key]; inp.oninput(); }; // double-click resets
     $("sliders").appendChild(row);
   });
-  seg("fps", [["auto", "Auto"], [20, "20"], [30, "30"], [60, "60"]], () => cfg.fps, (v) => set({ fps: v }));
+  document.querySelectorAll("[data-only=media]").forEach((el) => (el.hidden = cfg.skin !== "media"));
+  seg("smooth", [["eco", "Eco"], ["balanced", "Balanced"], ["smooth", "Smooth"]],
+    () => (cfg.powerSaver ? "eco" : String(cfg.fps) === "60" || cfg.fps === "auto" ? "smooth" : "balanced"),
+    (v) => set(v === "eco" ? { powerSaver: true, fps: 30 } : v === "balanced" ? { powerSaver: false, fps: 30 } : { powerSaver: false, fps: 60 }));
   seg("fit", [["cover", "Cover"], ["fit", "Contain"], ["stretch", "Stretch"]], () => cfg.fit, (v) => set({ fit: v }));
-  seg("powerSaver", [[false, "Off"], [true, "On"]], () => cfg.powerSaver, (v) => set({ powerSaver: v }));
-  seg("motion", [[false, "Play"], [true, "Pause"]], () => cfg.paused, (v) => set({ paused: v }));
-  seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => set({ layer: v }));
+  seg("calm", [[false, "Off"], [true, "On"]], () => cfg.calm, (v) => set({ calm: v }));
+  seg("motion", [[false, "On"], [true, "Paused"]], () => cfg.paused, (v) => set({ paused: v }));
+  seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => { set({ layer: v }); syncTune(); });
   seg("react", [["off", "Off"], ["market", "Price"], ["pnl", "Position"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
-  seg("pnlSide", [["long", "Long"], ["short", "Short"]], () => cfg.pnlSide, (v) => set({ pnlSide: v }));
   syncReact();
 }
 function syncReact() {
   $("reactOpts").hidden = cfg.react === "off";
-  $("pnlOpts").hidden = cfg.react !== "pnl";
+
   $("reactStrength").value = cfg.reactStrength;
   $("reactStrengthOut").textContent = Math.round(cfg.reactStrength * 100) + "%";
-  $("pnlEntry").value = cfg.pnlEntry || "";
-  $("pnlSymbol").value = cfg.pnlSymbol;
+
   $("reactHint").textContent = cfg.react === "market"
     ? "Chart edges glow green/red with the day's move and pulse on every tick. Skins speed up when price moves."
-    : "Glows with your P&L from the entry you type here, worked out on your computer. Never reads your account or positions.";
+    : "Glows green/red with the open P&L shown on your chart's position line (broker, prop platform or paper trading). Nothing is sent anywhere.";
 }
 $("reactStrength").oninput = (e) => { set({ reactStrength: +e.target.value }); $("reactStrengthOut").textContent = Math.round(+e.target.value * 100) + "%"; };
-$("pnlEntry").oninput = (e) => set({ pnlEntry: +e.target.value || 0 });
-$("pnlSymbol").oninput = (e) => set({ pnlSymbol: e.target.value.trim() });
-// ---------- watermark ----------
-const WM_MAX_KB = 1024;
+
+// ---------- watermark (logo + name) ----------
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
-  $("wmText").value = cfg.wmText || "";
-  $("wmSize").value = cfg.wmSize; $("wmSizeOut").textContent = (+cfg.wmSize).toFixed(1) + "×";
-  $("wmOpacity").value = cfg.wmOpacity; $("wmOpacityOut").textContent = Math.round(cfg.wmOpacity * 100) + "%";
-  $("wmColor").value = cfg.wmColor || "#ffffff";
-  $("wmPreview").style.display = $("wmClear").style.display = cfg.wmImage ? "" : "none";
-  if (cfg.wmImage) $("wmPreview").src = cfg.wmImage;
-  seg("wmPos", [["tl", cornerIcon(2.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["center", cornerIcon(5.5, 4.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]], () => cfg.wmPos, (v) => set({ wmPos: v }));
+  seg("wmPos", [["tl", cornerIcon(2.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["center", cornerIcon(5.5, 4.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]],
+    () => cfg.wmPos, (v) => set({ wmPos: v, wmOn: true }));
 }
-// Typing or adding a logo turns the watermark on, so it's obvious where it went.
 $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
-$("wmText").oninput = (e) => { set({ wmText: e.target.value, ...(e.target.value.trim() && !cfg.wmOn ? { wmOn: true } : {}) }); $("wmOn").checked = cfg.wmOn; };
-$("wmSize").oninput = (e) => { set({ wmSize: +e.target.value }); $("wmSizeOut").textContent = (+e.target.value).toFixed(1) + "×"; };
-$("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
-$("wmColor").oninput = (e) => set({ wmColor: e.target.value });
-$("wmClear").onclick = () => { set({ wmImage: null }); syncWatermark(); };
-$("wmFile").onchange = async (e) => {
-  const f = e.target.files[0]; e.target.value = "";
-  if (!f) return;
-  if (f.size > WM_MAX_KB * 1024) { $("wmHint").textContent = `That logo is over ${WM_MAX_KB / 1024} MB. Use a smaller PNG or SVG.`; return; }
-  const src = await readAsDataURL(f);
-  const ok = await new Promise((r) => { const i = new Image(); i.onload = () => r(i.naturalWidth > 0); i.onerror = () => r(false); i.src = src; });
-  if (!ok) { $("wmHint").textContent = "That file can't be shown as an image. Try PNG, JPG, WebP or SVG."; return; }
-  set({ wmImage: src, wmOn: true }); syncWatermark();
-};
 
-const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength"];
-const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleLabels"];
+const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength","vignette","calm"];
+const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
 
@@ -679,6 +669,14 @@ async function updates() {
   if (!EXT_MODE || IS_TAB) return;
   const me = chrome.runtime.getManifest().version;
   if (window.WickedMigrate) await WickedMigrate.run().catch(() => {});
+  // Another copy of the extension drew on a chart recently (content.js reports it).
+  const { dupSeen } = await chrome.storage.local.get("dupSeen");
+  if (dupSeen && Date.now() - dupSeen < 3 * 86400e3) {
+    notice("Two copies of Wicked Skins are installed", `Remove the older one so they don't fight (keep version ${me}). It's under chrome://extensions.`,
+      "Open extensions", "#", () => chrome.storage.local.remove("dupSeen"));
+    $("noticeLink").onclick = (e) => { e.preventDefault(); chrome.tabs.create({ url: "chrome://extensions" }); };
+    return;
+  }
   const { justUpdated } = await chrome.storage.local.get("justUpdated");
   if (justUpdated && justUpdated.to === me) {
     return notice(`Updated to ${me}`, "New features and fixes are live.", "What's new", `${RELEASES}/tag/v${me}`,

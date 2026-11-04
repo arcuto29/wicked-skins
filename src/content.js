@@ -16,13 +16,12 @@
     // Behaviour: react to the market / your own P&L (entry typed in by the user; never reads the account)
     react: "off",          // "off" | "market" | "pnl"
     reactStrength: 0.6,
-    pnlSide: "long",       // "long" | "short"
-    pnlEntry: 0,
-    pnlSymbol: "",         // optional: only react on this symbol (e.g. "BTCUSDT")
     // Watermark: your own text and/or logo on the chart (for screenshots / streams)
-    wmOn: false, wmText: "", wmImage: null, wmPos: "br", wmSize: 1, wmOpacity: 0.6, wmColor: "#ffffff",
+    wmOn: false, wmPos: "br",             // watermark: the Wicked Skins logo + name
+    vignette: 0, calm: false,            // darker edges; dim + slow down while your cursor is on the chart
     // Glow on indicators / lines / P&L, and price scale styling
-    lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleLabels: false,
+    lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
+    scaleSize: 0, scaleFont: "default",
   };
 
   let cfg = { ...DEFAULTS };
@@ -55,23 +54,32 @@
   const upColor = () => (cfg.candleOn ? cfg.candleUp : "#00e08a");
   const downColor = () => (cfg.candleOn ? cfg.candleDown : "#ff3355");
 
-  function pnlPct(q) {
-    const entry = +cfg.pnlEntry;
-    if (!entry || !q) return null;
-    if (cfg.pnlSymbol && cfg.pnlSymbol.trim().toUpperCase() !== q.sym.toUpperCase()) return null;
-    return ((q.price - entry) / entry) * 100 * (cfg.pnlSide === "short" ? -1 : 1);
+  // Position: the open P&L TradingView already shows on your chart's position line(s), read by hook.js.
+  // Strength is relative to the biggest swing seen this session, so there's nothing to set up.
+  let pnlMaxAbs = 0;
+  function readPnl() {
+    try {
+      const p = JSON.parse(document.documentElement.getAttribute("data-ws-pnl") || "null");
+      if (!p || Date.now() - p.ts > 5000) return null;          // no position line drawn recently
+      pnlMaxAbs = Math.max(pnlMaxAbs * 0.999, Math.abs(p.v), 1);
+      return p;
+    } catch { return null; }
   }
 
   function updateReact(tick) {
     if (!reactEl) return;
-    let active = cfg.react !== "off" && !!quote;
+    let active = cfg.react !== "off" && (!!quote || cfg.react === "pnl");
     let label = "";
     if (!active) mood = 0;
     else if (cfg.react === "market") { mood = clamp(quote.chg / 2); }          // ±2% day move = full
     else {
-      const p = pnlPct(quote);
-      if (p === null) { active = false; mood = 0; }                              // no entry / other symbol
-      else { mood = clamp(p / 1); label = `P&L ${p >= 0 ? "+" : ""}${p.toFixed(2)}%`; } // ±1% = full
+      const p = readPnl();
+      if (!p) { active = false; mood = 0; }                                       // no open position on the chart
+      else {
+        mood = clamp(p.v / pnlMaxAbs);
+        const unit = p.unit && p.unit.length === 1 ? p.unit : "", code = p.unit && p.unit.length > 1 ? " " + p.unit : "";
+        label = `P&L ${p.v >= 0 ? "+" : "\u2212"}${unit}${Math.abs(p.v).toFixed(2)}${code}`;
+      }
     }
     const col = mood >= 0 ? upColor() : downColor();
     const k = Math.abs(mood) * cfg.reactStrength;
@@ -99,11 +107,14 @@
     if (!q) return;
     let tick = 0;
     if (lastPrice !== null && quote && q.sym === quote.sym && q.price !== lastPrice) {
-      tick = cfg.react === "pnl" && cfg.pnlSide === "short" ? (q.price < lastPrice ? 1 : -1) : (q.price > lastPrice ? 1 : -1);
+      tick = q.price > lastPrice ? 1 : -1;
     }
     quote = q; lastPrice = q.price;
     updateReact(tick);
   }
+  new MutationObserver(() => { if (cfg.react === "pnl") updateReact(0); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ["data-ws-pnl"] });
+  setInterval(() => { if (cfg.react === "pnl") updateReact(0); }, 2000);     // clears the glow when the position closes
   const watchTitle = () => {
     const t = document.querySelector("title");
     if (!t) return setTimeout(watchTitle, 1000);
@@ -116,6 +127,18 @@
   let repaintTimer;
   const repaint = () => { clearTimeout(repaintTimer); repaintTimer = setTimeout(() => document.dispatchEvent(new Event("bd-repaint")), 60); };
 
+  // Calm while working: when your cursor is on the chart the wallpaper dims and slows down.
+  let calmActive = false;
+  addEventListener("mousemove", (e) => {
+    if (!cfg.calm || !layer) { if (calmActive) { calmActive = false; applyLook(); } return; }
+    const el = document.querySelector(".chart-container"); if (!el) return;
+    const r = el.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (inside !== calmActive) { calmActive = inside; applyLook(); }
+  }, { passive: true });
+  document.addEventListener("mouseleave", () => { if (calmActive) { calmActive = false; applyLook(); } });
+  const calmFactor = () => (cfg.calm && calmActive ? 0.35 : 1);
+
   function applyLook() {
     if (!layer) return;
     setTimeout(measureBackdrop, 300);
@@ -125,7 +148,9 @@
     updateReact(0);
     // Over-chart sits ON TOP of the candles, so it needs its own (lower) strength or it hides them.
     layer.style.opacity = String(cfg.layer === "over" ? cfg.overOpacity : cfg.opacity);
-    layer.querySelector(".bd-dim").style.opacity = String(cfg.dim);
+    layer.querySelector(".bd-dim").style.opacity = String(Math.min(0.95, cfg.dim + (cfg.calm && calmActive ? 0.3 : 0)));
+    const vg = layer.querySelector(".bd-vignette");
+    if (vg) vg.style.background = cfg.vignette > 0 ? `radial-gradient(ellipse at center, transparent ${Math.round(70 - cfg.vignette * 40)}%, rgba(0,0,0,${(0.35 + cfg.vignette * 0.55).toFixed(2)}) 100%)` : "none";
     if (!content) return;
     const f = [];
     if (cfg.blur) f.push(`blur(${cfg.blur}px)`);
@@ -138,7 +163,7 @@
       content.style.objectPosition = `${cfg.posX}% ${cfg.posY}%`;
     }
     if (content.tagName === "VIDEO") {
-      content.playbackRate = Math.max(0.25, Math.min(4, cfg.speed));
+      content.playbackRate = Math.max(0.25, Math.min(4, cfg.speed * calmFactor()));
       cfg.paused ? content.pause() : content.play().catch(() => {});
     }    if (content.tagName === "IFRAME") postLook();
   }
@@ -146,7 +171,7 @@
   // Files stored in the extension's database play inside an extension iframe (player/player.html).
   function postLook() {
     if (!content || content.tagName !== "IFRAME" || !content.contentWindow) return;
-    content.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed, paused: cfg.paused } }, "*");
+    content.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed * calmFactor(), paused: cfg.paused } }, "*");
   }
 
   function build() {
@@ -164,6 +189,7 @@
 
     layer = document.createElement("div");
     layer.id = "bd-layer";
+    layer.dataset.bdOwner = ME.token;
 
     const m = activeMedia();
     if (m && m.file && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
@@ -189,6 +215,9 @@
     const dim = document.createElement("div");
     dim.className = "bd-dim";
     layer.appendChild(dim);
+    const vg = document.createElement("div");
+    vg.className = "bd-vignette";
+    layer.appendChild(vg);
     reactEl = document.createElement("div");
     reactEl.className = "bd-react";
     layer.appendChild(reactEl);
@@ -221,7 +250,7 @@
       if (document.hidden || cfg.paused) { last = now; return; }
       const target = cfg.powerSaver ? 15 : cfg.fps === "auto" ? 60 : +cfg.fps;
       if (now - last < 1000 / target - 2) return;
-      const dt = Math.min(0.1, (now - last) / 1000) * cfg.speed * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
+      const dt = Math.min(0.1, (now - last) / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
       last = now;
       clock += dt;
       skin.frame(clock, dt);
@@ -243,8 +272,8 @@
   // Candle colours are drawn by hook.js (page world); hand it the config via an attribute.
   function pushCandles() {
     const h = document.documentElement;
-    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-bd-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow, look: cfg.candleLook }));
-    else h.removeAttribute("data-bd-candles");
+    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-ws-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow, look: cfg.candleLook }));
+    else h.removeAttribute("data-ws-candles");
     // "Shift" look: colours cycle over time via a GPU hue animation on the chart layer (no redraws needed)
     const shift = cfg.enabled && cfg.candleOn && cfg.candleLook === "shift";
     h.classList.toggle("bd-shift", shift);
@@ -253,7 +282,7 @@
   }
 
   // Line glow + price scale styling, also drawn by hook.js
-  const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleLabels"];
+  const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [] };
   const sampler = document.createElement("canvas"); sampler.width = 32; sampler.height = 18;
@@ -295,8 +324,8 @@
 
   function pushFx() {
     const h = document.documentElement;
-    if (cfg.enabled) h.setAttribute("data-bd-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [] }));
-    else h.removeAttribute("data-bd-fx");
+    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [] }));
+    else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
   }
 
@@ -319,28 +348,30 @@
     if (p[1] === "l") st.left = r.left + pad + "px";
     else st.left = r.right - axisR - pad - wmEl.offsetWidth + "px";
   }
+  // Brand shown in the watermark. Renaming the product: change BRAND_NAME and the logo below.
+  const BRAND_NAME = "Wicked Skins";
+  const BRAND_LOGO = "data:image/svg+xml;base64," + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="5" y1="28" x2="27" y2="4"><stop offset="0" stop-color="#19d3ff"/><stop offset=".5" stop-color="#2ef2b0"/><stop offset="1" stop-color="#c6ff3d"/></linearGradient></defs><rect x=".5" y=".5" width="31" height="31" rx="8" fill="#0b141b"/><g fill="url(#g)"><rect x="5" y="17" width="6" height="9" rx="1.5"/><rect x="13" y="11" width="6" height="12" rx="1.5"/><rect x="21" y="5" width="6" height="15" rx="1.5"/><rect x="7.25" y="15" width="1.5" height="13" rx=".75"/><rect x="15.25" y="8" width="1.5" height="17" rx=".75"/><rect x="23.25" y="3" width="1.5" height="19" rx=".75"/></g></svg>');
   function renderWatermark() {
-    const show = cfg.enabled && cfg.wmOn && ((cfg.wmText || "").trim() || cfg.wmImage);
+    const show = cfg.enabled && cfg.wmOn;
     if (!show) { if (wmEl) { wmEl.remove(); wmEl = null; } return; }
     if (!wmEl) {
       wmEl = document.createElement("div");
       wmEl.id = "bd-wm";
+      wmEl.dataset.bdOwner = ME.token;
+      wmEl.innerHTML = `<img alt="" src="${BRAND_LOGO}"><span></span>`;
+      wmEl.querySelector("span").textContent = BRAND_NAME;
+      wmEl.querySelector("img").onload = placeWatermark;
       document.documentElement.appendChild(wmEl);
       const el = document.querySelector(".chart-container");
       if (!wmRO && el) { wmRO = new ResizeObserver(placeWatermark); wmRO.observe(el); addEventListener("resize", placeWatermark); }
     }
-    const big = cfg.wmPos === "center" ? 2.4 : 1;
-    const size = Math.max(0.4, Math.min(4, +cfg.wmSize || 1)) * big;
-    wmEl.textContent = "";
-    if (cfg.wmImage) { const img = document.createElement("img"); img.src = cfg.wmImage; img.style.height = Math.round(34 * size) + "px"; img.onload = placeWatermark; wmEl.appendChild(img); }
-    if ((cfg.wmText || "").trim()) { const t = document.createElement("span"); t.textContent = cfg.wmText.trim().slice(0, 80); wmEl.appendChild(t); }
-    wmEl.style.fontSize = Math.round(17 * size) + "px";
-    wmEl.style.color = cfg.wmColor || "#ffffff";
-    wmEl.style.opacity = String(Math.max(0.05, Math.min(1, +cfg.wmOpacity)));
+    wmEl.classList.toggle("bd-wm-center", cfg.wmPos === "center");
     requestAnimationFrame(placeWatermark);
   }
 
+
   function apply(keys) {
+    if (standDown || (EXT && !owner)) return;
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
@@ -368,14 +399,56 @@
     flash(next ? "Wicked Skins on" : "Wicked Skins off");
   }, true);
 
+  // ---------- one instance per page ----------
+  // Two copies of the extension installed, or a stale script left in an open tab after an update, would each draw
+  // their own wallpaper + watermark. The newest instance owns the page; others stand down. Older copies that don't
+  // know this protocol are detected (their elements aren't marked as ours), cleaned up, and reported to the panel.
+  const EXT = typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id;
+  const ME = { id: EXT || "desktop", ver: EXT ? chrome.runtime.getManifest().version : "desktop", token: Math.random().toString(36).slice(2) };
+  const verCmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number);
+    for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
+  const readOwner = () => { const [id, ver, token, ts] = (document.documentElement.getAttribute("data-bd-owner") || "").split("|"); return id ? { id, ver, token, ts: +ts } : null; };
+  const writeOwner = () => document.documentElement.setAttribute("data-bd-owner", [ME.id, ME.ver, ME.token, Date.now()].join("|"));
+  let owner = false, standDown = false, dupReported = false;
+  function reportDuplicate() {
+    if (dupReported || !EXT) return; dupReported = true;
+    try { chrome.storage.local.set({ dupSeen: Date.now() }); } catch {}
+  }
+  function claim() {
+    const cur = readOwner();
+    const alive = cur && Date.now() - cur.ts < 6000;
+    if (alive && cur.token !== ME.token && (cur.id !== ME.id || cur.ver !== ME.ver)) {
+      if (cur.id !== ME.id) reportDuplicate();
+      if (verCmp(cur.ver, ME.ver) >= 0 && cur.id !== ME.id) return false;     // a same-or-newer copy already owns it
+    }
+    writeOwner(); owner = true; return true;
+  }
+  // remove anything drawn by another (older) copy, now and later
+  const mine = (el) => el.dataset && el.dataset.bdOwner === ME.token;
+  function sweep() {
+    for (const el of document.querySelectorAll("#bd-layer, #bd-wm")) if (!mine(el)) { el.remove(); reportDuplicate(); }
+  }
+  new MutationObserver(() => { if (owner && !standDown) sweep(); }).observe(document.documentElement, { childList: true });
+  setInterval(() => {
+    if (!owner || standDown) return;
+    const cur = readOwner();
+    if (cur && cur.token !== ME.token && Date.now() - cur.ts < 6000 && verCmp(cur.ver, ME.ver) > 0) {
+      standDown = true; teardown(); if (wmEl) { wmEl.remove(); wmEl = null; }   // a newer copy took over
+      return;
+    }
+    writeOwner();                                                                // heartbeat
+  }, 2000);
+
   // Only switch on in a frame that actually contains a TradingView-style chart (tradingview.com, or a
   // platform's embedded chart iframe). Other frames / pages of an enabled site are left untouched.
   const CHART_SEL = ".chart-markup-table, .chart-container";
+  const bigChart = () => [...document.querySelectorAll(CHART_SEL)].some((el) => { const r = el.getBoundingClientRect(); return r.width >= 400 && r.height >= 250; });
   function whenChart(start) {
-    if (document.querySelector(CHART_SEL)) return start();
-    const mo = new MutationObserver(() => { if (document.querySelector(CHART_SEL)) { mo.disconnect(); clearTimeout(t); start(); } });
-    mo.observe(document.documentElement, { childList: true, subtree: true });
-    const t = setTimeout(() => mo.disconnect(), 180000); // charts that load later than 3 min: reload the page
+    const go = () => { if (!claim()) return; sweep(); start(); };
+    if (bigChart()) return go();
+    // charts render late and small widgets (mini charts) never qualify; check for a while
+    const iv = setInterval(() => { if (bigChart()) { clearInterval(iv); go(); } }, 500);
+    setTimeout(() => clearInterval(iv), 180000); // charts that load later than 3 min: reload the page
   }
 
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {

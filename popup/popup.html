@@ -62,12 +62,14 @@
 
       <details class="grp" data-grp="scale">
         <summary>Price scale</summary>
-        <div class="row"><span>Text</span><input type="color" id="scaleText" /><label class="btn" style="padding:5px 10px"><input type="checkbox" id="scaleTextOn" /> custom colour</label></div>
-        <div class="row"><span>Glow</span><input type="range" id="scaleGlow" min="0" max="1" step="0.05" /><output id="scaleGlowOut"></output></div>
+        <div class="row"><span>Text</span><div class="seg" id="scaleTextMode"></div><input type="color" id="scaleText" title="Text colour" /></div>
+        <div class="row"><span>Size</span><div class="seg" id="scaleSize"></div></div>
+        <div class="row"><span>Font</span><div class="seg" id="scaleFont"></div></div>
         <div class="row"><span>Weight</span><div class="seg" id="scaleBold"></div></div>
-        <div class="row"><span>Backing</span><div class="seg" id="scaleBg"></div></div>
+        <div class="row"><span>Glow</span><input type="range" id="scaleGlow" min="0" max="1" step="0.05" /><output id="scaleGlowOut"></output></div>
+        <div class="row"><span>Backing</span><div class="seg" id="scaleBg"></div><input type="color" id="scaleBgColor" title="Backing colour" /></div>
         <div class="row"><span>Price tags</span><div class="seg" id="scaleLabels"></div></div>
-        <p class="hint">Text automatically turns light or dark to stay readable on any wallpaper (unless you pick a colour). "Auto" backing adds a glass strip only behind busy wallpapers. Price tags are the coloured price boxes; "Candle" paints them in your candle colours.</p>
+        <p class="hint">Auto text turns light or dark per label to stay readable on any wallpaper. Auto backing adds a glass strip only behind busy wallpapers. Also styles the time scale.</p>
       </details>
       <button id="resetStyle" class="link">Reset style</button>
     </section>
@@ -102,9 +104,8 @@
       <details class="grp" data-grp="picture" open>
         <summary>Picture</summary>
         <div id="sliders"></div>
-        <div class="row"><span>Frame rate</span><div class="seg" id="fps"></div></div>
-        <div class="row"><span>Fit</span><div class="seg" id="fit"></div></div>
-        <p class="hint">Fit and position apply to images and videos.</p>
+        <div class="row" data-only="media"><span>Fit</span><div class="seg" id="fit"></div></div>
+        <div class="row"><span>Smoothness</span><div class="seg" id="smooth"></div></div>
       </details>
       <details class="grp" data-grp="motion">
         <summary>Motion &amp; mood</summary>
@@ -112,35 +113,21 @@
         <div id="reactOpts" hidden>
           <div class="row"><span>Strength</span><input type="range" id="reactStrength" min="0.1" max="1" step="0.05" /><output id="reactStrengthOut"></output></div>
           <p class="hint" id="reactHint"></p>
-          <div id="pnlOpts" hidden>
-            <div class="row"><span>Side</span><div class="seg" id="pnlSide"></div></div>
-            <div class="row"><span>Entry</span><input id="pnlEntry" type="number" step="any" min="0" placeholder="Your entry price" class="field" /></div>
-            <div class="row"><span>Symbol</span><input id="pnlSymbol" placeholder="Any (or e.g. BTCUSDT)" class="field" maxlength="20" /></div>
-          </div>
         </div>
-        <div class="row"><span>Eco mode</span><div class="seg" id="powerSaver"></div></div>
-        <div class="row"><span>Motion</span><div class="seg" id="motion"></div></div>
+        <div class="row"><span>Calm</span><div class="seg" id="calm"></div></div>
+        <p class="hint">Calm: when your cursor is on the chart, the wallpaper dims and slows down so you can focus.</p>
+        <div class="row"><span>Animation</span><div class="seg" id="motion"></div></div>
       </details>
       <details class="grp" data-grp="placement">
         <summary>Placement</summary>
         <div class="row"><span>Layer</span><div class="seg" id="layer"></div></div>
       </details>
       <details class="grp" data-grp="watermark">
-        <summary>Watermark</summary>
-        <div class="row"><span>Show</span><label class="switch"><input type="checkbox" id="wmOn" /><span></span></label>
-          <small class="hint" style="margin:0">your name / logo on the chart</small></div>
-        <div class="row"><span>Text</span><input id="wmText" class="field" maxlength="60" placeholder="e.g. @yourname" /></div>
-        <div class="row"><span>Logo</span>
-          <label class="btn" style="flex:1;text-align:center">Choose image<input type="file" id="wmFile" accept="image/*,.svg" hidden /></label>
-          <img id="wmPreview" alt="" style="height:28px;max-width:60px;object-fit:contain;display:none" />
-          <button id="wmClear" title="Remove logo" style="display:none"><svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+        <summary>Watermark <label class="switch" title="Watermark on/off"><input type="checkbox" id="wmOn" /><span></span></label></summary>
         <div class="row"><span>Position</span><div class="seg" id="wmPos"></div></div>
-        <div class="row"><span>Size</span><input type="range" id="wmSize" min="0.5" max="3" step="0.1" /><output id="wmSizeOut"></output></div>
-        <div class="row"><span>Opacity</span><input type="range" id="wmOpacity" min="0.05" max="1" step="0.05" /><output id="wmOpacityOut"></output></div>
-        <div class="row"><span>Colour</span><input type="color" id="wmColor" /></div>
-        <p class="hint" id="wmHint">Shows on top of the chart, so it appears in screen recordings and screenshots of your screen. TradingView's own camera snapshot won't include it.</p>
-          </details>
-      <button id="reset" class="link">Reset look</button>
+        <p class="hint">Shows the Wicked Skins logo and name on your chart, e.g. for screen recordings and screenshots.</p>
+      </details>
+      <button id="reset" class="link">Reset adjustments</button>
     </section>
 
     <div id="toast" hidden><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
