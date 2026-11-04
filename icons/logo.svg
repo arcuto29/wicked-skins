@@ -1,36 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#241443"/>
-      <stop offset="1" stop-color="#0b0912"/>
+      <stop offset="0" stop-color="#10202b"/>
+      <stop offset="1" stop-color="#05080c"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0" stop-color="#8f7bff"/>
-      <stop offset="1" stop-color="#ff5fc7"/>
-    </linearGradient>
-    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0" stop-color="#ff4f8b"/>
-      <stop offset="0.55" stop-color="#ffb15c"/>
-      <stop offset="1" stop-color="#fff3b0"/>
+    <!-- one spectrum across all three candles: light "split" by the chart -->
+    <linearGradient id="spec" gradientUnits="userSpaceOnUse" x1="26" y1="104" x2="104" y2="24">
+      <stop offset="0" stop-color="#19d3ff"/>
+      <stop offset="0.5" stop-color="#2ef2b0"/>
+      <stop offset="1" stop-color="#c6ff3d"/>
     </linearGradient>
     <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#ff7ab8" stop-opacity="0.55"/>
-      <stop offset="1" stop-color="#ff7ab8" stop-opacity="0"/>
+      <stop offset="0" stop-color="#c6ff3d" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#c6ff3d" stop-opacity="0"/>
     </radialGradient>
+    <linearGradient id="beam" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
   </defs>
-  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
-  <rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
-  <!-- glow behind the flame -->
-  <circle cx="64" cy="34" r="30" fill="url(#glow)"/>
-  <!-- side candles -->
-  <rect x="31" y="58" width="4" height="40" rx="2" fill="#8f7bff" opacity="0.7"/>
-  <rect x="25" y="66" width="16" height="24" rx="4" fill="#8f7bff" opacity="0.85"/>
-  <rect x="93" y="50" width="4" height="44" rx="2" fill="#ff5fc7" opacity="0.7"/>
-  <rect x="87" y="58" width="16" height="28" rx="4" fill="#ff5fc7" opacity="0.85"/>
-  <!-- main candle -->
-  <rect x="62" y="44" width="4" height="62" rx="2" fill="url(#accent)"/>
-  <rect x="53" y="54" width="22" height="40" rx="5" fill="url(#accent)"/>
-  <!-- the wick is a flame -->
-  <path d="M64 13 C 70 22, 76 28, 75 37 C 74.5 44, 69.5 48, 64 48 C 58.5 48, 53.5 44, 53 37 C 52.6 31, 56 27, 58.5 24 C 58.8 28.5, 60.8 31, 63 31.5 C 61.5 25.5, 62 19, 64 13 Z" fill="url(#flame)"/>
-  <path d="M64 30 C 67 34, 69 37, 68.4 40.5 C 68 43.5, 66 45, 64 45 C 62 45, 60 43.5, 59.6 40.5 C 59.3 37.8, 61.5 34.5, 64 30 Z" fill="#fff8d6" opacity="0.9"/>
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#bg)"/>
+  <rect x="4.5" y="4.5" width="119" height="119" rx="29.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+  <!-- soft diagonal light beam behind the candles -->
+  <path d="M10 112 L112 10 L124 22 L22 124 Z" fill="url(#beam)"/>
+  <circle cx="91" cy="38" r="30" fill="url(#glow)"/>
+  <!-- three rising candles -->
+  <g fill="url(#spec)">
+    <rect x="35.5" y="66" width="5" height="40" rx="2.5"/>
+    <rect x="28" y="74" width="20" height="24" rx="5"/>
+    <rect x="61.5" y="44" width="5" height="54" rx="2.5"/>
+    <rect x="54" y="52" width="20" height="36" rx="5"/>
+    <rect x="87.5" y="20" width="5" height="62" rx="2.5"/>
+    <rect x="80" y="28" width="20" height="44" rx="5"/>
+  </g>
+  <!-- glint on the newest candle -->
+  <path d="M90 13 L91.6 18.4 L97 20 L91.6 21.6 L90 27 L88.4 21.6 L83 20 L88.4 18.4 Z" fill="#f4ffd6"/>
 </svg>

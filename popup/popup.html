@@ -49,6 +49,7 @@
         <div class="row"><span>Colours</span>
           <input type="color" id="candleUp" title="Up candles" /> <input type="color" id="candleDown" title="Down candles" />
           <small class="hint" style="margin:0">up · down</small></div>
+        <div class="chips" id="candleChips"></div>
         <div class="cards" id="candleCards"></div>
       </details>
 
@@ -84,15 +85,16 @@
     <section id="tab-loadouts" hidden>
       <div class="box">
         <div class="inline">
-          <input id="loName" placeholder="Name this look" maxlength="40" />
-          <button class="primary" id="loSave">Save</button>
+          <input id="loName" placeholder="Name your current setup" maxlength="40" />
+          <button class="primary" id="loSave">Save look</button>
         </div>
-        <p class="hint">Saves your skin, style and adjustments as one look. Stored on this computer.</p>
+        <p class="hint">Saves wallpaper, candles, glow, price scale and adjustments together. Tap a look to apply it (with Undo).</p>
       </div>
+      <p class="hint" id="loEmpty">No saved looks yet. Set things up the way you like, then save it here.</p>
       <div class="cards one" id="loCards"></div>
       <div class="inline" style="margin-top:10px">
-        <button id="loExport">Export</button>
-        <label class="btn">Import<input type="file" id="loImport" accept="application/json" hidden /></label>
+        <button id="loExport">Export all</button>
+        <label class="btn">Import<input type="file" id="loImport" accept="application/json,.json" hidden /></label>
       </div>
     </section>
 

@@ -61,30 +61,33 @@ let last = 0;
   requestAnimationFrame(loop);
   if (now - last < 66) return; // ~15fps previews
   const dt = (now - last) / 1000; last = now;
-  for (const p of [...previews, ...quickPreviews]) p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1));
+  for (const p of [...previews, ...quickPreviews, ...lookPreviews]) p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1));
 })(0);
 
 // ---------- candles ----------
+// [id, name, up, down, group]. Ids are stored in settings; keep them stable.
+const CANDLE_GROUPS = ["Clean", "Neon", "Warm", "Cool", "Rich"];
 const CANDLE_PRESETS = [
-  ["neon", "Neon Pulse", "#00ffa3", "#ff2e97"],
-  ["ice", "Glacier", "#8be9ff", "#3d5afe"],
-  ["lava", "Magma", "#ffb300", "#ff3d00"],
-  ["gold", "Aurum", "#ffd36b", "#a67c1a"],
-  ["ghost", "Ghost", "#f5f5f5", "#5c5c5c"],
-  ["amethyst", "Amethyst", "#b388ff", "#4a5a6a"],
-  ["dusk", "Dusk", "#ffb74d", "#ec407a"],
-  ["acid", "Acid", "#c6ff00", "#7c4dff"],
-  ["crimson", "Crimson", "#ff5252", "#8a0f2e"],
-  ["deepsea", "Deepsea", "#4dd0e1", "#5c6bc0"],
-  ["cyberpunk", "Cyberpunk", "#fcee0a", "#00f0ff"],
-  ["matrix", "Terminal", "#00ff41", "#0b6623"],
-  ["bubblegum", "Bubblegum", "#7cf7d4", "#ff8fd8"],
-  ["mono", "Mono", "#ffffff", "#2f2f35"],
-  ["sunrise", "Sunrise", "#ffe082", "#ff6e40"],
-  ["forest", "Forest", "#9ccc65", "#6d4c41"],
-  ["royal", "Royal", "#ffd700", "#6a1b9a"],
-  ["arctic", "Arctic", "#e0f7fa", "#0288d1"],
+  ["mono", "Mono", "#ffffff", "#2f2f35", "Clean"],
+  ["ghost", "Ghost", "#f5f5f5", "#5c5c5c", "Clean"],
+  ["arctic", "Arctic", "#e0f7fa", "#0288d1", "Clean"],
+  ["neon", "Neon Pulse", "#00ffa3", "#ff2e97", "Neon"],
+  ["cyberpunk", "Cyberpunk", "#fcee0a", "#00f0ff", "Neon"],
+  ["matrix", "Terminal", "#00ff41", "#0b6623", "Neon"],
+  ["acid", "Acid", "#c6ff00", "#7c4dff", "Neon"],
+  ["bubblegum", "Bubblegum", "#7cf7d4", "#ff8fd8", "Neon"],
+  ["lava", "Magma", "#ffb300", "#ff3d00", "Warm"],
+  ["gold", "Aurum", "#ffd36b", "#a67c1a", "Warm"],
+  ["sunrise", "Sunrise", "#ffe082", "#ff6e40", "Warm"],
+  ["dusk", "Dusk", "#ffb74d", "#ec407a", "Warm"],
+  ["crimson", "Crimson", "#ff5252", "#8a0f2e", "Warm"],
+  ["ice", "Glacier", "#8be9ff", "#3d5afe", "Cool"],
+  ["deepsea", "Deepsea", "#4dd0e1", "#5c6bc0", "Cool"],
+  ["amethyst", "Amethyst", "#b388ff", "#4a5a6a", "Cool"],
+  ["forest", "Forest", "#9ccc65", "#6d4c41", "Rich"],
+  ["royal", "Royal", "#ffd700", "#6a1b9a", "Rich"],
 ];
+let candleGroup = "All";
 const bars = (up, down) => {
   // 8 tiny candles: [open, close, low, high] in a 0-30 box
   const d = [[20,16,22,12],[16,18,19,13],[18,12,20,10],[12,14,16,9],[14,9,15,6],[9,10,12,5],[10,5,11,2],[5,6,8,1]];
@@ -115,10 +118,25 @@ function renderCandles() {
   seg("scaleLabels", [[false, "Original"], [true, "Candle"]], () => cfg.scaleLabels, (v) => set({ scaleLabels: v }));
   $("candleGlow").value = cfg.candleGlow; $("candleGlowOut").textContent = Math.round(cfg.candleGlow * 100) + "%";
   $("candleUp").value = cfg.candleUp; $("candleDown").value = cfg.candleDown;
+  // filter chips + grouped grid
+  const chips = $("candleChips"); chips.innerHTML = "";
+  for (const g of ["All", ...CANDLE_GROUPS]) {
+    const c = document.createElement("button");
+    c.className = "chip" + (g === candleGroup ? " on" : ""); c.textContent = g;
+    c.onclick = () => { candleGroup = g; renderCandles(); };
+    chips.appendChild(c);
+  }
   const box = $("candleCards"); box.innerHTML = "";
-  CANDLE_PRESETS.forEach(([id, name, up, down]) => {
+  const custom = cfg.candleOn && !CANDLE_PRESETS.some(([, , u, d]) => u === cfg.candleUp && d === cfg.candleDown);
+  if (custom) {
+    box.insertAdjacentHTML("beforeend", `<div class="grp-label">Your colours</div>`);
+    box.insertAdjacentHTML("beforeend", `<button class="card preset on" disabled>${bars(cfg.candleUp, cfg.candleDown)}<div class="label">Custom</div></button>`);
+  }
+  let lastGroup = null;
+  CANDLE_PRESETS.filter((p) => candleGroup === "All" || p[4] === candleGroup).forEach(([id, name, up, down, group]) => {
+    if (candleGroup === "All" && group !== lastGroup) { box.insertAdjacentHTML("beforeend", `<div class="grp-label">${group}</div>`); lastGroup = group; }
     const b = document.createElement("button");
-    b.className = "card preset" + (cfg.candlePreset === id ? " on" : "");
+    b.className = "card preset" + (cfg.candleOn && cfg.candleUp === up && cfg.candleDown === down ? " on" : "");
     b.innerHTML = bars(up, down) + `<div class="label">${esc(name)}</div>`;
     b.onclick = () => applyWithUndo({ candleOn: true, candleUp: up, candleDown: down, candlePreset: id }, `Candles: ${name}.`);
     box.appendChild(b);
@@ -141,11 +159,11 @@ function applyWithUndo(changes, label) {
   const before = Object.fromEntries(Object.keys(changes).map((k) => [k, cfg[k]]));
   set(changes); refreshAll();
   $("toastMsg").textContent = label;
-  $("toast").hidden = false;
+  $("toast").hidden = false; $("toastUndo").hidden = false;
   $("toastUndo").onclick = () => { set(before); refreshAll(); $("toast").hidden = true; };
   clearTimeout(undoTimer); undoTimer = setTimeout(() => ($("toast").hidden = true), 8000);
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); }
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 const QUICK_LOOKS = [
@@ -397,47 +415,98 @@ mediaTab.addEventListener("dragover", (e) => { e.preventDefault(); mediaTab.clas
 mediaTab.addEventListener("dragleave", () => mediaTab.classList.remove("drop"));
 mediaTab.addEventListener("drop", (e) => { e.preventDefault(); mediaTab.classList.remove("drop"); addFiles([...e.dataTransfer.files]); });
 
-// ---------- loadouts ----------
+// ---------- saved looks ----------
 const snapshot = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, cfg[k]]));
+const lookPreviews = [];
+const sameLook = (lo) => lo.skin === cfg.skin && (lo.skin !== "media" || lo.mediaId === cfg.mediaId) &&
+  ["candleOn", "candleUp", "candleDown", "candleLook", "lineGlow", "dim"].every((k) => JSON.stringify(lo.look[k]) === JSON.stringify(cfg[k]));
+function describe(lo) {
+  const sk = lo.skin === "media" ? (cfg.media.find((m) => m.id === lo.mediaId)?.name || "Upload") : (WickedSkins[lo.skin]?.name || lo.skin);
+  const preset = lo.look.candleOn ? (CANDLE_PRESETS.find(([, , u, d]) => u === lo.look.candleUp && d === lo.look.candleDown)?.[1] || "Custom colours") : "Chart colours";
+  const style = { solid: "", neon: " · Tube", prism: " · Spectrum", shift: " · Cycle" }[lo.look.candleLook] || "";
+  return `${sk} · ${preset}${style}`;
+}
+function applyLook(lo) {
+  const hasMedia = lo.skin !== "media" || cfg.media.some((m) => m.id === lo.mediaId);
+  applyWithUndo({ ...lo.look, enabled: true, skin: hasMedia ? lo.skin : cfg.skin, mediaId: hasMedia ? lo.mediaId : cfg.mediaId },
+    hasMedia ? `Applied “${lo.name}”.` : `Applied “${lo.name}” (its upload is gone, kept your current wallpaper).`);
+  renderLoadouts();
+}
+function download(name, data) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  a.download = name; a.click();
+}
+// uploads (your own files) aren't put in shared files: size + they're yours
+const exportable = (lo) => ({ name: lo.name, skin: lo.skin === "media" ? "aurora" : lo.skin, look: lo.look });
+
 function renderLoadouts() {
-  const box = $("loCards"); box.innerHTML = "";
+  const box = $("loCards"); box.innerHTML = ""; lookPreviews.length = 0;
+  $("loEmpty").hidden = cfg.loadouts.length > 0;
   cfg.loadouts.forEach((lo) => {
     const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `<div class="label"><span>${esc(lo.name)}<br><small style="color:#8b8e9c">${esc(lo.skin === "media" ? "Upload" : (WickedSkins[lo.skin]?.name || lo.skin))}</small></span><button class="x" title="Delete">${ICON_X}</button></div>`;
+    card.className = "card look" + (sameLook(lo) ? " on" : "");
+    // preview: the look's skin (live) or upload thumbnail, with its candle colours on top
+    const media = lo.skin === "media" && cfg.media.find((m) => m.id === lo.mediaId);
+    if (media && media.thumb) { const im = document.createElement("img"); im.src = media.thumb; card.append(im); }
+    else {
+      const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
+      const def = WickedSkins[lo.skin] || WickedSkins.aurora; const sk = def.create(cv.getContext("2d")); sk.resize(160, 64);
+      lookPreviews.push({ skin: sk, t: 0 }); card.append(cv);
+    }
+    if (lo.look.candleOn) card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(lo.look.candleUp, lo.look.candleDown)}</div>`);
+    card.insertAdjacentHTML("beforeend", `<div class="label"><span class="nm">${esc(lo.name)}<small>${esc(describe(lo))}</small></span></div>
+      <div class="acts">
+        <button data-a="update" title="Save your current setup into this look">Update</button>
+        <button data-a="rename" title="Rename">Rename</button>
+        <button data-a="share" title="Save this look as a file to share">Share</button>
+        <button data-a="del" class="x" title="Delete">${ICON_X}</button>
+      </div>`);
     card.onclick = (e) => {
-      if (e.target.classList.contains("x")) { set({ loadouts: cfg.loadouts.filter((x) => x.id !== lo.id) }); }
-      else {
-        const hasMedia = lo.skin !== "media" || cfg.media.some((m) => m.id === lo.mediaId);
-        applyWithUndo({ ...lo.look, skin: hasMedia ? lo.skin : cfg.skin, mediaId: hasMedia ? lo.mediaId : cfg.mediaId }, `Applied “${lo.name}”.`);
-        syncTune(); renderSkins(); renderMedia(); renderCandles();
+      const act = e.target.closest("[data-a]")?.dataset.a;
+      if (!act) return applyLook(lo);
+      e.stopPropagation();
+      if (act === "del") {
+        const before = cfg.loadouts;
+        set({ loadouts: cfg.loadouts.filter((x) => x.id !== lo.id) }); renderLoadouts();
+        $("toastMsg").textContent = `Deleted “${lo.name}”.`; $("toast").hidden = false;
+        $("toastUndo").onclick = () => { set({ loadouts: before }); renderLoadouts(); $("toast").hidden = true; };
+      } else if (act === "update") {
+        set({ loadouts: cfg.loadouts.map((x) => (x.id === lo.id ? { ...x, skin: cfg.skin, mediaId: cfg.mediaId, look: snapshot() } : x)) });
+        renderLoadouts(); hintToast(`Updated “${lo.name}” with your current setup.`);
+      } else if (act === "rename") {
+        const span = card.querySelector(".nm");
+        span.innerHTML = `<input class="field" maxlength="40" value="${esc(lo.name)}" />`;
+        const inp = span.querySelector("input"); inp.focus(); inp.select();
+        const done = () => { const v = inp.value.trim(); if (v && v !== lo.name) set({ loadouts: cfg.loadouts.map((x) => (x.id === lo.id ? { ...x, name: v } : x)) }); renderLoadouts(); };
+        inp.onkeydown = (k) => { if (k.key === "Enter") done(); if (k.key === "Escape") renderLoadouts(); };
+        inp.onblur = done; inp.onclick = (k) => k.stopPropagation();
+      } else if (act === "share") {
+        download(`${lo.name.replace(/[^\w-]+/g, "-").toLowerCase() || "look"}.wicked.json`, [exportable(lo)]);
       }
-      renderLoadouts();
     };
     box.appendChild(card);
   });
 }
-$("loSave").onclick = () => {
-  const name = $("loName").value.trim(); if (!name) return;
+function hintToast(msg) { $("toastMsg").textContent = msg; $("toast").hidden = false; $("toastUndo").hidden = true; clearTimeout(undoTimer); undoTimer = setTimeout(() => { $("toast").hidden = true; $("toastUndo").hidden = false; }, 3000); }
+const saveLook = () => {
+  const name = $("loName").value.trim() || `Look ${cfg.loadouts.length + 1}`;
   set({ loadouts: [{ id: uid(), name, skin: cfg.skin, mediaId: cfg.mediaId, look: snapshot() }, ...cfg.loadouts] });
-  $("loName").value = ""; renderLoadouts();
+  $("loName").value = ""; renderLoadouts(); hintToast(`Saved “${name}”.`);
 };
-$("loExport").onclick = () => {
-  // Media files are not included in exports (size + rights); only skin id and look.
-  const data = cfg.loadouts.map(({ id, name, skin, look }) => ({ name, skin: skin === "media" ? "aurora" : skin, look }));
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-  a.download = "wicked-skins-looks.json"; a.click();
-};
+$("loSave").onclick = saveLook;
+$("loName").onkeydown = (e) => { if (e.key === "Enter") saveLook(); };
+$("loExport").onclick = () => download("wicked-skins-looks.json", cfg.loadouts.map(exportable));
 $("loImport").onchange = async (e) => {
   try {
     const arr = JSON.parse(await e.target.files[0].text());
-    const clean = arr.filter((x) => x && typeof x.name === "string" && WickedSkins[x.skin]).map((x) => ({
+    const clean = (Array.isArray(arr) ? arr : [arr]).filter((x) => x && typeof x.name === "string" && WickedSkins[x.skin]).map((x) => ({
       id: uid(), name: x.name.slice(0, 40), skin: x.skin, mediaId: null,
       look: Object.fromEntries(LOOK_KEYS.filter((k) => x.look && k in x.look).map((k) => [k, x.look[k]])),
     }));
-    set({ loadouts: [...clean, ...cfg.loadouts] }); renderLoadouts();
-  } catch { alert("That file isn't a saved-looks export."); }
+    if (!clean.length) throw 0;
+    set({ loadouts: [...clean, ...cfg.loadouts] }); renderLoadouts(); hintToast(`Imported ${clean.length} look${clean.length > 1 ? "s" : ""}.`);
+  } catch { hintToast("That file isn't a saved-looks file."); }
   e.target.value = "";
 };
 
