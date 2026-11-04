@@ -8,17 +8,18 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleLabels","react","reactStrength"];
+const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
   fps: "auto", fit: "cover", posX: 50, posY: 50,
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
-  react: "off", reactStrength: 0.6, pnlSide: "long", pnlEntry: 0, pnlSymbol: "",
-  wmOn: false, wmText: "", wmImage: null, wmPos: "br", wmSize: 1, wmOpacity: 0.6, wmColor: "#ffffff",
+  react: "off", reactStrength: 0.6,
+  wmOn: false, wmPos: "br", vignette: 0, calm: false,
   candleLook: "solid", shiftSpeed: 10,
-  lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleLabels: false,
+  lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
+  scaleSize: 0, scaleFont: "default",
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -57,7 +58,7 @@ function renderSkins() {
     previews.push({ skin, t: 0 });
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span><div class="label">${esc(s.name)}</div>`);
-    card.onclick = () => { set({ skin: id }); renderSkins(); renderMedia(); };
+    card.onclick = () => { set({ skin: id }); renderSkins(); renderMedia(); syncTune(); };
     $("skinCards").appendChild(card);
   }
 }
@@ -116,10 +117,15 @@ function renderCandles() {
   $("shiftSpeed").value = cfg.shiftSpeed; $("shiftSpeedOut").textContent = cfg.shiftSpeed + "s";
   $("lookHint").textContent = LOOK_HINT[cfg.candleLook] || "";
   $("lineGlow").value = cfg.lineGlow; $("lineGlowOut").textContent = Math.round(cfg.lineGlow * 100) + "%";
-  $("scaleTextOn").checked = !!cfg.scaleText; $("scaleText").value = cfg.scaleText || "#e8eaf0";
+  seg("scaleTextMode", [["auto", "Auto"], ["custom", "Custom"]], () => (cfg.scaleText ? "custom" : "auto"),
+    (v) => { set({ scaleText: v === "custom" ? $("scaleText").value : "" }); renderCandles(); });
+  $("scaleText").value = cfg.scaleText || "#e9ebf2"; $("scaleText").hidden = !cfg.scaleText;
+  seg("scaleSize", [[0, "Normal"], [1, "Large"], [2, "XL"]], () => cfg.scaleSize, (v) => set({ scaleSize: v }));
+  seg("scaleFont", [["default", "Default"], ["mono", "Mono"], ["rounded", "Rounded"]], () => cfg.scaleFont, (v) => set({ scaleFont: v }));
+  $("scaleBgColor").value = cfg.scaleBgColor || "#0b1320"; $("scaleBgColor").hidden = cfg.scaleBg !== "color";
   $("scaleGlow").value = cfg.scaleGlow; $("scaleGlowOut").textContent = Math.round(cfg.scaleGlow * 100) + "%";
   seg("scaleBold", [[false, "Regular"], [true, "Bold"]], () => cfg.scaleBold, (v) => set({ scaleBold: v }));
-  seg("scaleBg", [["auto", "Auto"], ["clear", "Clear"], ["glass", "Glass"], ["default", "TV"]], () => cfg.scaleBg, (v) => set({ scaleBg: v }));
+  seg("scaleBg", [["auto", "Auto"], ["glass", "Glass"], ["color", "Colour"], ["default", "TV"]], () => (cfg.scaleBg === "clear" ? "auto" : cfg.scaleBg), (v) => { set({ scaleBg: v }); renderCandles(); });
   seg("scaleLabels", [[false, "Original"], [true, "Candle"]], () => cfg.scaleLabels, (v) => set({ scaleLabels: v }));
   $("candleGlow").value = cfg.candleGlow; $("candleGlowOut").textContent = Math.round(cfg.candleGlow * 100) + "%";
   $("candleUp").value = cfg.candleUp; $("candleDown").value = cfg.candleDown;
@@ -151,8 +157,8 @@ $("candleOn").onchange = (e) => set({ candleOn: e.target.checked });
 $("shiftSpeed").oninput = (e) => { set({ shiftSpeed: +e.target.value }); $("shiftSpeedOut").textContent = e.target.value + "s"; };
 $("lineGlow").oninput = (e) => { set({ lineGlow: +e.target.value }); $("lineGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("scaleGlow").oninput = (e) => { set({ scaleGlow: +e.target.value }); $("scaleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
-$("scaleText").oninput = (e) => { set({ scaleText: e.target.value }); $("scaleTextOn").checked = true; };
-$("scaleTextOn").onchange = (e) => set({ scaleText: e.target.checked ? $("scaleText").value : "" });
+$("scaleText").oninput = (e) => set({ scaleText: e.target.value });
+$("scaleBgColor").oninput = (e) => set({ scaleBgColor: e.target.value });
 $("candleGlow").oninput = (e) => { set({ candleGlow: +e.target.value }); $("candleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("candleUp").oninput = (e) => { set({ candleUp: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
 $("candleDown").oninput = (e) => { set({ candleDown: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
@@ -240,14 +246,16 @@ function renderMedia() {
     const badge = m.pending ? `<span class="live">${converting[m.id] !== undefined ? "CONVERTING " + Math.round(converting[m.id] * 100) + "%" : "WAITING TO CONVERT"}</span>`
       : m.type === "video" ? '<span class="live">● VIDEO</span>' : "";
     card.insertAdjacentHTML("beforeend", `${badge}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">${ICON_X}</button></div>`);
+    if (window.Workshop && Workshop.configured && !m.pending) card.insertAdjacentHTML("beforeend", `<button class="media-share" title="Share to the Workshop">Share</button>`);
     card.onclick = (e) => {
+      if (e.target.closest(".media-share")) { e.stopPropagation(); return openShare(m); }
       if (e.target.classList.contains("x")) {
         const media = cfg.media.filter((x) => x.id !== m.id);
         const wasActive = cfg.skin === "media" && cfg.mediaId === m.id;
         if (m.file && window.WickedMediaDB) WickedMediaDB.del(m.id).catch(() => {});
         set(wasActive ? { media, skin: "aurora", mediaId: null } : { media });
       } else if (!m.pending) set({ skin: "media", mediaId: m.id });
-      renderMedia(); renderSkins();
+      renderMedia(); renderSkins(); syncTune();
     };
     box.appendChild(card);
   });
@@ -424,6 +432,151 @@ mediaTab.addEventListener("dragover", (e) => { e.preventDefault(); mediaTab.clas
 mediaTab.addEventListener("dragleave", () => mediaTab.classList.remove("drop"));
 mediaTab.addEventListener("drop", (e) => { e.preventDefault(); mediaTab.classList.remove("drop"); addFiles([...e.dataTransfer.files]); });
 
+// ---------- workshop: community wallpapers ----------
+const WS_SHARE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif", "video/mp4", "video/webm"];
+let wsSort = "popular", wsPage = 0, wsItems = [], wsAuthOpen = false;
+const HEART = '<svg viewBox="0 0 16 14" width="11" height="10" aria-hidden="true" style="vertical-align:-1px"><path d="M8 13.5S1 9.3 1 4.7A3.4 3.4 0 0 1 8 3a3.4 3.4 0 0 1 7 1.7C15 9.3 8 13.5 8 13.5z" fill="currentColor"/></svg>';
+const W = () => window.Workshop;
+
+function wsAccount() {
+  const u = W().me();
+  $("wsWho").innerHTML = u ? `<b>${esc(u.name)}</b>${u.admin ? '<span class="badge">ADMIN</span>' : ""}<br><small class="hint" style="margin:0">${esc(u.email || "")}</small>`
+    : `<b>Browse freely</b><br><small class="hint" style="margin:0">Sign in to share, like and report.</small>`;
+  $("wsSignBtn").textContent = u ? "Sign out" : wsAuthOpen ? "Close" : "Sign in";
+  $("wsAuth").hidden = !!u || !wsAuthOpen;
+}
+function wsTabs() {
+  const u = W().me(), box = $("wsTabs"); box.innerHTML = "";
+  const tabs = [["popular", "Popular"], ["new", "New"]];
+  if (u) tabs.push(["mine", "Mine"]);
+  if (u && u.admin) tabs.push(["review", "Review"]);
+  for (const [k, label] of tabs) {
+    const b = document.createElement("button"); b.className = "chip" + (k === wsSort ? " on" : ""); b.textContent = label;
+    b.onclick = () => { wsSort = k; wsLoad(true); };
+    box.appendChild(b);
+  }
+}
+async function wsLoad(reset) {
+  if (!W() || !W().configured) return;
+  if (reset) { wsPage = 0; wsItems = []; }
+  if ((wsSort === "mine" || wsSort === "review") && !W().me()) wsSort = "popular";
+  wsTabs(); wsAccount();
+  $("wsMsg").textContent = "Loading…";
+  try {
+    const rows = await W().list(wsSort, wsPage);
+    wsItems = reset ? rows : [...wsItems, ...rows];
+    $("wsMore").hidden = rows.length < 24;
+    $("wsMsg").textContent = wsItems.length ? "" : wsSort === "review" ? "Nothing waiting for review." : wsSort === "mine" ? "You haven't shared anything yet. Use Share on a file in Uploads." : "No wallpapers yet. Be the first to share one!";
+  } catch (e) { $("wsMsg").textContent = "Couldn't load the Workshop: " + e.message; }
+  wsRender();
+}
+function wsRender() {
+  const box = $("wsCards"); box.innerHTML = "";
+  const u = W().me();
+  for (const it of wsItems) {
+    const card = document.createElement("div"); card.className = "card ws";
+    const statusTag = wsSort === "mine" || wsSort === "review" ? `<span class="status ${it.status}">${it.status === "approved" ? "LIVE" : it.status === "pending" ? "IN REVIEW" : "REJECTED"}</span>` : "";
+    const sub = it.status === "rejected" && it.reject_reason ? "Rejected: " + it.reject_reason : `${it.likes} like${it.likes === 1 ? "" : "s"} · ${it.uses} use${it.uses === 1 ? "" : "s"}`;
+    card.innerHTML = `<img alt="" loading="lazy" src="${esc(it.thumbUrl || "")}">${statusTag}<span class="live">${it.kind === "video" ? "● VIDEO" : "IMAGE"}</span>
+      <div class="label"><span>${esc(it.title)}<small>${esc(sub)}</small></span></div><div class="acts"></div>`;
+    const acts = card.querySelector(".acts");
+    const btn = (label, fn, cls) => { const b = document.createElement("button"); if (label.startsWith("<svg")) b.innerHTML = label; else b.textContent = label; if (cls) b.className = cls; b.onclick = (e) => { e.stopPropagation(); fn(b); }; acts.appendChild(b); return b; };
+    if (wsSort === "review") {
+      btn("Approve", async () => { await wsDo(() => W().moderate(it.id, "approved"), "Approved: it's live now."); wsLoad(true); }, "primary");
+      btn("Reject", async (b) => {
+        const reason = prompt("Reason (the uploader sees this):", "Not allowed in the Workshop");
+        if (reason === null) return;
+        await wsDo(() => W().moderate(it.id, "rejected", reason), "Rejected."); wsLoad(true);
+      });
+      btn("Preview", () => wsUse(it, true));
+    } else {
+      if (it.status === "approved") btn("Use", () => wsUse(it), "primary");
+      if (it.status === "approved") btn(`${HEART} ${it.likes}`, async (b) => {
+        if (!u) return wsNeedSignIn("Sign in to like wallpapers.");
+        const on = !it.liked; it.liked = on; it.likes += on ? 1 : -1; b.innerHTML = `${HEART} ${it.likes}`; b.classList.toggle("on", on);
+        try { await W().like(it.id, on); } catch (e) { toast("Couldn't save your like: " + e.message); }
+      }, "heart" + (it.liked ? " on" : ""));
+      if (!it.mine && it.status === "approved") btn("Report", async () => {
+        if (!u) return wsNeedSignIn("Sign in to report a wallpaper.");
+        const reason = prompt("What's wrong with it? (copyright, explicit, spam…)", "");
+        if (reason === null) return;
+        await wsDo(() => W().report(it.id, reason), "Thanks, it's been reported for review.");
+      });
+    }
+    if (it.mine || (u && u.admin)) btn("Delete", async () => {
+      if (!confirm(`Delete “${it.title}” from the Workshop?`)) return;
+      await wsDo(() => W().remove(it), "Deleted."); wsLoad(true);
+    });
+    card.onclick = () => (it.status === "approved" ? wsUse(it) : null);
+    box.appendChild(card);
+  }
+}
+async function wsDo(fn, okMsg) { try { await fn(); toast(okMsg); } catch (e) { toast(e.message); } }
+function wsNeedSignIn(msg) { wsAuthOpen = true; wsAccount(); $("wsAuthMsg").textContent = msg; $("wsEmail").focus(); }
+// "Use": download into your Uploads and put it on the chart
+async function wsUse(it, previewOnly) {
+  toast(`Downloading “${it.title}”…`);
+  try {
+    const blob = await W().fetchFile(it);
+    const ext = (blob.type.split("/")[1] || "").replace("jpeg", "jpg");
+    await addFiles([new File([blob], `${it.title}.${ext || (it.kind === "video" ? "webm" : "png")}`, { type: blob.type })]);
+    toast(previewOnly ? `Added “${it.title}” to your Uploads to preview.` : `“${it.title}” is on your chart and in your Uploads.`);
+  } catch (e) { toast("Couldn't use it: " + e.message); }
+}
+// Share one of your Uploads
+let shareItem = null;
+async function openShare(m) {
+  if (!W().me()) { $("nav").querySelector('[data-tab="workshop"]').click(); return wsNeedSignIn("Sign in to share to the Workshop."); }
+  shareItem = m;
+  $("shareWhat").textContent = `“${m.name}” will be ${W().me().admin ? "published right away (you're an admin)" : "sent for review, then shown to everyone"}.`;
+  $("shareTitle").value = m.name.replace(/\.[^.]+$/, "").slice(0, 60);
+  $("shareRights").checked = false; $("shareGo").disabled = true; $("shareMsg").textContent = "";
+  $("shareDlg").hidden = false;
+}
+$("shareRights").onchange = (e) => ($("shareGo").disabled = !e.target.checked);
+$("shareCancel").onclick = () => ($("shareDlg").hidden = true);
+$("shareGo").onclick = async () => {
+  const m = shareItem; if (!m) return;
+  $("shareGo").disabled = true; $("shareMsg").textContent = "Uploading…";
+  try {
+    const blob = m.file ? await WickedMediaDB.get(m.id) : await (await fetch(m.src)).blob();
+    if (!blob) throw new Error("file not found");
+    if (!WS_SHARE_TYPES.includes(blob.type)) throw new Error("the Workshop takes MP4, WebM, PNG, JPG, WebP, GIF or AVIF. Videos converted here are WebM and work.");
+    if (blob.size > 50 * 1024 * 1024) throw new Error("the Workshop limit is 50 MB per file.");
+    const thumb = m.thumb ? await (await fetch(m.thumb)).blob() : null;
+    const r = await W().share({ blob, thumb, title: $("shareTitle").value.trim() || m.name, kind: m.type });
+    $("shareDlg").hidden = true;
+    toast(r.status === "approved" ? "Shared: it's live in the Workshop." : "Shared: it'll appear after review. See Workshop → Mine.");
+  } catch (e) { $("shareMsg").textContent = "Couldn't share: " + e.message; $("shareGo").disabled = false; }
+};
+// accounts
+$("wsSignBtn").onclick = async () => {
+  if (W().me()) { await W().signOut(); wsSort = "popular"; return wsLoad(true); }
+  wsAuthOpen = !wsAuthOpen; wsAccount();
+};
+const authMsg = (t) => ($("wsAuthMsg").textContent = t);
+const creds = () => ({ email: $("wsEmail").value.trim(), password: $("wsPass").value });
+async function afterSignIn() { wsAuthOpen = false; $("wsPass").value = ""; $("wsCodeBox").hidden = true; await wsLoad(true); toast(`Signed in as ${W().me().name}.`); }
+$("wsSignIn").onclick = async () => { const c = creds(); if (!c.email || !c.password) return authMsg("Enter your email and password.");
+  try { authMsg("Signing in…"); await W().signIn(c.email, c.password); await afterSignIn(); } catch (e) { authMsg(e.message); } };
+$("wsSignUp").onclick = async () => { const c = creds(); if (!c.email || c.password.length < 8) return authMsg("Use your email and a password of at least 8 characters.");
+  try { authMsg("Creating your account…"); const r = await W().signUp(c.email, c.password);
+    if (r.needsConfirm) authMsg("Check your email to confirm your account, then sign in here."); else await afterSignIn(); } catch (e) { authMsg(e.message); } };
+$("wsGoogle").onclick = async () => { try { authMsg("Opening Google…"); await W().signInGoogle(); await afterSignIn(); } catch (e) { authMsg(e.message); } };
+$("wsForgot").onclick = async () => { const email = $("wsEmail").value.trim(); if (!email) return authMsg("Enter your email first.");
+  try { await W().sendCode(email); $("wsCodeBox").hidden = false; authMsg("We emailed you a sign-in code."); } catch (e) { authMsg(e.message); } };
+$("wsVerify").onclick = async () => { try { await W().verifyCode($("wsEmail").value.trim(), $("wsCode").value.trim()); await afterSignIn();
+  const pw = prompt("Set a new password? (leave empty to skip)", ""); if (pw && pw.length >= 8) { await W().setPassword(pw); toast("Password updated."); } } catch (e) { authMsg(e.message); } };
+$("wsMore").onclick = () => { wsPage++; wsLoad(false); };
+function initWorkshop() {
+  const on = !!(window.Workshop && Workshop.configured);
+  $("wsOff").hidden = on; $("wsOn").hidden = !on;
+  if (!on) return;
+  Workshop.onAuth(() => { wsAccount(); wsTabs(); });
+  let loaded = false;
+  document.querySelector('#nav [data-tab="workshop"]').addEventListener("click", () => { if (!loaded) { loaded = true; wsLoad(true); } });
+}
+
 // ---------- saved looks ----------
 const snapshot = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, cfg[k]]));
 const lookPreviews = [];
@@ -527,6 +680,7 @@ const SLIDERS = [
   ["vividness", "Saturation", 0, 2, 0.05, (v) => Math.round(v * 100) + "%"],
   ["tint", "Hue", 0, 360, 5, (v) => (v ? v + "°" : "Off")],
   ["speed", "Speed", 0.25, 3, 0.05, (v) => v.toFixed(1) + "×"],
+  ["vignette", "Vignette", 0, 1, 0.05, (v) => (v ? Math.round(v * 100) + "%" : "Off")],
   ["posX", "Horizontal", 0, 100, 1, (v) => (v === 50 ? "Middle" : v + "%")],
   ["posY", "Vertical", 0, 100, 1, (v) => (v === 50 ? "Middle" : v + "%")],
 ];
@@ -543,6 +697,10 @@ function seg(id, options, get, onPick) {
 function syncTune() {
   $("sliders").innerHTML = "";
   SLIDERS.forEach(([key, label, min, max, step, fmt]) => {
+    // only show what matters right now
+    if ((key === "posX" || key === "posY") && cfg.skin !== "media") return;
+    if (key === "overOpacity" && cfg.layer !== "over") return;
+    if (key === "opacity" && cfg.layer === "over") return;
     const row = document.createElement("div"); row.className = "row";
     row.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
     const inp = row.querySelector("input"), out = row.querySelector("output");
@@ -551,60 +709,39 @@ function syncTune() {
     inp.ondblclick = () => { inp.value = DEFAULTS[key]; inp.oninput(); }; // double-click resets
     $("sliders").appendChild(row);
   });
-  seg("fps", [["auto", "Auto"], [20, "20"], [30, "30"], [60, "60"]], () => cfg.fps, (v) => set({ fps: v }));
+  document.querySelectorAll("[data-only=media]").forEach((el) => (el.hidden = cfg.skin !== "media"));
+  seg("smooth", [["eco", "Eco"], ["balanced", "Balanced"], ["smooth", "Smooth"]],
+    () => (cfg.powerSaver ? "eco" : String(cfg.fps) === "60" || cfg.fps === "auto" ? "smooth" : "balanced"),
+    (v) => set(v === "eco" ? { powerSaver: true, fps: 30 } : v === "balanced" ? { powerSaver: false, fps: 30 } : { powerSaver: false, fps: 60 }));
   seg("fit", [["cover", "Cover"], ["fit", "Contain"], ["stretch", "Stretch"]], () => cfg.fit, (v) => set({ fit: v }));
-  seg("powerSaver", [[false, "Off"], [true, "On"]], () => cfg.powerSaver, (v) => set({ powerSaver: v }));
-  seg("motion", [[false, "Play"], [true, "Pause"]], () => cfg.paused, (v) => set({ paused: v }));
-  seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => set({ layer: v }));
+  seg("calm", [[false, "Off"], [true, "On"]], () => cfg.calm, (v) => set({ calm: v }));
+  seg("motion", [[false, "On"], [true, "Paused"]], () => cfg.paused, (v) => set({ paused: v }));
+  seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => { set({ layer: v }); syncTune(); });
   seg("react", [["off", "Off"], ["market", "Price"], ["pnl", "Position"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
-  seg("pnlSide", [["long", "Long"], ["short", "Short"]], () => cfg.pnlSide, (v) => set({ pnlSide: v }));
   syncReact();
 }
 function syncReact() {
   $("reactOpts").hidden = cfg.react === "off";
-  $("pnlOpts").hidden = cfg.react !== "pnl";
+
   $("reactStrength").value = cfg.reactStrength;
   $("reactStrengthOut").textContent = Math.round(cfg.reactStrength * 100) + "%";
-  $("pnlEntry").value = cfg.pnlEntry || "";
-  $("pnlSymbol").value = cfg.pnlSymbol;
+
   $("reactHint").textContent = cfg.react === "market"
     ? "Chart edges glow green/red with the day's move and pulse on every tick. Skins speed up when price moves."
-    : "Glows with your P&L from the entry you type here, worked out on your computer. Never reads your account or positions.";
+    : "Glows green/red with the open P&L shown on your chart's position line (broker, prop platform or paper trading). Nothing is sent anywhere.";
 }
 $("reactStrength").oninput = (e) => { set({ reactStrength: +e.target.value }); $("reactStrengthOut").textContent = Math.round(+e.target.value * 100) + "%"; };
-$("pnlEntry").oninput = (e) => set({ pnlEntry: +e.target.value || 0 });
-$("pnlSymbol").oninput = (e) => set({ pnlSymbol: e.target.value.trim() });
-// ---------- watermark ----------
-const WM_MAX_KB = 1024;
+
+// ---------- watermark (logo + name) ----------
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
-  $("wmText").value = cfg.wmText || "";
-  $("wmSize").value = cfg.wmSize; $("wmSizeOut").textContent = (+cfg.wmSize).toFixed(1) + "×";
-  $("wmOpacity").value = cfg.wmOpacity; $("wmOpacityOut").textContent = Math.round(cfg.wmOpacity * 100) + "%";
-  $("wmColor").value = cfg.wmColor || "#ffffff";
-  $("wmPreview").style.display = $("wmClear").style.display = cfg.wmImage ? "" : "none";
-  if (cfg.wmImage) $("wmPreview").src = cfg.wmImage;
-  seg("wmPos", [["tl", cornerIcon(2.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["center", cornerIcon(5.5, 4.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]], () => cfg.wmPos, (v) => set({ wmPos: v }));
+  seg("wmPos", [["tl", cornerIcon(2.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["center", cornerIcon(5.5, 4.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]],
+    () => cfg.wmPos, (v) => set({ wmPos: v, wmOn: true }));
 }
-// Typing or adding a logo turns the watermark on, so it's obvious where it went.
 $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
-$("wmText").oninput = (e) => { set({ wmText: e.target.value, ...(e.target.value.trim() && !cfg.wmOn ? { wmOn: true } : {}) }); $("wmOn").checked = cfg.wmOn; };
-$("wmSize").oninput = (e) => { set({ wmSize: +e.target.value }); $("wmSizeOut").textContent = (+e.target.value).toFixed(1) + "×"; };
-$("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
-$("wmColor").oninput = (e) => set({ wmColor: e.target.value });
-$("wmClear").onclick = () => { set({ wmImage: null }); syncWatermark(); };
-$("wmFile").onchange = async (e) => {
-  const f = e.target.files[0]; e.target.value = "";
-  if (!f) return;
-  if (f.size > WM_MAX_KB * 1024) { $("wmHint").textContent = `That logo is over ${WM_MAX_KB / 1024} MB. Use a smaller PNG or SVG.`; return; }
-  const src = await readAsDataURL(f);
-  const ok = await new Promise((r) => { const i = new Image(); i.onload = () => r(i.naturalWidth > 0); i.onerror = () => r(false); i.src = src; });
-  if (!ok) { $("wmHint").textContent = "That file can't be shown as an image. Try PNG, JPG, WebP or SVG."; return; }
-  set({ wmImage: src, wmOn: true }); syncWatermark();
-};
 
-const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength"];
-const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleLabels"];
+const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength","vignette","calm"];
+const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
 
@@ -679,6 +816,14 @@ async function updates() {
   if (!EXT_MODE || IS_TAB) return;
   const me = chrome.runtime.getManifest().version;
   if (window.WickedMigrate) await WickedMigrate.run().catch(() => {});
+  // Another copy of the extension drew on a chart recently (content.js reports it).
+  const { dupSeen } = await chrome.storage.local.get("dupSeen");
+  if (dupSeen && Date.now() - dupSeen < 3 * 86400e3) {
+    notice("Two copies of Wicked Skins are installed", `Remove the older one so they don't fight (keep version ${me}). It's under chrome://extensions.`,
+      "Open extensions", "#", () => chrome.storage.local.remove("dupSeen"));
+    $("noticeLink").onclick = (e) => { e.preventDefault(); chrome.tabs.create({ url: "chrome://extensions" }); };
+    return;
+  }
   const { justUpdated } = await chrome.storage.local.get("justUpdated");
   if (justUpdated && justUpdated.to === me) {
     return notice(`Updated to ${me}`, "New features and fixes are live.", "What's new", `${RELEASES}/tag/v${me}`,
@@ -706,7 +851,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop();
   siteBar();
   updates();
   const q = new URLSearchParams(location.search);

@@ -7,11 +7,28 @@
         with an optional glow.
      4. Glow on indicator / drawing / price lines, and price-scale styling (text colour, glow,
         bold, background, label colours).
-   Settings arrive via attributes on <html> (class "bd-on", data-bd-candles + data-bd-fx JSON).
+   Settings arrive via attributes on <html> (class "bd-on", data-ws-candles + data-ws-fx JSON).
    Nothing is read or sent anywhere; this only changes how things are drawn. */
 (function () {
-  if (window.__bdHooked) return;
+  // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
+  // already on the page (e.g. two copies of the extension installed), so new settings always work.
+  const HOOK_VERSION = 2;
+  if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
+  const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
+  window.__bdHookVer = HOOK_VERSION;
+  // An older copy of the extension already wrapped the canvas API. Put the browser's own untouched functions back
+  // (taken from a fresh hidden frame), so the old wrappers are cut out and only this version draws.
+  if (olderHook) {
+    try {
+      const f = document.createElement("iframe"); f.style.display = "none";
+      (document.documentElement || document.head || document.body).appendChild(f);
+      const N = f.contentWindow.CanvasRenderingContext2D.prototype, P = CanvasRenderingContext2D.prototype;
+      for (const m of ["fillText", "fillRect", "stroke", "beginPath", "moveTo", "lineTo", "strokeRect"]) P[m] = N[m];
+      for (const prop of ["fillStyle", "strokeStyle"]) Object.defineProperty(P, prop, Object.getOwnPropertyDescriptor(N, prop));
+      f.remove();
+    } catch {}
+  }
 
   // <html> can be missing when this runs very early (desktop app preload), so always look it up lazily.
   const EMPTY = { classList: { contains: () => false }, getAttribute: () => null };
@@ -28,7 +45,7 @@
   function readCandles() {
     remapCache.clear();
     try {
-      const raw = htmlEl().getAttribute("data-bd-candles");
+      const raw = htmlEl().getAttribute("data-ws-candles");
       const c = raw ? JSON.parse(raw) : null;
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
         candles = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
@@ -39,24 +56,29 @@
   readCandles();
 
   // Line glow + price scale styling
-  let fx = { lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleLabels: false, bg: null, busy: false };
+  const FX0 = { lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
+    scaleSize: 0, scaleFont: "default", bg: null, busy: false, prof: [] };
+  let fx = { ...FX0 };
   function readFx() {
     try {
-      const raw = htmlEl().getAttribute("data-bd-fx"), f = raw ? JSON.parse(raw) : {};
+      const raw = htmlEl().getAttribute("data-ws-fx"), f = raw ? JSON.parse(raw) : {};
       fx = {
         lineGlow: Math.max(0, Math.min(1, +f.lineGlow || 0)),
         scaleText: /^#[0-9a-f]{6}$/i.test(f.scaleText || "") ? f.scaleText : "",
         scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)),
         scaleBold: !!f.scaleBold,
-        scaleBg: ["auto", "clear", "glass", "default"].includes(f.scaleBg) ? f.scaleBg : "auto",
+        scaleBg: ["auto", "glass", "color", "default"].includes(f.scaleBg) ? f.scaleBg : "auto",
+        scaleBgColor: /^#[0-9a-f]{6}$/i.test(f.scaleBgColor || "") ? f.scaleBgColor : "#0b1320",
+        scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
+        scaleFont: ["default", "mono", "rounded"].includes(f.scaleFont) ? f.scaleFont : "default",
         scaleLabels: !!f.scaleLabels,
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
         prof: Array.isArray(f.prof) ? f.prof.slice(0, 18).map(Number) : [],  // brightness behind the price scale, top->bottom
       };
-    } catch { fx = { lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleLabels: false, bg: null, busy: false }; }
+    } catch { fx = { ...FX0 }; }
     remapCache.clear();
-    const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleLabels]);
+    const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -67,8 +89,8 @@
     let repaint = false, soft = false;
     for (const m of muts) {
       if (m.attributeName === "class") on = htmlEl().classList.contains("bd-on");
-      if (m.attributeName === "data-bd-candles") readCandles();
-      if (m.attributeName === "data-bd-fx") { if (readFx()) repaint = true; else soft = true; }
+      if (m.attributeName === "data-ws-candles") readCandles();
+      if (m.attributeName === "data-ws-fx") { if (readFx()) repaint = true; else soft = true; }
     }
     if (repaint) forceRepaint(false);
     else if (soft) forceRepaint(true);   // brightness-only update: redraw only if it can be done without a blink
@@ -76,7 +98,7 @@
   (function watchSettings() {
     const el = document.documentElement;
     if (!el) return setTimeout(watchSettings, 5);            // wait for the page's <html>
-    settingsObserver.observe(el, { attributes: true, attributeFilter: ["class", "data-bd-candles", "data-bd-fx"] });
+    settingsObserver.observe(el, { attributes: true, attributeFilter: ["class", "data-ws-candles", "data-ws-fx"] });
     on = el.classList.contains("bd-on"); readCandles(); readFx();
   })();
 
@@ -345,21 +367,52 @@
   const paCache = new WeakMap();
   function isPriceAxis(c) { let v = paCache.get(c); if (v === undefined) { v = !!(c.closest && c.closest(".price-axis, [class*='price-axis']")); paCache.set(c, v); } return v; }
   const autoOn = () => !htmlEl().classList.contains("bd-over-mode") && !!fx.bg;
-  const scaleStyled = () => fx.scaleText || fx.scaleGlow > 0 || fx.scaleBold || autoOn();
+  const scaleStyled = () => fx.scaleText || fx.scaleGlow > 0 || fx.scaleBold || fx.scaleSize > 0 || fx.scaleFont !== "default" || autoOn();
+  const FONTS = { mono: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace', rounded: '"SF Pro Rounded", "Nunito", "Varela Round", ui-rounded, system-ui, sans-serif' };
+  function styledFont(font) {
+    let f = font;
+    if (fx.scaleSize > 0) f = f.replace(/(\d+(?:\.\d+)?)px/, (m, n) => (+n + fx.scaleSize * 1.5) + "px");
+    if (fx.scaleFont !== "default") f = f.replace(/(\d+(?:\.\d+)?px)\s+.*$/, (m, sz) => sz + " " + FONTS[fx.scaleFont]);
+    if (fx.scaleBold && !/\bbold\b|\b[6-9]00\b/.test(f)) f = "bold " + f;
+    return f;
+  }
   function isScaleLabel(style) {           // tick labels, not text on coloured price badges
     const r = rgbKey(style);
     if (!r) return false;
     if (scaleTextKey) return r.key === scaleTextKey;
     return r.key !== "255,255,255";        // fallback when the theme colour is unknown
   }
+  // Position lines show your open P&L as text on the chart ("+128.40 USD", "P&L: -45.00", "$-12.50"...).
+  // We read that text as it's drawn, add up every position shown in the same frame, and publish the total
+  // on <html data-ws-pnl> for content.js. Nothing leaves your computer.
+  const PNL_RE = /^(?:p\s*(?:&|n|\/)?\s*l\s*:?\s*)?([+\-\u2212])?\s*([$\u20ac\u00a3\u00a5])?\s*([+\-\u2212])?\s*(\d{1,3}(?:,\d{3})*|\d+)(\.\d{1,2})\s*(usd|usdt|usdc|eur|gbp|jpy|aud|cad|chf|nzd|pts|points)?$/i;
+  let pnlFrame = -1, pnlSum = 0, pnlUnit = "", pnlLastWrite = 0, frameNo = 0;
+  (function tick() { frameNo++; requestAnimationFrame(tick); })();
+  function notePnl(text, c) {
+    if (!on || typeof text !== "string" || text.length > 40 || !isPane(c)) return;
+    const m = text.trim().match(PNL_RE);
+    if (!m) return;
+    const hasPrefix = /^p/i.test(text.trim()), sign = m[1] || m[3], cur = m[2], code = m[6];
+    if (!hasPrefix && !sign && !cur && !code) return;          // a bare number: price/qty, not P&L
+    const v = parseFloat((m[4] + m[5]).replace(/,/g, "")) * (sign === "-" || sign === "\u2212" ? -1 : 1);
+    if (frameNo !== pnlFrame) { pnlFrame = frameNo; pnlSum = 0; }
+    pnlSum += v; pnlUnit = cur || (code ? code.toUpperCase() : "");
+    const now = performance.now();
+    if (now - pnlLastWrite > 400) {
+      pnlLastWrite = now;
+      htmlEl().setAttribute && htmlEl().setAttribute("data-ws-pnl", JSON.stringify({ v: Math.round(pnlSum * 100) / 100, unit: pnlUnit, ts: Date.now() }));
+    }
+  }
+
   proto.fillText = function (...a) {
     const c = this.canvas;
+    notePnl(a[0], c);
     if (on && c && isAxis(c) && scaleStyled() && isScaleLabel(this.fillStyle)) {
       const pF = this.fillStyle, pFont = this.font, pSB = this.shadowBlur, pSC = this.shadowColor;
       const tone = autoOn() ? toneAt(this, a[2]) : null;
       if (fx.scaleText) this.fillStyle = fx.scaleText;
       else if (tone) this.fillStyle = AUTO_TEXT[tone];
-      if (fx.scaleBold && !/\bbold\b|\b[6-9]00\b/.test(pFont)) this.font = "bold " + pFont;
+      const nf = styledFont(pFont); if (nf !== pFont) this.font = nf;
       if (fx.scaleGlow > 0) { this.shadowColor = this.fillStyle; this.shadowBlur = 2 + fx.scaleGlow * 12; }
       else if (tone) { this.shadowColor = autoHalo(tone); this.shadowBlur = 3; }      // halo keeps text crisp on busy art
       origText.apply(this, a);
@@ -414,9 +467,10 @@
           if (fx.scaleBg === "default") return origFill.call(this, x, y, w, h);   // TradingView's own background
           this.clearRect(x, y, w, h);
           const glass = fx.scaleBg === "glass" || (fx.scaleBg === "auto" && fx.busy && autoOn());
-          if (glass) {                                                            // frosted strip matched to the text
+          if (glass || fx.scaleBg === "color") {                                  // frosted strip, or your colour
             const pf = this.fillStyle;
-            this.fillStyle = fx.bg === "light" && !fx.scaleText ? "rgba(255,255,255,0.55)" : "rgba(8,10,18,0.55)";
+            if (fx.scaleBg === "color") { const [r, g, b] = hexToRgb(fx.scaleBgColor); this.fillStyle = `rgba(${r},${g},${b},0.82)`; }
+            else this.fillStyle = fx.bg === "light" && !fx.scaleText ? "rgba(255,255,255,0.55)" : "rgba(8,10,18,0.55)";
             origFill.call(this, x, y, w, h); this.fillStyle = pf;
           }
           return;

@@ -106,3 +106,20 @@ details.grp > summary .switch { margin-left: auto; }
 .card.look .nm input { width: 100%; }
 .seg button { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 6px 3px; font-size: 12px; }
 #loSave { white-space: nowrap; }
+/* workshop */
+.ws-account { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.ws-account .badge { font: 700 9px system-ui, sans-serif; letter-spacing: .08em; padding: 2px 6px; border-radius: 99px; background: #0f2b26; color: #2ef2b0; margin-left: 6px; vertical-align: middle; }
+#wsAuth { display: grid; gap: 8px; margin-bottom: 10px; }
+#wsAuth[hidden] { display: none; }
+.google { display: flex; align-items: center; justify-content: center; gap: 8px; background: #fff; color: #1f1f1f; border: none; font-weight: 600; }
+.ws-or { text-align: center; color: #6f7280; font-size: 11px; }
+.card.ws img { height: 76px; width: 100%; object-fit: cover; display: block; background: #0b0e14; }
+.card.ws .label small { display: block; color: #8b8e9c; font-weight: 500; margin-top: 2px; }
+.card.ws .acts { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 8px 8px; }
+.card.ws .acts button { padding: 4px 7px; font-size: 11px; }
+.card.ws .acts .heart.on { color: #ff6e9c; border-color: #6b2a42; }
+.card.ws .status { position: absolute; top: 6px; left: 6px; font: 700 9px system-ui, sans-serif; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,.65); }
+.card.ws .status.pending { color: #ffd36b; } .card.ws .status.rejected { color: #ff6b6b; } .card.ws .status.approved { color: #2ef2b0; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+.modal .box { display: grid; gap: 8px; width: 100%; max-width: 320px; background: #12141a; }
+.media-share { position: absolute; top: 6px; left: 6px; padding: 3px 7px; font-size: 10px; background: rgba(0,0,0,.65); }

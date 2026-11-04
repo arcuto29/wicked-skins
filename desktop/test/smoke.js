@@ -8,7 +8,7 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
 
 (async () => {
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), "wicked-"));
-  fs.writeFileSync(path.join(userData, "settings.json"), JSON.stringify({ skin: "galaxy", candleOn: true, candleUp: "#00ffa3", candleDown: "#ff2e97", wmOn: true, wmText: "@smoke-test" }));
+  fs.writeFileSync(path.join(userData, "settings.json"), JSON.stringify({ skin: "galaxy", candleOn: true, candleUp: "#00ffa3", candleDown: "#ff2e97", wmOn: true }));
   const app = await _electron.launch({ args: [DESK, "--no-sandbox", `--user-data-dir=${userData}`], timeout: 60000 });
   const tv = await app.waitForEvent("window", { predicate: (w) => w.url().includes("tradingview"), timeout: 60000 }).catch(() => app.windows().find((w) => w.url().includes("tradingview")));
   ok("TradingView window opens", !!tv);
@@ -29,7 +29,7 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
   ok("hook loaded at page start", st.hooked);
   ok("skin layer present", st.layer && st.on);
   ok("candles recoloured", st.neon > 1000, `neon px ${st.neon}`);
-  ok("watermark shown", st.watermark.includes("@smoke-test"));
+  ok("watermark shown (logo + name)", st.watermark.includes("Wicked Skins"));
   await tv.screenshot({ path: path.join(OUT, "tradingview.png") });
 
   const settings = app.windows().find((w) => w.url().includes("popup.html"));
