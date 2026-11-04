@@ -7,6 +7,7 @@
 <body>
   <nav id="nav">
     <button data-tab="skins" class="on">Skins</button>
+    <button data-tab="candles">Candles</button>
     <button data-tab="media">My media</button>
     <button data-tab="loadouts">Loadouts</button>
     <button data-tab="tune">Tune</button>
@@ -23,11 +24,28 @@
       <div class="cards" id="skinCards"></div>
     </section>
 
+    <section id="tab-candles" hidden>
+      <div class="box">
+        <div class="inline" style="justify-content:space-between;align-items:center">
+          <b>Candle colours</b>
+          <label class="switch"><input type="checkbox" id="candleOn" /><span></span></label>
+        </div>
+        <p class="hint">Changes how candles look, never what they show. Works with TradingView's default candle colours.</p>
+      </div>
+      <div class="row"><span>Glow</span><input type="range" id="candleGlow" min="0" max="1" step="0.05" /><output id="candleGlowOut"></output></div>
+      <div class="row"><span>Custom</span>
+        <input type="color" id="candleUp" title="Up candles" /> <input type="color" id="candleDown" title="Down candles" />
+        <small class="hint" style="margin:0">up · down</small></div>
+      <h4>Presets</h4>
+      <div class="cards" id="candleCards"></div>
+    </section>
+
     <section id="tab-media" hidden>
       <div class="cards" id="mediaCards"></div>
       <label class="add">
-        <input type="file" id="file" accept="image/*,video/*,.gif" multiple hidden />
-        <b>+</b> Add video / image / GIF
+        <input type="file" id="file" multiple hidden
+          accept="image/*,video/*,.png,.jpg,.jpeg,.jfif,.gif,.webp,.avif,.apng,.bmp,.ico,.svg,.mp4,.m4v,.webm,.mov,.ogv,.ogg,.mkv" />
+        <b>+</b> Add video / image / GIF<small class="hint" style="margin-top:4px">or drop files here · MP4 WebM MOV MKV GIF PNG JPG WebP AVIF SVG</small>
       </label>
       <p class="hint" id="mediaHint">Files stay on your computer. Max 50 MB each.</p>
     </section>
@@ -54,6 +72,16 @@
       <div class="row"><span>Fit</span><div class="seg" id="fit"></div></div>
       <p class="hint">Fit and position apply to images and videos.</p>
       <h4>Behaviour</h4>
+      <div class="row"><span>Reacts to</span><div class="seg" id="react"></div></div>
+      <div id="reactOpts" hidden>
+        <div class="row"><span>Strength</span><input type="range" id="reactStrength" min="0.1" max="1" step="0.05" /><output id="reactStrengthOut"></output></div>
+        <p class="hint" id="reactHint"></p>
+        <div id="pnlOpts" hidden>
+          <div class="row"><span>Side</span><div class="seg" id="pnlSide"></div></div>
+          <div class="row"><span>Entry</span><input id="pnlEntry" type="number" step="any" min="0" placeholder="Your entry price" class="field" /></div>
+          <div class="row"><span>Symbol</span><input id="pnlSymbol" placeholder="Any (or e.g. BTCUSDT)" class="field" maxlength="20" /></div>
+        </div>
+      </div>
       <div class="row"><span>Power saver</span><div class="seg" id="powerSaver"></div></div>
       <div class="row"><span>Motion</span><div class="seg" id="motion"></div></div>
       <h4>Chart</h4>

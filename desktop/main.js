@@ -19,7 +19,7 @@ async function inject() {
   await wc.insertCSS(read("content.css"));
   await wc.executeJavaScript(
     `window.__BD_CFG = ${JSON.stringify(cfg)};\n` +
-    `if (window.__bdUpdate) { window.__bdUpdate(window.__BD_CFG); } else {\n${read("skins.js")}\n${read("content.js")}\n}`
+    `if (window.__bdUpdate) { window.__bdUpdate(window.__BD_CFG); } else {\n${read("hook.js")}\n${read("skins.js")}\n${read("content.js")}\n}`
   );
 }
 
