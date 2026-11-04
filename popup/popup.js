@@ -70,6 +70,14 @@ const CANDLE_PRESETS = [
   ["acid", "Acid", "#c6ff00", "#7c4dff"],
   ["crimson", "Crimson", "#ff5252", "#8a0f2e"],
   ["deepsea", "Deepsea", "#4dd0e1", "#5c6bc0"],
+  ["cyberpunk", "Cyberpunk", "#fcee0a", "#00f0ff"],
+  ["matrix", "Matrix", "#00ff41", "#0b6623"],
+  ["bubblegum", "Bubblegum", "#7cf7d4", "#ff8fd8"],
+  ["mono", "Mono", "#ffffff", "#2f2f35"],
+  ["sunrise", "Sunrise", "#ffe082", "#ff6e40"],
+  ["forest", "Forest", "#9ccc65", "#6d4c41"],
+  ["royal", "Royal", "#ffd700", "#6a1b9a"],
+  ["arctic", "Arctic", "#e0f7fa", "#0288d1"],
 ];
 const bars = (up, down) => {
   // 8 tiny candles: [open, close, low, high] in a 0-30 box
@@ -99,56 +107,85 @@ $("candleUp").oninput = (e) => { set({ candleUp: e.target.value, candleOn: true,
 $("candleDown").oninput = (e) => { set({ candleDown: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
 
 // ---------- my media ----------
+// Extension: files are stored as Blobs in IndexedDB (src/mediadb.js) and played by player/player.html,
+// so big videos are fine. Desktop app (no chrome.runtime): falls back to data URLs, 50 MB each.
+const EXT_MODE = !!(chrome.runtime && chrome.runtime.id);
+const IS_TAB = new URLSearchParams(location.search).has("page");
+const MAX_FILE_MB = EXT_MODE ? 2048 : MAX_MB;
+const converting = {}; // id -> progress 0..1
+
 function renderMedia() {
   const box = $("mediaCards"); box.innerHTML = "";
   cfg.media.forEach((m) => {
     const card = document.createElement("div");
     card.className = "card" + (cfg.skin === "media" && cfg.mediaId === m.id ? " on" : "");
-    const el = document.createElement(m.type === "video" ? "video" : "img");
-    el.src = m.src;
-    if (m.type === "video") Object.assign(el, { muted: true, loop: true, autoplay: true });
-    card.append(el);
-    card.insertAdjacentHTML("beforeend", `<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">✕</button></div>`);
+    if (m.thumb || m.pending) {
+      const img = document.createElement("img");
+      if (m.thumb) img.src = m.thumb; else img.alt = "";
+      card.append(img);
+    } else {
+      const el = document.createElement(m.type === "video" ? "video" : "img");
+      el.src = m.src;
+      if (m.type === "video") Object.assign(el, { muted: true, loop: true, autoplay: true });
+      card.append(el);
+    }
+    const badge = m.pending ? `<span class="live">${converting[m.id] !== undefined ? "CONVERTING " + Math.round(converting[m.id] * 100) + "%" : "WAITING TO CONVERT"}</span>`
+      : m.type === "video" ? '<span class="live">● VIDEO</span>' : "";
+    card.insertAdjacentHTML("beforeend", `${badge}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">✕</button></div>`);
     card.onclick = (e) => {
       if (e.target.classList.contains("x")) {
         const media = cfg.media.filter((x) => x.id !== m.id);
         const wasActive = cfg.skin === "media" && cfg.mediaId === m.id;
+        if (m.file && window.WickedMediaDB) WickedMediaDB.del(m.id).catch(() => {});
         set(wasActive ? { media, skin: "aurora", mediaId: null } : { media });
-      } else set({ skin: "media", mediaId: m.id });
+      } else if (!m.pending) set({ skin: "media", mediaId: m.id });
       renderMedia(); renderSkins();
     };
     box.appendChild(card);
   });
 }
-// Formats Chrome/Edge/Electron can decode natively. Anything else gets a clear message.
+
 const IMAGE_EXT = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", jfif: "image/jpeg", pjpeg: "image/jpeg",
   gif: "image/gif", webp: "image/webp", avif: "image/avif", apng: "image/apng", bmp: "image/bmp",
   ico: "image/x-icon", svg: "image/svg+xml" };
-const VIDEO_EXT = { mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm", mov: "video/mp4", // most .mov are H.264
-  ogv: "video/ogg", ogg: "video/ogg", mkv: "video/webm" };                                   // mkv w/ VP8/VP9/AV1 plays
+// Any of these is accepted. Ones the browser can't play are converted to WebM on your computer.
+const VIDEO_EXT = new Set(["mp4", "m4v", "mov", "qt", "webm", "mkv", "avi", "wmv", "asf", "flv", "f4v", "mpg", "mpeg",
+  "mpe", "m2v", "ts", "mts", "m2ts", "3gp", "3g2", "ogv", "ogg", "hevc", "h264", "264", "h265", "265", "vob", "divx",
+  "xvid", "rm", "rmvb", "mxf", "dv", "y4m", "gifv"]);
 const UNSUPPORTED = { heic: "HEIC (iPhone photo): export it as JPG or PNG first",
   heif: "HEIF: export it as JPG or PNG first", tif: "TIFF: convert it to PNG first", tiff: "TIFF: convert it to PNG first",
-  avi: "AVI: convert it to MP4 first", wmv: "WMV: convert it to MP4 first", flv: "FLV: convert it to MP4 first",
   psd: "PSD: export it as PNG first" };
 
 function classify(f) {
   const ext = (f.name.split(".").pop() || "").toLowerCase();
   if (UNSUPPORTED[ext]) return { err: UNSUPPORTED[ext] };
-  if (f.type.startsWith("video/") || VIDEO_EXT[ext]) return { type: "video", mime: f.type || VIDEO_EXT[ext] };
+  if (f.type.startsWith("video/") || VIDEO_EXT.has(ext)) return { type: "video" };
   if (f.type.startsWith("image/") || IMAGE_EXT[ext]) return { type: "image", mime: f.type || IMAGE_EXT[ext] };
   return { err: "not an image or video file" };
 }
 
-// Actually try to decode it, so users find out now instead of seeing a black chart.
-function canDecode(type, src) {
+// Load it for real; for videos also grab a small thumbnail frame.
+function probe(type, url) {
   return new Promise((ok) => {
     const el = document.createElement(type === "video" ? "video" : "img");
-    const done = (v) => { clearTimeout(t); el.removeAttribute("src"); ok(v); };
-    const t = setTimeout(() => done(false), 8000);
-    if (type === "video") { el.muted = true; el.preload = "metadata"; el.onloadeddata = () => done(el.videoWidth > 0); }
-    else el.onload = () => done(el.naturalWidth > 0);
-    el.onerror = () => done(false);
-    el.src = src;
+    let t;
+    const done = (v) => { clearTimeout(t); ok(v); };
+    t = setTimeout(() => done(null), 10000);
+    const thumbOf = (src, w, h) => {
+      try {
+        const c = document.createElement("canvas"); c.width = 192; c.height = 108;
+        const g = c.getContext("2d"), s = Math.max(192 / w, 108 / h);
+        g.drawImage(src, (192 - w * s) / 2, (108 - h * s) / 2, w * s, h * s);
+        return c.toDataURL("image/jpeg", 0.7);
+      } catch { return null; }
+    };
+    if (type === "video") {
+      Object.assign(el, { muted: true, preload: "auto", playsInline: true });
+      el.onloadeddata = () => { if (!el.videoWidth) return done(null); el.currentTime = Math.min(1, (el.duration || 2) / 3); };
+      el.onseeked = () => done({ thumb: thumbOf(el, el.videoWidth, el.videoHeight) });
+    } else el.onload = () => done(el.naturalWidth ? { thumb: thumbOf(el, el.naturalWidth, el.naturalHeight) } : null);
+    el.onerror = () => done(null);
+    el.src = url;
   });
 }
 
@@ -159,31 +196,118 @@ const readAsDataURL = (f, mime) => new Promise((res, rej) => {
   r.readAsDataURL(f);
 });
 
+const hint = (t) => { $("mediaHint").textContent = t; };
+const saveMedia = (media, extra = {}) => set({ media, ...extra });
+
 async function addFiles(files) {
-  const added = [], problems = [];
-  $("mediaHint").textContent = "Checking files…";
+  const problems = []; let added = 0, needConvert = 0, lastId = null;
+  hint("Checking files…");
   for (const f of files) {
     const c = classify(f);
     if (c.err) { problems.push(`${f.name}: ${c.err}`); continue; }
-    if (f.size > MAX_MB * 1024 * 1024) { problems.push(`${f.name}: over ${MAX_MB} MB`); continue; }
-    const src = await readAsDataURL(f, c.mime);
-    if (!(await canDecode(c.type, src))) {
-      problems.push(`${f.name}: this ${c.type}'s format/codec can't play in the browser` +
-        (c.type === "video" ? " (try exporting as MP4 H.264 or WebM)" : ""));
+    if (f.size > MAX_FILE_MB * 1024 * 1024) { problems.push(`${f.name}: over ${MAX_FILE_MB >= 1024 ? MAX_FILE_MB / 1024 + " GB" : MAX_FILE_MB + " MB"}`); continue; }
+    const name = f.name;
+    const id = uid();
+
+    if (!EXT_MODE) { // desktop app fallback
+      const src = await readAsDataURL(f, c.mime);
+      const p = await probe(c.type, src);
+      if (!p) { problems.push(`${f.name}: can't play in the desktop app yet (try MP4 H.264 or WebM)`); continue; }
+      cfg.media = [...cfg.media, { id, name, type: c.type, src }]; lastId = id; added++;
       continue;
     }
-    added.push({ id: uid(), name: f.name.replace(/\.[^.]+$/, ""), type: c.type, src });
+
+    const url = URL.createObjectURL(f);
+    const p = await probe(c.type, url);
+    URL.revokeObjectURL(url);
+    if (p) {
+      await WickedMediaDB.put(id, f);
+      cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size }];
+      lastId = id; added++;
+    } else if (c.type === "video") {
+      await WickedMediaDB.put(id + ":src", f); // original kept until converted
+      cfg.media = [...cfg.media, { id, name, type: "video", file: true, pending: true, origName: f.name, size: f.size }];
+      needConvert++;
+    } else problems.push(`${f.name}: this image's format can't be shown in the browser`);
   }
-  if (added.length) {
-    const last = added[added.length - 1];
-    set({ media: [...cfg.media, ...added], skin: "media", mediaId: last.id });
-    renderMedia(); renderSkins();
+  saveMedia(cfg.media, lastId ? { skin: "media", mediaId: lastId } : {});
+  renderMedia(); renderSkins();
+  const parts = [];
+  if (added) parts.push(`Added ${added} file${added > 1 ? "s" : ""}.`);
+  if (needConvert) parts.push(`${needConvert} video${needConvert > 1 ? "s" : ""} need converting…`);
+  if (problems.length) parts.push("Skipped " + problems.join(" · "));
+  hint(parts.join(" ") || "Files stay on your computer.");
+  if (needConvert) {
+    if (IS_TAB) convertPending();
+    else chrome.tabs.create({ url: chrome.runtime.getURL("popup/popup.html?page=media") }); // keep converting even if the popup closes
   }
-  $("mediaHint").textContent = problems.length
-    ? "Skipped " + problems.join(" · ")
-    : added.length ? `Added ${added.length} file${added.length > 1 ? "s" : ""}.` : "Files stay on your computer. Max 50 MB each.";
 }
 
+// ---------- video converter (ffmpeg.wasm, runs locally, loaded only when needed) ----------
+let ffmpegP;
+function getFFmpeg() {
+  if (ffmpegP) return ffmpegP;
+  // ESM build: ffmpeg.wasm 0.12 runs in a module worker, which needs the ESM core.
+  const base = chrome.runtime.getURL("vendor/ffmpeg/");
+  ffmpegP = import(base + "esm/index.js").then(async ({ FFmpeg }) => {
+    const ff = new FFmpeg();
+    await ff.load({ coreURL: base + "ffmpeg-core.js", wasmURL: base + "ffmpeg-core.wasm" });
+    return ff;
+  }).catch((e) => { ffmpegP = null; throw e; });
+  return ffmpegP;
+}
+
+let convertBusy = false;
+async function convertPending() {
+  if (convertBusy || !EXT_MODE) return;
+  convertBusy = true;
+  try {
+    for (;;) {
+      const m = cfg.media.find((x) => x.pending);
+      if (!m) break;
+      converting[m.id] = 0; renderMedia();
+      hint(`Converting ${m.origName} to a format the browser can play… keep this tab open.`);
+      try {
+        const src = await WickedMediaDB.get(m.id + ":src");
+        if (!src) throw new Error("original file missing");
+        const ff = await getFFmpeg();
+        const onProg = ({ progress }) => { converting[m.id] = Math.max(0, Math.min(1, progress || 0)); renderMedia(); };
+        ff.on("progress", onProg);
+        const inName = "in." + ((m.origName.split(".").pop() || "bin").toLowerCase());
+        await ff.writeFile(inName, new Uint8Array(await src.arrayBuffer()));
+        // Wallpaper-friendly: no audio, max 1920px wide, 30 fps, fast VP8 WebM, first 3 minutes.
+        const code = await ff.exec(["-i", inName, "-t", "180", "-an", "-vf", "scale='min(1920,iw)':-2,fps=30",
+          "-c:v", "libvpx", "-b:v", "4M", "-deadline", "realtime", "-cpu-used", "8", "-pix_fmt", "yuv420p", "out.webm"]);
+        ff.off("progress", onProg);
+        if (code !== 0) throw new Error("ffmpeg could not read this video");
+        const data = await ff.readFile("out.webm");
+        await ff.deleteFile(inName).catch(() => {}); await ff.deleteFile("out.webm").catch(() => {});
+        const blob = new Blob([data.buffer], { type: "video/webm" });
+        const url = URL.createObjectURL(blob); const p = await probe("video", url); URL.revokeObjectURL(url);
+        if (!p) throw new Error("converted video still won't play");
+        await WickedMediaDB.put(m.id, blob);
+        await WickedMediaDB.del(m.id + ":src");
+        delete converting[m.id];
+        cfg.media = cfg.media.map((x) => (x.id === m.id ? { id: x.id, name: x.name, type: "video", file: true, thumb: p.thumb, size: blob.size, converted: true } : x));
+        saveMedia(cfg.media, { skin: "media", mediaId: m.id });
+        hint(`Converted ${m.origName}. It's on your chart now.`);
+      } catch (e) {
+        delete converting[m.id];
+        await WickedMediaDB.del(m.id + ":src").catch(() => {});
+        cfg.media = cfg.media.filter((x) => x.id !== m.id);
+        saveMedia(cfg.media);
+        hint(`Couldn't convert ${m.origName}: ${e.message || e}.`);
+      }
+      renderMedia(); renderSkins();
+    }
+  } finally { convertBusy = false; }
+}
+
+// In the popup, picking files opens the full-tab manager: Chrome can close the popup when a file
+// dialog opens, and long conversions need a page that stays open.
+$("addMedia").addEventListener("click", (e) => {
+  if (EXT_MODE && !IS_TAB) { e.preventDefault(); chrome.tabs.create({ url: chrome.runtime.getURL("popup/popup.html?page=media&pick=1") }); }
+});
 $("file").onchange = async (e) => { await addFiles([...e.target.files]); e.target.value = ""; };
 
 // Drag & drop anywhere on the My media tab
@@ -299,4 +423,11 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
   renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles();
+  const q = new URLSearchParams(location.search);
+  if (q.get("page")) {
+    document.body.classList.add("page");
+    const b = document.querySelector(`#nav button[data-tab="${q.get("page")}"]`); b && b.click();
+    if (q.has("pick")) hint("Click “Add video / image” or drop files here.");
+    convertPending();
+  }
 });

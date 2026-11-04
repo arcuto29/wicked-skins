@@ -3,22 +3,56 @@
   "name": "Wicked Skins for TradingView",
   "version": "0.1.0",
   "description": "Live animated backgrounds, videos, GIFs and images behind your TradingView charts.",
-  "permissions": ["storage", "unlimitedStorage"],
-  "host_permissions": ["https://*.tradingview.com/*"],
-  "action": { "default_popup": "popup/popup.html", "default_title": "Wicked Skins" },
+  "permissions": [
+    "storage",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://*.tradingview.com/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Wicked Skins"
+  },
   "content_scripts": [
     {
-      "matches": ["https://*.tradingview.com/*"],
-      "js": ["src/hook.js"],
+      "matches": [
+        "https://*.tradingview.com/*"
+      ],
+      "js": [
+        "src/hook.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN",
       "all_frames": true
     },
     {
-      "matches": ["https://*.tradingview.com/*"],
-      "js": ["src/skins.js", "src/content.js"],
-      "css": ["src/content.css"],
+      "matches": [
+        "https://*.tradingview.com/*"
+      ],
+      "js": [
+        "src/skins.js",
+        "src/content.js"
+      ],
+      "css": [
+        "src/content.css"
+      ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "player/player.html",
+        "player/player.js",
+        "src/mediadb.js"
+      ],
+      "matches": [
+        "https://*.tradingview.com/*"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
 }

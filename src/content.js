@@ -145,7 +145,13 @@
     if (content.tagName === "VIDEO") {
       content.playbackRate = Math.max(0.25, Math.min(4, cfg.speed));
       cfg.paused ? content.pause() : content.play().catch(() => {});
-    }
+    }    if (content.tagName === "IFRAME") postLook();
+  }
+
+  // Files stored in the extension's database play inside an extension iframe (player/player.html).
+  function postLook() {
+    if (!content || content.tagName !== "IFRAME" || !content.contentWindow) return;
+    content.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed, paused: cfg.paused } }, "*");
   }
 
   function build() {
@@ -165,7 +171,13 @@
     layer.id = "bd-layer";
 
     const m = activeMedia();
-    if (m) {
+    if (m && m.file && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
+      content = document.createElement("iframe");
+      content.className = "bd-player";
+      content.setAttribute("allow", "autoplay");
+      content.src = chrome.runtime.getURL(`player/player.html?id=${encodeURIComponent(m.id)}&type=${m.type}`);
+      content.addEventListener("load", postLook);
+    } else if (m && m.src) {
       if (m.type === "video") {
         content = document.createElement("video");
         Object.assign(content, { src: m.src, loop: true, muted: true, autoplay: true, playsInline: true });
