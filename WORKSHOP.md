@@ -8,32 +8,35 @@
    - `site/site-config.js` (`supabaseUrl`, `supabaseAnonKey`)
    The anon key is public by design; the rules in `schema.sql` decide what it can do.
 
-## 2. Sign-in
+## 2. Sign-in (website only)
+Accounts and uploading live on the **website** (`site/workshop.html`). The extension never asks anyone to log in —
+it only browses and uses approved wallpapers. That keeps the extension simple and avoids email limits in a popup.
+
 **Email + password:** on by default (Authentication → Providers → Email). To let people sign in right after creating
 an account, turn off "Confirm email"; otherwise they confirm via the email link first.
-"Forgot password" emails a reset link that opens `site/reset.html` on the website, where the user picks a new password.
-No email-template changes are needed. Note: Supabase's built-in email sender only allows a few emails per hour —
-for a real launch, add custom SMTP (e.g. Resend) under **Authentication → Emails → SMTP Settings**.
+"Forgot password" emails a reset link that opens `site/reset.html`. Note: Supabase's built-in email sender only allows
+a few emails per hour — for a real launch, add custom SMTP (e.g. Resend) under **Authentication → Emails → SMTP Settings**.
 
 **Google:**
 1. Google Cloud Console → APIs & Services → Credentials → **Create OAuth client ID** → *Web application*.
    Authorized redirect URI: `https://<your-project>.supabase.co/auth/v1/callback`
 2. Supabase → Authentication → Providers → **Google** → paste the Client ID + Secret → enable.
-3. Supabase → Authentication → URL Configuration → **Redirect URLs** → add `https://*.chromiumapp.org/**`
-   (that's where Chrome returns from Google sign-in for extensions).
+3. Supabase → Authentication → URL Configuration → **Redirect URLs** → add your website URL
+   (e.g. `https://arcuto29.github.io/wicked-skins/**`), where Google returns after sign-in.
 
 ## 3. Make yourself admin
-Sign in once from the extension (Workshop tab), then in the SQL Editor run, with your email:
+Sign in once on the **website** (Workshop → Share), then in the SQL Editor run, with your email:
 ```sql
 update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com');
 ```
 Now your uploads go live immediately, and **Workshop → Review** shows everyone else's for you to approve or reject.
 
 ## How it works
-- Anyone can browse approved wallpapers (extension + website), no account needed.
-- Signed-in users can share (max 50 MB; MP4, WebM, PNG, JPG, WebP, GIF, AVIF), like and report.
-- Uploads wait for your review; yours are approved automatically.
-- 3 reports hide a wallpaper until you review it again.
+- **Extension:** browse approved wallpapers and tap **Use** — no account, ever. "Use" downloads the file into Uploads
+  and puts it on the chart. A **Submit on the website** link opens the site for sharing.
+- **Website:** sign in to **share** (max 50 MB; MP4, WebM, PNG, JPG, WebP, GIF, AVIF). Anyone can browse there too.
+- Uploads wait for admin review; an admin's own uploads are approved automatically.
+- 3 reports hide a wallpaper until an admin reviews it again.
 - All of this is enforced in the database (`supabase/schema.sql`), verified by 27 tests.
 
 ## Costs

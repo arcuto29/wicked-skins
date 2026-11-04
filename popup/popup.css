@@ -122,7 +122,6 @@ details.grp > summary .switch { margin-left: auto; }
 .card.ws .status.pending { color: #ffd36b; } .card.ws .status.rejected { color: #ff6b6b; } .card.ws .status.approved { color: #2ef2b0; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
 .modal .box { display: grid; gap: 8px; width: 100%; max-width: 320px; background: #12141a; }
-.media-share { position: absolute; top: 6px; left: 6px; padding: 3px 7px; font-size: 10px; background: rgba(0,0,0,.65); }
 #sessionRows .row > span { width: 104px; line-height: 1.2; }
 #sessionRows select { flex: 1; padding: 6px 8px; }
 .now { font: 700 9px system-ui, sans-serif; color: #04130f; background: #2ef2b0; padding: 1px 5px; border-radius: 99px; letter-spacing: .05em; }
@@ -133,3 +132,4 @@ details.grp > summary .switch { margin-left: auto; }
 .chartpick > span { color: #9a9dab; font-size: 12px; margin-right: 2px; }
 .chartpick .chip { padding: 4px 10px; font-size: 12px; }
 .chartpick .chip.on { background: #2ef2b0; color: #06110d; border-color: #2ef2b0; }
+.btn.block { display:block; width:100%; text-align:center; margin-top:10px; }

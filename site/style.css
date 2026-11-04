@@ -46,3 +46,27 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; } footer a { color: va
 .empty { color: var(--muted); padding: 30px 0; }
 .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: flex; align-items: center; justify-content: center; z-index: 20; padding: 24px; }
 .lightbox img, .lightbox video { max-width: 100%; max-height: 90vh; border-radius: 12px; }
+
+/* Workshop submit panel */
+.submit-box { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; max-width: 560px; }
+.submit-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.submit-head b { font-size: 17px; }
+.who { color: var(--muted); font-size: 13px; } .who a { color: var(--a2); } .who .adm { color: var(--a3); font-weight: 700; }
+.submit-box .hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+.field { width: 100%; box-sizing: border-box; margin-top: 10px; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: #0b0e14; color: var(--text); font: inherit; }
+.field:focus { outline: none; border-color: var(--a2); }
+.row2 { display: flex; gap: 10px; margin-top: 10px; } .row2 .btn { flex: 1; justify-content: center; }
+.linkbtn { background: none; border: none; color: var(--muted); cursor: pointer; margin-top: 8px; padding: 0; font: inherit; font-size: 13px; }
+.linkbtn:hover { color: var(--text); }
+.google-btn { width: 100%; justify-content: center; background: #fff; color: #1f1f1f; border: none; }
+.or { text-align: center; color: var(--muted); font-size: 13px; margin: 12px 0; position: relative; }
+.or::before, .or::after { content: ""; position: absolute; top: 50%; width: 42%; height: 1px; background: var(--line); } .or::before { left: 0; } .or::after { right: 0; }
+.drop { display: block; border: 1.5px dashed var(--line); border-radius: 12px; padding: 26px; text-align: center; cursor: pointer; }
+.drop:hover, .drop.over { border-color: var(--a2); background: rgba(46,242,176,.05); }
+.drop b { display: block; } .drop small { color: var(--muted); display: block; margin-top: 6px; }
+.preview { margin-top: 12px; border-radius: 12px; overflow: hidden; background: #0b0e14; aspect-ratio: 16/9; }
+.preview img, .preview video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rights { display: flex; gap: 8px; align-items: flex-start; color: var(--muted); font-size: 13px; margin: 12px 0; } .rights a { color: var(--a2); }
+#share { width: 100%; justify-content: center; }
+#share:disabled { opacity: .5; cursor: not-allowed; }
+.lightbox { cursor: zoom-out; }
