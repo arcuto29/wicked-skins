@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 5;
+  const HOOK_VERSION = 4;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -24,7 +24,7 @@
       const f = document.createElement("iframe"); f.style.display = "none";
       (document.documentElement || document.head || document.body).appendChild(f);
       const N = f.contentWindow.CanvasRenderingContext2D.prototype, P = CanvasRenderingContext2D.prototype;
-      for (const m of ["fillText", "fillRect", "fill", "stroke", "beginPath", "moveTo", "lineTo", "strokeRect", "arcTo", "clearRect"]) P[m] = N[m];
+      for (const m of ["fillText", "fillRect", "fill", "stroke", "beginPath", "moveTo", "lineTo", "strokeRect"]) P[m] = N[m];
       for (const prop of ["fillStyle", "strokeStyle"]) Object.defineProperty(P, prop, Object.getOwnPropertyDescriptor(N, prop));
       f.remove();
     } catch {}
@@ -260,18 +260,9 @@
   //  - any colourful, visible line can glow; grid (faint) and crosshair (grey) never do
   const segs = new WeakMap();
   const origBegin = proto.beginPath, origMove = proto.moveTo, origLine = proto.lineTo, origStroke = proto.stroke;
-  // On the price scale we also note how tall the current path is, to find the live-price tag (see "price light").
-  const pathY = new WeakMap();   // ctx -> [minY, maxY] in canvas pixels
-  const noteY = (ctx, x, y) => {
-    if (!on || !isPriceAxis(ctx.canvas)) return;
-    const t = ctx.getTransform(), dy = t.b * x + t.d * y + t.f, k = pathY.get(ctx);
-    if (k) { if (dy < k[0]) k[0] = dy; if (dy > k[1]) k[1] = dy; } else pathY.set(ctx, [dy, dy]);
-  };
-  proto.beginPath = function () { segs.set(this, [0, 0]); pathY.delete(this); return origBegin.call(this); };
-  proto.moveTo = function (x, y) { const k = segs.get(this); if (k) k[0]++; noteY(this, x, y); return origMove.call(this, x, y); };
-  proto.lineTo = function (x, y) { const k = segs.get(this); if (k) k[1]++; noteY(this, x, y); return origLine.call(this, x, y); };
-  const origArcTo = proto.arcTo;
-  proto.arcTo = function (x1, y1, x2, y2, r) { noteY(this, x1, y1); noteY(this, x2, y2); return origArcTo.apply(this, arguments); };
+  proto.beginPath = function () { segs.set(this, [0, 0]); return origBegin.call(this); };
+  proto.moveTo = function (x, y) { const k = segs.get(this); if (k) k[0]++; return origMove.call(this, x, y); };
+  proto.lineTo = function (x, y) { const k = segs.get(this); if (k) k[1]++; return origLine.call(this, x, y); };
 
   const glowCache = new Map();
   function glowable(col) {
@@ -406,7 +397,7 @@
   // on <html data-ws-pnl> for content.js. Nothing leaves your computer.
   const PNL_RE = /^(?:p\s*(?:&|n|\/)?\s*l\s*:?\s*)?([+\-\u2212])?\s*([$\u20ac\u00a3\u00a5])?\s*([+\-\u2212])?\s*(\d{1,3}(?:,\d{3})*|\d+)(\.\d{1,2})\s*(usd|usdt|usdc|eur|gbp|jpy|aud|cad|chf|nzd|pts|points)?$/i;
   let pnlFrame = -1, pnlSum = 0, pnlUnit = "", pnlLastWrite = 0, frameNo = 0;
-  requestAnimationFrame(function tick() { frameNo++; checkClosed(); requestAnimationFrame(tick); });
+  (function tick() { frameNo++; requestAnimationFrame(tick); })();
   function notePnl(text, c) {
     if (!on || typeof text !== "string" || text.length > 40 || !isPane(c)) return;
     const m = text.trim().match(PNL_RE);
@@ -416,7 +407,6 @@
     const v = parseFloat((m[4] + m[5]).replace(/,/g, "")) * (sign === "-" || sign === "\u2212" ? -1 : 1);
     if (frameNo !== pnlFrame) { pnlFrame = frameNo; pnlSum = 0; }
     pnlSum += v; pnlUnit = cur || (code ? code.toUpperCase() : "");
-    pnlCanvas = c; pnlSeen = frameNo; pnlMissing = 0; pnlLastV = Math.round(pnlSum * 100) / 100; pnlLastUnit = pnlUnit;
     const now = performance.now();
     if (now - pnlLastWrite > 400) {
       pnlLastWrite = now;
@@ -424,56 +414,9 @@
     }
   }
 
-  // ---------- live price position (for the "price light" behind the chart) ----------
-  // Where each chart's live-price tag sits on screen, and whether the last bar is up or down. Published on
-  // <html data-ws-price> as [{ l, r, t, b, y, side }] (CSS px; l/r/t/b = the chart's box). Read-only, nothing sent.
-  const pendingTag = new WeakMap();
-  const prices = new Map();      // price-axis canvas -> { y, side }
-  let priceT = 0, priceSig = "";
-  function notePrice(c, tag) {
-    let rc = rectCache.get(c), now = performance.now();
-    if (!rc || now - rc.t > 1000) { rc = { r: c.getBoundingClientRect(), t: now }; rectCache.set(c, rc); }
-    prices.set(c, { y: rc.r.top + (tag.y / c.height) * rc.r.height, side: tag.side });
-    if (now - priceT > 150) publishPrices(); else if (!pubQueued) { pubQueued = true; setTimeout(() => { pubQueued = false; publishPrices(); }, 160); }
-  }
-  let pubQueued = false;
-  function publishPrices() {
-    priceT = performance.now();
-    const out = [];
-    for (const [c, p] of prices) {
-      if (!c.isConnected) { prices.delete(c); continue; }
-      const box = c.closest(".chart-container") || c.closest(".chart-markup-table") || c;
-      const r = box.getBoundingClientRect();
-      out.push({ l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom), y: Math.round(p.y), side: p.side });
-    }
-    const sig = JSON.stringify(out);
-    if (sig !== priceSig) { priceSig = sig; htmlEl().setAttribute && htmlEl().setAttribute("data-ws-price", sig); }
-  }
-
-  // ---------- trade closed (for "trade effects") ----------
-  // A position line that was on the chart is gone after the chart has redrawn twice without it -> the trade closed.
-  // Its last P&L goes out on <html data-ws-trade> = { v, unit, ts }.
-  let pnlCanvas = null, pnlSeen = -1, pnlCleared = -1, pnlChecked = -1, pnlMissing = 0, pnlLastV = 0, pnlLastUnit = "";
-  const origClear = proto.clearRect;
-  proto.clearRect = function (x, y, w, h) {
-    const c = this.canvas;
-    if (c && c === pnlCanvas && w * (this.getTransform().a || 1) >= c.width * 0.98 && h * (this.getTransform().d || 1) >= c.height * 0.98) pnlCleared = frameNo;
-    return origClear.call(this, x, y, w, h);
-  };
-  function checkClosed() {
-    if (!pnlCanvas || pnlCleared <= pnlChecked) return;
-    pnlChecked = pnlCleared;
-    if (pnlSeen >= pnlCleared) { pnlMissing = 0; return; }
-    if (++pnlMissing < 2) return;
-    htmlEl().setAttribute && htmlEl().setAttribute("data-ws-trade", JSON.stringify({ v: pnlLastV, unit: pnlLastUnit, ts: Date.now() }));
-    pnlCanvas = null; pnlMissing = 0;
-  }
-
   proto.fillText = function (...a) {
     const c = this.canvas;
     notePnl(a[0], c);
-    const tag = pendingTag.get(this);
-    if (tag) { pendingTag.delete(this); if (/^[+\-\u2212]?[\d.,'\s]+$/.test(String(a[0]))) notePrice(c, tag); }   // a price, not "63.14M" volume
     // Live-price tags (and other price boxes): same font/weight/size as the scale, text kept inside its box.
     const tagsRecoloured = candles && fx.scaleLabels;
     if (on && c && isAxis(c) && !isScaleLabel(this.fillStyle) && (tagsRecoloured || fx.scaleFont !== "default" || fx.scaleSize > 0 || fx.scaleBold)) {
@@ -550,11 +493,6 @@
   proto.fill = function (...a) {
     const c = this.canvas;
     if (on && c && isAxis(c)) lastTag.set(this, this.fillStyle);
-    if (on && c && isPriceAxis(c)) {             // a candle-coloured box on the price scale: maybe the live-price tag
-      const k = pathY.get(this), r = rgbKey(this.__bdFill || this.fillStyle), side = r && sides.get(r.key);
-      if (k && side && k[1] - k[0] < 60) pendingTag.set(this, { y: (k[0] + k[1]) / 2, side });
-      else pendingTag.delete(this);
-    }
     if (on && c && fx.scaleGlow > 0 && isAxis(c)) {
       const col = this.fillStyle;
       if (typeof col === "string" && glowable(col)) {
