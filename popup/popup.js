@@ -16,7 +16,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   candleLook: "solid", shiftSpeed: 10,
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
@@ -767,10 +767,19 @@ $("showNums").onclick = () => flashNumbers(typeof target === "number" ? target :
 // ---------- watermark (logo + name) ----------
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
+  $("wmText").value = cfg.wmText || "";
+  seg("wmStyle", [["corner", "Corner"], ["tiled", "Tiled"]], () => cfg.wmStyle, (v) => { set({ wmStyle: v, wmOn: true }); $("wmOn").checked = true; syncWatermark(); });
+  const tiled = cfg.wmStyle === "tiled";
+  $("wmPosRow").hidden = tiled;
+  $("wmDriftRow").hidden = tiled;
   seg("wmPos", [["tl", cornerIcon(2.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["center", cornerIcon(5.5, 4.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]],
     () => cfg.wmPos, (v) => { set({ wmPos: v, wmOn: true }); $("wmOn").checked = true; });
+  seg("wmDrift", [[false, "Fixed"], [true, "Drift"]], () => !!cfg.wmDrift, (v) => set({ wmDrift: v }));
+  $("wmOpacity").value = cfg.wmOpacity; $("wmOpacityOut").textContent = Math.round(cfg.wmOpacity * 100) + "%";
 }
 $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
+$("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cfg.wmOn || !!e.target.value });
+$("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
 const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength","vignette","calm"];
 const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont"];

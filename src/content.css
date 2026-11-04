@@ -78,8 +78,10 @@ html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="valueTitle
   filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
 #bd-wm img { display: block; width: 22px; height: 22px; }
 #bd-wm span { background: linear-gradient(90deg, #19d3ff, #2ef2b0 55%, #c6ff3d); -webkit-background-clip: text; background-clip: text; color: transparent; }
-#bd-wm.bd-wm-center { font-size: 34px; gap: 14px; opacity: .55; }
+#bd-wm.bd-wm-center { font-size: 34px; gap: 14px; }
 #bd-wm.bd-wm-center img { width: 48px; height: 48px; }
+/* Tiled: a faint repeated mark across the whole chart (hard to crop out of a repost) */
+#bd-wm.bd-wm-tiled { position: fixed; display: block; gap: 0; background-repeat: repeat; background-size: 300px 170px; filter: none; }
 
 /* "Shift" candle look: the chart's main canvas (candles, volume, indicators) cycles through colours.
    First canvas in each pane is the main layer; the second (crosshair) is left alone. */
