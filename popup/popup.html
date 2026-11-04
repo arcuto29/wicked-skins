@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <nav id="nav">
+    <button data-tab="skins" class="on">Skins</button>
+    <button data-tab="media">My media</button>
+    <button data-tab="loadouts">Loadouts</button>
+    <button data-tab="tune">Tune</button>
+  </nav>
+
+  <main>
+    <div class="top">
+      <span id="status"></span>
+      <label class="switch"><input type="checkbox" id="enabled" /><span></span></label>
+    </div>
+
+    <section id="tab-skins">
+      <div class="chips" id="chips"></div>
+      <div class="cards" id="skinCards"></div>
+    </section>
+
+    <section id="tab-media" hidden>
+      <div class="cards" id="mediaCards"></div>
+      <label class="add">
+        <input type="file" id="file" accept="image/*,video/*,.gif" multiple hidden />
+        <b>+</b> Add video / image / GIF
+      </label>
+      <p class="hint" id="mediaHint">Files stay on your computer. Max 50 MB each.</p>
+    </section>
+
+    <section id="tab-loadouts" hidden>
+      <div class="box">
+        <div class="inline">
+          <input id="loName" placeholder="Name your loadout" maxlength="40" />
+          <button class="primary" id="loSave">Save</button>
+        </div>
+        <p class="hint">Saves your skin and Tune settings together. Stored locally.</p>
+      </div>
+      <div class="cards one" id="loCards"></div>
+      <div class="inline" style="margin-top:10px">
+        <button id="loExport">Export</button>
+        <label class="btn">Import<input type="file" id="loImport" accept="application/json" hidden /></label>
+      </div>
+    </section>
+
+    <section id="tab-tune" hidden>
+      <h4>Look</h4>
+      <div id="sliders"></div>
+      <div class="row"><span>Frame rate</span><div class="seg" id="fps"></div></div>
+      <div class="row"><span>Fit</span><div class="seg" id="fit"></div></div>
+      <p class="hint">Fit and position apply to images and videos.</p>
+      <h4>Behaviour</h4>
+      <div class="row"><span>Power saver</span><div class="seg" id="powerSaver"></div></div>
+      <div class="row"><span>Motion</span><div class="seg" id="motion"></div></div>
+      <h4>Chart</h4>
+      <div class="row"><span>Layer</span><div class="seg" id="layer"></div></div>
+      <button id="reset" class="link">Reset look</button>
+    </section>
+
+    <p class="legal">Cosmetic only. Not affiliated with TradingView, Inc.</p>
+  </main>
+
+  <script src="../src/skins.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

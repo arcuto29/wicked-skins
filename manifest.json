@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Wicked Skins for TradingView",
+  "version": "0.1.0",
+  "description": "Live animated backgrounds, videos, GIFs and images behind your TradingView charts.",
+  "permissions": ["storage", "unlimitedStorage"],
+  "host_permissions": ["https://*.tradingview.com/*"],
+  "action": { "default_popup": "popup/popup.html", "default_title": "Wicked Skins" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.tradingview.com/*"],
+      "js": ["src/hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": ["https://*.tradingview.com/*"],
+      "js": ["src/skins.js", "src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

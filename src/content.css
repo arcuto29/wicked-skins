@@ -1,0 +1,47 @@
+/* Layer sits behind the page (z-index -1) and the chart is made see-through.
+   If TradingView changes its markup, adjust the selectors in the block below. */
+#bd-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  background: #000;
+}
+#bd-layer.bd-over { z-index: 2147483000; background: transparent; }
+#bd-layer.bd-over .bd-dim { display: none; }
+#bd-layer canvas,
+#bd-layer video,
+#bd-layer img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#bd-layer .bd-dim { position: absolute; inset: 0; background: #000; }
+
+html.bd-on { background: var(--bd-page-bg, #131722) !important; }
+html.bd-on body {
+  background: transparent !important;
+  --tv-color-pane-background: transparent !important;
+}
+html.bd-on [class*="titlesWrapper"],
+html.bd-on [class*="valuesWrapper"],
+html.bd-on [class*="buttonsWrapper"],
+html.bd-on [class*="legend-"] [class*="item-"],
+html.bd-on [class*="legend-"] [class*="wrapper-"],
+html.bd-on .chart-container,
+html.bd-on .chart-container-border,
+html.bd-on .chart-markup-table,
+html.bd-on .layout__area--center,
+html.bd-on .chart-gui-wrapper,
+html.bd-on .layout__area--center .tv-chart-view {
+  background: transparent !important;
+}
+
+/* Light TradingView theme: make dark legend text readable on dark skins. */
+html.bd-on.theme-light [class*="legend-"] [class*="title"],
+html.bd-on.theme-light [class*="legend-"] [class*="title"] * {
+  color: #e8eaf0 !important;
+}

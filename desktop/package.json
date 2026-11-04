@@ -1,0 +1,8 @@
+{
+  "name": "wicked-skins-desktop",
+  "version": "0.1.0",
+  "description": "Wicked Skins desktop app: TradingView with live wallpapers (Windows, macOS, Linux)",
+  "main": "main.js",
+  "scripts": { "start": "electron ." },
+  "devDependencies": { "electron": "^33.0.0" }
+}
