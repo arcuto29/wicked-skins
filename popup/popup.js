@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins"];
+const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","parallax","priceLight","tradeFx"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -22,6 +22,7 @@ const DEFAULTS = {
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
   multi: "span", chartSkins: {},
+  parallax: "subtle", priceLight: true, tradeFx: true,
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -180,7 +181,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncCharts(); }
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncCharts(); syncEffects(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 const QUICK_LOOKS = [
@@ -846,6 +847,13 @@ function syncCharts() {
 }
 $("showNums").onclick = () => flashNumbers(typeof target === "number" ? target : 0);
 
+// ---------- effects ----------
+function syncEffects() {
+  seg("parallax", [["off", "Off"], ["subtle", "Subtle"], ["deep", "Deep"]], () => cfg.parallax, (v) => set({ parallax: v }));
+  seg("priceLight", [[false, "Off"], [true, "On"]], () => cfg.priceLight, (v) => set({ priceLight: v }));
+  seg("tradeFx", [[false, "Off"], [true, "On"]], () => cfg.tradeFx, (v) => set({ tradeFx: v }));
+}
+
 // ---------- watermark (logo + name) ----------
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
@@ -854,7 +862,7 @@ function syncWatermark() {
 }
 $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
 
-const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength","vignette","calm"];
+const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength","vignette","calm","parallax","priceLight","tradeFx"];
 const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
@@ -965,7 +973,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncCharts();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncCharts(); syncEffects();
   siteBar();
   detectCharts();
   updates();

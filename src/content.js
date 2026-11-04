@@ -27,6 +27,9 @@
     // Multi-chart layouts: "span" = one wallpaper across the whole layout, "each" = every chart gets its own copy,
     // "mix" = pick a wallpaper per chart (chartSkins: { "2": "galaxy", "3": "media:<id>" }; chart 1 = your main skin)
     multi: "span", chartSkins: {},
+    // Effects: depth (parallax) as you move over / drag / zoom the chart, a soft light behind the live price,
+    // and a short shimmer when a trade closes green (calm fade when red)
+    parallax: "subtle", priceLight: true, tradeFx: true,
   };
 
   let cfg = { ...DEFAULTS };
@@ -139,7 +142,7 @@
   // ---------- Reacts to: Market / My P&L ----------
   // Price comes from the tab title TradingView already shows, e.g. "BTCUSDT 77,228.95 ▼ −0.29%".
   const TITLE_RE = /^(\S+)\s+([\d,]+(?:\.\d+)?)\s*[▲▼]?\s*([+\-\u2212]?[\d.]+)%/;
-  let quote = null, lastPrice = null, mood = 0, reactEl, pillEl, lastPulse = 0;
+  let quote = null, lastPrice = null, mood = 0, reactEl, pillEl, lastPulse = 0, lastSymChange = 0;
 
   function parseTitle() {
     const m = (document.title || "").match(TITLE_RE);
@@ -163,6 +166,10 @@
     } catch { return null; }
   }
 
+  function fmtPnl(v, u) {
+    const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
+    return `${v >= 0 ? "+" : "\u2212"}${unit}${Math.abs(v).toFixed(2)}${code}`;
+  }
   function updateReact(tick) {
     if (!reactEl) return;
     let active = cfg.react !== "off" && (!!quote || cfg.react === "pnl");
@@ -174,8 +181,7 @@
       if (!p) { active = false; mood = 0; }                                       // no open position on the chart
       else {
         mood = clamp(p.v / pnlMaxAbs);
-        const unit = p.unit && p.unit.length === 1 ? p.unit : "", code = p.unit && p.unit.length > 1 ? " " + p.unit : "";
-        label = `P&L ${p.v >= 0 ? "+" : "\u2212"}${unit}${Math.abs(p.v).toFixed(2)}${code}`;
+        label = "P&L " + fmtPnl(p.v, p.unit);
       }
     }
     const col = mood >= 0 ? upColor() : downColor();
@@ -202,6 +208,7 @@
     const q = parseTitle();
     if (!q) return;
     let tick = 0;
+    if (quote && q.sym !== quote.sym) lastSymChange = Date.now();     // switching symbol removes position lines: not a closed trade
     if (lastPrice !== null && quote && q.sym === quote.sym && q.price !== lastPrice) {
       tick = q.price > lastPrice ? 1 : -1;
     }
@@ -243,6 +250,8 @@
     document.documentElement.classList.toggle("bd-over-mode", cfg.layer === "over");
     clipToChart();
     updateReact(0);
+    renderPriceLight();
+    nudge();
     // Over-chart sits ON TOP of the candles, so it needs its own (lower) strength or it hides them.
     layer.style.opacity = String(cfg.layer === "over" ? cfg.overOpacity : cfg.opacity);
     const f = [];
@@ -342,6 +351,100 @@
     applyLook();
   }
 
+  // ---------- effects ----------
+  // Depth: the wallpaper sits "further away" than the chart. It shifts a few pixels against your cursor, follows a
+  // drag for a moment and breathes on zoom, then settles. Nothing moves while you're not touching the chart.
+  const DEPTH = { off: 0, subtle: 9, deep: 20 };
+  const px = { tx: 0, ty: 0, x: 0, y: 0, kick: 0, zoom: 0, z: 0, raf: 0 };
+  const depth = () => (cfg.powerSaver || cfg.paused || !cfg.enabled ? 0 : DEPTH[cfg.parallax] || 0);
+  const clampN = (v, a) => Math.max(-a, Math.min(a, v));
+  function depthFrame() {
+    px.raf = 0;
+    const A = depth();
+    px.kick *= 0.9; px.zoom *= 0.88;
+    const tx = px.tx * A + px.kick, ty = px.ty * A;
+    px.x += (tx - px.x) * 0.09; px.y += (ty - px.y) * 0.09; px.z += (px.zoom - px.z) * 0.18;
+    for (const v of views) {
+      const base = A ? 1 + (A * 3.2) / Math.max(240, Math.min(v.w || innerWidth, v.h || innerHeight)) : 1;   // room so edges never show
+      v.content.style.transform = A ? `translate3d(${px.x.toFixed(2)}px, ${px.y.toFixed(2)}px, 0) scale(${(base + px.z).toFixed(4)})` : "";
+    }
+    const moving = Math.abs(tx - px.x) > 0.05 || Math.abs(ty - px.y) > 0.05 || Math.abs(px.kick) > 0.05 || Math.abs(px.zoom) > 0.0002 || Math.abs(px.z) > 0.0002;
+    if (A && moving && layer) px.raf = requestAnimationFrame(depthFrame);
+  }
+  const nudge = () => { if (!px.raf && layer) px.raf = requestAnimationFrame(depthFrame); };
+  let dragX = null;
+  addEventListener("pointermove", (e) => {
+    const A = depth(); if (!layer || !A) return;
+    if (insideChart(e.clientX, e.clientY)) {
+      const b = chartsBox();
+      px.tx = -clampN((e.clientX - (b.left + b.width / 2)) / (b.width / 2 || 1), 1);
+      px.ty = -clampN((e.clientY - (b.top + b.height / 2)) / (b.height / 2 || 1), 1) * 0.6;
+    } else px.tx = px.ty = 0;
+    if (dragX !== null && e.buttons & 1) { px.kick = clampN(px.kick + (e.clientX - dragX) * 0.1, A * 2.2); dragX = e.clientX; }
+    nudge();
+  }, { passive: true, capture: true });
+  addEventListener("pointerdown", (e) => { dragX = insideChart(e.clientX, e.clientY) ? e.clientX : null; }, { passive: true, capture: true });
+  addEventListener("pointerup", () => { dragX = null; }, { passive: true, capture: true });
+  addEventListener("wheel", (e) => {
+    const A = depth(); if (!layer || !A || !insideChart(e.clientX, e.clientY)) return;
+    px.zoom = clampN(px.zoom + (e.deltaY < 0 ? 1 : -1) * 0.0007 * A, 0.035); nudge();
+  }, { passive: true, capture: true });
+  document.addEventListener("mouseleave", () => { px.tx = px.ty = 0; nudge(); });
+
+  // Price light: a soft glow in the wallpaper right behind the live price, in your up / down colour.
+  // Position comes from hook.js (where the live-price tag is drawn), so it works on any platform.
+  let priceEls = [];
+  function renderPriceLight() {
+    if (!layer) { priceEls = []; return; }
+    let list = [];
+    try { list = JSON.parse(document.documentElement.getAttribute("data-ws-price") || "[]"); } catch {}
+    if (!cfg.priceLight || cfg.layer === "over" || !Array.isArray(list)) list = [];
+    while (priceEls.length > list.length) priceEls.pop().remove();
+    list.forEach((p, i) => {
+      let el = priceEls[i];
+      if (!el || !el.isConnected) { el = document.createElement("div"); el.className = "bd-plight"; el.appendChild(document.createElement("i")); layer.insertBefore(el, reactEl); priceEls[i] = el; }
+      const h = Math.max(140, Math.min(380, (p.b - p.t) * 0.45));
+      Object.assign(el.style, { left: p.l + "px", top: p.t + "px", width: Math.max(0, p.r - p.l) + "px", height: Math.max(0, p.b - p.t) + "px" });
+      el.style.setProperty("--y", p.y - p.t + "px"); el.style.setProperty("--h", h + "px");
+      el.style.setProperty("--c", p.side === "down" ? downColor() : upColor());
+    });
+  }
+  new MutationObserver(renderPriceLight).observe(document.documentElement, { attributes: true, attributeFilter: ["data-ws-price"] });
+
+  // Trade effects: when a position line disappears (trade closed), a short shimmer rises behind the candles for a win;
+  // a loss gets a calm, cool fade. Both sit behind the chart and are gone in under 2 seconds.
+  new MutationObserver(() => {
+    let t = null; try { t = JSON.parse(document.documentElement.getAttribute("data-ws-trade") || "null"); } catch {}
+    if (!t || !cfg.enabled || !cfg.tradeFx || !layer || Date.now() - t.ts > 3000 || Date.now() - lastSymChange < 3000) return;
+    tradeEffect(+t.v || 0, t.unit || "");
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-ws-trade"] });
+  function tradeEffect(v, unit) {
+    const win = v >= 0, col = win ? upColor() : downColor(), b = chartsBox(), dur = win ? 1900 : 1300;
+    const wrap = document.createElement("div"); wrap.className = "bd-tradefx" + (win ? " bd-win" : " bd-loss");
+    Object.assign(wrap.style, { left: b.left + "px", top: b.top + "px", width: b.width + "px", height: b.height + "px" });
+    wrap.style.setProperty("--c", col); wrap.style.setProperty("--dur", dur + "ms");
+    const cv = document.createElement("canvas"), W = Math.max(2, (b.width / 2) | 0), H = Math.max(2, (b.height / 2) | 0);
+    cv.width = W; cv.height = H; wrap.appendChild(cv);
+    const lbl = document.createElement("b"); lbl.textContent = fmtPnl(v, unit); wrap.appendChild(lbl);
+    layer.insertBefore(wrap, reactEl);
+    const g = cv.getContext("2d"), n = win ? 70 : 0, parts = [];
+    for (let i = 0; i < n; i++) parts.push({ x: Math.random() * W, y: H + Math.random() * H * 0.3, vy: -(0.35 + Math.random() * 0.9) * H / 60, r: 0.6 + Math.random() * 1.8, w: Math.random() * 6.28 });
+    const t0 = performance.now();
+    (function frame(now) {
+      const k = (now - t0) / dur;
+      if (k >= 1 || !wrap.isConnected) { wrap.remove(); return; }
+      g.clearRect(0, 0, W, H);
+      const fade = k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85;
+      g.fillStyle = col; g.shadowColor = col; g.shadowBlur = 6;
+      for (const p of parts) {
+        p.y += p.vy; p.x += Math.sin((p.w += 0.08)) * 0.3;
+        g.globalAlpha = Math.max(0, fade * Math.min(1, (p.y / H) * 1.6));
+        g.beginPath(); g.arc(p.x, p.y, p.r, 0, 6.283); g.fill();
+      }
+      requestAnimationFrame(frame);
+    })(t0);
+  }
+
   // Keep every wallpaper on top of its chart as the layout changes (resize, 1 -> 4 charts, panels opening...).
   const sigOf = (list) => list.map((c) => [c.r.left, c.r.top, c.r.width, c.r.height].map(Math.round).join(",")).join("|") + "@" + innerWidth + "x" + innerHeight;
   let layoutSig = "";
@@ -402,7 +505,7 @@
       layer.remove();
       layer = reactEl = pillEl = null;
     }
-    views = [];
+    views = []; priceEls = []; if (px.raf) { cancelAnimationFrame(px.raf); px.raf = 0; }
   }
 
   // "Show chart numbers": big 1, 2, 3... on each chart for a moment, so you know which is which.
@@ -570,7 +673,7 @@
   function apply(keys) {
     if (standDown || (EXT && !owner)) return;
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
-    if (candleKeys.length || keys.includes("enabled")) pushCandles();
+    if (candleKeys.length || keys.includes("enabled")) { pushCandles(); renderPriceLight(); }
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !FX_KEYS.includes(k));
