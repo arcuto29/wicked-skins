@@ -4,6 +4,7 @@ const path = require("path");
 
 const SRC = path.join(__dirname, "..", "src");
 const POPUP = path.join(__dirname, "..", "popup", "popup.html");
+const ICON = path.join(__dirname, "..", "icons", "icon-512.png");
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
 
 let cfg = {};
@@ -25,7 +26,7 @@ async function inject() {
 
 function createTV() {
   tvWin = new BrowserWindow({
-    width: 1440, height: 900, backgroundColor: "#000000",
+    width: 1440, height: 900, backgroundColor: "#000000", icon: ICON, title: "Wicked Skins",
     webPreferences: { contextIsolation: true, sandbox: true }, // no node access for remote content
   });
   tvWin.loadURL("https://www.tradingview.com/chart/");
@@ -36,7 +37,7 @@ function createTV() {
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) return settingsWin.focus();
   settingsWin = new BrowserWindow({
-    width: 420, height: 640, title: "Wicked Skins", autoHideMenuBar: true, resizable: false,
+    width: 420, height: 640, title: "Wicked Skins", icon: ICON, autoHideMenuBar: true, resizable: false,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: false },
   });
   settingsWin.loadFile(POPUP);

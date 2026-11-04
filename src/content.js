@@ -18,6 +18,8 @@
     pnlSide: "long",       // "long" | "short"
     pnlEntry: 0,
     pnlSymbol: "",         // optional: only react on this symbol (e.g. "BTCUSDT")
+    // Watermark: your own text and/or logo on the chart (for screenshots / streams)
+    wmOn: false, wmText: "", wmImage: null, wmPos: "br", wmSize: 1, wmOpacity: 0.6, wmColor: "#ffffff",
   };
 
   let cfg = { ...DEFAULTS };
@@ -254,10 +256,49 @@
 
   // Keys that need a rebuild vs. ones we can apply live.
   const REBUILD = new Set(["enabled", "skin", "mediaId", "powerSaver"]);
+  // ---------- watermark ----------
+  // Sits ON TOP of the chart (so it shows in screenshots/streams) but never takes clicks.
+  // Kept clear of the price axis (right) and time axis (bottom).
+  let wmEl, wmRO;
+  function placeWatermark() {
+    if (!wmEl) return;
+    const el = document.querySelector(".chart-container");
+    const r = el ? el.getBoundingClientRect() : { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth, height: innerHeight };
+    const pad = 14, axisR = 72, axisB = 30, st = wmEl.style;
+    st.left = st.right = st.top = st.bottom = st.transform = "";
+    const p = cfg.wmPos;
+    if (p === "center") { st.left = r.left + (r.width - axisR) / 2 + "px"; st.top = r.top + (r.height - axisB) / 2 + "px"; st.transform = "translate(-50%,-50%)"; return; }
+    if (p[0] === "t") st.top = r.top + pad + 34 + "px";              // below TradingView's legend row
+    else st.top = r.bottom - axisB - pad - wmEl.offsetHeight + "px";
+    if (p[1] === "l") st.left = r.left + pad + "px";
+    else st.left = r.right - axisR - pad - wmEl.offsetWidth + "px";
+  }
+  function renderWatermark() {
+    const show = cfg.enabled && cfg.wmOn && ((cfg.wmText || "").trim() || cfg.wmImage);
+    if (!show) { if (wmEl) { wmEl.remove(); wmEl = null; } return; }
+    if (!wmEl) {
+      wmEl = document.createElement("div");
+      wmEl.id = "bd-wm";
+      document.documentElement.appendChild(wmEl);
+      const el = document.querySelector(".chart-container");
+      if (!wmRO && el) { wmRO = new ResizeObserver(placeWatermark); wmRO.observe(el); addEventListener("resize", placeWatermark); }
+    }
+    const big = cfg.wmPos === "center" ? 2.4 : 1;
+    const size = Math.max(0.4, Math.min(4, +cfg.wmSize || 1)) * big;
+    wmEl.textContent = "";
+    if (cfg.wmImage) { const img = document.createElement("img"); img.src = cfg.wmImage; img.style.height = Math.round(34 * size) + "px"; img.onload = placeWatermark; wmEl.appendChild(img); }
+    if ((cfg.wmText || "").trim()) { const t = document.createElement("span"); t.textContent = cfg.wmText.trim().slice(0, 80); wmEl.appendChild(t); }
+    wmEl.style.fontSize = Math.round(17 * size) + "px";
+    wmEl.style.color = cfg.wmColor || "#ffffff";
+    wmEl.style.opacity = String(Math.max(0.05, Math.min(1, +cfg.wmOpacity)));
+    requestAnimationFrame(placeWatermark);
+  }
+
   function apply(keys) {
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
-    keys = keys.filter((k) => !k.startsWith("candle"));
+    if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm"));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && cfg.skin === "media");
@@ -265,7 +306,7 @@
   }
 
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); });
+    chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); renderWatermark(); });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       for (const k in changes) cfg[k] = changes[k].newValue;
@@ -276,6 +317,7 @@
     cfg = { ...DEFAULTS, ...(window.__BD_CFG || {}) };
     build();
     pushCandles();
+    renderWatermark();
     window.__bdUpdate = (next) => {
       const keys = Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(cfg[k]));
       cfg = { ...cfg, ...next };

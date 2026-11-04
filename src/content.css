@@ -52,3 +52,9 @@ html.bd-on.theme-light:not(.bd-over-mode) [class*="legend-"] [class*="title"] * 
   color: #e8eaf0 !important;
 }
 #bd-layer iframe { border: 0; background: transparent; }
+
+/* User watermark (over the chart, click-through) */
+#bd-wm { position: fixed; z-index: 2147483001; pointer-events: none; display: flex; align-items: center; gap: .45em;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight: 800; letter-spacing: .02em; white-space: nowrap;
+  text-shadow: 0 1px 3px rgba(0,0,0,.55); user-select: none; }
+#bd-wm img { display: block; width: auto; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }

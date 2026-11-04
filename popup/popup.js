@@ -1,4 +1,7 @@
 const $ = (id) => document.getElementById(id);
+// Small inline icons (some system fonts lack ↖ ✕ etc.)
+const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","react","reactStrength"];
 const DEFAULTS = {
@@ -8,6 +11,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6, pnlSide: "long", pnlEntry: 0, pnlSymbol: "",
+  wmOn: false, wmText: "", wmImage: null, wmPos: "br", wmSize: 1, wmOpacity: 0.6, wmColor: "#ffffff",
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -131,7 +135,7 @@ function renderMedia() {
     }
     const badge = m.pending ? `<span class="live">${converting[m.id] !== undefined ? "CONVERTING " + Math.round(converting[m.id] * 100) + "%" : "WAITING TO CONVERT"}</span>`
       : m.type === "video" ? '<span class="live">● VIDEO</span>' : "";
-    card.insertAdjacentHTML("beforeend", `${badge}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">✕</button></div>`);
+    card.insertAdjacentHTML("beforeend", `${badge}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">${ICON_X}</button></div>`);
     card.onclick = (e) => {
       if (e.target.classList.contains("x")) {
         const media = cfg.media.filter((x) => x.id !== m.id);
@@ -323,7 +327,7 @@ function renderLoadouts() {
   cfg.loadouts.forEach((lo) => {
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<div class="label"><span>${esc(lo.name)}<br><small style="color:#8b8e9c">${esc(lo.skin === "media" ? "My media" : (WickedSkins[lo.skin]?.name || lo.skin))}</small></span><button class="x" title="Delete">✕</button></div>`;
+    card.innerHTML = `<div class="label"><span>${esc(lo.name)}<br><small style="color:#8b8e9c">${esc(lo.skin === "media" ? "My media" : (WickedSkins[lo.skin]?.name || lo.skin))}</small></span><button class="x" title="Delete">${ICON_X}</button></div>`;
     card.onclick = (e) => {
       if (e.target.classList.contains("x")) { set({ loadouts: cfg.loadouts.filter((x) => x.id !== lo.id) }); }
       else {
@@ -376,7 +380,8 @@ function seg(id, options, get, onPick) {
   const box = $(id); box.innerHTML = "";
   options.forEach(([val, label]) => {
     const b = document.createElement("button");
-    b.textContent = label; b.className = get() === val ? "on" : "";
+    if (label.startsWith("<svg")) { b.innerHTML = label; b.title = val; } else b.textContent = label;
+    b.className = get() === val ? "on" : "";
     b.onclick = () => { onPick(val); seg(id, options, get, onPick); };
     box.appendChild(b);
   });
@@ -415,6 +420,35 @@ function syncReact() {
 $("reactStrength").oninput = (e) => { set({ reactStrength: +e.target.value }); $("reactStrengthOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("pnlEntry").oninput = (e) => set({ pnlEntry: +e.target.value || 0 });
 $("pnlSymbol").oninput = (e) => set({ pnlSymbol: e.target.value.trim() });
+// ---------- watermark ----------
+const WM_MAX_KB = 1024;
+function syncWatermark() {
+  $("wmOn").checked = cfg.wmOn;
+  $("wmText").value = cfg.wmText || "";
+  $("wmSize").value = cfg.wmSize; $("wmSizeOut").textContent = (+cfg.wmSize).toFixed(1) + "×";
+  $("wmOpacity").value = cfg.wmOpacity; $("wmOpacityOut").textContent = Math.round(cfg.wmOpacity * 100) + "%";
+  $("wmColor").value = cfg.wmColor || "#ffffff";
+  $("wmPreview").style.display = $("wmClear").style.display = cfg.wmImage ? "" : "none";
+  if (cfg.wmImage) $("wmPreview").src = cfg.wmImage;
+  seg("wmPos", [["tl", cornerIcon(2.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["center", cornerIcon(5.5, 4.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]], () => cfg.wmPos, (v) => set({ wmPos: v }));
+}
+// Typing or adding a logo turns the watermark on, so it's obvious where it went.
+$("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
+$("wmText").oninput = (e) => { set({ wmText: e.target.value, ...(e.target.value.trim() && !cfg.wmOn ? { wmOn: true } : {}) }); $("wmOn").checked = cfg.wmOn; };
+$("wmSize").oninput = (e) => { set({ wmSize: +e.target.value }); $("wmSizeOut").textContent = (+e.target.value).toFixed(1) + "×"; };
+$("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+$("wmColor").oninput = (e) => set({ wmColor: e.target.value });
+$("wmClear").onclick = () => { set({ wmImage: null }); syncWatermark(); };
+$("wmFile").onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  if (f.size > WM_MAX_KB * 1024) { $("wmHint").textContent = `That logo is over ${WM_MAX_KB / 1024} MB. Use a smaller PNG or SVG.`; return; }
+  const src = await readAsDataURL(f);
+  const ok = await new Promise((r) => { const i = new Image(); i.onload = () => r(i.naturalWidth > 0); i.onerror = () => r(false); i.src = src; });
+  if (!ok) { $("wmHint").textContent = "That file can't be shown as an image. Try PNG, JPG, WebP or SVG."; return; }
+  set({ wmImage: src, wmOn: true }); syncWatermark();
+};
+
 $("reset").onclick = () => { set(Object.fromEntries(LOOK_KEYS.map((k) => [k, DEFAULTS[k]]))); syncTune(); };
 
 // ---------- master switch + boot ----------
@@ -422,7 +456,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark();
   const q = new URLSearchParams(location.search);
   if (q.get("page")) {
     document.body.classList.add("page");

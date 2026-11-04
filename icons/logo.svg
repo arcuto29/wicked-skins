@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#241443"/>
+      <stop offset="1" stop-color="#0b0912"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#8f7bff"/>
+      <stop offset="1" stop-color="#ff5fc7"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff4f8b"/>
+      <stop offset="0.55" stop-color="#ffb15c"/>
+      <stop offset="1" stop-color="#fff3b0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff7ab8" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ff7ab8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
+  <rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+  <!-- glow behind the flame -->
+  <circle cx="64" cy="34" r="30" fill="url(#glow)"/>
+  <!-- side candles -->
+  <rect x="31" y="58" width="4" height="40" rx="2" fill="#8f7bff" opacity="0.7"/>
+  <rect x="25" y="66" width="16" height="24" rx="4" fill="#8f7bff" opacity="0.85"/>
+  <rect x="93" y="50" width="4" height="44" rx="2" fill="#ff5fc7" opacity="0.7"/>
+  <rect x="87" y="58" width="16" height="28" rx="4" fill="#ff5fc7" opacity="0.85"/>
+  <!-- main candle -->
+  <rect x="62" y="44" width="4" height="62" rx="2" fill="url(#accent)"/>
+  <rect x="53" y="54" width="22" height="40" rx="5" fill="url(#accent)"/>
+  <!-- the wick is a flame -->
+  <path d="M64 13 C 70 22, 76 28, 75 37 C 74.5 44, 69.5 48, 64 48 C 58.5 48, 53.5 44, 53 37 C 52.6 31, 56 27, 58.5 24 C 58.8 28.5, 60.8 31, 63 31.5 C 61.5 25.5, 62 19, 64 13 Z" fill="url(#flame)"/>
+  <path d="M64 30 C 67 34, 69 37, 68.4 40.5 C 68 43.5, 66 45, 64 45 C 62 45, 60 43.5, 59.6 40.5 C 59.3 37.8, 61.5 34.5, 64 30 Z" fill="#fff8d6" opacity="0.9"/>
+</svg>

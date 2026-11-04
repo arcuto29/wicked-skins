@@ -52,3 +52,7 @@ body.page { width: auto; min-height: 100vh; max-width: 980px; margin: 0 auto; }
 body.page main { height: 100vh; }
 body.page .cards { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 body.page .card img, body.page .card video { height: 112px; }
+.brand { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 2px 0 10px; margin-bottom: 4px; border-bottom: 1px solid #1c1e26; }
+.brand img { width: 36px; height: 36px; filter: drop-shadow(0 0 8px rgba(255,95,199,.35)); }
+.brand span { font: 800 10px/1.1 system-ui, sans-serif; letter-spacing: .04em; text-align: center; background: linear-gradient(90deg,#b7a8ff,#ff8fd8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.x { pointer-events: auto; } .x svg, .seg svg { display: block; margin: 0 auto; pointer-events: none; }

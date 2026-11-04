@@ -2,10 +2,13 @@
 <html>
 <head>
   <meta charset="utf-8" />
+  <title>Wicked Skins</title>
+  <link rel="icon" href="../icons/icon-32.png" />
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
   <nav id="nav">
+    <div class="brand" title="Wicked Skins"><img src="../icons/icon-48.png" alt="" /><span>Wicked<br>Skins</span></div>
     <button data-tab="skins" class="on">Skins</button>
     <button data-tab="candles">Candles</button>
     <button data-tab="media">My media</button>
@@ -86,6 +89,19 @@
       <div class="row"><span>Motion</span><div class="seg" id="motion"></div></div>
       <h4>Chart</h4>
       <div class="row"><span>Layer</span><div class="seg" id="layer"></div></div>
+      <h4>Watermark</h4>
+      <div class="row"><span>Show</span><label class="switch"><input type="checkbox" id="wmOn" /><span></span></label>
+        <small class="hint" style="margin:0">your name / logo on the chart</small></div>
+      <div class="row"><span>Text</span><input id="wmText" class="field" maxlength="60" placeholder="e.g. @yourname" /></div>
+      <div class="row"><span>Logo</span>
+        <label class="btn" style="flex:1;text-align:center">Choose image<input type="file" id="wmFile" accept="image/*,.svg" hidden /></label>
+        <img id="wmPreview" alt="" style="height:28px;max-width:60px;object-fit:contain;display:none" />
+        <button id="wmClear" title="Remove logo" style="display:none"><svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+      <div class="row"><span>Position</span><div class="seg" id="wmPos"></div></div>
+      <div class="row"><span>Size</span><input type="range" id="wmSize" min="0.5" max="3" step="0.1" /><output id="wmSizeOut"></output></div>
+      <div class="row"><span>Opacity</span><input type="range" id="wmOpacity" min="0.05" max="1" step="0.05" /><output id="wmOpacityOut"></output></div>
+      <div class="row"><span>Colour</span><input type="color" id="wmColor" /></div>
+      <p class="hint" id="wmHint">Shows on top of the chart, so it appears in screen recordings and screenshots of your screen. TradingView's own camera snapshot won't include it.</p>
       <button id="reset" class="link">Reset look</button>
     </section>
 

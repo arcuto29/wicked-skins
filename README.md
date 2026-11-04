@@ -1,5 +1,7 @@
 # Wicked Skins for TradingView
 
+<img src="icons/icon-128.png" width="96" alt="Wicked Skins logo">
+
 Live backgrounds (animated skins, images, GIFs, video) behind TradingView charts.
 Purely cosmetic. It does not read orders, positions or account data and makes no network requests.
 
@@ -26,6 +28,9 @@ Purely cosmetic. It does not read orders, positions or account data and makes no
     Price comes from the tab title TradingView already shows.
   - *My P&L*: glows with your P&L from an entry price **you type in** (long/short, optional symbol). Worked out locally;
     it never reads your account, orders or positions.
+- **Watermark**: your own text and/or logo on the chart (on/off switch, 5 positions, size, opacity, colour).
+  It sits on top of the chart so it shows in screen recordings and screenshots of your screen; it never blocks clicks.
+  (TradingView's own camera snapshot is rendered by TradingView and won't include it.)
 - **Tune**: opacity, Over chart strength, dim, blur, vividness, tint, speed, position, fit, FPS, power saver, layer.
 - **Loadouts**: save/apply/export/import your look.
 
@@ -50,3 +55,7 @@ Note: this wraps tradingview.com; it does not modify the official TradingView De
 - **Android**: Chrome for Android has no extensions. Options are Firefox for Android (supports WebExtensions)
   or a small WebView app that loads tradingview.com and injects `src/` (same approach as `desktop/`).
 - The official TradingView mobile apps cannot be modified, so mobile means web-in-browser or our own wrapper app.
+
+## Logo
+`icons/logo.svg` (full) and `icons/logo-small.svg` (simplified, used for 16/32 px) are the sources.
+PNG sizes 16/32/48/128/512 are rendered from them. If the name changes, only the popup label and these files need updating.
