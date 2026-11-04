@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm"];
+const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -17,6 +17,7 @@ const DEFAULTS = {
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
   wmOn: false, wmPos: "br", vignette: 0, calm: false,
+  sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   candleLook: "solid", shiftSpeed: 10,
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
   scaleSize: 0, scaleFont: "default",
@@ -178,7 +179,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); }
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 const QUICK_LOOKS = [
@@ -732,11 +733,33 @@ function syncReact() {
 }
 $("reactStrength").oninput = (e) => { set({ reactStrength: +e.target.value }); $("reactStrengthOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
+// ---------- session skins ----------
+const SESSIONS = [["asia", "Asia", "6pm–3am"], ["london", "London", "3am–8am"], ["ny", "New York", "8am–5pm"], ["off", "After-hours", "5–6pm, weekends"]];
+function nowSession() {   // same rules as content.js
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hourCycle: "h23", weekday: "short" }).formatToParts(new Date()).map((p) => [p.type, p.value]));
+  const h = +parts.hour, day = parts.weekday;
+  if (day === "Sat" || (day === "Sun" && h < 18) || (day === "Fri" && h >= 17)) return "off";
+  if (h >= 18 || h < 3) return "asia"; if (h < 8) return "london"; if (h < 17) return "ny"; return "off";
+}
+function syncSessions() {
+  $("sessionOn").checked = cfg.sessionOn;
+  const box = $("sessionRows"); box.innerHTML = ""; const now = nowSession();
+  const options = `<option value="">Your normal skin</option>` + Object.entries(WickedSkins).map(([id, sk]) => `<option value="${id}">${esc(sk.name)}</option>`).join("");
+  for (const [key, label, hours] of SESSIONS) {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<span>${label}${key === now ? ' <b class="now">now</b>' : ""}<br><small class="hint" style="margin:0">${hours}</small></span><select class="field">${options}</select>`;
+    const sel = row.querySelector("select"); sel.value = (cfg.sessionSkins || {})[key] || "";
+    sel.onchange = () => { set({ sessionSkins: { ...cfg.sessionSkins, [key]: sel.value }, sessionOn: true }); $("sessionOn").checked = true; };
+    box.appendChild(row);
+  }
+}
+$("sessionOn").onchange = (e) => set({ sessionOn: e.target.checked });
+
 // ---------- watermark (logo + name) ----------
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
   seg("wmPos", [["tl", cornerIcon(2.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["center", cornerIcon(5.5, 4.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]],
-    () => cfg.wmPos, (v) => set({ wmPos: v, wmOn: true }));
+    () => cfg.wmPos, (v) => { set({ wmPos: v, wmOn: true }); $("wmOn").checked = true; });
 }
 $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
 
@@ -851,7 +874,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions();
   siteBar();
   updates();
   const q = new URLSearchParams(location.search);

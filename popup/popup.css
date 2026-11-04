@@ -123,3 +123,6 @@ details.grp > summary .switch { margin-left: auto; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
 .modal .box { display: grid; gap: 8px; width: 100%; max-width: 320px; background: #12141a; }
 .media-share { position: absolute; top: 6px; left: 6px; padding: 3px 7px; font-size: 10px; background: rgba(0,0,0,.65); }
+#sessionRows .row > span { width: 104px; line-height: 1.2; }
+#sessionRows select { flex: 1; padding: 6px 8px; }
+.now { font: 700 9px system-ui, sans-serif; color: #04130f; background: #2ef2b0; padding: 1px 5px; border-radius: 99px; letter-spacing: .05em; }

@@ -19,6 +19,8 @@
     // Watermark: your own text and/or logo on the chart (for screenshots / streams)
     wmOn: false, wmPos: "br",             // watermark: the Wicked Skins logo + name
     vignette: 0, calm: false,            // darker edges; dim + slow down while your cursor is on the chart
+    // Session skins: a different wallpaper per market session ("" = keep your normal skin)
+    sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
     // Glow on indicators / lines / P&L, and price scale styling
     lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
     scaleSize: 0, scaleFont: "default",
@@ -27,7 +29,26 @@
   let cfg = { ...DEFAULTS };
   let layer, content, raf, running = false;
 
-  const activeMedia = () => (cfg.skin === "media" ? cfg.media.find((m) => m.id === cfg.mediaId) : null);
+  // ---------- session skins (New York time) ----------
+  // Asia 18:00-03:00 · London 03:00-08:00 · New York 08:00-17:00 · After-hours 17:00-18:00 and weekends
+  function currentSession(d = new Date()) {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hourCycle: "h23", weekday: "short" })
+      .formatToParts(d).map((p) => [p.type, p.value]));
+    const h = +parts.hour, day = parts.weekday;
+    if (day === "Sat" || (day === "Sun" && h < 18) || (day === "Fri" && h >= 17)) return "off";
+    if (h >= 18 || h < 3) return "asia";
+    if (h < 8) return "london";
+    if (h < 17) return "ny";
+    return "off";
+  }
+  let session = currentSession();
+  const skinNow = () => {
+    if (!cfg.sessionOn) return cfg.skin;
+    const pick = (cfg.sessionSkins || {})[session];
+    return pick && window.WickedSkins[pick] ? pick : cfg.skin;
+  };
+  setInterval(() => { const s2 = currentSession(); if (s2 !== session) { session = s2; if (cfg.sessionOn && layer) build(); } }, 30000);
+  const activeMedia = () => (skinNow() === "media" ? cfg.media.find((m) => m.id === cfg.mediaId) : null);
 
   // "Over chart" mode: only cover the chart area, not toolbars/watchlist.
   let ro;
@@ -207,7 +228,7 @@
         content.src = m.src; // GIFs animate natively
       }
     } else {
-      const def = window.WickedSkins[cfg.skin] || window.WickedSkins.aurora;
+      const def = window.WickedSkins[skinNow()] || window.WickedSkins.aurora;
       content = document.createElement("canvas");
       startCanvas(content, def);
     }
@@ -330,7 +351,7 @@
   }
 
   // Keys that need a rebuild vs. ones we can apply live.
-  const REBUILD = new Set(["enabled", "skin", "mediaId", "powerSaver"]);
+  const REBUILD = new Set(["enabled", "skin", "mediaId", "powerSaver", "sessionOn", "sessionSkins"]);
   // ---------- watermark ----------
   // Sits ON TOP of the chart (so it shows in screenshots/streams) but never takes clicks.
   // Kept clear of the price axis (right) and time axis (bottom).
