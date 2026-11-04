@@ -1,3 +1,8 @@
+// Desktop app: its preload provides storage as window.wickedStore (Electron already owns window.chrome).
+if (window.wickedStore && !(window.chrome && window.chrome.storage)) {
+  try { window.chrome = window.chrome || {}; window.chrome.storage = window.wickedStore.storage; }
+  catch { window.chrome = { storage: window.wickedStore.storage }; }
+}
 const $ = (id) => document.getElementById(id);
 // Small inline icons (some system fonts lack ↖ ✕ etc.)
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
