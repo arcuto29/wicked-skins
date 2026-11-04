@@ -572,6 +572,8 @@ $("wsMore").onclick = () => { wsPage++; wsLoad(false); };
 function initWorkshop() {
   const on = !!(window.Workshop && Workshop.configured);
   $("wsOff").hidden = on; $("wsOn").hidden = !on;
+  // Not connected to a backend yet (see WORKSHOP.md): hide the tab entirely instead of showing an empty one.
+  document.querySelector('#nav [data-tab="workshop"]').hidden = !on;
   if (!on) return;
   Workshop.onAuth(() => { wsAccount(); wsTabs(); });
   let loaded = false;
