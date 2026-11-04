@@ -196,6 +196,18 @@ const QUICK_LOOKS = [
     set: { candleOn: true, candleUp: "#8be9ff", candleDown: "#3d5afe", candleLook: "solid", candleGlow: 0.2, candlePreset: "ice", lineGlow: 0.15, scaleText: "", scaleGlow: 0, scaleBg: "auto", dim: 0.3 } },
   { id: "flow", name: "Colour Flow", sub: "Polar Lights · Cycle", skin: "aurora",
     set: { candleOn: true, candleUp: "#00ffa3", candleDown: "#ff2e97", candleLook: "shift", shiftSpeed: 12, candleGlow: 0.3, candlePreset: "neon", lineGlow: 0.3, scaleText: "", scaleGlow: 0.2, scaleBg: "auto", dim: 0.3 } },
+  // Monochrome: a live black background with crisp white (up) and dark (down) candles. Clean for streams.
+  { id: "mono-black", name: "Blackout", sub: "Deep Field · White & Black", skin: "starfield",
+    set: { candleOn: true, candleUp: "#ffffff", candleDown: "#2a2d36", candleLook: "solid", candleGlow: 0, candlePreset: "mono", lineGlow: 0.1, scaleText: "#ffffff", scaleGlow: 0, scaleBold: true, scaleBg: "auto", scaleLabels: false, dim: 0.55 } },
+  // Terminal green on black — hacker/retro.
+  { id: "terminal", name: "Terminal", sub: "Code Rain · Green", skin: "matrix",
+    set: { candleOn: true, candleUp: "#00ff41", candleDown: "#0b6623", candleLook: "neon", candleGlow: 0.4, candlePreset: "matrix", lineGlow: 0.4, scaleText: "#00ff41", scaleGlow: 0.4, scaleFont: "mono", scaleBg: "auto", dim: 0.4 } },
+  // Gold on deep navy — premium look.
+  { id: "midas", name: "Midas", sub: "Abyssal Glow · Gold", skin: "deepsea",
+    set: { candleOn: true, candleUp: "#ffd36b", candleDown: "#8a6d1a", candleLook: "solid", candleGlow: 0.35, candlePreset: "gold", lineGlow: 0.25, scaleText: "#ffd36b", scaleGlow: 0.3, scaleBg: "glass", dim: 0.35 } },
+  // Soft pastel on falling petals — calm, pretty.
+  { id: "blossom", name: "Blossom", sub: "Petal Drift · Pastel", skin: "sakura",
+    set: { candleOn: true, candleUp: "#7cf7d4", candleDown: "#ff8fd8", candleLook: "solid", candleGlow: 0.2, candlePreset: "bubblegum", lineGlow: 0.15, scaleText: "", scaleGlow: 0, scaleBg: "glass", dim: 0.25 } },
 ];
 function renderQuick() {
   const box = $("quickLooks"); if (!box) return;
