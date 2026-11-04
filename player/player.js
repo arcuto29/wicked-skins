@@ -31,6 +31,21 @@
     document.body.appendChild(el);
     apply();
     parent.postMessage({ __wicked: "player-ready", id }, "*");
+    // brightness report for the page's auto-contrast (we're same-origin with our own blob, so we can read pixels)
+    const c = document.createElement("canvas"); c.width = 32; c.height = 18;
+    const g = c.getContext("2d", { willReadFrequently: true });
+    setInterval(() => {
+      try {
+        g.clearRect(0, 0, 32, 18); g.drawImage(el, 0, 0, 32, 18);
+        const d = g.getImageData(0, 0, 32, 18).data; let sum = 0, sq = 0, n = 0; const prof = new Array(18).fill(0);
+        for (let i = 0; i < d.length; i += 4) {
+          const l = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; sum += l; sq += l * l; n++;
+          if ((i / 4) % 32 >= 27) prof[Math.floor(i / 4 / 32)] += l / 5;
+        }
+        const mean = sum / n;
+        parent.postMessage({ __wicked: "lum", mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), prof }, "*");
+      } catch {}
+    }, 1500);
   } catch (err) {
     parent.postMessage({ __wicked: "player-error", id, msg: String(err) }, "*");
   }

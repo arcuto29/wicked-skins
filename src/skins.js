@@ -550,29 +550,10 @@
     };
   };
 
-  // Trading-themed: ghost candlesticks drifting past
-  const ghostcandles = (ctx) => {
-    let w = 0, h = 0, bars = [], price = 0.5, x0 = 0;
-    const step = 14;
-    const add = () => { const o = price; price = Math.max(0.15, Math.min(0.85, price + rnd(-0.06, 0.06))); bars.push({ o, c: price, hi: Math.max(o, price) + rnd(0, 0.03), lo: Math.min(o, price) - rnd(0, 0.03) }); };
-    return {
-      resize(W, H) { w = W; h = H; bars = []; price = 0.5; for (let i = 0; i < w / step + 4; i++) add(); },
-      frame(t, dt) {
-        ctx.fillStyle = "#05070b"; ctx.fillRect(0, 0, w, h);
-        x0 -= dt * 18; if (x0 <= -step) { x0 += step; bars.shift(); add(); }
-        bars.forEach((b, i) => {
-          const x = x0 + i * step, up = b.c >= b.o, col = up ? "rgba(0,255,160,0.16)" : "rgba(255,60,120,0.16)";
-          ctx.fillStyle = col; ctx.fillRect(x + step / 2 - 0.5, h * (1 - b.hi), 1, h * (b.hi - b.lo));
-          ctx.fillRect(x + 2, h * (1 - Math.max(b.o, b.c)), step - 4, Math.max(2, h * Math.abs(b.c - b.o)));
-        });
-      },
-    };
-  };
-
   const tickertape = (ctx) => {
     let w = 0, h = 0, rows = [];
     const SYMS = ["BTC", "ETH", "SOL", "NQ", "ES", "AAPL", "TSLA", "NVDA", "EUR", "GOLD", "OIL", "SPX"];
-    const item = () => { const up = Math.random() < 0.5; return { s: SYMS[(Math.random() * SYMS.length) | 0], c: (up ? "+" : "−") + rnd(0.1, 4.9).toFixed(2) + "%", up }; };
+    const item = () => ({ s: SYMS[(Math.random() * SYMS.length) | 0], up: Math.random() < 0.3 });
     return {
       resize(W, H) { w = W; h = H; rows = Array.from({ length: Math.ceil(h / 40) }, (_, i) => ({ y: 30 + i * 40, sp: rnd(20, 60) * (i % 2 ? -1 : 1), off: rnd(0, 400), items: Array.from({ length: 30 }, item) })); },
       frame(t) {
@@ -582,8 +563,8 @@
           let x = ((r.off + t * r.sp) % 140) - 140;
           for (let k = 0; x < w + 140; k++, x += 140) {
             const it = r.items[(k + Math.floor((r.off + t * r.sp) / 140) + 3000) % r.items.length];
-            ctx.fillStyle = "rgba(200,210,230,0.10)"; ctx.fillText(it.s, x, r.y);
-            ctx.fillStyle = it.up ? "rgba(0,255,150,0.16)" : "rgba(255,70,110,0.16)"; ctx.fillText(it.c, x + 52, r.y);
+            // symbols only: no made-up % changes that could be mistaken for real market data
+            ctx.fillStyle = it.up ? "rgba(0,255,150,0.13)" : "rgba(200,210,230,0.10)"; ctx.fillText(it.s, x, r.y);
           }
         }
       },
@@ -591,30 +572,29 @@
   };
 
   window.WickedSkins = {
-    aurora:    { name: "Aurora",    cat: "Nature", create: aurora },
-    nebula:    { name: "Nebula",    cat: "Space",  create: nebula },
-    starfield: { name: "Starfield", cat: "Space",  create: starfield },
-    embers:    { name: "Embers",    cat: "Warm",   create: embers },
-    matrix:    { name: "Matrix",    cat: "Neon",   create: matrix },
-    synthwave: { name: "Synthwave", cat: "Neon",   create: synthwave },
-    rain:      { name: "City Rain", cat: "City",   create: rain },
-    graphite:  { name: "Graphite",  cat: "Calm",   create: graphite },
-    ocean:     { name: "Ocean",     cat: "Calm",   create: ocean },
-    deepsea:   { name: "Deep Sea",  cat: "Calm",   create: deepsea },
-    bokeh:     { name: "Bokeh",     cat: "Calm",   create: bokeh },
-    fireflies: { name: "Fireflies", cat: "Nature", create: fireflies },
-    sakura:    { name: "Sakura",    cat: "Nature", create: sakura },
-    snow:      { name: "Snowfall",  cat: "Weather", create: snow },
-    storm:     { name: "Thunderstorm", cat: "Weather", create: storm },
-    sunset:    { name: "Sunset Clouds", cat: "Weather", create: sunsetclouds },
-    galaxy:    { name: "Galaxy",    cat: "Space",  create: galaxy },
-    hyperspace:{ name: "Hyperspace", cat: "Space", create: hyperspace },
-    lavalamp:  { name: "Lava Lamp", cat: "Warm",   create: lavalamp },
-    plasma:    { name: "Plasma",    cat: "Neon",   create: plasma },
-    cybergrid: { name: "Cyber Grid", cat: "Neon",  create: cybergrid },
-    circuit:   { name: "Circuit",   cat: "Neon",   create: circuit },
-    neoncity:  { name: "Neon City", cat: "City",   create: neoncity },
-    ghostcandles: { name: "Ghost Candles", cat: "Trading", create: ghostcandles },
-    tickertape:   { name: "Ticker Tape",   cat: "Trading", create: tickertape },
+    aurora:    { name: "Polar Lights",    cat: "Wild", create: aurora },
+    nebula:    { name: "Stardust",    cat: "Cosmos",  create: nebula },
+    starfield: { name: "Deep Field", cat: "Cosmos",  create: starfield },
+    embers:    { name: "Cinders",    cat: "Fire",   create: embers },
+    matrix:    { name: "Code Rain",    cat: "Electric",   create: matrix },
+    synthwave: { name: "Retro Sun", cat: "Electric",   create: synthwave },
+    rain:      { name: "Night Drizzle", cat: "Urban",   create: rain },
+    graphite:  { name: "Slate",  cat: "Chill",   create: graphite },
+    ocean:     { name: "Tide",     cat: "Chill",   create: ocean },
+    deepsea:   { name: "Abyssal Glow",  cat: "Chill",   create: deepsea },
+    bokeh:     { name: "Soft Focus",     cat: "Chill",   create: bokeh },
+    fireflies: { name: "Glowbugs", cat: "Wild", create: fireflies },
+    sakura:    { name: "Petal Drift",    cat: "Wild", create: sakura },
+    snow:      { name: "Snowfall",  cat: "Elements", create: snow },
+    storm:     { name: "Thunderstorm", cat: "Elements", create: storm },
+    sunset:    { name: "Dusk Clouds", cat: "Elements", create: sunsetclouds },
+    galaxy:    { name: "Spiral Galaxy",    cat: "Cosmos",  create: galaxy },
+    hyperspace:{ name: "Lightspeed", cat: "Cosmos", create: hyperspace },
+    lavalamp:  { name: "Lava Lamp", cat: "Fire",   create: lavalamp },
+    plasma:    { name: "Plasma",    cat: "Electric",   create: plasma },
+    cybergrid: { name: "Cyber Grid", cat: "Electric",  create: cybergrid },
+    circuit:   { name: "Circuit",   cat: "Electric",   create: circuit },
+    neoncity:  { name: "Skyline", cat: "Urban",   create: neoncity },
+    tickertape:   { name: "Ticker Tape",   cat: "Markets", create: tickertape },
   };
 })();

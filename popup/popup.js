@@ -1,6 +1,9 @@
 const $ = (id) => document.getElementById(id);
+// Small inline icons (some system fonts lack ↖ ✕ etc.)
+const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","react","reactStrength"];
+const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleLabels","react","reactStrength"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -8,6 +11,9 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6, pnlSide: "long", pnlEntry: 0, pnlSymbol: "",
+  wmOn: false, wmText: "", wmImage: null, wmPos: "br", wmSize: 1, wmOpacity: 0.6, wmColor: "#ffffff",
+  candleLook: "solid", shiftSpeed: 10,
+  lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleLabels: false,
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -23,7 +29,7 @@ document.querySelectorAll("#nav button").forEach((b) => {
 });
 
 // ---------- skins (live previews share one loop) ----------
-let previews = [], activeCat = "All";
+let previews = [], quickPreviews = [], activeCat = "All";
 function renderSkins() {
   const cats = ["All", ...new Set(Object.values(WickedSkins).map((s) => s.cat))];
   $("chips").innerHTML = "";
@@ -55,7 +61,7 @@ let last = 0;
   requestAnimationFrame(loop);
   if (now - last < 66) return; // ~15fps previews
   const dt = (now - last) / 1000; last = now;
-  previews.forEach((p) => p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1)));
+  for (const p of [...previews, ...quickPreviews]) p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1));
 })(0);
 
 // ---------- candles ----------
@@ -71,7 +77,7 @@ const CANDLE_PRESETS = [
   ["crimson", "Crimson", "#ff5252", "#8a0f2e"],
   ["deepsea", "Deepsea", "#4dd0e1", "#5c6bc0"],
   ["cyberpunk", "Cyberpunk", "#fcee0a", "#00f0ff"],
-  ["matrix", "Matrix", "#00ff41", "#0b6623"],
+  ["matrix", "Terminal", "#00ff41", "#0b6623"],
   ["bubblegum", "Bubblegum", "#7cf7d4", "#ff8fd8"],
   ["mono", "Mono", "#ffffff", "#2f2f35"],
   ["sunrise", "Sunrise", "#ffe082", "#ff6e40"],
@@ -88,8 +94,25 @@ const bars = (up, down) => {
     return `<line x1="${x}" x2="${x}" y1="${hi}" y2="${lo}" stroke="${col}"/><rect x="${x - 3}" y="${top}" width="6" height="${ht}" fill="${col}"/>`;
   }).join("")}</svg>`;
 };
+const LOOK_HINT = {
+  solid: "Solid bodies in your colours.",
+  neon: "Tube: glowing outlines with a faint fill.",
+  prism: "Spectrum: colours fan out across the chart, left to right.",
+  shift: "Cycle: colours keep flowing over time. Indicator lines on the chart cycle too.",
+};
 function renderCandles() {
   $("candleOn").checked = cfg.candleOn;
+  seg("candleLook", [["solid", "Solid"], ["neon", "Tube"], ["prism", "Spectrum"], ["shift", "Cycle"]], () => cfg.candleLook,
+    (v) => { set({ candleLook: v, candleOn: true }); $("candleOn").checked = true; renderCandles(); });
+  $("shiftRow").hidden = cfg.candleLook !== "shift";
+  $("shiftSpeed").value = cfg.shiftSpeed; $("shiftSpeedOut").textContent = cfg.shiftSpeed + "s";
+  $("lookHint").textContent = LOOK_HINT[cfg.candleLook] || "";
+  $("lineGlow").value = cfg.lineGlow; $("lineGlowOut").textContent = Math.round(cfg.lineGlow * 100) + "%";
+  $("scaleTextOn").checked = !!cfg.scaleText; $("scaleText").value = cfg.scaleText || "#e8eaf0";
+  $("scaleGlow").value = cfg.scaleGlow; $("scaleGlowOut").textContent = Math.round(cfg.scaleGlow * 100) + "%";
+  seg("scaleBold", [[false, "Regular"], [true, "Bold"]], () => cfg.scaleBold, (v) => set({ scaleBold: v }));
+  seg("scaleBg", [["auto", "Auto"], ["clear", "Clear"], ["glass", "Glass"], ["default", "TV"]], () => cfg.scaleBg, (v) => set({ scaleBg: v }));
+  seg("scaleLabels", [[false, "Original"], [true, "Candle"]], () => cfg.scaleLabels, (v) => set({ scaleLabels: v }));
   $("candleGlow").value = cfg.candleGlow; $("candleGlowOut").textContent = Math.round(cfg.candleGlow * 100) + "%";
   $("candleUp").value = cfg.candleUp; $("candleDown").value = cfg.candleDown;
   const box = $("candleCards"); box.innerHTML = "";
@@ -97,14 +120,72 @@ function renderCandles() {
     const b = document.createElement("button");
     b.className = "card preset" + (cfg.candlePreset === id ? " on" : "");
     b.innerHTML = bars(up, down) + `<div class="label">${esc(name)}</div>`;
-    b.onclick = () => { set({ candleOn: true, candleUp: up, candleDown: down, candlePreset: id }); renderCandles(); };
+    b.onclick = () => applyWithUndo({ candleOn: true, candleUp: up, candleDown: down, candlePreset: id }, `Candles: ${name}.`);
     box.appendChild(b);
   });
 }
 $("candleOn").onchange = (e) => set({ candleOn: e.target.checked });
+$("shiftSpeed").oninput = (e) => { set({ shiftSpeed: +e.target.value }); $("shiftSpeedOut").textContent = e.target.value + "s"; };
+$("lineGlow").oninput = (e) => { set({ lineGlow: +e.target.value }); $("lineGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+$("scaleGlow").oninput = (e) => { set({ scaleGlow: +e.target.value }); $("scaleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+$("scaleText").oninput = (e) => { set({ scaleText: e.target.value }); $("scaleTextOn").checked = true; };
+$("scaleTextOn").onchange = (e) => set({ scaleText: e.target.checked ? $("scaleText").value : "" });
 $("candleGlow").oninput = (e) => { set({ candleGlow: +e.target.value }); $("candleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("candleUp").oninput = (e) => { set({ candleUp: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
 $("candleDown").oninput = (e) => { set({ candleDown: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
+
+// ---------- undo ----------
+// Any one-click change can be undone from the toast at the bottom.
+let undoTimer;
+function applyWithUndo(changes, label) {
+  const before = Object.fromEntries(Object.keys(changes).map((k) => [k, cfg[k]]));
+  set(changes); refreshAll();
+  $("toastMsg").textContent = label;
+  $("toast").hidden = false;
+  $("toastUndo").onclick = () => { set(before); refreshAll(); $("toast").hidden = true; };
+  clearTimeout(undoTimer); undoTimer = setTimeout(() => ($("toast").hidden = true), 8000);
+}
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); }
+
+// ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
+const QUICK_LOOKS = [
+  { id: "neon-night", name: "Neon Night", sub: "Cyber Grid · Tube", skin: "cybergrid",
+    set: { candleOn: true, candleUp: "#fcee0a", candleDown: "#00f0ff", candleLook: "neon", candleGlow: 0.5, candlePreset: "cyberpunk", lineGlow: 0.5, scaleText: "#7df9ff", scaleGlow: 0.45, scaleBg: "auto", dim: 0.25 } },
+  { id: "clean-focus", name: "Clean Focus", sub: "Slate · Mono", skin: "graphite",
+    set: { candleOn: true, candleUp: "#ffffff", candleDown: "#5c5f6e", candleLook: "solid", candleGlow: 0, candlePreset: "mono", lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBg: "auto", dim: 0.35 } },
+  { id: "cosmic", name: "Cosmic", sub: "Spiral Galaxy · Spectrum", skin: "galaxy",
+    set: { candleOn: true, candleUp: "#b388ff", candleDown: "#ff6ec7", candleLook: "prism", candleGlow: 0.35, candlePreset: "custom", lineGlow: 0.35, scaleText: "", scaleGlow: 0.3, scaleBg: "auto", dim: 0.2 } },
+  { id: "inferno", name: "Inferno", sub: "Cinders · Magma", skin: "embers",
+    set: { candleOn: true, candleUp: "#ffb300", candleDown: "#ff3d00", candleLook: "solid", candleGlow: 0.6, candlePreset: "lava", lineGlow: 0.3, scaleText: "#ffcc80", scaleGlow: 0.35, scaleBg: "auto", dim: 0.3 } },
+  { id: "ocean-calm", name: "Ocean Calm", sub: "Tide · Glacier", skin: "ocean",
+    set: { candleOn: true, candleUp: "#8be9ff", candleDown: "#3d5afe", candleLook: "solid", candleGlow: 0.2, candlePreset: "ice", lineGlow: 0.15, scaleText: "", scaleGlow: 0, scaleBg: "auto", dim: 0.3 } },
+  { id: "flow", name: "Colour Flow", sub: "Polar Lights · Cycle", skin: "aurora",
+    set: { candleOn: true, candleUp: "#00ffa3", candleDown: "#ff2e97", candleLook: "shift", shiftSpeed: 12, candleGlow: 0.3, candlePreset: "neon", lineGlow: 0.3, scaleText: "", scaleGlow: 0.2, scaleBg: "auto", dim: 0.3 } },
+];
+function renderQuick() {
+  const box = $("quickLooks"); if (!box) return;
+  box.innerHTML = ""; quickPreviews = [];
+  for (const q of QUICK_LOOKS) {
+    const on = cfg.skin === q.skin && cfg.candleOn && cfg.candleUp === q.set.candleUp && cfg.candleLook === q.set.candleLook;
+    const card = document.createElement("button");
+    card.className = "card" + (on ? " on" : "");
+    const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
+    const sk = WickedSkins[q.skin].create(cv.getContext("2d")); sk.resize(160, 64); quickPreviews.push({ skin: sk, t: 0 });
+    card.append(cv);
+    card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(q.set.candleUp, q.set.candleDown)}</div><div class="label"><span>${esc(q.name)}<small>${esc(q.sub)}</small></span></div>`);
+    card.onclick = () => applyWithUndo({ enabled: true, skin: q.skin, ...q.set }, `Applied ${q.name}.`);
+    box.appendChild(card);
+  }
+}
+
+// ---------- remember which sections are open ----------
+document.querySelectorAll("details.grp").forEach((d) => {
+  const k = "grp:" + d.dataset.grp, v = localStorage.getItem(k);
+  if (v !== null) d.open = v === "1";
+  d.addEventListener("toggle", () => localStorage.setItem(k, d.open ? "1" : "0"));
+});
+// the candle switch lives inside a <summary>; don't let clicking it fold the section
+document.querySelectorAll("summary .switch").forEach((sw) => sw.addEventListener("click", (e) => e.stopPropagation()));
 
 // ---------- my media ----------
 // Extension: files are stored as Blobs in IndexedDB (src/mediadb.js) and played by player/player.html,
@@ -131,7 +212,7 @@ function renderMedia() {
     }
     const badge = m.pending ? `<span class="live">${converting[m.id] !== undefined ? "CONVERTING " + Math.round(converting[m.id] * 100) + "%" : "WAITING TO CONVERT"}</span>`
       : m.type === "video" ? '<span class="live">● VIDEO</span>' : "";
-    card.insertAdjacentHTML("beforeend", `${badge}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">✕</button></div>`);
+    card.insertAdjacentHTML("beforeend", `${badge}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">${ICON_X}</button></div>`);
     card.onclick = (e) => {
       if (e.target.classList.contains("x")) {
         const media = cfg.media.filter((x) => x.id !== m.id);
@@ -310,7 +391,7 @@ $("addMedia").addEventListener("click", (e) => {
 });
 $("file").onchange = async (e) => { await addFiles([...e.target.files]); e.target.value = ""; };
 
-// Drag & drop anywhere on the My media tab
+// Drag & drop anywhere on the Uploads tab
 const mediaTab = $("tab-media");
 mediaTab.addEventListener("dragover", (e) => { e.preventDefault(); mediaTab.classList.add("drop"); });
 mediaTab.addEventListener("dragleave", () => mediaTab.classList.remove("drop"));
@@ -323,12 +404,12 @@ function renderLoadouts() {
   cfg.loadouts.forEach((lo) => {
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<div class="label"><span>${esc(lo.name)}<br><small style="color:#8b8e9c">${esc(lo.skin === "media" ? "My media" : (WickedSkins[lo.skin]?.name || lo.skin))}</small></span><button class="x" title="Delete">✕</button></div>`;
+    card.innerHTML = `<div class="label"><span>${esc(lo.name)}<br><small style="color:#8b8e9c">${esc(lo.skin === "media" ? "Upload" : (WickedSkins[lo.skin]?.name || lo.skin))}</small></span><button class="x" title="Delete">${ICON_X}</button></div>`;
     card.onclick = (e) => {
       if (e.target.classList.contains("x")) { set({ loadouts: cfg.loadouts.filter((x) => x.id !== lo.id) }); }
       else {
         const hasMedia = lo.skin !== "media" || cfg.media.some((m) => m.id === lo.mediaId);
-        set({ ...lo.look, skin: hasMedia ? lo.skin : cfg.skin, mediaId: hasMedia ? lo.mediaId : cfg.mediaId });
+        applyWithUndo({ ...lo.look, skin: hasMedia ? lo.skin : cfg.skin, mediaId: hasMedia ? lo.mediaId : cfg.mediaId }, `Applied “${lo.name}”.`);
         syncTune(); renderSkins(); renderMedia(); renderCandles();
       }
       renderLoadouts();
@@ -346,7 +427,7 @@ $("loExport").onclick = () => {
   const data = cfg.loadouts.map(({ id, name, skin, look }) => ({ name, skin: skin === "media" ? "aurora" : skin, look }));
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-  a.download = "wicked-skins-loadouts.json"; a.click();
+  a.download = "wicked-skins-looks.json"; a.click();
 };
 $("loImport").onchange = async (e) => {
   try {
@@ -356,27 +437,28 @@ $("loImport").onchange = async (e) => {
       look: Object.fromEntries(LOOK_KEYS.filter((k) => x.look && k in x.look).map((k) => [k, x.look[k]])),
     }));
     set({ loadouts: [...clean, ...cfg.loadouts] }); renderLoadouts();
-  } catch { alert("That file isn't a valid loadouts export."); }
+  } catch { alert("That file isn't a saved-looks export."); }
   e.target.value = "";
 };
 
 // ---------- tune ----------
 const SLIDERS = [
   ["opacity", "Opacity", 0, 1, 0.05, (v) => Math.round(v * 100) + "%"],
-  ["overOpacity", "Over chart", 0.05, 1, 0.05, (v) => Math.round(v * 100) + "%"],
-  ["dim", "Dim", 0, 0.9, 0.05, (v) => Math.round(v * 100) + "%"],
+  ["overOpacity", "On top", 0.05, 1, 0.05, (v) => Math.round(v * 100) + "%"],
+  ["dim", "Darken", 0, 0.9, 0.05, (v) => Math.round(v * 100) + "%"],
   ["blur", "Blur", 0, 20, 1, (v) => v + "px"],
-  ["vividness", "Vividness", 0, 2, 0.05, (v) => Math.round(v * 100) + "%"],
-  ["tint", "Tint", 0, 360, 5, (v) => (v ? v + "°" : "Off")],
+  ["vividness", "Saturation", 0, 2, 0.05, (v) => Math.round(v * 100) + "%"],
+  ["tint", "Hue", 0, 360, 5, (v) => (v ? v + "°" : "Off")],
   ["speed", "Speed", 0.25, 3, 0.05, (v) => v.toFixed(1) + "×"],
-  ["posX", "Left · Right", 0, 100, 1, (v) => (v === 50 ? "Middle" : v + "%")],
-  ["posY", "Up · Down", 0, 100, 1, (v) => (v === 50 ? "Middle" : v + "%")],
+  ["posX", "Horizontal", 0, 100, 1, (v) => (v === 50 ? "Middle" : v + "%")],
+  ["posY", "Vertical", 0, 100, 1, (v) => (v === 50 ? "Middle" : v + "%")],
 ];
 function seg(id, options, get, onPick) {
   const box = $(id); box.innerHTML = "";
   options.forEach(([val, label]) => {
     const b = document.createElement("button");
-    b.textContent = label; b.className = get() === val ? "on" : "";
+    if (label.startsWith("<svg")) { b.innerHTML = label; b.title = val; } else b.textContent = label;
+    b.className = get() === val ? "on" : "";
     b.onclick = () => { onPick(val); seg(id, options, get, onPick); };
     box.appendChild(b);
   });
@@ -393,11 +475,11 @@ function syncTune() {
     $("sliders").appendChild(row);
   });
   seg("fps", [["auto", "Auto"], [20, "20"], [30, "30"], [60, "60"]], () => cfg.fps, (v) => set({ fps: v }));
-  seg("fit", [["cover", "Fill"], ["fit", "Fit"], ["stretch", "Stretch"]], () => cfg.fit, (v) => set({ fit: v }));
+  seg("fit", [["cover", "Cover"], ["fit", "Contain"], ["stretch", "Stretch"]], () => cfg.fit, (v) => set({ fit: v }));
   seg("powerSaver", [[false, "Off"], [true, "On"]], () => cfg.powerSaver, (v) => set({ powerSaver: v }));
   seg("motion", [[false, "Play"], [true, "Pause"]], () => cfg.paused, (v) => set({ paused: v }));
-  seg("layer", [["behind", "Behind candles"], ["over", "Over chart"]], () => cfg.layer, (v) => set({ layer: v }));
-  seg("react", [["off", "Off"], ["market", "Market"], ["pnl", "My P&L"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
+  seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => set({ layer: v }));
+  seg("react", [["off", "Off"], ["market", "Price"], ["pnl", "Position"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
   seg("pnlSide", [["long", "Long"], ["short", "Short"]], () => cfg.pnlSide, (v) => set({ pnlSide: v }));
   syncReact();
 }
@@ -415,14 +497,101 @@ function syncReact() {
 $("reactStrength").oninput = (e) => { set({ reactStrength: +e.target.value }); $("reactStrengthOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("pnlEntry").oninput = (e) => set({ pnlEntry: +e.target.value || 0 });
 $("pnlSymbol").oninput = (e) => set({ pnlSymbol: e.target.value.trim() });
-$("reset").onclick = () => { set(Object.fromEntries(LOOK_KEYS.map((k) => [k, DEFAULTS[k]]))); syncTune(); };
+// ---------- watermark ----------
+const WM_MAX_KB = 1024;
+function syncWatermark() {
+  $("wmOn").checked = cfg.wmOn;
+  $("wmText").value = cfg.wmText || "";
+  $("wmSize").value = cfg.wmSize; $("wmSizeOut").textContent = (+cfg.wmSize).toFixed(1) + "×";
+  $("wmOpacity").value = cfg.wmOpacity; $("wmOpacityOut").textContent = Math.round(cfg.wmOpacity * 100) + "%";
+  $("wmColor").value = cfg.wmColor || "#ffffff";
+  $("wmPreview").style.display = $("wmClear").style.display = cfg.wmImage ? "" : "none";
+  if (cfg.wmImage) $("wmPreview").src = cfg.wmImage;
+  seg("wmPos", [["tl", cornerIcon(2.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["center", cornerIcon(5.5, 4.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]], () => cfg.wmPos, (v) => set({ wmPos: v }));
+}
+// Typing or adding a logo turns the watermark on, so it's obvious where it went.
+$("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
+$("wmText").oninput = (e) => { set({ wmText: e.target.value, ...(e.target.value.trim() && !cfg.wmOn ? { wmOn: true } : {}) }); $("wmOn").checked = cfg.wmOn; };
+$("wmSize").oninput = (e) => { set({ wmSize: +e.target.value }); $("wmSizeOut").textContent = (+e.target.value).toFixed(1) + "×"; };
+$("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+$("wmColor").oninput = (e) => set({ wmColor: e.target.value });
+$("wmClear").onclick = () => { set({ wmImage: null }); syncWatermark(); };
+$("wmFile").onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  if (f.size > WM_MAX_KB * 1024) { $("wmHint").textContent = `That logo is over ${WM_MAX_KB / 1024} MB. Use a smaller PNG or SVG.`; return; }
+  const src = await readAsDataURL(f);
+  const ok = await new Promise((r) => { const i = new Image(); i.onload = () => r(i.naturalWidth > 0); i.onerror = () => r(false); i.src = src; });
+  if (!ok) { $("wmHint").textContent = "That file can't be shown as an image. Try PNG, JPG, WebP or SVG."; return; }
+  set({ wmImage: src, wmOn: true }); syncWatermark();
+};
+
+const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","react","reactStrength"];
+const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleLabels"];
+$("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
+$("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
+
+// ---------- other sites (prop-firm platforms with TradingView charts, e.g. TopstepX) ----------
+// Looks at the page you're on; if it has a TradingView-style chart, offers to turn on there.
+const BUILT_IN = /(^|\.)tradingview\.com$/;
+async function siteBar() {
+  if (!EXT_MODE || IS_TAB || !chrome.tabs || !chrome.scripting) return;
+  const bar = $("siteBar");
+  let tab; try { [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); } catch { return; }
+  if (!tab || !/^https?:/.test(tab.url || "")) return;
+  const url = new URL(tab.url), origin = url.origin, host = url.hostname.replace(/^www\./, "");
+  if (BUILT_IN.test(url.hostname)) return;                       // always on there
+  const show = (cls, title, hintText, btn, onClick) => {
+    bar.hidden = false; bar.className = "sitebar" + (cls ? " " + cls : "");
+    $("siteTitle").textContent = title; $("siteHint").textContent = hintText;
+    $("siteBtn").textContent = btn; $("siteBtn").onclick = onClick;
+  };
+  const enabled = await WickedSites.find(origin);
+  if (enabled) {
+    return show("on", `On for ${host}`, "Skins, candles and glow are active on this site's charts.", "Turn off", async () => {
+      await WickedSites.disable(enabled.origin); chrome.tabs.reload(tab.id); window.close();
+    });
+  }
+  // Detect a chart: in the page, in same-origin chart iframes, or by an iframe that loads a charting library.
+  let found = { chart: false, frames: [] };
+  try {
+    const [res] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
+      const SEL = ".chart-markup-table, .chart-container";
+      let chart = !!document.querySelector(SEL); const frames = new Set();
+      for (const f of document.querySelectorAll("iframe")) {
+        try { if (f.contentDocument && f.contentDocument.querySelector(SEL)) chart = true; } catch {}
+        const src = f.src || "";
+        if (/charting_library|tradingview|tv[-_]?chart/i.test(src) || /^tradingview_/i.test(f.id || "") || /tradingview/i.test(f.name || "")) {
+          chart = true;
+          try { const o = new URL(src, location.href).origin; if (/^https?:/.test(o) && o !== location.origin) frames.add(o); } catch {}
+        }
+      }
+      if (window.TradingView || window.tvWidget) chart = true;
+      return { chart, frames: [...frames] };
+    } });
+    found = res.result || found;
+  } catch {}
+  const turnOn = async () => {
+    const origins = [origin, ...found.frames];
+    const ok = await chrome.permissions.request({ origins: origins.map((o) => o + "/*") });  // Chrome shows its prompt here
+    if (!ok) { $("siteHint").textContent = "Not turned on: Chrome's permission was declined."; return; }
+    await WickedSites.enable(origin, found.frames);
+    chrome.tabs.reload(tab.id); window.close();
+  };
+  if (found.chart) {
+    show("", `Chart found on ${host}`, "Chrome will ask to let Wicked Skins \u201cread and change\u201d this site. That's Chrome's standard wording for drawing on a page; it only paints the chart and never reads your account or orders.", "Turn on here", turnOn);
+  } else {
+    show("", `No TradingView chart found on ${host}`, "Open a chart on this site first, or turn it on anyway if the chart loads later.", "Turn on anyway", turnOn);
+  }
+}
 
 // ---------- master switch + boot ----------
 $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status").textContent = e.target.checked ? "On" : "Off"; };
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick();
+  siteBar();
   const q = new URLSearchParams(location.search);
   if (q.get("page")) {
     document.body.classList.add("page");

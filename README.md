@@ -1,5 +1,7 @@
 # Wicked Skins for TradingView
 
+<img src="icons/icon-128.png" width="96" alt="Wicked Skins logo">
+
 Live backgrounds (animated skins, images, GIFs, video) behind TradingView charts.
 Purely cosmetic. It does not read orders, positions or account data and makes no network requests.
 
@@ -14,20 +16,36 @@ Purely cosmetic. It does not read orders, positions or account data and makes no
 - `src/content.css`: makes the chart transparent. **If TradingView changes its markup, fix selectors here.**
 - `popup/`: skin picker, custom media upload, darken/blur/FPS.
 
+## Works on other platforms (TopstepX and other prop-firm platforms)
+Many platforms embed TradingView's charting library (e.g. [TopstepX](https://help.topstepx.com/components/tradingview-tm-charts)).
+Open the platform's chart, click the Wicked Skins icon. If a chart is found you'll see **"Chart found on …" → Turn on here**.
+Chrome asks once for that site; the page reloads skinned. **Turn off** in the same place removes it (and the permission).
+It only switches on inside the frame that contains the chart; the rest of the platform is untouched.
+On platforms without TradingView's internal API, candle colours are learned from what's drawn.
+
 ## Features
+- **One-click looks**: complete combos (skin + candles + glow + price scale) in one tap, with **Undo**.
+- **Candle styles**: Solid, Tube (glowing outlines), Spectrum (colours across the chart), Cycle (colours flow over time).
+- **Glow**: candles, plus indicators / drawings / price & position lines / the P&L pill. Grid and crosshair never glow.
+- **Price scale**: custom text colour, glow, bold, backing (Auto / Clear / Glass / TradingView), price tags in candle colours.
+- **Auto readability**: scale and legend text switch light/dark per label from the brightness behind it (videos too).
+- **Alt+Shift+W** on the chart: everything on/off.
 - **Candles**: recolour up/down candles and volume (18 presets or custom colours; works with your own TradingView colours and candle/hollow/Heikin Ashi/bar styles) with optional glow. Changes apply live.
-- **Skins**: 25 live wallpapers in 8 categories (Nature, Space, Warm, Neon, City, Calm, Weather, Trading).
-- **My media**: your own images/GIFs/videos, **any video format**. MP4/MOV/MKV/WebM play directly; AVI, WMV, FLV,
+- **Skins**: 24 live wallpapers in 8 categories (Nature, Space, Warm, Neon, City, Calm, Weather, Trading).
+- **Uploads**: your own images/GIFs/videos, **any video format**. MP4/MOV/MKV/WebM play directly; AVI, WMV, FLV,
   HEVC/H.265 and others are converted to WebM on your computer (ffmpeg.wasm, see `vendor/ffmpeg/NOTICE.md`).
   Files are stored in the extension's own database (up to 2 GB each) and played by `player/player.html`.
   Adding files opens a full-tab manager so long conversions aren't interrupted. Drag & drop supported.
-- **Reacts to**:
-  - *Market*: the chart edges glow green or red with the day's move and pulse on price ticks, and skins speed up when price moves.
+- **Live mood** (Adjust → Motion & mood):
+  - *Price*: the chart edges glow green or red with the day's move and pulse on price ticks, and skins speed up when price moves.
     Price comes from the tab title TradingView already shows.
-  - *My P&L*: glows with your P&L from an entry price **you type in** (long/short, optional symbol). Worked out locally;
+  - *Position*: glows with your P&L from an entry price **you type in** (long/short, optional symbol). Worked out locally;
     it never reads your account, orders or positions.
-- **Tune**: opacity, Over chart strength, dim, blur, vividness, tint, speed, position, fit, FPS, power saver, layer.
-- **Loadouts**: save/apply/export/import your look.
+- **Watermark** (Adjust → Watermark): your own text and/or logo on the chart (on/off switch, 5 positions, size, opacity, colour).
+  It sits on top of the chart so it shows in screen recordings and screenshots of your screen; it never blocks clicks.
+  (TradingView's own camera snapshot is rendered by TradingView and won't include it.)
+- **Adjust**: opacity, on-top strength, darken, blur, saturation, hue, speed, position, fit, FPS, eco mode, layer.
+- **Saved**: save/apply/export/import your looks.
 
 ## Roadmap
 1. Skin format: a skin pack is JSON `{ id, name, type, ...}` so it can be exported/imported and shared.
@@ -50,3 +68,7 @@ Note: this wraps tradingview.com; it does not modify the official TradingView De
 - **Android**: Chrome for Android has no extensions. Options are Firefox for Android (supports WebExtensions)
   or a small WebView app that loads tradingview.com and injects `src/` (same approach as `desktop/`).
 - The official TradingView mobile apps cannot be modified, so mobile means web-in-browser or our own wrapper app.
+
+## Logo
+`icons/logo.svg` (full) and `icons/logo-small.svg` (simplified, used for 16/32 px) are the sources.
+PNG sizes 16/32/48/128/512 are rendered from them. If the name changes, only the popup label and these files need updating.
