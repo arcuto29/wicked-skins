@@ -85,7 +85,7 @@
       pillEl.textContent = label;
       pillEl.style.color = col;
       const el = document.querySelector(".chart-container");
-      if (el && label) { const r = el.getBoundingClientRect(); pillEl.style.top = r.top + 8 + "px"; pillEl.style.left = r.right - 80 + "px"; // left of the price axis }
+      if (el && label) { const r = el.getBoundingClientRect(); pillEl.style.top = r.top + 8 + "px"; pillEl.style.left = r.right - 80 + "px"; } // pill sits left of the price axis
     }
   }
 
