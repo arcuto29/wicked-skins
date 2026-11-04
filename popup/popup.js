@@ -549,7 +549,7 @@ $("shareGo").onclick = async () => {
     const thumb = m.thumb ? await (await fetch(m.thumb)).blob() : null;
     const r = await W().share({ blob, thumb, title: $("shareTitle").value.trim() || m.name, kind: m.type });
     $("shareDlg").hidden = true;
-    toast(r.status === "approved" ? "Shared: it's live in the Workshop." : "Shared: it'll appear after review. See Workshop → Mine.");
+    toast(r.status === "approved" ? "Shared: it's live in the Workshop." : "Shared: it'll appear after review. See Workshop › Mine.");
   } catch (e) { $("shareMsg").textContent = "Couldn't share: " + e.message; $("shareGo").disabled = false; }
 };
 // accounts
@@ -559,7 +559,7 @@ $("wsSignBtn").onclick = async () => {
 };
 const authMsg = (t) => ($("wsAuthMsg").textContent = t);
 const creds = () => ({ email: $("wsEmail").value.trim(), password: $("wsPass").value });
-async function afterSignIn() { wsAuthOpen = false; $("wsPass").value = ""; $("wsCodeBox").hidden = true; await wsLoad(true); toast(`Signed in as ${W().me().name}.`); }
+async function afterSignIn() { wsAuthOpen = false; $("wsPass").value = ""; await wsLoad(true); toast(`Signed in as ${W().me().name}.`); }
 $("wsSignIn").onclick = async () => { const c = creds(); if (!c.email || !c.password) return authMsg("Enter your email and password.");
   try { authMsg("Signing in…"); await W().signIn(c.email, c.password); await afterSignIn(); } catch (e) { authMsg(e.message); } };
 $("wsSignUp").onclick = async () => { const c = creds(); if (!c.email || c.password.length < 8) return authMsg("Use your email and a password of at least 8 characters.");
@@ -567,9 +567,7 @@ $("wsSignUp").onclick = async () => { const c = creds(); if (!c.email || c.passw
     if (r.needsConfirm) authMsg("Check your email to confirm your account, then sign in here."); else await afterSignIn(); } catch (e) { authMsg(e.message); } };
 $("wsGoogle").onclick = async () => { try { authMsg("Opening Google…"); await W().signInGoogle(); await afterSignIn(); } catch (e) { authMsg(e.message); } };
 $("wsForgot").onclick = async () => { const email = $("wsEmail").value.trim(); if (!email) return authMsg("Enter your email first.");
-  try { await W().sendCode(email); $("wsCodeBox").hidden = false; authMsg("We emailed you a sign-in code."); } catch (e) { authMsg(e.message); } };
-$("wsVerify").onclick = async () => { try { await W().verifyCode($("wsEmail").value.trim(), $("wsCode").value.trim()); await afterSignIn();
-  const pw = prompt("Set a new password? (leave empty to skip)", ""); if (pw && pw.length >= 8) { await W().setPassword(pw); toast("Password updated."); } } catch (e) { authMsg(e.message); } };
+  try { await W().resetPassword(email); authMsg("Check your email for a link to set a new password, then sign in here."); } catch (e) { authMsg(e.message); } };
 $("wsMore").onclick = () => { wsPage++; wsLoad(false); };
 function initWorkshop() {
   const on = !!(window.Workshop && Workshop.configured);

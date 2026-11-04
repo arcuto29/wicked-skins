@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Set a new password · Wicked Skins</title>
+<link rel="icon" href="img/icon-32.png"><link rel="stylesheet" href="style.css"></head>
+<body><main class="doc wrap" style="max-width:460px">
+  <h1>Set a new password</h1>
+  <div id="form" hidden>
+    <p>Choose a new password for your Wicked Skins account.</p>
+    <input id="pw" type="password" placeholder="New password (8+ characters)" autocomplete="new-password"
+      style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit">
+    <p><button class="btn primary" id="save" style="border:0;cursor:pointer">Save password</button></p>
+  </div>
+  <p id="msg" style="color:var(--muted)">Checking your link…</p>
+</main>
+<script src="site-config.js"></script><script src="common.js"></script><script src="supabase.js"></script>
+<script>
+(async function () {
+  const S = window.SITE, msg = document.getElementById("msg"), form = document.getElementById("form");
+  if (!S.supabaseUrl) { msg.textContent = "Accounts aren't set up yet."; return; }
+  const sb = supabase.createClient(S.supabaseUrl, S.supabaseAnonKey, { auth: { detectSessionInUrl: true, persistSession: false, flowType: "implicit" } });
+  const hash = new URLSearchParams(location.hash.slice(1));
+  if (hash.get("error_description")) { msg.textContent = "This link didn't work: " + hash.get("error_description") + ". Ask for a new one from the extension."; return; }
+  await new Promise((r) => setTimeout(r, 300));             // let supabase-js read the link
+  const { data } = await sb.auth.getSession();
+  if (!data.session) { msg.textContent = "This reset link has expired or was already used. In the extension: Workshop › Sign in › Forgot password."; return; }
+  history.replaceState(null, "", location.pathname);      // tokens out of the address bar
+  form.hidden = false; msg.textContent = "";
+  document.getElementById("save").onclick = async () => {
+    const pw = document.getElementById("pw").value;
+    if (pw.length < 8) { msg.textContent = "Use at least 8 characters."; return; }
+    const { error } = await sb.auth.updateUser({ password: pw });
+    if (error) { msg.textContent = error.message; return; }
+    form.hidden = true; msg.textContent = "Done. Your password is changed. Sign in from the extension: Workshop › Sign in.";
+    await sb.auth.signOut();
+  };
+})();
+</script></body></html>

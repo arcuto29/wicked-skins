@@ -43,9 +43,8 @@
       return { needsConfirm: !d.session };          // Supabase may require email confirmation first
     },
     async signIn(email, password) { need(); err(await sb.auth.signInWithPassword({ email, password })); return refreshUser(); },
-    async sendCode(email) { need(); err(await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })); },
-    async verifyCode(email, token) { need(); err(await sb.auth.verifyOtp({ email, token, type: "email" })); return refreshUser(); },
-    async setPassword(password) { need(); err(await sb.auth.updateUser({ password })); },
+    // Forgot password: Supabase emails a link that opens the website's reset page (site/reset.html)
+    async resetPassword(email) { need(); err(await sb.auth.resetPasswordForEmail(email, { redirectTo: (CFG.siteUrl || "https://arcuto29.github.io/wicked-skins/") + "reset.html" })); },
     async signInGoogle() {
       need();
       if (!(window.chrome && chrome.identity && chrome.identity.launchWebAuthFlow)) throw new Error("Google sign-in works in the browser extension.");
