@@ -1,0 +1,11 @@
+{
+  "name": "wicked-skins",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Live wallpapers, candle styles and glow for TradingView charts: browser extension + desktop app",
+  "scripts": {
+    "check": "node scripts/check.js",
+    "build:ext": "node scripts/build-extension.js",
+    "release": "node scripts/release.js"
+  }
+}

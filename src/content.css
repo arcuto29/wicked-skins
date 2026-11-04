@@ -77,5 +77,5 @@ html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="valueTitle
 html.bd-shift .chart-markup-table.pane canvas:first-of-type { animation: bd-hue var(--bd-shift-dur, 10s) linear infinite; }
 .bd-flash { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); z-index: 2147483002; pointer-events: none;
   padding: 8px 16px; border-radius: 99px; background: rgba(12,10,22,.85); color: #fff; font: 700 13px system-ui, sans-serif;
-  border: 1px solid rgba(255,95,199,.5); box-shadow: 0 0 18px rgba(143,123,255,.45); animation: bd-flash 1.4s ease-out forwards; }
+  border: 1px solid rgba(46,242,176,.5); box-shadow: 0 0 18px rgba(25,211,255,.4); animation: bd-flash 1.4s ease-out forwards; }
 @keyframes bd-flash { 0% { opacity: 0; } 12% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }

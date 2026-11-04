@@ -23,9 +23,13 @@ Chrome asks once for that site; the page reloads skinned. **Turn off** in the sa
 It only switches on inside the frame that contains the chart; the rest of the platform is untouched.
 On platforms without TradingView's internal API, candle colours are learned from what's drawn.
 
+## Updates
+Buyers get updates automatically (Chrome Web Store, desktop auto-updater, or an in-panel banner for zip installs).
+See **[RELEASING.md](RELEASING.md)**: one command + a tag push publishes everywhere.
+
 ## Features
 - **One-click looks**: complete combos (skin + candles + glow + price scale) in one tap, with **Undo**.
-- **Candle styles**: Solid, Tube (glowing outlines), Spectrum (colours across the chart), Cycle (colours flow over time).
+- **Candle styles**: Solid, Tube (glowing outlines), Rainbow (colours across the chart), Cycle (colours flow over time).
 - **Glow**: candles, plus indicators / drawings / price & position lines / the P&L pill. Grid and crosshair never glow.
 - **Price scale**: custom text colour, glow, bold, backing (Auto / Clear / Glass / TradingView), price tags in candle colours.
 - **Auto readability**: scale and legend text switch light/dark per label from the brightness behind it (videos too).
