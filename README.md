@@ -16,7 +16,7 @@ Purely cosmetic. It does not read orders, positions or account data and makes no
 
 ## Features
 - **Candles**: recolour up/down candles and volume (18 presets or custom colours; works with your own TradingView colours and candle/hollow/Heikin Ashi/bar styles) with optional glow. Changes apply live.
-- **Skins**: 25 live wallpapers in 8 categories (Nature, Space, Warm, Neon, City, Calm, Weather, Trading).
+- **Skins**: 24 live wallpapers in 8 categories (Nature, Space, Warm, Neon, City, Calm, Weather, Trading).
 - **My media**: your own images/GIFs/videos, **any video format**. MP4/MOV/MKV/WebM play directly; AVI, WMV, FLV,
   HEVC/H.265 and others are converted to WebM on your computer (ffmpeg.wasm, see `vendor/ffmpeg/NOTICE.md`).
   Files are stored in the extension's own database (up to 2 GB each) and played by `player/player.html`.

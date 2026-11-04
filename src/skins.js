@@ -550,29 +550,10 @@
     };
   };
 
-  // Trading-themed: ghost candlesticks drifting past
-  const ghostcandles = (ctx) => {
-    let w = 0, h = 0, bars = [], price = 0.5, x0 = 0;
-    const step = 14;
-    const add = () => { const o = price; price = Math.max(0.15, Math.min(0.85, price + rnd(-0.06, 0.06))); bars.push({ o, c: price, hi: Math.max(o, price) + rnd(0, 0.03), lo: Math.min(o, price) - rnd(0, 0.03) }); };
-    return {
-      resize(W, H) { w = W; h = H; bars = []; price = 0.5; for (let i = 0; i < w / step + 4; i++) add(); },
-      frame(t, dt) {
-        ctx.fillStyle = "#05070b"; ctx.fillRect(0, 0, w, h);
-        x0 -= dt * 18; if (x0 <= -step) { x0 += step; bars.shift(); add(); }
-        bars.forEach((b, i) => {
-          const x = x0 + i * step, up = b.c >= b.o, col = up ? "rgba(0,255,160,0.16)" : "rgba(255,60,120,0.16)";
-          ctx.fillStyle = col; ctx.fillRect(x + step / 2 - 0.5, h * (1 - b.hi), 1, h * (b.hi - b.lo));
-          ctx.fillRect(x + 2, h * (1 - Math.max(b.o, b.c)), step - 4, Math.max(2, h * Math.abs(b.c - b.o)));
-        });
-      },
-    };
-  };
-
   const tickertape = (ctx) => {
     let w = 0, h = 0, rows = [];
     const SYMS = ["BTC", "ETH", "SOL", "NQ", "ES", "AAPL", "TSLA", "NVDA", "EUR", "GOLD", "OIL", "SPX"];
-    const item = () => { const up = Math.random() < 0.5; return { s: SYMS[(Math.random() * SYMS.length) | 0], c: (up ? "+" : "−") + rnd(0.1, 4.9).toFixed(2) + "%", up }; };
+    const item = () => ({ s: SYMS[(Math.random() * SYMS.length) | 0], up: Math.random() < 0.3 });
     return {
       resize(W, H) { w = W; h = H; rows = Array.from({ length: Math.ceil(h / 40) }, (_, i) => ({ y: 30 + i * 40, sp: rnd(20, 60) * (i % 2 ? -1 : 1), off: rnd(0, 400), items: Array.from({ length: 30 }, item) })); },
       frame(t) {
@@ -582,8 +563,8 @@
           let x = ((r.off + t * r.sp) % 140) - 140;
           for (let k = 0; x < w + 140; k++, x += 140) {
             const it = r.items[(k + Math.floor((r.off + t * r.sp) / 140) + 3000) % r.items.length];
-            ctx.fillStyle = "rgba(200,210,230,0.10)"; ctx.fillText(it.s, x, r.y);
-            ctx.fillStyle = it.up ? "rgba(0,255,150,0.16)" : "rgba(255,70,110,0.16)"; ctx.fillText(it.c, x + 52, r.y);
+            // symbols only: no made-up % changes that could be mistaken for real market data
+            ctx.fillStyle = it.up ? "rgba(0,255,150,0.13)" : "rgba(200,210,230,0.10)"; ctx.fillText(it.s, x, r.y);
           }
         }
       },
@@ -614,7 +595,6 @@
     cybergrid: { name: "Cyber Grid", cat: "Neon",  create: cybergrid },
     circuit:   { name: "Circuit",   cat: "Neon",   create: circuit },
     neoncity:  { name: "Neon City", cat: "City",   create: neoncity },
-    ghostcandles: { name: "Ghost Candles", cat: "Trading", create: ghostcandles },
     tickertape:   { name: "Ticker Tape",   cat: "Trading", create: tickertape },
   };
 })();
