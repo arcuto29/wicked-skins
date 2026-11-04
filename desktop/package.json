@@ -53,11 +53,10 @@
     },
     "mac": {
       "target": [
-        "dmg",
         "zip"
       ],
       "category": "public.app-category.finance",
-      "icon": "../icons/icon-512.png"
+      "icon": "../icons/icon-1024.png"
     },
     "linux": {
       "target": "AppImage",
