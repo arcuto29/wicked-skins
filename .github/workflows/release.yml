@@ -1,0 +1,75 @@
+# Push a tag like v0.3.0 (npm run release 0.3.0 does it) and this:
+#  1. builds the extension zip and creates the GitHub Release with your CHANGELOG notes
+#  2. uploads + publishes the extension to the Chrome Web Store (if the CWS_* secrets are set)
+#     -> Chrome updates every store user automatically
+#  3. builds the desktop app for Windows, macOS and Linux and attaches the installers
+#     -> installed apps find the new version and update themselves
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  extension:
+    runs-on: ubuntu-latest
+    env:
+      CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+      PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+      EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Check code and that the tag matches the version
+        run: EXPECT_VERSION="${GITHUB_REF_NAME#v}" node scripts/check.js
+      - name: Build extension zip
+        run: node scripts/build-extension.js
+      - name: Release notes from CHANGELOG.md
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          awk -v v="$V" '$0 ~ "^## "v {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Wicked Skins $V" > notes.md
+          cat notes.md
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Wicked Skins ${{ github.ref_name }}
+          body_path: notes.md
+          files: dist/wicked-skins-*.zip
+      - name: Publish to Chrome Web Store
+        if: env.EXTENSION_ID != '' && env.REFRESH_TOKEN != ''
+        run: npx --yes chrome-webstore-upload-cli@4 --source "dist/wicked-skins-${GITHUB_REF_NAME#v}.zip"
+
+  desktop:
+    needs: extension
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Optional code signing. Without it the apps still install and update on Windows/Linux;
+      # macOS needs signing + notarization for silent auto-updates (see RELEASING.md).
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install
+      - name: Skip signing when no certificate is configured
+        if: env.CSC_LINK == ''
+        shell: bash
+        run: echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
+      - name: Build installers and attach them to the release
+        run: npx electron-builder --publish always

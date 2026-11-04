@@ -1,8 +1,76 @@
 {
   "name": "wicked-skins-desktop",
+  "productName": "Wicked Skins",
   "version": "0.1.0",
   "description": "Wicked Skins desktop app: TradingView with live wallpapers (Windows, macOS, Linux)",
+  "author": "arcuto29",
   "main": "main.js",
-  "scripts": { "start": "electron ." },
-  "devDependencies": { "electron": "^33.0.0" }
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:publish": "electron-builder --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "devDependencies": {
+    "electron": "^45.2.2",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.wickedskins.desktop",
+    "productName": "Wicked Skins",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "tv-preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../src",
+        "to": "shared/src"
+      },
+      {
+        "from": "../popup",
+        "to": "shared/popup"
+      },
+      {
+        "from": "../icons",
+        "to": "shared/icons"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "../icons/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.finance",
+      "icon": "../icons/icon-512.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "../icons/icon-512.png",
+      "category": "Finance"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "arcuto29",
+        "repo": "wicked-skins",
+        "releaseType": "release"
+      }
+    ]
+  }
 }

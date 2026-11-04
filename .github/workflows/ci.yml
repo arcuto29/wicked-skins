@@ -1,0 +1,32 @@
+# Runs on every pull request and push to main: catches broken code before it ships.
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: node scripts/check.js
+      - run: node scripts/build-extension.js
+
+  desktop-smoke:
+    # Launches the real desktop app against tradingview.com under a virtual display.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install
+      - run: npm install --no-save playwright@1.64.1
+      - run: xvfb-run -a node test/smoke.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: desktop-screenshots, path: desktop/test-output }

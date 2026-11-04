@@ -17,6 +17,11 @@
   </nav>
 
   <main>
+    <div id="notice" class="sitebar" hidden>
+      <div><b id="noticeTitle"></b><p class="hint" id="noticeHint"></p></div>
+      <a id="noticeLink" class="btn" target="_blank" rel="noopener"></a>
+      <button id="noticeClose" class="x" title="Dismiss"></button>
+    </div>
     <div id="siteBar" class="sitebar" hidden>
       <div><b id="siteTitle"></b><p class="hint" id="siteHint"></p></div>
       <button id="siteBtn" class="primary"></button>
@@ -141,6 +146,7 @@
   </main>
 
   <script src="../src/sites.js"></script>
+  <script src="../src/migrate.js"></script>
   <script src="../src/mediadb.js"></script>
   <script src="../src/skins.js"></script>
   <script src="popup.js"></script>

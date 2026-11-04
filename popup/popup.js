@@ -585,6 +585,45 @@ async function siteBar() {
   }
 }
 
+// ---------- updates ----------
+// Store installs are updated by Chrome automatically; we just say what's new afterwards.
+// Zip / "Load unpacked" installs can't auto-update, so we check GitHub Releases (max every 6 h) and offer the download.
+const REPO = "arcuto29/wicked-skins";
+const RELEASES = `https://github.com/${REPO}/releases`;
+const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+function notice(title, hintText, linkText, href, onClose) {
+  const n = $("notice"); n.hidden = false;
+  $("noticeTitle").textContent = title; $("noticeHint").textContent = hintText;
+  $("noticeLink").textContent = linkText; $("noticeLink").href = href;
+  $("noticeClose").innerHTML = ICON_X; $("noticeClose").onclick = () => { n.hidden = true; onClose && onClose(); };
+}
+async function updates() {
+  if (!EXT_MODE || IS_TAB) return;
+  const me = chrome.runtime.getManifest().version;
+  if (window.WickedMigrate) await WickedMigrate.run().catch(() => {});
+  const { justUpdated } = await chrome.storage.local.get("justUpdated");
+  if (justUpdated && justUpdated.to === me) {
+    return notice(`Updated to ${me}`, "New features and fixes are live.", "What's new", `${RELEASES}/tag/v${me}`,
+      () => chrome.storage.local.remove("justUpdated"));
+  }
+  // The Chrome Web Store adds update_url to the manifest of store installs; zip/unpacked installs don't have it.
+  if ("update_url" in chrome.runtime.getManifest()) return;
+  const { updCheck } = await chrome.storage.local.get("updCheck");
+  let latest = updCheck && Date.now() - updCheck.at < 6 * 3600e3 ? updCheck.latest : null;
+  if (!latest) {
+    try {
+      const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
+      if (r.ok) latest = String((await r.json()).tag_name || "").replace(/^v/, "");
+    } catch {}
+    if (latest) chrome.storage.local.set({ updCheck: { at: Date.now(), latest } });
+  }
+  if (latest && newer(latest, me)) {
+    notice(`Update available: ${latest}`, "Download it, replace the files in your Wicked Skins folder, then click the reload arrow on its card in chrome://extensions. Your settings are kept.",
+      "Download", `${RELEASES}/latest`);
+  }
+}
+
 // ---------- master switch + boot ----------
 $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status").textContent = e.target.checked ? "On" : "Off"; };
 chrome.storage.local.get(DEFAULTS, (stored) => {
@@ -592,6 +631,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
   renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick();
   siteBar();
+  updates();
   const q = new URLSearchParams(location.search);
   if (q.get("page")) {
     document.body.classList.add("page");

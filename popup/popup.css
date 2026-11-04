@@ -86,3 +86,7 @@ details.grp > summary .switch { margin-left: auto; }
 .sitebar button { white-space: nowrap; }
 .sitebar.on { background: rgba(0,224,138,.08); border-color: rgba(0,224,138,.35); }
 .sitebar.on button { background: #181a22; color: inherit; border: 1px solid #2b2e3a; font-weight: 600; }
+#notice a.btn { text-decoration: none; white-space: nowrap; }
+#notice .x { align-self: flex-start; }
+.sitebar[hidden] { display: none; }   /* display:flex would otherwise override the hidden attribute */
+#notice b { white-space: normal; }
