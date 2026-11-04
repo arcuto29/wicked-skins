@@ -14,6 +14,19 @@ Purely cosmetic. It does not read orders, positions or account data and makes no
 - `src/content.css`: makes the chart transparent. **If TradingView changes its markup, fix selectors here.**
 - `popup/`: skin picker, custom media upload, darken/blur/FPS.
 
+## Features
+- **Skins**: 8 animated canvas skins with live previews and categories.
+- **Candles**: recolour up/down candles and volume (10 presets or custom colours) with optional glow. Changes apply live.
+- **My media**: your own images/GIFs/videos (PNG, JPG, WebP, AVIF, GIF, SVG, BMP, MP4, WebM, MOV, MKV, OGG; up to 50 MB).
+  Drag & drop supported. Files are checked before saving; HEIC/AVI/WMV etc. get a "convert it first" message.
+- **Reacts to**:
+  - *Market*: the chart edges glow green or red with the day's move and pulse on price ticks, and skins speed up when price moves.
+    Price comes from the tab title TradingView already shows.
+  - *My P&L*: glows with your P&L from an entry price **you type in** (long/short, optional symbol). Worked out locally;
+    it never reads your account, orders or positions.
+- **Tune**: opacity, Over chart strength, dim, blur, vividness, tint, speed, position, fit, FPS, power saver, layer.
+- **Loadouts**: save/apply/export/import your look.
+
 ## Roadmap
 1. Skin format: a skin pack is JSON `{ id, name, type, ...}` so it can be exported/imported and shared.
 2. Workshop: backend (auth, uploads, moderation queue, likes, report/DMCA flow) plus an in-extension browser.

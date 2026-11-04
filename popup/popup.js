@@ -1,11 +1,13 @@
 const $ = (id) => document.getElementById(id);
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer"];
+const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","react","reactStrength"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
   fps: "auto", fit: "cover", posX: 50, posY: 50,
   powerSaver: false, paused: false, bw: false, layer: "behind",
+  candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
+  react: "off", reactStrength: 0.6, pnlSide: "long", pnlEntry: 0, pnlSymbol: "",
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -56,6 +58,46 @@ let last = 0;
   previews.forEach((p) => p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1)));
 })(0);
 
+// ---------- candles ----------
+const CANDLE_PRESETS = [
+  ["neon", "Neon Pulse", "#00ffa3", "#ff2e97"],
+  ["ice", "Glacier", "#8be9ff", "#3d5afe"],
+  ["lava", "Magma", "#ffb300", "#ff3d00"],
+  ["gold", "Aurum", "#ffd36b", "#a67c1a"],
+  ["ghost", "Ghost", "#f5f5f5", "#5c5c5c"],
+  ["amethyst", "Amethyst", "#b388ff", "#4a5a6a"],
+  ["dusk", "Dusk", "#ffb74d", "#ec407a"],
+  ["acid", "Acid", "#c6ff00", "#7c4dff"],
+  ["crimson", "Crimson", "#ff5252", "#8a0f2e"],
+  ["deepsea", "Deepsea", "#4dd0e1", "#5c6bc0"],
+];
+const bars = (up, down) => {
+  // 8 tiny candles: [open, close, low, high] in a 0-30 box
+  const d = [[20,16,22,12],[16,18,19,13],[18,12,20,10],[12,14,16,9],[14,9,15,6],[9,10,12,5],[10,5,11,2],[5,6,8,1]];
+  return `<svg viewBox="0 0 80 30" preserveAspectRatio="none">${d.map(([o, c, lo, hi], i) => {
+    const col = c <= o ? up : down; // lower y = higher price
+    const x = 5 + i * 10, top = Math.min(o, c), ht = Math.max(2, Math.abs(o - c));
+    return `<line x1="${x}" x2="${x}" y1="${hi}" y2="${lo}" stroke="${col}"/><rect x="${x - 3}" y="${top}" width="6" height="${ht}" fill="${col}"/>`;
+  }).join("")}</svg>`;
+};
+function renderCandles() {
+  $("candleOn").checked = cfg.candleOn;
+  $("candleGlow").value = cfg.candleGlow; $("candleGlowOut").textContent = Math.round(cfg.candleGlow * 100) + "%";
+  $("candleUp").value = cfg.candleUp; $("candleDown").value = cfg.candleDown;
+  const box = $("candleCards"); box.innerHTML = "";
+  CANDLE_PRESETS.forEach(([id, name, up, down]) => {
+    const b = document.createElement("button");
+    b.className = "card preset" + (cfg.candlePreset === id ? " on" : "");
+    b.innerHTML = bars(up, down) + `<div class="label">${esc(name)}</div>`;
+    b.onclick = () => { set({ candleOn: true, candleUp: up, candleDown: down, candlePreset: id }); renderCandles(); };
+    box.appendChild(b);
+  });
+}
+$("candleOn").onchange = (e) => set({ candleOn: e.target.checked });
+$("candleGlow").oninput = (e) => { set({ candleGlow: +e.target.value }); $("candleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+$("candleUp").oninput = (e) => { set({ candleUp: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
+$("candleDown").oninput = (e) => { set({ candleDown: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
+
 // ---------- my media ----------
 function renderMedia() {
   const box = $("mediaCards"); box.innerHTML = "";
@@ -78,20 +120,77 @@ function renderMedia() {
     box.appendChild(card);
   });
 }
-$("file").onchange = async (e) => {
-  const added = [];
-  for (const f of e.target.files) {
-    if (f.size > MAX_MB * 1024 * 1024) { $("mediaHint").textContent = `${f.name} is over ${MAX_MB} MB.`; continue; }
-    const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(f); });
-    added.push({ id: uid(), name: f.name.replace(/\.[^.]+$/, ""), type: f.type.startsWith("video") ? "video" : "image", src });
+// Formats Chrome/Edge/Electron can decode natively. Anything else gets a clear message.
+const IMAGE_EXT = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", jfif: "image/jpeg", pjpeg: "image/jpeg",
+  gif: "image/gif", webp: "image/webp", avif: "image/avif", apng: "image/apng", bmp: "image/bmp",
+  ico: "image/x-icon", svg: "image/svg+xml" };
+const VIDEO_EXT = { mp4: "video/mp4", m4v: "video/mp4", webm: "video/webm", mov: "video/mp4", // most .mov are H.264
+  ogv: "video/ogg", ogg: "video/ogg", mkv: "video/webm" };                                   // mkv w/ VP8/VP9/AV1 plays
+const UNSUPPORTED = { heic: "HEIC (iPhone photo): export it as JPG or PNG first",
+  heif: "HEIF: export it as JPG or PNG first", tif: "TIFF: convert it to PNG first", tiff: "TIFF: convert it to PNG first",
+  avi: "AVI: convert it to MP4 first", wmv: "WMV: convert it to MP4 first", flv: "FLV: convert it to MP4 first",
+  psd: "PSD: export it as PNG first" };
+
+function classify(f) {
+  const ext = (f.name.split(".").pop() || "").toLowerCase();
+  if (UNSUPPORTED[ext]) return { err: UNSUPPORTED[ext] };
+  if (f.type.startsWith("video/") || VIDEO_EXT[ext]) return { type: "video", mime: f.type || VIDEO_EXT[ext] };
+  if (f.type.startsWith("image/") || IMAGE_EXT[ext]) return { type: "image", mime: f.type || IMAGE_EXT[ext] };
+  return { err: "not an image or video file" };
+}
+
+// Actually try to decode it, so users find out now instead of seeing a black chart.
+function canDecode(type, src) {
+  return new Promise((ok) => {
+    const el = document.createElement(type === "video" ? "video" : "img");
+    const done = (v) => { clearTimeout(t); el.removeAttribute("src"); ok(v); };
+    const t = setTimeout(() => done(false), 8000);
+    if (type === "video") { el.muted = true; el.preload = "metadata"; el.onloadeddata = () => done(el.videoWidth > 0); }
+    else el.onload = () => done(el.naturalWidth > 0);
+    el.onerror = () => done(false);
+    el.src = src;
+  });
+}
+
+const readAsDataURL = (f, mime) => new Promise((res, rej) => {
+  const r = new FileReader();
+  r.onload = () => res(mime ? r.result.replace(/^data:[^;,]*/, "data:" + mime) : r.result);
+  r.onerror = () => rej(r.error);
+  r.readAsDataURL(f);
+});
+
+async function addFiles(files) {
+  const added = [], problems = [];
+  $("mediaHint").textContent = "Checking files…";
+  for (const f of files) {
+    const c = classify(f);
+    if (c.err) { problems.push(`${f.name}: ${c.err}`); continue; }
+    if (f.size > MAX_MB * 1024 * 1024) { problems.push(`${f.name}: over ${MAX_MB} MB`); continue; }
+    const src = await readAsDataURL(f, c.mime);
+    if (!(await canDecode(c.type, src))) {
+      problems.push(`${f.name}: this ${c.type}'s format/codec can't play in the browser` +
+        (c.type === "video" ? " (try exporting as MP4 H.264 or WebM)" : ""));
+      continue;
+    }
+    added.push({ id: uid(), name: f.name.replace(/\.[^.]+$/, ""), type: c.type, src });
   }
   if (added.length) {
     const last = added[added.length - 1];
     set({ media: [...cfg.media, ...added], skin: "media", mediaId: last.id });
     renderMedia(); renderSkins();
   }
-  e.target.value = "";
-};
+  $("mediaHint").textContent = problems.length
+    ? "Skipped " + problems.join(" · ")
+    : added.length ? `Added ${added.length} file${added.length > 1 ? "s" : ""}.` : "Files stay on your computer. Max 50 MB each.";
+}
+
+$("file").onchange = async (e) => { await addFiles([...e.target.files]); e.target.value = ""; };
+
+// Drag & drop anywhere on the My media tab
+const mediaTab = $("tab-media");
+mediaTab.addEventListener("dragover", (e) => { e.preventDefault(); mediaTab.classList.add("drop"); });
+mediaTab.addEventListener("dragleave", () => mediaTab.classList.remove("drop"));
+mediaTab.addEventListener("drop", (e) => { e.preventDefault(); mediaTab.classList.remove("drop"); addFiles([...e.dataTransfer.files]); });
 
 // ---------- loadouts ----------
 const snapshot = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, cfg[k]]));
@@ -106,7 +205,7 @@ function renderLoadouts() {
       else {
         const hasMedia = lo.skin !== "media" || cfg.media.some((m) => m.id === lo.mediaId);
         set({ ...lo.look, skin: hasMedia ? lo.skin : cfg.skin, mediaId: hasMedia ? lo.mediaId : cfg.mediaId });
-        syncTune(); renderSkins(); renderMedia();
+        syncTune(); renderSkins(); renderMedia(); renderCandles();
       }
       renderLoadouts();
     };
@@ -174,7 +273,24 @@ function syncTune() {
   seg("powerSaver", [[false, "Off"], [true, "On"]], () => cfg.powerSaver, (v) => set({ powerSaver: v }));
   seg("motion", [[false, "Play"], [true, "Pause"]], () => cfg.paused, (v) => set({ paused: v }));
   seg("layer", [["behind", "Behind candles"], ["over", "Over chart"]], () => cfg.layer, (v) => set({ layer: v }));
+  seg("react", [["off", "Off"], ["market", "Market"], ["pnl", "My P&L"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
+  seg("pnlSide", [["long", "Long"], ["short", "Short"]], () => cfg.pnlSide, (v) => set({ pnlSide: v }));
+  syncReact();
 }
+function syncReact() {
+  $("reactOpts").hidden = cfg.react === "off";
+  $("pnlOpts").hidden = cfg.react !== "pnl";
+  $("reactStrength").value = cfg.reactStrength;
+  $("reactStrengthOut").textContent = Math.round(cfg.reactStrength * 100) + "%";
+  $("pnlEntry").value = cfg.pnlEntry || "";
+  $("pnlSymbol").value = cfg.pnlSymbol;
+  $("reactHint").textContent = cfg.react === "market"
+    ? "Chart edges glow green/red with the day's move and pulse on every tick. Skins speed up when price moves."
+    : "Glows with your P&L from the entry you type here, worked out on your computer. Never reads your account or positions.";
+}
+$("reactStrength").oninput = (e) => { set({ reactStrength: +e.target.value }); $("reactStrengthOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+$("pnlEntry").oninput = (e) => set({ pnlEntry: +e.target.value || 0 });
+$("pnlSymbol").oninput = (e) => set({ pnlSymbol: e.target.value.trim() });
 $("reset").onclick = () => { set(Object.fromEntries(LOOK_KEYS.map((k) => [k, DEFAULTS[k]]))); syncTune(); };
 
 // ---------- master switch + boot ----------
@@ -182,5 +298,5 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles();
 });

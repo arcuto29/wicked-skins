@@ -40,3 +40,10 @@ button, .btn { padding: 8px 12px; border-radius: 8px; border: 1px solid #2b2e3a;
 .switch span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .15s; }
 .switch input:checked + span { background: #8f7bff; }
 .switch input:checked + span::after { transform: translateX(18px); }
+
+.preset { padding: 8px; text-align: left; }
+.preset svg { display: block; width: 100%; height: 34px; margin-bottom: 6px; }
+.preset .label { padding: 0; font-weight: 600; font-size: 12px; }
+input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid #2b2e3a; border-radius: 6px; background: none; cursor: pointer; }
+#tab-media.drop .add { border-color: #8f7bff; background: #1a1830; }
+.field { flex: 1; padding: 6px 8px; border-radius: 8px; border: 1px solid #2b2e3a; background: #0a0b0f; color: inherit; min-width: 0; }
