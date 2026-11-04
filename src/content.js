@@ -17,7 +17,9 @@
     react: "off",          // "off" | "market" | "pnl"
     reactStrength: 0.6,
     // Watermark: your own text and/or logo on the chart (for screenshots / streams)
-    wmOn: false, wmPos: "br",             // watermark: the Priism Skins logo + name
+    // Watermark: the Priism Skins logo + your name/handle, for recordings and streams.
+    // style: "corner" (clean logo + text in a corner) or "tiled" (faint repeated mark across the chart, hard to crop out)
+    wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false,
     vignette: 0, calm: false,            // darker edges; dim + slow down while your cursor is on the chart
     // Session skins: a different wallpaper per market session ("" = keep your normal skin)
     sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
@@ -533,21 +535,44 @@
   // Sits ON TOP of the chart (so it shows in screenshots/streams) but never takes clicks.
   // Kept clear of the price axis (right) and time axis (bottom).
   let wmEl, wmRO;
-  function placeWatermark() {
-    if (!wmEl) return;
-    const r = chartsBox();                                            // all charts of a multi-chart layout
-    const pad = 14, axisR = 72, axisB = 30, st = wmEl.style;
-    st.left = st.right = st.top = st.bottom = st.transform = "";
-    const p = cfg.wmPos;
-    if (p === "center") { st.left = r.left + (r.width - axisR) / 2 + "px"; st.top = r.top + (r.height - axisB) / 2 + "px"; st.transform = "translate(-50%,-50%)"; return; }
-    if (p[0] === "t") st.top = r.top + pad + 34 + "px";              // below TradingView's legend row
-    else st.top = r.bottom - axisB - pad - wmEl.offsetHeight + "px";
-    if (p[1] === "l") st.left = r.left + pad + "px";
-    else st.left = r.right - axisR - pad - wmEl.offsetWidth + "px";
-  }
   // Brand shown in the watermark. Renaming the product: change BRAND_NAME and the logo below.
   const BRAND_NAME = "Priism Skins";
   const BRAND_LOGO = "data:image/svg+xml;base64," + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="5" y1="28" x2="27" y2="4"><stop offset="0" stop-color="#19d3ff"/><stop offset=".5" stop-color="#2ef2b0"/><stop offset="1" stop-color="#c6ff3d"/></linearGradient></defs><rect x=".5" y=".5" width="31" height="31" rx="8" fill="#0b141b"/><g fill="url(#g)"><rect x="5" y="17" width="6" height="9" rx="1.5"/><rect x="13" y="11" width="6" height="12" rx="1.5"/><rect x="21" y="5" width="6" height="15" rx="1.5"/><rect x="7.25" y="15" width="1.5" height="13" rx=".75"/><rect x="15.25" y="8" width="1.5" height="17" rx=".75"/><rect x="23.25" y="3" width="1.5" height="19" rx=".75"/></g></svg>');
+  // The label: your handle if you set one, otherwise the brand name.
+  const wmLabel = () => (cfg.wmText && cfg.wmText.trim() ? cfg.wmText.trim().slice(0, 40) : BRAND_NAME);
+
+  function placeWatermark() {
+    if (!wmEl || cfg.wmStyle === "tiled") return;                     // tiled covers the whole chart; nothing to place
+    const r = chartsBox();                                            // all charts of a multi-chart layout
+    const pad = 16, axisR = 72, axisB = 30, st = wmEl.style;
+    st.left = st.right = st.top = st.bottom = st.transform = "";
+    const p = cfg.wmPos;
+    if (p === "center") { st.left = r.left + (r.width - axisR) / 2 + "px"; st.top = r.top + (r.height - axisB) / 2 + "px"; st.transform = "translate(-50%,-50%)"; return; }
+    // "Drift" slowly moves the mark along its edge so it's hard to crop or paint out in a repost.
+    let dx = 0;
+    if (cfg.wmDrift) { const t = Date.now() / 1000; dx = Math.round(Math.sin(t / 7) * Math.max(0, (r.width - axisR) / 2 - 120)); }
+    if (p[0] === "t") st.top = r.top + pad + 34 + "px";              // below TradingView's legend row
+    else st.top = r.bottom - axisB - pad - wmEl.offsetHeight + "px";
+    const cx = r.left + (r.width - axisR) / 2 - wmEl.offsetWidth / 2 + dx;
+    if (cfg.wmDrift) st.left = Math.max(r.left + pad, Math.min(r.right - axisR - pad - wmEl.offsetWidth, cx)) + "px";
+    else if (p[1] === "l") st.left = r.left + pad + "px";
+    else st.left = r.right - axisR - pad - wmEl.offsetWidth + "px";
+  }
+
+  // Tiled: a faint diagonal "logo · label" repeated across the chart. Painted once to a canvas and tiled as a
+  // background, so it reads as deliberate branding and is very hard to crop or inpaint out of a repost.
+  function tilePattern() {
+    const dpr = Math.min(2, devicePixelRatio || 1), W = 300, H = 170;
+    const c = document.createElement("canvas"); c.width = W * dpr; c.height = H * dpr;
+    const g = c.getContext("2d"); g.scale(dpr, dpr);
+    g.translate(W / 2, H / 2); g.rotate(-Math.PI / 9); g.translate(-W / 2, -H / 2);
+    g.font = '700 15px system-ui, -apple-system, "Segoe UI", sans-serif';
+    g.textBaseline = "middle"; g.fillStyle = "rgba(255,255,255,0.9)";
+    const label = wmLabel();
+    g.fillText("◆ " + label, 16, H / 2);                              // ◆ stands in for the logo at small size
+    return c.toDataURL("image/png");
+  }
+
   function renderWatermark() {
     const show = cfg.enabled && cfg.wmOn;
     if (!show) { if (wmEl) { wmEl.remove(); wmEl = null; } return; }
@@ -555,15 +580,34 @@
       wmEl = document.createElement("div");
       wmEl.id = "bd-wm";
       wmEl.dataset.bdOwner = ME.token;
-      wmEl.innerHTML = `<img alt="" src="${BRAND_LOGO}"><span></span>`;
-      wmEl.querySelector("span").textContent = BRAND_NAME;
-      wmEl.querySelector("img").onload = placeWatermark;
       document.documentElement.appendChild(wmEl);
       const el = document.querySelector(".chart-container");
       if (!wmRO && el) { wmRO = new ResizeObserver(placeWatermark); wmRO.observe(el); addEventListener("resize", placeWatermark); }
     }
-    wmEl.classList.toggle("bd-wm-center", cfg.wmPos === "center");
+    const tiled = cfg.wmStyle === "tiled";
+    wmEl.classList.toggle("bd-wm-tiled", tiled);
+    wmEl.classList.toggle("bd-wm-center", !tiled && cfg.wmPos === "center");
+    wmEl.style.opacity = String(Math.max(0.1, Math.min(1, +cfg.wmOpacity || 0.85)) * (tiled ? 0.22 : 1));
+    if (tiled) {
+      const r = chartsBox();
+      Object.assign(wmEl.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", backgroundImage: `url(${tilePattern()})` });
+      wmEl.innerHTML = "";
+    } else {
+      wmEl.style.backgroundImage = "";
+      wmEl.innerHTML = `<img alt="" src="${BRAND_LOGO}"><span></span>`;
+      wmEl.querySelector("span").textContent = wmLabel();
+      wmEl.querySelector("img").onload = placeWatermark;
+    }
     requestAnimationFrame(placeWatermark);
+    scheduleDrift();
+  }
+  // Keep the corner mark drifting smoothly while "Drift" is on.
+  let driftRaf = 0;
+  function scheduleDrift() {
+    cancelAnimationFrame(driftRaf);
+    if (!(wmEl && cfg.wmOn && cfg.wmDrift && cfg.wmStyle !== "tiled" && cfg.wmPos !== "center")) return;
+    const loop = () => { if (!wmEl) return; placeWatermark(); driftRaf = requestAnimationFrame(loop); };
+    driftRaf = requestAnimationFrame(loop);
   }
 
 

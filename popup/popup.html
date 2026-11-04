@@ -155,8 +155,12 @@
       </details>
       <details class="grp" data-grp="watermark">
         <summary>Watermark <label class="switch" title="Watermark on/off"><input type="checkbox" id="wmOn" /><span></span></label></summary>
-        <div class="row"><span>Position</span><div class="seg" id="wmPos"></div></div>
-        <p class="hint">Shows the Priism Skins logo and name on your chart, e.g. for screen recordings and screenshots.</p>
+        <div class="row"><span>Your handle</span><input type="text" id="wmText" class="field" maxlength="40" placeholder="@yourname (blank = Priism Skins)" /></div>
+        <div class="row"><span>Style</span><div class="seg" id="wmStyle"></div></div>
+        <div class="row" id="wmPosRow"><span>Position</span><div class="seg" id="wmPos"></div></div>
+        <div class="row" id="wmDriftRow"><span>Movement</span><div class="seg" id="wmDrift"></div></div>
+        <div class="row"><span>Strength</span><input type="range" id="wmOpacity" min="0.1" max="1" step="0.05" /><output id="wmOpacityOut"></output></div>
+        <p class="hint">Puts your logo + handle on the chart for recordings. <b>Corner</b> is a clean mark (try <b>Drift</b> so it's harder to crop out); <b>Tiled</b> repeats it faintly across the chart so a reposter can't remove it without wrecking the clip.</p>
       </details>
       <button id="reset" class="link">Reset adjustments</button>
     </section>
