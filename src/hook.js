@@ -42,7 +42,7 @@
     return v;
   }
   proto.fillText = function (...a) {
-    if (on && html.classList.contains("theme-light") && this.canvas && inChart(this.canvas) && isDark(this.fillStyle)) {
+    if (on && html.classList.contains("theme-light") && !html.classList.contains("bd-over-mode") && this.canvas && inChart(this.canvas) && isDark(this.fillStyle)) {
       const prev = this.fillStyle;
       this.fillStyle = "#e8eaf0";
       origText.apply(this, a);

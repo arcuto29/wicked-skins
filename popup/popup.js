@@ -1,9 +1,9 @@
 const $ = (id) => document.getElementById(id);
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer"];
+const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
-  opacity: 1, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
+  opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
   fps: "auto", fit: "cover", posX: 50, posY: 50,
   powerSaver: false, paused: false, bw: false, layer: "behind",
 };
@@ -140,6 +140,7 @@ $("loImport").onchange = async (e) => {
 // ---------- tune ----------
 const SLIDERS = [
   ["opacity", "Opacity", 0, 1, 0.05, (v) => Math.round(v * 100) + "%"],
+  ["overOpacity", "Over chart", 0.05, 1, 0.05, (v) => Math.round(v * 100) + "%"],
   ["dim", "Dim", 0, 0.9, 0.05, (v) => Math.round(v * 100) + "%"],
   ["blur", "Blur", 0, 20, 1, (v) => v + "px"],
   ["vividness", "Vividness", 0, 2, 0.05, (v) => Math.round(v * 100) + "%"],

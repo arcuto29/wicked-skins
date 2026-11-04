@@ -41,7 +41,7 @@ html.bd-on .layout__area--center .tv-chart-view {
 }
 
 /* Light TradingView theme: make dark legend text readable on dark skins. */
-html.bd-on.theme-light [class*="legend-"] [class*="title"],
-html.bd-on.theme-light [class*="legend-"] [class*="title"] * {
+html.bd-on.theme-light:not(.bd-over-mode) [class*="legend-"] [class*="title"],
+html.bd-on.theme-light:not(.bd-over-mode) [class*="legend-"] [class*="title"] * {
   color: #e8eaf0 !important;
 }

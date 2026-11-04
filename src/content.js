@@ -6,7 +6,7 @@
     media: [],             // [{ id, name, type: "image"|"video", src }]
     loadouts: [],
     // Tune
-    opacity: 1, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
+    opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
     fps: "auto", fit: "cover", posX: 50, posY: 50,
     powerSaver: false, paused: false, bw: false,
     layer: "behind",       // "behind" | "over"
@@ -33,8 +33,10 @@
   function applyLook() {
     if (!layer) return;
     layer.classList.toggle("bd-over", cfg.layer === "over");
+    document.documentElement.classList.toggle("bd-over-mode", cfg.layer === "over");
     clipToChart();
-    layer.style.opacity = String(cfg.opacity);
+    // Over-chart sits ON TOP of the candles, so it needs its own (lower) strength or it hides them.
+    layer.style.opacity = String(cfg.layer === "over" ? cfg.overOpacity : cfg.opacity);
     layer.querySelector(".bd-dim").style.opacity = String(cfg.dim);
     if (!content) return;
     const f = [];
@@ -62,6 +64,7 @@
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
     document.documentElement.classList.toggle("bd-on", cfg.enabled);
+    if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
 
