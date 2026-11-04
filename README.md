@@ -1,6 +1,6 @@
-# Wicked Skins for TradingView
+# Priism Skins for TradingView
 
-<img src="icons/icon-128.png" width="96" alt="Wicked Skins logo">
+<img src="icons/icon-128.png" width="96" alt="Priism Skins logo">
 
 Live backgrounds (animated skins, images, GIFs, video) behind TradingView charts.
 Purely cosmetic. It does not read orders, positions or account data and makes no network requests.
@@ -8,7 +8,7 @@ Purely cosmetic. It does not read orders, positions or account data and makes no
 ## Try it
 1. Open `chrome://extensions`, enable **Developer mode**.
 2. **Load unpacked** and select this `wicked-skins/` folder.
-3. Open a TradingView chart and click the Wicked Skins icon.
+3. Open a TradingView chart and click the Priism Skins icon.
 
 ## Layout
 - `src/skins.js`: built-in canvas skins. Add one by adding a factory to `window.WickedSkins`.
@@ -18,7 +18,7 @@ Purely cosmetic. It does not read orders, positions or account data and makes no
 
 ## Works on other platforms (TopstepX and other prop-firm platforms)
 Many platforms embed TradingView's charting library (e.g. [TopstepX](https://help.topstepx.com/components/tradingview-tm-charts)).
-Open the platform's chart, click the Wicked Skins icon. If a chart is found you'll see **"Chart found on …" → Turn on here**.
+Open the platform's chart, click the Priism Skins icon. If a chart is found you'll see **"Chart found on …" → Turn on here**.
 Chrome asks once for that site; the page reloads skinned. **Turn off** in the same place removes it (and the permission).
 It only switches on inside the frame that contains the chart; the rest of the platform is untouched.
 On platforms without TradingView's internal API, candle colours are learned from what's drawn.

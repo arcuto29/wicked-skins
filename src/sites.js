@@ -1,4 +1,4 @@
-/* Turn Wicked Skins on for other sites that embed TradingView-style charts (prop-firm platforms
+/* Turn Priism Skins on for other sites that embed TradingView-style charts (prop-firm platforms
    such as TopstepX use TradingView's charting library). Used by the popup and the background worker.
    For each enabled site we register the same scripts that run on tradingview.com, in all frames
    (the chart usually lives in an iframe). The content script only switches on in frames that

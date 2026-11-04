@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Wicked Skins for TradingView",
+  "name": "Priism Skins for TradingView",
   "version": "0.1.0",
   "description": "Live wallpapers, candle styles, glow and watermarks for TradingView charts, on tradingview.com and platforms that embed TradingView charts (e.g. TopstepX).",
   "permissions": [
@@ -15,7 +15,7 @@
   ],
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Wicked Skins",
+    "default_title": "Priism Skins",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"

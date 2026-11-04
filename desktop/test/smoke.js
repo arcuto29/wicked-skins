@@ -29,7 +29,7 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
   ok("hook loaded at page start", st.hooked);
   ok("skin layer present", st.layer && st.on);
   ok("candles recoloured", st.neon > 1000, `neon px ${st.neon}`);
-  ok("watermark shown (logo + name)", st.watermark.includes("Wicked Skins"));
+  ok("watermark shown (logo + name)", st.watermark.includes("Priism Skins"));
   await tv.screenshot({ path: path.join(OUT, "tradingview.png") });
 
   const settings = app.windows().find((w) => w.url().includes("popup.html"));

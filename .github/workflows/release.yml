@@ -31,17 +31,17 @@ jobs:
         run: |
           V="${GITHUB_REF_NAME#v}"
           awk -v v="$V" '$0 ~ "^## "v {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
-          [ -s notes.md ] || echo "Wicked Skins $V" > notes.md
+          [ -s notes.md ] || echo "Priism Skins $V" > notes.md
           cat notes.md
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Wicked Skins ${{ github.ref_name }}
+          name: Priism Skins ${{ github.ref_name }}
           body_path: notes.md
-          files: dist/wicked-skins-*.zip
+          files: dist/priism-skins-*.zip
       - name: Publish to Chrome Web Store
         if: env.EXTENSION_ID != '' && env.REFRESH_TOKEN != ''
-        run: npx --yes chrome-webstore-upload-cli@4 --source "dist/wicked-skins-${GITHUB_REF_NAME#v}.zip"
+        run: npx --yes chrome-webstore-upload-cli@4 --source "dist/priism-skins-${GITHUB_REF_NAME#v}.zip"
 
   desktop:
     needs: extension

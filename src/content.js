@@ -17,7 +17,7 @@
     react: "off",          // "off" | "market" | "pnl"
     reactStrength: 0.6,
     // Watermark: your own text and/or logo on the chart (for screenshots / streams)
-    wmOn: false, wmPos: "br",             // watermark: the Wicked Skins logo + name
+    wmOn: false, wmPos: "br",             // watermark: the Priism Skins logo + name
     vignette: 0, calm: false,            // darker edges; dim + slow down while your cursor is on the chart
     // Session skins: a different wallpaper per market session ("" = keep your normal skin)
     sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
@@ -546,7 +546,7 @@
     else st.left = r.right - axisR - pad - wmEl.offsetWidth + "px";
   }
   // Brand shown in the watermark. Renaming the product: change BRAND_NAME and the logo below.
-  const BRAND_NAME = "Wicked Skins";
+  const BRAND_NAME = "Priism Skins";
   const BRAND_LOGO = "data:image/svg+xml;base64," + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="5" y1="28" x2="27" y2="4"><stop offset="0" stop-color="#19d3ff"/><stop offset=".5" stop-color="#2ef2b0"/><stop offset="1" stop-color="#c6ff3d"/></linearGradient></defs><rect x=".5" y=".5" width="31" height="31" rx="8" fill="#0b141b"/><g fill="url(#g)"><rect x="5" y="17" width="6" height="9" rx="1.5"/><rect x="13" y="11" width="6" height="12" rx="1.5"/><rect x="21" y="5" width="6" height="15" rx="1.5"/><rect x="7.25" y="15" width="1.5" height="13" rx=".75"/><rect x="15.25" y="8" width="1.5" height="17" rx=".75"/><rect x="23.25" y="3" width="1.5" height="19" rx=".75"/></g></svg>');
   function renderWatermark() {
     const show = cfg.enabled && cfg.wmOn;
@@ -593,7 +593,7 @@
     const next = !cfg.enabled;
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) chrome.storage.local.set({ enabled: next });
     else if (window.__bdUpdate) window.__bdUpdate({ enabled: next });
-    flash(next ? "Wicked Skins on" : "Wicked Skins off");
+    flash(next ? "Priism Skins on" : "Priism Skins off");
   }, true);
 
   // ---------- one instance per page ----------

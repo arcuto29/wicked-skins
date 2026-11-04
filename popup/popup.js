@@ -646,7 +646,7 @@ function renderLoadouts() {
         inp.onkeydown = (k) => { if (k.key === "Enter") done(); if (k.key === "Escape") renderLoadouts(); };
         inp.onblur = done; inp.onclick = (k) => k.stopPropagation();
       } else if (act === "share") {
-        download(`${lo.name.replace(/[^\w-]+/g, "-").toLowerCase() || "look"}.wicked.json`, [exportable(lo)]);
+        download(`${lo.name.replace(/[^\w-]+/g, "-").toLowerCase() || "look"}.priism.json`, [exportable(lo)]);
       }
     };
     box.appendChild(card);
@@ -660,7 +660,7 @@ const saveLook = () => {
 };
 $("loSave").onclick = saveLook;
 $("loName").onkeydown = (e) => { if (e.key === "Enter") saveLook(); };
-$("loExport").onclick = () => download("wicked-skins-looks.json", cfg.loadouts.map(exportable));
+$("loExport").onclick = () => download("priism-skins-looks.json", cfg.loadouts.map(exportable));
 $("loImport").onchange = async (e) => {
   try {
     const arr = JSON.parse(await e.target.files[0].text());
@@ -907,7 +907,7 @@ async function siteBar() {
     chrome.tabs.reload(tab.id); window.close();
   };
   if (found.chart) {
-    show("", `Chart found on ${host}`, "Chrome will ask to let Wicked Skins \u201cread and change\u201d this site. That's Chrome's standard wording for drawing on a page; it only paints the chart and never reads your account or orders.", "Turn on here", turnOn);
+    show("", `Chart found on ${host}`, "Chrome will ask to let Priism Skins \u201cread and change\u201d this site. That's Chrome's standard wording for drawing on a page; it only paints the chart and never reads your account or orders.", "Turn on here", turnOn);
   } else {
     show("", `No TradingView chart found on ${host}`, "Open a chart on this site first, or turn it on anyway if the chart loads later.", "Turn on anyway", turnOn);
   }
@@ -933,7 +933,7 @@ async function updates() {
   // Another copy of the extension drew on a chart recently (content.js reports it).
   const { dupSeen } = await chrome.storage.local.get("dupSeen");
   if (dupSeen && Date.now() - dupSeen < 3 * 86400e3) {
-    notice("Two copies of Wicked Skins are installed", `Remove the older one so they don't fight (keep version ${me}). It's under chrome://extensions.`,
+    notice("Two copies of Priism Skins are installed", `Remove the older one so they don't fight (keep version ${me}). It's under chrome://extensions.`,
       "Open extensions", "#", () => chrome.storage.local.remove("dupSeen"));
     $("noticeLink").onclick = (e) => { e.preventDefault(); chrome.tabs.create({ url: "chrome://extensions" }); };
     return;
@@ -955,7 +955,7 @@ async function updates() {
     if (latest) chrome.storage.local.set({ updCheck: { at: Date.now(), latest } });
   }
   if (latest && newer(latest, me)) {
-    notice(`Update available: ${latest}`, "Download it, replace the files in your Wicked Skins folder, then click the reload arrow on its card in chrome://extensions. Your settings are kept.",
+    notice(`Update available: ${latest}`, "Download it, replace the files in your Priism Skins folder, then click the reload arrow on its card in chrome://extensions. Your settings are kept.",
       "Download", `${RELEASES}/latest`);
   }
 }

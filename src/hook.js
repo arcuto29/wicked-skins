@@ -1,6 +1,6 @@
 /* Runs in the PAGE's JS world (manifest "world": "MAIN"; the desktop app injects it too).
    TradingView paints the chart inside <canvas>, so CSS alone can't restyle it. This hook:
-     1. Background: when Wicked Skins is on, turns the full-pane background fill into a clear,
+     1. Background: when Priism Skins is on, turns the full-pane background fill into a clear,
         so the skin shows through. Candles, grid, axes and drawings are untouched.
      2. Light theme: lightens dark axis text so it stays readable on dark skins.
      3. Candle colours: remaps TradingView's default up/down colours to the chosen ones,
