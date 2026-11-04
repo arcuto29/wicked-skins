@@ -1,7 +1,7 @@
 # Chrome Web Store submission (copy-paste)
 
 **Name:** Priism Skins (decided). The listing name is hard to change once people install it, so keep it.
-Fill `contactEmail` in `site/site-config.js` and publish the website (Privacy policy URL is required).
+Website is published via GitHub Pages; contact email is set in `site/site-config.js`.
 
 ## 1. Upload
 Chrome Web Store Developer Dashboard → **New item** → upload `priism-skins-<version>.zip`
@@ -52,7 +52,7 @@ Not affiliated with, endorsed or sponsored by TradingView, Inc. Not financial ad
 - Small promo tile 440×280: `store/promo-small.png`
 - Marquee 1400×560 (optional): `store/promo-marquee.png`
 
-**Website:** https://arcuto29.github.io/wicked-skins/  ·  **Support:** your contact email
+**Website:** https://arcuto29.github.io/wicked-skins/  ·  **Support:** arcuto2978@gmail.com
 
 ## 3. Privacy tab
 **Single purpose:** Restyle TradingView charts (wallpapers, candle colours, glow, price-scale styling) on tradingview.com and on sites the user turns it on for.
