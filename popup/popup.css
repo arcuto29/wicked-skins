@@ -1,3 +1,4 @@
+[hidden] { display: none !important; }   /* never let a display rule override the hidden attribute */
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body { width: 400px; min-height: 560px; display: flex; background: #0e0f14; color: #e4e5ea; font: 13px system-ui, sans-serif; }
@@ -103,3 +104,5 @@ details.grp > summary .switch { margin-left: auto; }
 .card.look .acts button { padding: 4px 8px; font-size: 11px; }
 .card.look .acts .x { margin-left: auto; }
 .card.look .nm input { width: 100%; }
+.seg button { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 6px 3px; font-size: 12px; }
+#loSave { white-space: nowrap; }

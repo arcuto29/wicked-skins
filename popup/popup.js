@@ -100,12 +100,12 @@ const bars = (up, down) => {
 const LOOK_HINT = {
   solid: "Solid bodies in your colours.",
   neon: "Tube: glowing outlines with a faint fill.",
-  prism: "Spectrum: colours fan out across the chart, left to right.",
+  prism: "Rainbow: colours fan out across the chart, left to right.",
   shift: "Cycle: colours keep flowing over time. Indicator lines on the chart cycle too.",
 };
 function renderCandles() {
   $("candleOn").checked = cfg.candleOn;
-  seg("candleLook", [["solid", "Solid"], ["neon", "Tube"], ["prism", "Spectrum"], ["shift", "Cycle"]], () => cfg.candleLook,
+  seg("candleLook", [["solid", "Solid"], ["neon", "Tube"], ["prism", "Rainbow"], ["shift", "Cycle"]], () => cfg.candleLook,
     (v) => { set({ candleLook: v, candleOn: true }); $("candleOn").checked = true; renderCandles(); });
   $("shiftRow").hidden = cfg.candleLook !== "shift";
   $("shiftSpeed").value = cfg.shiftSpeed; $("shiftSpeedOut").textContent = cfg.shiftSpeed + "s";
@@ -155,13 +155,17 @@ $("candleDown").oninput = (e) => { set({ candleDown: e.target.value, candleOn: t
 // ---------- undo ----------
 // Any one-click change can be undone from the toast at the bottom.
 let undoTimer;
+function toast(msg, undo) {
+  $("toastMsg").textContent = msg;
+  $("toast").hidden = false;
+  $("toastUndo").hidden = !undo;
+  $("toastUndo").onclick = undo ? () => { undo(); $("toast").hidden = true; } : null;
+  clearTimeout(undoTimer); undoTimer = setTimeout(() => ($("toast").hidden = true), undo ? 8000 : 3000);
+}
 function applyWithUndo(changes, label) {
   const before = Object.fromEntries(Object.keys(changes).map((k) => [k, cfg[k]]));
   set(changes); refreshAll();
-  $("toastMsg").textContent = label;
-  $("toast").hidden = false; $("toastUndo").hidden = false;
-  $("toastUndo").onclick = () => { set(before); refreshAll(); $("toast").hidden = true; };
-  clearTimeout(undoTimer); undoTimer = setTimeout(() => ($("toast").hidden = true), 8000);
+  toast(label, () => { set(before); refreshAll(); });
 }
 function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); }
 
@@ -171,7 +175,7 @@ const QUICK_LOOKS = [
     set: { candleOn: true, candleUp: "#fcee0a", candleDown: "#00f0ff", candleLook: "neon", candleGlow: 0.5, candlePreset: "cyberpunk", lineGlow: 0.5, scaleText: "#7df9ff", scaleGlow: 0.45, scaleBg: "auto", dim: 0.25 } },
   { id: "clean-focus", name: "Clean Focus", sub: "Slate · Mono", skin: "graphite",
     set: { candleOn: true, candleUp: "#ffffff", candleDown: "#5c5f6e", candleLook: "solid", candleGlow: 0, candlePreset: "mono", lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBg: "auto", dim: 0.35 } },
-  { id: "cosmic", name: "Cosmic", sub: "Spiral Galaxy · Spectrum", skin: "galaxy",
+  { id: "cosmic", name: "Cosmic", sub: "Spiral Galaxy · Rainbow", skin: "galaxy",
     set: { candleOn: true, candleUp: "#b388ff", candleDown: "#ff6ec7", candleLook: "prism", candleGlow: 0.35, candlePreset: "custom", lineGlow: 0.35, scaleText: "", scaleGlow: 0.3, scaleBg: "auto", dim: 0.2 } },
   { id: "inferno", name: "Inferno", sub: "Cinders · Magma", skin: "embers",
     set: { candleOn: true, candleUp: "#ffb300", candleDown: "#ff3d00", candleLook: "solid", candleGlow: 0.6, candlePreset: "lava", lineGlow: 0.3, scaleText: "#ffcc80", scaleGlow: 0.35, scaleBg: "auto", dim: 0.3 } },
@@ -423,7 +427,7 @@ const sameLook = (lo) => lo.skin === cfg.skin && (lo.skin !== "media" || lo.medi
 function describe(lo) {
   const sk = lo.skin === "media" ? (cfg.media.find((m) => m.id === lo.mediaId)?.name || "Upload") : (WickedSkins[lo.skin]?.name || lo.skin);
   const preset = lo.look.candleOn ? (CANDLE_PRESETS.find(([, , u, d]) => u === lo.look.candleUp && d === lo.look.candleDown)?.[1] || "Custom colours") : "Chart colours";
-  const style = { solid: "", neon: " · Tube", prism: " · Spectrum", shift: " · Cycle" }[lo.look.candleLook] || "";
+  const style = { solid: "", neon: " · Tube", prism: " · Rainbow", shift: " · Cycle" }[lo.look.candleLook] || "";
   return `${sk} · ${preset}${style}`;
 }
 function applyLook(lo) {
@@ -469,8 +473,7 @@ function renderLoadouts() {
       if (act === "del") {
         const before = cfg.loadouts;
         set({ loadouts: cfg.loadouts.filter((x) => x.id !== lo.id) }); renderLoadouts();
-        $("toastMsg").textContent = `Deleted “${lo.name}”.`; $("toast").hidden = false;
-        $("toastUndo").onclick = () => { set({ loadouts: before }); renderLoadouts(); $("toast").hidden = true; };
+        toast(`Deleted “${lo.name}”.`, () => { set({ loadouts: before }); renderLoadouts(); });
       } else if (act === "update") {
         set({ loadouts: cfg.loadouts.map((x) => (x.id === lo.id ? { ...x, skin: cfg.skin, mediaId: cfg.mediaId, look: snapshot() } : x)) });
         renderLoadouts(); hintToast(`Updated “${lo.name}” with your current setup.`);
@@ -488,7 +491,7 @@ function renderLoadouts() {
     box.appendChild(card);
   });
 }
-function hintToast(msg) { $("toastMsg").textContent = msg; $("toast").hidden = false; $("toastUndo").hidden = true; clearTimeout(undoTimer); undoTimer = setTimeout(() => { $("toast").hidden = true; $("toastUndo").hidden = false; }, 3000); }
+const hintToast = (msg) => toast(msg);
 const saveLook = () => {
   const name = $("loName").value.trim() || `Look ${cfg.loadouts.length + 1}`;
   set({ loadouts: [{ id: uid(), name, skin: cfg.skin, mediaId: cfg.mediaId, look: snapshot() }, ...cfg.loadouts] });

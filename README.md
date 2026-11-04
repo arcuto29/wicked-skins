@@ -29,7 +29,7 @@ See **[RELEASING.md](RELEASING.md)**: one command + a tag push publishes everywh
 
 ## Features
 - **One-click looks**: complete combos (skin + candles + glow + price scale) in one tap, with **Undo**.
-- **Candle styles**: Solid, Tube (glowing outlines), Spectrum (colours across the chart), Cycle (colours flow over time).
+- **Candle styles**: Solid, Tube (glowing outlines), Rainbow (colours across the chart), Cycle (colours flow over time).
 - **Glow**: candles, plus indicators / drawings / price & position lines / the P&L pill. Grid and crosshair never glow.
 - **Price scale**: custom text colour, glow, bold, backing (Auto / Clear / Glass / TradingView), price tags in candle colours.
 - **Auto readability**: scale and legend text switch light/dark per label from the brightness behind it (videos too).
