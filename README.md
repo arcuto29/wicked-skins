@@ -15,10 +15,12 @@ Purely cosmetic. It does not read orders, positions or account data and makes no
 - `popup/`: skin picker, custom media upload, darken/blur/FPS.
 
 ## Features
-- **Skins**: 8 animated canvas skins with live previews and categories.
-- **Candles**: recolour up/down candles and volume (10 presets or custom colours) with optional glow. Changes apply live.
-- **My media**: your own images/GIFs/videos (PNG, JPG, WebP, AVIF, GIF, SVG, BMP, MP4, WebM, MOV, MKV, OGG; up to 50 MB).
-  Drag & drop supported. Files are checked before saving; HEIC/AVI/WMV etc. get a "convert it first" message.
+- **Candles**: recolour up/down candles and volume (18 presets or custom colours; works with your own TradingView colours and candle/hollow/Heikin Ashi/bar styles) with optional glow. Changes apply live.
+- **Skins**: 25 live wallpapers in 8 categories (Nature, Space, Warm, Neon, City, Calm, Weather, Trading).
+- **My media**: your own images/GIFs/videos, **any video format**. MP4/MOV/MKV/WebM play directly; AVI, WMV, FLV,
+  HEVC/H.265 and others are converted to WebM on your computer (ffmpeg.wasm, see `vendor/ffmpeg/NOTICE.md`).
+  Files are stored in the extension's own database (up to 2 GB each) and played by `player/player.html`.
+  Adding files opens a full-tab manager so long conversions aren't interrupted. Drag & drop supported.
 - **Reacts to**:
   - *Market*: the chart edges glow green or red with the day's move and pulse on price ticks, and skins speed up when price moves.
     Price comes from the tab title TradingView already shows.

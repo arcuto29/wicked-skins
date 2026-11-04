@@ -47,3 +47,8 @@ button, .btn { padding: 8px 12px; border-radius: 8px; border: 1px solid #2b2e3a;
 input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid #2b2e3a; border-radius: 6px; background: none; cursor: pointer; }
 #tab-media.drop .add { border-color: #8f7bff; background: #1a1830; }
 .field { flex: 1; padding: 6px 8px; border-radius: 8px; border: 1px solid #2b2e3a; background: #0a0b0f; color: inherit; min-width: 0; }
+/* full-tab manager (popup.html?page=...) */
+body.page { width: auto; min-height: 100vh; max-width: 980px; margin: 0 auto; }
+body.page main { height: 100vh; }
+body.page .cards { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+body.page .card img, body.page .card video { height: 112px; }

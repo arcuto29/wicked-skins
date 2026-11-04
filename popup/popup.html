@@ -42,12 +42,12 @@
 
     <section id="tab-media" hidden>
       <div class="cards" id="mediaCards"></div>
-      <label class="add">
+      <label class="add" id="addMedia">
         <input type="file" id="file" multiple hidden
           accept="image/*,video/*,.png,.jpg,.jpeg,.jfif,.gif,.webp,.avif,.apng,.bmp,.ico,.svg,.mp4,.m4v,.webm,.mov,.ogv,.ogg,.mkv" />
-        <b>+</b> Add video / image / GIF<small class="hint" style="margin-top:4px">or drop files here · MP4 WebM MOV MKV GIF PNG JPG WebP AVIF SVG</small>
+        <b>+</b> Add video / image / GIF<small class="hint" style="margin-top:4px">or drop files here · any video (MP4, MOV, MKV, AVI, WMV, WebM…) · GIF PNG JPG WebP AVIF SVG</small>
       </label>
-      <p class="hint" id="mediaHint">Files stay on your computer. Max 50 MB each.</p>
+      <p class="hint" id="mediaHint">Files stay on your computer. Videos the browser can't play are converted automatically.</p>
     </section>
 
     <section id="tab-loadouts" hidden>
@@ -92,6 +92,7 @@
     <p class="legal">Cosmetic only. Not affiliated with TradingView, Inc.</p>
   </main>
 
+  <script src="../src/mediadb.js"></script>
   <script src="../src/skins.js"></script>
   <script src="popup.js"></script>
 </body>

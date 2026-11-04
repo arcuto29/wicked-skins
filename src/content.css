@@ -12,6 +12,7 @@
 #bd-layer.bd-over .bd-dim { display: none; }
 #bd-layer canvas,
 #bd-layer video,
+#bd-layer iframe,
 #bd-layer img {
   position: absolute;
   inset: 0;
@@ -50,3 +51,4 @@ html.bd-on.theme-light:not(.bd-over-mode) [class*="legend-"] [class*="title"],
 html.bd-on.theme-light:not(.bd-over-mode) [class*="legend-"] [class*="title"] * {
   color: #e8eaf0 !important;
 }
+#bd-layer iframe { border: 0; background: transparent; }

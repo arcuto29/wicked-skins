@@ -60,6 +60,7 @@
   let sidesSig = "";
   const UP_KEYS = ["upColor", "borderUpColor", "wickUpColor"];
   const DOWN_KEYS = ["downColor", "borderDownColor", "wickDownColor"];
+  const KIND = { upColor: "body", downColor: "body", borderUpColor: "border", borderDownColor: "border", wickUpColor: "wick", wickDownColor: "wick" };
   const STYLES = ["candleStyle", "hollowCandleStyle", "haStyle", "barStyle", "volCandlesStyle", "hlcBarsStyle"];
 
   function chartWidgets() {
@@ -79,19 +80,25 @@
         for (const st of STYLES) {
           const cs = p[st] && p[st].childs && p[st].childs();
           if (!cs) continue;
-          for (const k of UP_KEYS) if (cs[k]) found.push([cs[k].value(), "up"]);
-          for (const k of DOWN_KEYS) if (cs[k]) found.push([cs[k].value(), "down"]);
+          for (const k of UP_KEYS) if (cs[k]) found.push([cs[k].value(), "up", KIND[k]]);
+          for (const k of DOWN_KEYS) if (cs[k]) found.push([cs[k].value(), "down", KIND[k]]);
         }
       } catch {}
     }
-    const next = new Map();
-    for (const [c, side] of [...DEFAULT_SIDES, ...found]) {
+    // A colour can be used by both sides (e.g. black borders on every candle + black down bodies).
+    // Resolve by priority: body colour > border > wick > TradingView defaults.
+    // Only a colour that is the BODY of both sides (or only a shared border/wick) is left alone.
+    const RANK = { body: 3, border: 2, wick: 1, def: 0 };
+    const best = new Map(); // key -> { side, rank, tie }
+    for (const [c, side, kind] of [...DEFAULT_SIDES.map(([c, s]) => [c, s, "def"]), ...found]) {
       const r = rgbKey(c);
       if (!r) continue;
-      if (next.has(r.key) && next.get(r.key) !== side) next.set(r.key, "both"); // up == down: ambiguous
-      else next.set(r.key, side);
+      const rank = RANK[kind], cur = best.get(r.key);
+      if (!cur || rank > cur.rank) best.set(r.key, { side, rank, tie: false });
+      else if (rank === cur.rank && side !== cur.side) cur.tie = true;
     }
-    for (const [k, v] of next) if (v === "both") next.delete(k);
+    const next = new Map();
+    for (const [k, v] of best) if (!v.tie) next.set(k, v.side);
     const sig = [...next].sort().join("|");
     if (sig !== sidesSig) {
       sides = next; sidesSig = sig; remapCache.clear();
