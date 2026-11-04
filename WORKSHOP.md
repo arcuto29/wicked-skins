@@ -11,7 +11,9 @@
 ## 2. Sign-in
 **Email + password:** on by default (Authentication → Providers → Email). To let people sign in right after creating
 an account, turn off "Confirm email"; otherwise they confirm via the email link first.
-For "Forgot password → email me a code", edit **Authentication → Email Templates → Magic Link** so it includes `{{ .Token }}`.
+"Forgot password" emails a reset link that opens `site/reset.html` on the website, where the user picks a new password.
+No email-template changes are needed. Note: Supabase's built-in email sender only allows a few emails per hour —
+for a real launch, add custom SMTP (e.g. Resend) under **Authentication → Emails → SMTP Settings**.
 
 **Google:**
 1. Google Cloud Console → APIs & Services → Credentials → **Create OAuth client ID** → *Web application*.
