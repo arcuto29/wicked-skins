@@ -20,7 +20,7 @@
     wmOn: false, wmPos: "br",             // watermark: the Wicked Skins logo + name
     vignette: 0, calm: false,            // darker edges; dim + slow down while your cursor is on the chart
     // Glow on indicators / lines / P&L, and price scale styling
-    lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
+    lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
     scaleSize: 0, scaleFont: "default",
   };
 
@@ -327,6 +327,15 @@
     if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [] }));
     else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
+    // Scale backing = real frosted glass behind the price + time scales
+    const mode = cfg.scaleBg === "default" ? "glass" : cfg.scaleBg;
+    const glass = cfg.enabled && cfg.layer !== "over" && (mode === "glass" || mode === "color" || (mode === "auto" && backdrop.busy));
+    h.classList.toggle("bd-scale-glass", glass);
+    let tint = backdrop.bg === "light" && !cfg.scaleText ? "rgba(255,255,255,0.42)" : "rgba(8,11,18,0.42)";
+    if (mode === "color" && /^#[0-9a-f]{6}$/i.test(cfg.scaleBgColor || "")) {
+      const n = parseInt(cfg.scaleBgColor.slice(1), 16); tint = `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},0.72)`;
+    }
+    h.style.setProperty("--bd-scale-tint", tint);
   }
 
   // Keys that need a rebuild vs. ones we can apply live.
@@ -375,7 +384,7 @@
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
-    if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled")) pushFx();
+    if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||

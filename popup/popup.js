@@ -18,7 +18,7 @@ const DEFAULTS = {
   react: "off", reactStrength: 0.6,
   wmOn: false, wmPos: "br", vignette: 0, calm: false,
   candleLook: "solid", shiftSpeed: 10,
-  lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
+  lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
 };
 let cfg = { ...DEFAULTS };
@@ -125,8 +125,8 @@ function renderCandles() {
   $("scaleBgColor").value = cfg.scaleBgColor || "#0b1320"; $("scaleBgColor").hidden = cfg.scaleBg !== "color";
   $("scaleGlow").value = cfg.scaleGlow; $("scaleGlowOut").textContent = Math.round(cfg.scaleGlow * 100) + "%";
   seg("scaleBold", [[false, "Regular"], [true, "Bold"]], () => cfg.scaleBold, (v) => set({ scaleBold: v }));
-  seg("scaleBg", [["auto", "Auto"], ["glass", "Glass"], ["color", "Colour"], ["default", "TV"]], () => (cfg.scaleBg === "clear" ? "auto" : cfg.scaleBg), (v) => { set({ scaleBg: v }); renderCandles(); });
-  seg("scaleLabels", [[false, "Original"], [true, "Candle"]], () => cfg.scaleLabels, (v) => set({ scaleLabels: v }));
+  seg("scaleBg", [["auto", "Auto"], ["glass", "Glass"], ["color", "Colour"]], () => (cfg.scaleBg === "clear" ? "auto" : cfg.scaleBg === "default" ? "glass" : cfg.scaleBg), (v) => { set({ scaleBg: v }); renderCandles(); });
+  seg("scaleLabels", [[true, "Candle colours"], [false, "Original"]], () => cfg.scaleLabels, (v) => set({ scaleLabels: v }));
   $("candleGlow").value = cfg.candleGlow; $("candleGlowOut").textContent = Math.round(cfg.candleGlow * 100) + "%";
   $("candleUp").value = cfg.candleUp; $("candleDown").value = cfg.candleDown;
   // filter chips + grouped grid
