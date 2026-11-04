@@ -126,3 +126,10 @@ details.grp > summary .switch { margin-left: auto; }
 #sessionRows .row > span { width: 104px; line-height: 1.2; }
 #sessionRows select { flex: 1; padding: 6px 8px; }
 .now { font: 700 9px system-ui, sans-serif; color: #04130f; background: #2ef2b0; padding: 1px 5px; border-radius: 99px; letter-spacing: .05em; }
+
+/* "Apply to: All charts / Chart 1 / Chart 2..." (multi-chart layouts) */
+.chartpick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 10px; padding: 8px 10px; border-radius: 10px;
+  background: linear-gradient(90deg, rgba(25,211,255,.08), rgba(46,242,176,.06)); border: 1px solid rgba(46,242,176,.22); }
+.chartpick > span { color: #9a9dab; font-size: 12px; margin-right: 2px; }
+.chartpick .chip { padding: 4px 10px; font-size: 12px; }
+.chartpick .chip.on { background: #2ef2b0; color: #06110d; border-color: #2ef2b0; }

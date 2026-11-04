@@ -23,6 +23,14 @@ Chrome asks once for that site; the page reloads skinned. **Turn off** in the sa
 It only switches on inside the frame that contains the chart; the rest of the platform is untouched.
 On platforms without TradingView's internal API, candle colours are learned from what's drawn.
 
+## Multi-chart layouts
+Adjust → **Multiple charts**: **Stretch** (one wallpaper across the layout), **Each chart** (a copy per chart) or
+**Mix** (a different skin per chart). In Mix, pick **Chart 1 / Chart 2…** at the top of the Skins or Uploads tab, then
+click a skin. Charts are numbered top-left first, row by row; **Show chart numbers** flashes them on the page.
+Candle colours, glow and price-scale styling apply to every chart. Works when the charts sit in one page or in
+iframes (prop platforms): the top page numbers charts across frames. Tested with 1, 2 and 4 charts on TradingView's
+Trading Platform demo (the same charting library prop platforms use).
+
 ## Website, store and Workshop
 - Website (`site/`): home, Workshop, Privacy, Terms; deployed to GitHub Pages by `.github/workflows/pages.yml`.
 - Chrome Web Store: see **[STORE.md](STORE.md)** (listing text, images in `store/`, permission justifications).

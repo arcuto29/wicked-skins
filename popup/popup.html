@@ -36,6 +36,7 @@
       <h4 style="margin-top:0">One-click looks</h4>
       <div class="quick" id="quickLooks"></div>
       <h4>Skins</h4>
+      <div class="chartpick" hidden></div>
       <div class="chips" id="chips"></div>
       <div class="cards" id="skinCards"></div>
     </section>
@@ -76,6 +77,7 @@
     </section>
 
     <section id="tab-media" hidden>
+      <div class="chartpick" hidden></div>
       <div class="cards" id="mediaCards"></div>
       <label class="add" id="addMedia">
         <input type="file" id="file" multiple hidden
@@ -149,6 +151,14 @@
         <div class="row"><span>Calm</span><div class="seg" id="calm"></div></div>
         <p class="hint">Calm: when your cursor is on the chart, the wallpaper dims and slows down so you can focus.</p>
         <div class="row"><span>Animation</span><div class="seg" id="motion"></div></div>
+      </details>
+      <details class="grp" data-grp="charts">
+        <summary>Multiple charts</summary>
+        <p class="hint">For layouts with 2 or more charts on screen. <span id="chartsFound"></span></p>
+        <div class="row"><span>Wallpaper</span><div class="seg" id="multi"></div></div>
+        <p class="hint" id="multiHint"></p>
+        <div id="chartRows"></div>
+        <button id="showNums" class="link">Show chart numbers on the page</button>
       </details>
       <details class="grp" data-grp="sessions">
         <summary>Sessions <label class="switch" title="Session skins on/off"><input type="checkbox" id="sessionOn" /><span></span></label></summary>

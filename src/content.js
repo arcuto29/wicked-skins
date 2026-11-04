@@ -24,10 +24,14 @@
     // Glow on indicators / lines / P&L, and price scale styling
     lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
     scaleSize: 0, scaleFont: "default",
+    // Multi-chart layouts: "span" = one wallpaper across the whole layout, "each" = every chart gets its own copy,
+    // "mix" = pick a wallpaper per chart (chartSkins: { "2": "galaxy", "3": "media:<id>" }; chart 1 = your main skin)
+    multi: "span", chartSkins: {},
   };
 
   let cfg = { ...DEFAULTS };
-  let layer, content, raf, running = false;
+  let layer, raf, running = false;
+  let views = [];          // one per wallpaper: { tile, content, dim, vg, n, x, y, w, h, skin?, clock, lum? }
 
   // ---------- session skins (New York time) ----------
   // Asia 18:00-03:00 · London 03:00-08:00 · New York 08:00-17:00 · After-hours 17:00-18:00 and weekends
@@ -48,17 +52,89 @@
     return pick && window.WickedSkins[pick] ? pick : cfg.skin;
   };
   setInterval(() => { const s2 = currentSession(); if (s2 !== session) { session = s2; if (cfg.sessionOn && layer) build(); } }, 30000);
-  const activeMedia = () => (skinNow() === "media" ? cfg.media.find((m) => m.id === cfg.mediaId) : null);
+  // ---------- charts on the page (multi-chart layouts) ----------
+  // Every visible chart, in reading order (top row left to right, then the next row). Chart 1 is top-left.
+  function chartEls() {
+    const all = [...document.querySelectorAll(".chart-container")];
+    return all
+      .filter((el) => !all.some((o) => o !== el && o.contains(el)))
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.width > 80 && r.height > 60)
+      .sort((a, b) => (Math.abs(a.r.top - b.r.top) > 20 ? a.r.top - b.r.top : a.r.left - b.r.left));
+  }
+  let charts = [];
+  const tiled = () => cfg.multi !== "span" && charts.length > 1;
+  // the area covered by all charts together (watermark, P&L pill, over-chart clipping)
+  function chartsBox() {
+    if (!charts.length) {
+      const el = document.querySelector(".layout__area--center");
+      const r = el ? el.getBoundingClientRect() : null;
+      return r && r.width > 80 ? r : { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth, height: innerHeight };
+    }
+    const l = Math.min(...charts.map((c) => c.r.left)), t = Math.min(...charts.map((c) => c.r.top));
+    const r = Math.max(...charts.map((c) => c.r.right)), b = Math.max(...charts.map((c) => c.r.bottom));
+    return { left: l, top: t, right: r, bottom: b, width: r - l, height: b - t };
+  }
 
-  // "Over chart" mode: only cover the chart area, not toolbars/watchlist.
-  let ro;
+  // Charts inside iframes (prop platforms embed TradingView's library in a frame, sometimes one frame per chart):
+  // the top page numbers every chart by position, so "Chart 2" means the same thing everywhere.
+  // firstNum = the number of this frame's first chart (1 on a normal page).
+  const IN_FRAME = window !== window.top;
+  let firstNum = 1;
+  const chartFrames = new Map();   // (top page only) frame window -> { seen, count }
+  function frameRects() {
+    const ifr = [...document.querySelectorAll("iframe")], now = Date.now(), out = [];
+    for (const [w, info] of chartFrames) {
+      const el = ifr.find((f) => f.contentWindow === w);
+      if (!el || now - info.seen > 10000) { chartFrames.delete(w); continue; }
+      const r = el.getBoundingClientRect();
+      if (r.width > 80 && r.height > 60) out.push({ w, r, count: info.count });
+    }
+    return out.sort((a, b) => (Math.abs(a.r.top - b.r.top) > 20 ? a.r.top - b.r.top : a.r.left - b.r.left));
+  }
+  function numberFrames() {
+    const list = frameRects(); let n = 1;
+    const total = list.reduce((a, f) => a + f.count, 0);
+    for (const f of list) { try { f.w.postMessage({ __wicked: "chart-index", n, total }, "*"); } catch {} n += f.count; }
+  }
+  addEventListener("message", (e) => {
+    const d = e.data;
+    if (!d || typeof d !== "object" || !e.source) return;
+    if (d.__wicked === "chart-frame" && !IN_FRAME) {
+      const prev = chartFrames.get(e.source), count = Math.max(1, Math.min(16, d.count | 0));
+      chartFrames.set(e.source, { seen: Date.now(), count });
+      if (!prev || prev.count !== count) setTimeout(numberFrames, 50); else numberFrames();
+    }
+    if (IN_FRAME && e.source === window.top) {
+      if (d.__wicked === "chart-index") {
+        const n = Math.max(1, Math.min(16, d.n | 0));
+        if (n !== firstNum) { firstNum = n; if (layer && cfg.multi === "mix") build(); }
+      }
+      if (d.__wicked === "show-numbers") showNumbers(+d.n || 0);
+    }
+  });
+  const announceFrame = () => { if (IN_FRAME && owner && !standDown && charts.length) try { window.top.postMessage({ __wicked: "chart-frame", count: charts.length }, "*"); } catch {} };
+  setInterval(announceFrame, 3000);
+  const chartCount = () => (charts.length || frameRects().reduce((a, f) => a + f.count, 0));
+
+  // What wallpaper does chart n show? A built-in skin id, or "media:<id>" for one of your uploads.
+  function mainSource() { const s = skinNow(); return s === "media" ? "media:" + cfg.mediaId : s; }
+  function validSource(s) {
+    if (typeof s !== "string" || !s) return false;
+    if (s.startsWith("media:")) return cfg.media.some((m) => m.id === s.slice(6) && !m.pending);
+    return !!window.WickedSkins[s];
+  }
+  function sourceFor(n) {
+    if (cfg.multi === "mix" && n > 1) { const s = (cfg.chartSkins || {})[n]; if (validSource(s)) return s; }
+    return mainSource();
+  }
+
+  // "Over chart" mode: only cover the charts, not toolbars/watchlist (every chart of a multi-chart layout).
   function clipToChart() {
     if (!layer) return;
-    const el = document.querySelector(".chart-container") || document.querySelector(".layout__area--center");
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    layer.style.clipPath = `inset(${r.top}px ${innerWidth - r.right}px ${innerHeight - r.bottom}px ${r.left}px)`;
-    if (!ro) { ro = new ResizeObserver(clipToChart); ro.observe(el); }
+    if (cfg.layer !== "over" || tiled()) { layer.style.clipPath = ""; return; }
+    const rects = charts.length ? charts.map((c) => c.r) : [chartsBox()];
+    layer.style.clipPath = `path("${rects.map((r) => `M${r.left} ${r.top}H${r.right}V${r.bottom}H${r.left}Z`).join(" ")}")`;
   }
   // ---------- Reacts to: Market / My P&L ----------
   // Price comes from the tab title TradingView already shows, e.g. "BTCUSDT 77,228.95 ▼ −0.29%".
@@ -118,8 +194,7 @@
       pillEl.hidden = !label;
       pillEl.textContent = label;
       pillEl.style.color = col;
-      const el = document.querySelector(".chart-container");
-      if (el && label) { const r = el.getBoundingClientRect(); pillEl.style.top = r.top + 8 + "px"; pillEl.style.left = r.right - 80 + "px"; } // pill sits left of the price axis
+      if (label) { const r = chartsBox(); pillEl.style.top = r.top + 8 + "px"; pillEl.style.left = r.right - 80 + "px"; } // pill sits left of the price axis
     }
   }
 
@@ -148,13 +223,13 @@
   let repaintTimer;
   const repaint = () => { clearTimeout(repaintTimer); repaintTimer = setTimeout(() => document.dispatchEvent(new Event("bd-repaint")), 60); };
 
-  // Calm while working: when your cursor is on the chart the wallpaper dims and slows down.
+  // Calm while working: when your cursor is on a chart the wallpaper dims and slows down.
   let calmActive = false;
+  const insideChart = (x, y) => (charts.length ? charts.map((c) => c.r) : [chartsBox()])
+    .some((r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom);
   addEventListener("mousemove", (e) => {
     if (!cfg.calm || !layer) { if (calmActive) { calmActive = false; applyLook(); } return; }
-    const el = document.querySelector(".chart-container"); if (!el) return;
-    const r = el.getBoundingClientRect();
-    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    const inside = insideChart(e.clientX, e.clientY);
     if (inside !== calmActive) { calmActive = inside; applyLook(); }
   }, { passive: true });
   document.addEventListener("mouseleave", () => { if (calmActive) { calmActive = false; applyLook(); } });
@@ -164,35 +239,65 @@
     if (!layer) return;
     setTimeout(measureBackdrop, 300);
     layer.classList.toggle("bd-over", cfg.layer === "over");
+    layer.classList.toggle("bd-tiled", tiled());
     document.documentElement.classList.toggle("bd-over-mode", cfg.layer === "over");
     clipToChart();
     updateReact(0);
     // Over-chart sits ON TOP of the candles, so it needs its own (lower) strength or it hides them.
     layer.style.opacity = String(cfg.layer === "over" ? cfg.overOpacity : cfg.opacity);
-    layer.querySelector(".bd-dim").style.opacity = String(Math.min(0.95, cfg.dim + (cfg.calm && calmActive ? 0.3 : 0)));
-    const vg = layer.querySelector(".bd-vignette");
-    if (vg) vg.style.background = cfg.vignette > 0 ? `radial-gradient(ellipse at center, transparent ${Math.round(70 - cfg.vignette * 40)}%, rgba(0,0,0,${(0.35 + cfg.vignette * 0.55).toFixed(2)}) 100%)` : "none";
-    if (!content) return;
     const f = [];
     if (cfg.blur) f.push(`blur(${cfg.blur}px)`);
     if (cfg.vividness !== 1) f.push(`saturate(${cfg.vividness})`);
     if (cfg.tint) f.push(`hue-rotate(${cfg.tint}deg)`);
     if (cfg.bw) f.push("grayscale(1)");
-    content.style.filter = f.join(" ");
-    if (content.tagName !== "CANVAS") {
-      content.style.objectFit = { cover: "cover", fit: "contain", stretch: "fill" }[cfg.fit] || "cover";
-      content.style.objectPosition = `${cfg.posX}% ${cfg.posY}%`;
+    for (const v of views) {
+      v.dim.style.opacity = String(Math.min(0.95, cfg.dim + (cfg.calm && calmActive ? 0.3 : 0)));
+      v.vg.style.background = cfg.vignette > 0 ? `radial-gradient(ellipse at center, transparent ${Math.round(70 - cfg.vignette * 40)}%, rgba(0,0,0,${(0.35 + cfg.vignette * 0.55).toFixed(2)}) 100%)` : "none";
+      const content = v.content;
+      content.style.filter = f.join(" ");
+      if (content.tagName !== "CANVAS") {
+        content.style.objectFit = { cover: "cover", fit: "contain", stretch: "fill" }[cfg.fit] || "cover";
+        content.style.objectPosition = `${cfg.posX}% ${cfg.posY}%`;
+      }
+      if (content.tagName === "VIDEO") {
+        content.playbackRate = Math.max(0.25, Math.min(4, cfg.speed * calmFactor()));
+        cfg.paused ? content.pause() : content.play().catch(() => {});
+      }
+      if (content.tagName === "IFRAME") postLook(content);
     }
-    if (content.tagName === "VIDEO") {
-      content.playbackRate = Math.max(0.25, Math.min(4, cfg.speed * calmFactor()));
-      cfg.paused ? content.pause() : content.play().catch(() => {});
-    }    if (content.tagName === "IFRAME") postLook();
   }
 
   // Files stored in the extension's database play inside an extension iframe (player/player.html).
-  function postLook() {
-    if (!content || content.tagName !== "IFRAME" || !content.contentWindow) return;
-    content.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed * calmFactor(), paused: cfg.paused } }, "*");
+  function postLook(frame) {
+    if (!frame || frame.tagName !== "IFRAME" || !frame.contentWindow) return;
+    frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed * calmFactor(), paused: cfg.paused } }, "*");
+  }
+
+  // One wallpaper element for a source ("aurora", "media:<id>").
+  function makeContent(src, view) {
+    const m = src.startsWith("media:") ? cfg.media.find((x) => x.id === src.slice(6)) : null;
+    let el;
+    if (m && m.file && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
+      el = document.createElement("iframe");
+      el.className = "bd-player";
+      el.setAttribute("allow", "autoplay");
+      el.src = chrome.runtime.getURL(`player/player.html?id=${encodeURIComponent(m.id)}&type=${m.type}`);
+      el.addEventListener("load", () => postLook(el));
+    } else if (m && m.src) {
+      if (m.type === "video") {
+        el = document.createElement("video");
+        Object.assign(el, { src: m.src, loop: true, muted: true, autoplay: true, playsInline: true });
+      } else {
+        el = document.createElement("img");
+        el.src = m.src; // GIFs animate natively
+      }
+    } else {
+      const def = window.WickedSkins[src] || window.WickedSkins[cfg.skin] || window.WickedSkins.aurora;
+      el = document.createElement("canvas");
+      view.skin = def.create(el.getContext("2d"));
+      view.clock = 0;
+    }
+    return el;
   }
 
   function build() {
@@ -208,37 +313,22 @@
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
 
+    charts = chartEls(); layoutSig = sigOf(charts);
     layer = document.createElement("div");
     layer.id = "bd-layer";
     layer.dataset.bdOwner = ME.token;
 
-    const m = activeMedia();
-    if (m && m.file && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
-      content = document.createElement("iframe");
-      content.className = "bd-player";
-      content.setAttribute("allow", "autoplay");
-      content.src = chrome.runtime.getURL(`player/player.html?id=${encodeURIComponent(m.id)}&type=${m.type}`);
-      content.addEventListener("load", postLook);
-    } else if (m && m.src) {
-      if (m.type === "video") {
-        content = document.createElement("video");
-        Object.assign(content, { src: m.src, loop: true, muted: true, autoplay: true, playsInline: true });
-      } else {
-        content = document.createElement("img");
-        content.src = m.src; // GIFs animate natively
-      }
-    } else {
-      const def = window.WickedSkins[skinNow()] || window.WickedSkins.aurora;
-      content = document.createElement("canvas");
-      startCanvas(content, def);
-    }
-    layer.appendChild(content);
-    const dim = document.createElement("div");
-    dim.className = "bd-dim";
-    layer.appendChild(dim);
-    const vg = document.createElement("div");
-    vg.className = "bd-vignette";
-    layer.appendChild(vg);
+    // one wallpaper across the layout, or one per chart
+    const nums = tiled() ? charts.map((c, i) => firstNum + i) : [firstNum];
+    views = nums.map((n) => {
+      const v = { n, tile: document.createElement("div"), dim: document.createElement("div"), vg: document.createElement("div") };
+      v.tile.className = "bd-tile";
+      v.content = makeContent(sourceFor(n), v);
+      v.dim.className = "bd-dim"; v.vg.className = "bd-vignette";
+      v.tile.append(v.content, v.dim, v.vg);
+      layer.appendChild(v.tile);
+      return v;
+    });
     reactEl = document.createElement("div");
     reactEl.className = "bd-react";
     layer.appendChild(reactEl);
@@ -247,24 +337,51 @@
     pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     layer.appendChild(pillEl);
     document.documentElement.appendChild(layer);
+    placeViews();
+    if (views.some((v) => v.skin)) startLoop();
     applyLook();
   }
 
-  function startCanvas(canvas, def) {
-    const ctx = canvas.getContext("2d");
-    const skin = def.create(ctx);
-    const size = () => {
-      const scale = cfg.powerSaver ? 0.5 : 0.75; // it's a background; lower res saves GPU
-      canvas.width = Math.max(2, (innerWidth * scale) | 0);
-      canvas.height = Math.max(2, (innerHeight * scale) | 0);
-      skin.resize(canvas.width, canvas.height);
-    };
-    size();
-    addEventListener("resize", size);
-    canvas._cleanup = () => removeEventListener("resize", size);
+  // Keep every wallpaper on top of its chart as the layout changes (resize, 1 -> 4 charts, panels opening...).
+  const sigOf = (list) => list.map((c) => [c.r.left, c.r.top, c.r.width, c.r.height].map(Math.round).join(",")).join("|") + "@" + innerWidth + "x" + innerHeight;
+  let layoutSig = "";
+  function placeViews() {
+    if (!layer) return;
+    views.forEach((v, i) => {
+      const r = tiled() && charts[i] ? charts[i].r : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+      Object.assign(v, { x: r.left, y: r.top, w: r.width, h: r.height });
+      Object.assign(v.tile.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" });
+      sizeCanvas(v);
+    });
+    clipToChart();
+    placeWatermark();
+  }
+  function trackLayout() {
+    if (!layer || standDown || document.querySelector(".chart-container[data-bd-repaint]")) return;   // mid-redraw: charts hidden for 2 frames
+    const next = chartEls(), sig = sigOf(next);
+    if (sig === layoutSig) return;
+    const before = charts.length, wasTiled = tiled();
+    charts = next; layoutSig = sig;
+    // number of tiles changed (chart added/removed, or 1 <-> many): rebuild; otherwise just move them
+    if (before !== charts.length) setTimeout(announceFrame, 0);
+    if (wasTiled !== tiled() || (tiled() && before !== charts.length)) build();
+    else { placeViews(); updateReact(0); }
+    setTimeout(measureBackdrop, 200);
+  }
+  setInterval(trackLayout, 600);
+  addEventListener("resize", () => setTimeout(trackLayout, 50));
 
+  function sizeCanvas(v) {
+    if (!v.skin) return;
+    const scale = cfg.powerSaver ? 0.5 : 0.75; // it's a background; lower res saves GPU
+    const w = Math.max(2, (v.w * scale) | 0), h = Math.max(2, (v.h * scale) | 0);
+    if (v.content.width !== w || v.content.height !== h) { v.content.width = w; v.content.height = h; v.skin.resize(w, h); }
+  }
+
+  // One animation loop drives every animated wallpaper on the page.
+  function startLoop() {
     running = true;
-    let last = performance.now(), clock = 0;
+    let last = performance.now();
     const step = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(step);
@@ -273,8 +390,7 @@
       if (now - last < 1000 / target - 2) return;
       const dt = Math.min(0.1, (now - last) / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
       last = now;
-      clock += dt;
-      skin.frame(clock, dt);
+      for (const v of views) if (v.skin) { v.clock += dt; v.skin.frame(v.clock, dt); }
     };
     raf = requestAnimationFrame(step);
   }
@@ -283,11 +399,32 @@
     running = false;
     cancelAnimationFrame(raf);
     if (layer) {
-      const c = layer.querySelector("canvas");
-      c && c._cleanup && c._cleanup();
       layer.remove();
-      layer = content = reactEl = pillEl = null;
+      layer = reactEl = pillEl = null;
     }
+    views = [];
+  }
+
+  // "Show chart numbers": big 1, 2, 3... on each chart for a moment, so you know which is which.
+  function showNumbers(highlight) {
+    if (!IN_FRAME) for (const f of frameRects()) try { f.w.postMessage({ __wicked: "show-numbers", n: highlight }, "*"); } catch {}
+    const rects = (charts.length ? charts : chartEls()).map((c) => c.r);
+    document.querySelectorAll(".bd-num").forEach((el) => el.remove());
+    rects.forEach((r, i) => {
+      const el = document.createElement("div"), n = firstNum + i;
+      el.className = "bd-num" + (highlight && highlight === n ? " bd-num-on" : "");
+      el.textContent = String(n);
+      Object.assign(el.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" });
+      document.documentElement.appendChild(el);
+      setTimeout(() => el.remove(), 1800);
+    });
+  }
+  if (!IN_FRAME && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+      if (!msg || typeof msg.ws !== "string") return;
+      if (msg.ws === "layout") reply({ count: chartCount() });
+      if (msg.ws === "numbers") { showNumbers(+msg.n || 0); reply({ count: chartCount() }); }
+    });
   }
 
   // Candle colours are drawn by hook.js (page world); hand it the config via an attribute.
@@ -305,47 +442,78 @@
   // Line glow + price scale styling, also drawn by hook.js
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
-  let backdrop = { bg: null, busy: false, prof: [] };
-  const sampler = document.createElement("canvas"); sampler.width = 32; sampler.height = 18;
+  let backdrop = { bg: null, busy: false, prof: [], profs: [] };
+  const GW = 32, GH = 18;                      // brightness grid of each wallpaper
+  const sampler = document.createElement("canvas"); sampler.width = GW; sampler.height = GH;
   const sctx = sampler.getContext("2d", { willReadFrequently: true });
-  function statsOf(source) {
+  function gridOf(source) {
     try {
-      sctx.clearRect(0, 0, 32, 18); sctx.drawImage(source, 0, 0, 32, 18);
-      const d = sctx.getImageData(0, 0, 32, 18).data; let sum = 0, sq = 0, n = 0; const prof = new Array(18).fill(0);
+      sctx.clearRect(0, 0, GW, GH); sctx.drawImage(source, 0, 0, GW, GH);
+      const d = sctx.getImageData(0, 0, GW, GH).data, grid = new Array(GW * GH); let sum = 0, sq = 0;
       for (let i = 0; i < d.length; i += 4) {
-        const l = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255 * (d[i + 3] / 255); sum += l; sq += l * l; n++;
-        const px = (i / 4) % 32, row = Math.floor(i / 4 / 32); if (px >= 27) prof[row] += l / 5;   // right-edge strip
+        const l = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255 * (d[i + 3] / 255);
+        grid[i / 4] = l; sum += l; sq += l * l;
       }
-      const mean = sum / n; return { mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), prof };
+      const n = GW * GH, mean = sum / n; return { mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), grid };
     } catch { return null; }                    // cross-origin media: the player iframe reports instead
   }
+  // Brightness behind one chart's price scale (its right-hand ~64px), top to bottom in 18 steps.
+  function scaleProfile(v, r) {
+    const g = v.lum.grid;
+    if (!g || g.length !== GW * GH) return v.lum.prof || [];
+    const col = (x) => Math.max(0, Math.min(GW - 1, Math.floor(((x - v.x) / v.w) * GW)));
+    const row = (y) => Math.max(0, Math.min(GH - 1, Math.floor(((y - v.y) / v.h) * GH)));
+    const c0 = col(r.right - 64), c1 = Math.max(c0, col(r.right - 1)), out = [];
+    for (let k = 0; k < GH; k++) {
+      const y = row(r.top + ((k + 0.5) / GH) * r.height); let s = 0;
+      for (let c = c0; c <= c1; c++) s += g[y * GW + c];
+      out.push(s / (c1 - c0 + 1));
+    }
+    return out;
+  }
+  function updateBackdrop() {
+    const lit = views.filter((v) => v.lum);
+    if (!lit.length) return;
+    const mean = lit.reduce((a, v) => a + v.lum.mean, 0) / lit.length, std = lit.reduce((a, v) => a + v.lum.std, 0) / lit.length;
+    const rects = charts.length ? charts.map((c) => c.r) : [chartsBox()];
+    const profs = rects.map((r, i) => {
+      const v = tiled() ? views[i] : views[0];
+      return v && v.lum ? { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom), p: scaleProfile(v, r) } : null;
+    }).filter(Boolean);
+    setBackdrop({ mean, std, profs });
+  }
   function setBackdrop(st) {
-    if (!st) return;
     const vis = (cfg.layer === "over" ? cfg.overOpacity : cfg.opacity) * (1 - cfg.dim);   // what actually reaches your eyes
     const mean = st.mean * vis, std = st.std * vis;
     // hysteresis so a moving video near the threshold doesn't flip the text back and forth
     const bg = backdrop.bg === "light" ? (mean < 0.37 ? "dark" : "light") : (mean > 0.47 ? "light" : "dark");
     const busy = backdrop.busy ? std > 0.12 : std > 0.17;
-    const prof = (st.prof || []).map((v) => Math.round(v * vis * 100) / 100);
+    const profs = st.profs.map((q) => ({ ...q, p: q.p.map((v) => Math.round(v * vis * 100) / 100) }));
     const h = document.documentElement;
     h.classList.toggle("bd-bg-dark", bg === "dark"); h.classList.toggle("bd-bg-light", bg === "light");
-    const profMoved = prof.length !== (backdrop.prof || []).length || prof.some((v, i) => Math.abs(v - backdrop.prof[i]) > 0.08);
-    if (bg !== backdrop.bg || busy !== backdrop.busy || profMoved) { backdrop = { bg, busy, prof }; pushFx(); }
+    const old = backdrop.profs || [];
+    const profMoved = profs.length !== old.length || profs.some((q, i) => q.l !== old[i].l || q.t !== old[i].t || q.r !== old[i].r || q.b !== old[i].b ||
+      q.p.length !== old[i].p.length || q.p.some((v, j) => Math.abs(v - old[i].p[j]) > 0.08));
+    if (bg !== backdrop.bg || busy !== backdrop.busy || profMoved) { backdrop = { bg, busy, profs, prof: profs[0] ? profs[0].p : [] }; pushFx(); }
   }
   function measureBackdrop() {
-    if (!layer || !content || !cfg.enabled) return;
-    if (content.tagName === "IFRAME") return;   // player posts { __wicked: "lum" }
-    setBackdrop(statsOf(content));
+    if (!layer || !views.length || !cfg.enabled) return;
+    for (const v of views) if (v.content.tagName !== "IFRAME") { const g = gridOf(v.content); if (g) v.lum = g; }  // players post { __wicked: "lum" }
+    updateBackdrop();
   }
   setInterval(measureBackdrop, 1500);
   addEventListener("message", (e) => {
-    if (!e.data || e.data.__wicked !== "lum" || !content || e.source !== content.contentWindow) return;
-    setBackdrop({ mean: +e.data.mean || 0, std: +e.data.std || 0, prof: Array.isArray(e.data.prof) ? e.data.prof.slice(0, 18).map(Number) : [] });
+    if (!e.data || e.data.__wicked !== "lum") return;
+    const v = views.find((x) => x.content.tagName === "IFRAME" && e.source === x.content.contentWindow);
+    if (!v) return;
+    const grid = Array.isArray(e.data.grid) && e.data.grid.length === GW * GH ? e.data.grid.map(Number) : null;
+    v.lum = { mean: +e.data.mean || 0, std: +e.data.std || 0, grid, prof: Array.isArray(e.data.prof) ? e.data.prof.slice(0, 18).map(Number) : [] };
+    updateBackdrop();
   });
 
   function pushFx() {
     const h = document.documentElement;
-    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [] }));
+    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [] }));
     else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     // Scale backing = real frosted glass behind the price + time scales
@@ -360,15 +528,14 @@
   }
 
   // Keys that need a rebuild vs. ones we can apply live.
-  const REBUILD = new Set(["enabled", "skin", "mediaId", "powerSaver", "sessionOn", "sessionSkins"]);
+  const REBUILD = new Set(["enabled", "skin", "mediaId", "powerSaver", "sessionOn", "sessionSkins", "multi", "chartSkins"]);
   // ---------- watermark ----------
   // Sits ON TOP of the chart (so it shows in screenshots/streams) but never takes clicks.
   // Kept clear of the price axis (right) and time axis (bottom).
   let wmEl, wmRO;
   function placeWatermark() {
     if (!wmEl) return;
-    const el = document.querySelector(".chart-container");
-    const r = el ? el.getBoundingClientRect() : { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth, height: innerHeight };
+    const r = chartsBox();                                            // all charts of a multi-chart layout
     const pad = 14, axisR = 72, axisB = 30, st = wmEl.style;
     st.left = st.right = st.top = st.bottom = st.transform = "";
     const p = cfg.wmPos;
@@ -409,7 +576,7 @@
     keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
-      (keys.includes("media") && cfg.skin === "media");
+      (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
     needsRebuild ? build() : applyLook();
   }
 
@@ -474,7 +641,7 @@
   const CHART_SEL = ".chart-markup-table, .chart-container";
   const bigChart = () => [...document.querySelectorAll(CHART_SEL)].some((el) => { const r = el.getBoundingClientRect(); return r.width >= 400 && r.height >= 250; });
   function whenChart(start) {
-    const go = () => { if (!claim()) return; sweep(); start(); };
+    const go = () => { if (!claim()) return; sweep(); start(); setTimeout(announceFrame, 300); };
     if (bigChart()) return go();
     // charts render late and small widgets (mini charts) never qualify; check for a while
     const iv = setInterval(() => { if (bigChart()) { clearInterval(iv); go(); } }, 500);

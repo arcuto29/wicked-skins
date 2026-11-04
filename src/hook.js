@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 3;
+  const HOOK_VERSION = 4;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -57,7 +57,7 @@
 
   // Line glow + price scale styling
   const FX0 = { lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
-    scaleSize: 0, scaleFont: "default", bg: null, busy: false, prof: [] };
+    scaleSize: 0, scaleFont: "default", bg: null, busy: false, prof: [], profs: [] };
   let fx = { ...FX0 };
   function readFx() {
     try {
@@ -75,6 +75,9 @@
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
         prof: Array.isArray(f.prof) ? f.prof.slice(0, 18).map(Number) : [],  // brightness behind the price scale, top->bottom
+        // one profile per chart (multi-chart layouts): { l, t, r, b } = the chart's box on screen, p = profile
+        profs: Array.isArray(f.profs) ? f.profs.slice(0, 16).filter((q) => q && Array.isArray(q.p))
+          .map((q) => ({ l: +q.l || 0, t: +q.t || 0, r: +q.r || 0, b: +q.b || 0, p: q.p.slice(0, 18).map(Number) })) : [],
       };
     } catch { fx = { ...FX0 }; }
     remapCache.clear();
@@ -357,12 +360,18 @@
   // Which tone is right behind this label? Uses the brightness profile of the strip behind the scale.
   const rectCache = new WeakMap();
   function toneAt(ctx, y) {
-    const c = ctx.canvas, prof = fx.prof;
-    if (!prof || prof.length < 6 || !isPriceAxis(c)) return fx.bg;
+    const c = ctx.canvas;
+    if (!isPriceAxis(c) || (!fx.profs.length && fx.prof.length < 6)) return fx.bg;
     let rc = rectCache.get(c), now = performance.now();
     if (!rc || now - rc.t > 1000) { rc = { r: c.getBoundingClientRect(), t: now }; rectCache.set(c, rc); }
     const t = ctx.getTransform(), cssY = rc.r.top + ((y * t.d + t.f) / c.height) * rc.r.height;
-    const row = Math.max(0, Math.min(prof.length - 1, Math.floor((cssY / innerHeight) * prof.length)));
+    // which chart is this price scale part of? (multi-chart layouts have one scale per chart)
+    const cx = (rc.r.left + rc.r.right) / 2, cy = (rc.r.top + rc.r.bottom) / 2;
+    const own = fx.profs.find((q) => cx >= q.l - 2 && cx <= q.r + 2 && cy >= q.t - 2 && cy <= q.b + 2);
+    let prof = fx.prof, top = 0, height = innerHeight;
+    if (own) { prof = own.p; top = own.t; height = Math.max(1, own.b - own.t); }
+    if (!prof || prof.length < 6) return fx.bg;
+    const row = Math.max(0, Math.min(prof.length - 1, Math.floor(((cssY - top) / height) * prof.length)));
     return prof[row] > 0.46 ? "light" : "dark";   // ~equal WCAG contrast for light vs dark text here
   }
   const paCache = new WeakMap();
