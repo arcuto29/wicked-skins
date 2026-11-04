@@ -41,34 +41,90 @@
   }).observe(html, { attributes: true, attributeFilter: ["class", "data-bd-candles"] });
 
   // ---------- candle colour remap (fillStyle / strokeStyle setters) ----------
-  // TradingView defaults: up #089981 / #26a69a, down #F23645 / #ef5350 (volume uses rgba of the latter pair).
-  const UP_HEX = new Set(["#089981", "#26a69a"]);
-  const DOWN_HEX = new Set(["#f23645", "#ef5350"]);
-  const RGBA = /^rgba?\((\d+),(\d+),(\d+)(?:,([\d.]+))?\)$/;
+  // We recolour the candles TradingView actually draws. To know WHICH colours are candles we
+  // read the chart's own candle settings (read-only, never written): your custom colours,
+  // hollow candles, Heikin Ashi, bars... TradingView's defaults are always included as a fallback
+  // (they also cover the default Volume bars).
+  const scratch0 = document.createElement("canvas").getContext("2d");
+  const origFillDesc = Object.getOwnPropertyDescriptor(proto, "fillStyle");
+  function rgbKey(v) {                      // any CSS colour -> { key:"r,g,b", a:alpha } or null
+    if (typeof v !== "string") return null;
+    origFillDesc.set.call(scratch0, "#000"); origFillDesc.set.call(scratch0, v);
+    const n = origFillDesc.get.call(scratch0);
+    if (n[0] === "#") return { key: [1, 3, 5].map((i) => parseInt(n.slice(i, i + 2), 16)).join(","), a: null };
+    const m = n.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    return m ? { key: m[1] + "," + m[2] + "," + m[3], a: m[4] === undefined ? null : m[4] } : null;
+  }
+  const DEFAULT_SIDES = [["#089981", "up"], ["#26a69a", "up"], ["#f23645", "down"], ["#ef5350", "down"]];
+  let sides = new Map();                    // "r,g,b" -> "up" | "down"
+  let sidesSig = "";
+  const UP_KEYS = ["upColor", "borderUpColor", "wickUpColor"];
+  const DOWN_KEYS = ["downColor", "borderDownColor", "wickDownColor"];
+  const STYLES = ["candleStyle", "hollowCandleStyle", "haStyle", "barStyle", "volCandlesStyle", "hlcBarsStyle"];
+
+  function chartWidgets() {
+    const api = window.TradingViewApi, out = [];
+    try { const a = api && api._activeChartWidgetWV && api._activeChartWidgetWV.value(); if (a) out.push(a); } catch {}
+    try { // multi-chart layouts
+      const n = api && api.chartsCount ? api.chartsCount() : 0;
+      for (let i = 0; i < n; i++) { const w = api.chart(i); if (w && !out.includes(w)) out.push(w); }
+    } catch {}
+    return out;
+  }
+  function learnSides() {
+    const found = [];
+    for (const w of chartWidgets()) {
+      try {
+        const p = (w._chartWidget || w).model().mainSeries().properties().childs();
+        for (const st of STYLES) {
+          const cs = p[st] && p[st].childs && p[st].childs();
+          if (!cs) continue;
+          for (const k of UP_KEYS) if (cs[k]) found.push([cs[k].value(), "up"]);
+          for (const k of DOWN_KEYS) if (cs[k]) found.push([cs[k].value(), "down"]);
+        }
+      } catch {}
+    }
+    const next = new Map();
+    for (const [c, side] of [...DEFAULT_SIDES, ...found]) {
+      const r = rgbKey(c);
+      if (!r) continue;
+      if (next.has(r.key) && next.get(r.key) !== side) next.set(r.key, "both"); // up == down: ambiguous
+      else next.set(r.key, side);
+    }
+    for (const [k, v] of next) if (v === "both") next.delete(k);
+    const sig = [...next].sort().join("|");
+    if (sig !== sidesSig) {
+      sides = next; sidesSig = sig; remapCache.clear();
+      if (candles) forceRepaint();
+    }
+  }
+  learnSides();
+  setInterval(learnSides, 2000); // cheap: picks up chart/style/colour changes the user makes
+
+  // Only recolour inside chart panes, never on the price/time axes (keeps label text intact).
+  const paneCache = new WeakMap();
+  function isPane(canvas) {
+    if (!canvas) return false;
+    let v = paneCache.get(canvas);
+    if (v === undefined) {
+      v = !!(canvas.closest && canvas.closest(".chart-markup-table") && !canvas.closest(".price-axis, .time-axis, [class*='price-axis'], [class*='time-axis']"));
+      paneCache.set(canvas, v);
+    }
+    return v;
+  }
 
   function remap(v) {
     if (!candles || typeof v !== "string") return v;
     let out = remapCache.get(v);
     if (out !== undefined) return out;
     out = v;
-    const s = v.toLowerCase().replace(/\s/g, "");
-    let side = null, alpha = null;
-    if (UP_HEX.has(s)) side = "up";
-    else if (DOWN_HEX.has(s)) side = "down";
-    else {
-      const m = s.match(RGBA);
-      if (m) {
-        const key = m[1] + "," + m[2] + "," + m[3];
-        if (key === "8,153,129" || key === "38,166,154") side = "up";
-        else if (key === "242,54,69" || key === "239,83,80") side = "down";
-        if (side && m[4] !== undefined) alpha = m[4];
-      }
-    }
+    const r = rgbKey(v);
+    const side = r && sides.get(r.key);
     if (side) {
       const c = side === "up" ? candles.up : candles.down;
-      out = alpha === null ? (side === "up" ? candles.upHex : candles.downHex) : `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+      out = r.a === null || r.a === "1" ? (side === "up" ? candles.upHex : candles.downHex) : `rgba(${c[0]},${c[1]},${c[2]},${r.a})`;
     }
-    if (remapCache.size < 500) remapCache.set(v, out);
+    if (remapCache.size < 800) remapCache.set(v, out);
     return out;
   }
 
@@ -79,8 +135,18 @@
       configurable: true,
       enumerable: d.enumerable,
       get: d.get,
-      set(v) { d.set.call(this, remap(v)); },
+      set(v) { d.set.call(this, candles && isPane(this.canvas) ? remap(v) : v); },
     });
+  }
+
+  // Same redraw trick as content.js: TradingView only rebuilds canvases when the chart is re-shown.
+  let rpT;
+  function forceRepaint() {
+    clearTimeout(rpT);
+    rpT = setTimeout(() => document.querySelectorAll(".chart-container").forEach((el) => {
+      const prev = el.style.display; el.style.display = "none";
+      requestAnimationFrame(() => requestAnimationFrame(() => { el.style.display = prev; }));
+    }), 150);
   }
 
   // ---------- helpers ----------

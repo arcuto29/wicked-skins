@@ -235,7 +235,7 @@
   // Candle colours are drawn by hook.js (page world); hand it the config via an attribute.
   function pushCandles() {
     const h = document.documentElement;
-    if (cfg.candleOn) h.setAttribute("data-bd-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow }));
+    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-bd-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow }));
     else h.removeAttribute("data-bd-candles");
     repaint();
   }
@@ -244,7 +244,7 @@
   const REBUILD = new Set(["enabled", "skin", "mediaId", "powerSaver"]);
   function apply(keys) {
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
-    if (candleKeys.length) pushCandles();
+    if (candleKeys.length || keys.includes("enabled")) pushCandles();
     keys = keys.filter((k) => !k.startsWith("candle"));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
