@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workshop · Wicked Skins</title>
+  <meta name="description" content="Community wallpapers for TradingView charts. Browse, preview and use them with Wicked Skins.">
+  <link rel="icon" href="img/icon-32.png"><link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap" style="padding:40px 20px 60px">
+    <h1 style="margin:0 0 6px">Workshop</h1>
+    <p style="color:var(--muted);margin:0 0 22px">Wallpapers shared by the community. To use one: open Wicked Skins → <b>Workshop</b> and tap <b>Use</b>, or download it and add it under <b>Uploads</b>. Share your own from <b>Uploads → Share</b>.</p>
+    <div class="ws-bar"><button class="chip on" data-sort="popular">Popular</button><button class="chip" data-sort="new">New</button></div>
+    <div class="ws-grid" id="grid"></div>
+    <p class="empty" id="empty" hidden></p>
+    <p style="text-align:center"><button class="chip" id="more" hidden>Load more</button></p>
+    <p style="color:var(--muted);font-size:13px;margin-top:30px">Each wallpaper belongs to its uploader or the original rights holder. We review uploads before they appear and remove anything that breaks the <a href="terms.html">rules</a>. If something here is yours and was posted without permission, email <span data-contact></span>.</p>
+  </main>
+  <script src="site-config.js"></script><script src="common.js"></script><script src="supabase.js"></script>
+  <script>
+  (function () {
+    const S = window.SITE, grid = document.getElementById("grid"), empty = document.getElementById("empty"), more = document.getElementById("more");
+    if (!S.supabaseUrl || !S.supabaseAnonKey) { empty.hidden = false; empty.textContent = "The Workshop opens soon."; return; }
+    const sb = supabase.createClient(S.supabaseUrl, S.supabaseAnonKey, { auth: { persistSession: false } });
+    const url = (p) => (p ? sb.storage.from("workshop").getPublicUrl(p).data.publicUrl : "");
+    const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    let sort = "popular", page = 0;
+    async function load(reset) {
+      if (reset) { page = 0; grid.innerHTML = ""; }
+      let q = sb.from("wallpapers").select("id,title,kind,file_path,thumb_path,likes,uses,created_at").eq("status", "approved");
+      q = sort === "new" ? q.order("created_at", { ascending: false }) : q.order("likes", { ascending: false }).order("uses", { ascending: false });
+      const { data, error } = await q.range(page * 24, page * 24 + 23);
+      if (error) { empty.hidden = false; empty.textContent = "Couldn't load the Workshop right now."; return; }
+      for (const w of data) {
+        const file = url(w.file_path), thumb = url(w.thumb_path) || file;
+        const el = document.createElement("div"); el.className = "ws-card";
+        el.innerHTML = `<div class="media"><img loading="lazy" alt="" src="${esc(thumb)}"><span class="tag">${w.kind === "video" ? "VIDEO" : "IMAGE"}</span></div>
+          <div class="info"><b>${esc(w.title)}</b><small>${w.likes} like${w.likes === 1 ? "" : "s"} · ${w.uses} use${w.uses === 1 ? "" : "s"}</small>
+          <div class="row"><a class="btn" href="${esc(file)}" download>Download</a></div></div>`;
+        el.querySelector(".media").onclick = () => {
+          const lb = document.createElement("div"); lb.className = "lightbox";
+          lb.innerHTML = w.kind === "video" ? `<video src="${esc(file)}" autoplay loop muted playsinline></video>` : `<img src="${esc(file)}" alt="">`;
+          lb.onclick = () => lb.remove(); document.body.appendChild(lb);
+        };
+        grid.appendChild(el);
+      }
+      empty.hidden = grid.children.length > 0; empty.textContent = "No wallpapers yet. Be the first to share one from the extension!";
+      more.hidden = data.length < 24;
+    }
+    document.querySelectorAll("[data-sort]").forEach((b) => (b.onclick = () => { document.querySelectorAll("[data-sort]").forEach((x) => x.classList.toggle("on", x === b)); sort = b.dataset.sort; load(true); }));
+    more.onclick = () => { page++; load(false); };
+    load(true);
+  })();
+  </script>
+</body>
+</html>

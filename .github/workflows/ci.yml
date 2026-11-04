@@ -30,3 +30,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: desktop-screenshots, path: desktop/test-output }
+
+  workshop-rules:
+    # The Workshop's database rules (supabase/schema.sql) against a real Postgres
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-save @electric-sql/pglite@0.5.15
+      - run: node supabase/test.mjs

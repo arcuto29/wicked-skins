@@ -5,6 +5,7 @@
   "description": "Live wallpapers, candle styles, glow and watermarks for TradingView charts, on tradingview.com and platforms that embed TradingView charts (e.g. TopstepX).",
   "permissions": [
     "activeTab",
+    "identity",
     "scripting",
     "storage",
     "unlimitedStorage"

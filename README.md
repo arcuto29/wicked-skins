@@ -23,6 +23,11 @@ Chrome asks once for that site; the page reloads skinned. **Turn off** in the sa
 It only switches on inside the frame that contains the chart; the rest of the platform is untouched.
 On platforms without TradingView's internal API, candle colours are learned from what's drawn.
 
+## Website, store and Workshop
+- Website (`site/`): home, Workshop, Privacy, Terms; deployed to GitHub Pages by `.github/workflows/pages.yml`.
+- Chrome Web Store: see **[STORE.md](STORE.md)** (listing text, images in `store/`, permission justifications).
+- Workshop (community wallpapers on Supabase): see **[WORKSHOP.md](WORKSHOP.md)**.
+
 ## Updates
 Buyers get updates automatically (Chrome Web Store, desktop auto-updater, or an in-panel banner for zip installs).
 See **[RELEASING.md](RELEASING.md)**: one command + a tag push publishes everywhere.

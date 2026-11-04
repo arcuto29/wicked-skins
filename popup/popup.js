@@ -246,7 +246,9 @@ function renderMedia() {
     const badge = m.pending ? `<span class="live">${converting[m.id] !== undefined ? "CONVERTING " + Math.round(converting[m.id] * 100) + "%" : "WAITING TO CONVERT"}</span>`
       : m.type === "video" ? '<span class="live">● VIDEO</span>' : "";
     card.insertAdjacentHTML("beforeend", `${badge}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">${ICON_X}</button></div>`);
+    if (window.Workshop && Workshop.configured && !m.pending) card.insertAdjacentHTML("beforeend", `<button class="media-share" title="Share to the Workshop">Share</button>`);
     card.onclick = (e) => {
+      if (e.target.closest(".media-share")) { e.stopPropagation(); return openShare(m); }
       if (e.target.classList.contains("x")) {
         const media = cfg.media.filter((x) => x.id !== m.id);
         const wasActive = cfg.skin === "media" && cfg.mediaId === m.id;
@@ -429,6 +431,151 @@ const mediaTab = $("tab-media");
 mediaTab.addEventListener("dragover", (e) => { e.preventDefault(); mediaTab.classList.add("drop"); });
 mediaTab.addEventListener("dragleave", () => mediaTab.classList.remove("drop"));
 mediaTab.addEventListener("drop", (e) => { e.preventDefault(); mediaTab.classList.remove("drop"); addFiles([...e.dataTransfer.files]); });
+
+// ---------- workshop: community wallpapers ----------
+const WS_SHARE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif", "video/mp4", "video/webm"];
+let wsSort = "popular", wsPage = 0, wsItems = [], wsAuthOpen = false;
+const HEART = '<svg viewBox="0 0 16 14" width="11" height="10" aria-hidden="true" style="vertical-align:-1px"><path d="M8 13.5S1 9.3 1 4.7A3.4 3.4 0 0 1 8 3a3.4 3.4 0 0 1 7 1.7C15 9.3 8 13.5 8 13.5z" fill="currentColor"/></svg>';
+const W = () => window.Workshop;
+
+function wsAccount() {
+  const u = W().me();
+  $("wsWho").innerHTML = u ? `<b>${esc(u.name)}</b>${u.admin ? '<span class="badge">ADMIN</span>' : ""}<br><small class="hint" style="margin:0">${esc(u.email || "")}</small>`
+    : `<b>Browse freely</b><br><small class="hint" style="margin:0">Sign in to share, like and report.</small>`;
+  $("wsSignBtn").textContent = u ? "Sign out" : wsAuthOpen ? "Close" : "Sign in";
+  $("wsAuth").hidden = !!u || !wsAuthOpen;
+}
+function wsTabs() {
+  const u = W().me(), box = $("wsTabs"); box.innerHTML = "";
+  const tabs = [["popular", "Popular"], ["new", "New"]];
+  if (u) tabs.push(["mine", "Mine"]);
+  if (u && u.admin) tabs.push(["review", "Review"]);
+  for (const [k, label] of tabs) {
+    const b = document.createElement("button"); b.className = "chip" + (k === wsSort ? " on" : ""); b.textContent = label;
+    b.onclick = () => { wsSort = k; wsLoad(true); };
+    box.appendChild(b);
+  }
+}
+async function wsLoad(reset) {
+  if (!W() || !W().configured) return;
+  if (reset) { wsPage = 0; wsItems = []; }
+  if ((wsSort === "mine" || wsSort === "review") && !W().me()) wsSort = "popular";
+  wsTabs(); wsAccount();
+  $("wsMsg").textContent = "Loading…";
+  try {
+    const rows = await W().list(wsSort, wsPage);
+    wsItems = reset ? rows : [...wsItems, ...rows];
+    $("wsMore").hidden = rows.length < 24;
+    $("wsMsg").textContent = wsItems.length ? "" : wsSort === "review" ? "Nothing waiting for review." : wsSort === "mine" ? "You haven't shared anything yet. Use Share on a file in Uploads." : "No wallpapers yet. Be the first to share one!";
+  } catch (e) { $("wsMsg").textContent = "Couldn't load the Workshop: " + e.message; }
+  wsRender();
+}
+function wsRender() {
+  const box = $("wsCards"); box.innerHTML = "";
+  const u = W().me();
+  for (const it of wsItems) {
+    const card = document.createElement("div"); card.className = "card ws";
+    const statusTag = wsSort === "mine" || wsSort === "review" ? `<span class="status ${it.status}">${it.status === "approved" ? "LIVE" : it.status === "pending" ? "IN REVIEW" : "REJECTED"}</span>` : "";
+    const sub = it.status === "rejected" && it.reject_reason ? "Rejected: " + it.reject_reason : `${it.likes} like${it.likes === 1 ? "" : "s"} · ${it.uses} use${it.uses === 1 ? "" : "s"}`;
+    card.innerHTML = `<img alt="" loading="lazy" src="${esc(it.thumbUrl || "")}">${statusTag}<span class="live">${it.kind === "video" ? "● VIDEO" : "IMAGE"}</span>
+      <div class="label"><span>${esc(it.title)}<small>${esc(sub)}</small></span></div><div class="acts"></div>`;
+    const acts = card.querySelector(".acts");
+    const btn = (label, fn, cls) => { const b = document.createElement("button"); if (label.startsWith("<svg")) b.innerHTML = label; else b.textContent = label; if (cls) b.className = cls; b.onclick = (e) => { e.stopPropagation(); fn(b); }; acts.appendChild(b); return b; };
+    if (wsSort === "review") {
+      btn("Approve", async () => { await wsDo(() => W().moderate(it.id, "approved"), "Approved: it's live now."); wsLoad(true); }, "primary");
+      btn("Reject", async (b) => {
+        const reason = prompt("Reason (the uploader sees this):", "Not allowed in the Workshop");
+        if (reason === null) return;
+        await wsDo(() => W().moderate(it.id, "rejected", reason), "Rejected."); wsLoad(true);
+      });
+      btn("Preview", () => wsUse(it, true));
+    } else {
+      if (it.status === "approved") btn("Use", () => wsUse(it), "primary");
+      if (it.status === "approved") btn(`${HEART} ${it.likes}`, async (b) => {
+        if (!u) return wsNeedSignIn("Sign in to like wallpapers.");
+        const on = !it.liked; it.liked = on; it.likes += on ? 1 : -1; b.innerHTML = `${HEART} ${it.likes}`; b.classList.toggle("on", on);
+        try { await W().like(it.id, on); } catch (e) { toast("Couldn't save your like: " + e.message); }
+      }, "heart" + (it.liked ? " on" : ""));
+      if (!it.mine && it.status === "approved") btn("Report", async () => {
+        if (!u) return wsNeedSignIn("Sign in to report a wallpaper.");
+        const reason = prompt("What's wrong with it? (copyright, explicit, spam…)", "");
+        if (reason === null) return;
+        await wsDo(() => W().report(it.id, reason), "Thanks, it's been reported for review.");
+      });
+    }
+    if (it.mine || (u && u.admin)) btn("Delete", async () => {
+      if (!confirm(`Delete “${it.title}” from the Workshop?`)) return;
+      await wsDo(() => W().remove(it), "Deleted."); wsLoad(true);
+    });
+    card.onclick = () => (it.status === "approved" ? wsUse(it) : null);
+    box.appendChild(card);
+  }
+}
+async function wsDo(fn, okMsg) { try { await fn(); toast(okMsg); } catch (e) { toast(e.message); } }
+function wsNeedSignIn(msg) { wsAuthOpen = true; wsAccount(); $("wsAuthMsg").textContent = msg; $("wsEmail").focus(); }
+// "Use": download into your Uploads and put it on the chart
+async function wsUse(it, previewOnly) {
+  toast(`Downloading “${it.title}”…`);
+  try {
+    const blob = await W().fetchFile(it);
+    const ext = (blob.type.split("/")[1] || "").replace("jpeg", "jpg");
+    await addFiles([new File([blob], `${it.title}.${ext || (it.kind === "video" ? "webm" : "png")}`, { type: blob.type })]);
+    toast(previewOnly ? `Added “${it.title}” to your Uploads to preview.` : `“${it.title}” is on your chart and in your Uploads.`);
+  } catch (e) { toast("Couldn't use it: " + e.message); }
+}
+// Share one of your Uploads
+let shareItem = null;
+async function openShare(m) {
+  if (!W().me()) { $("nav").querySelector('[data-tab="workshop"]').click(); return wsNeedSignIn("Sign in to share to the Workshop."); }
+  shareItem = m;
+  $("shareWhat").textContent = `“${m.name}” will be ${W().me().admin ? "published right away (you're an admin)" : "sent for review, then shown to everyone"}.`;
+  $("shareTitle").value = m.name.replace(/\.[^.]+$/, "").slice(0, 60);
+  $("shareRights").checked = false; $("shareGo").disabled = true; $("shareMsg").textContent = "";
+  $("shareDlg").hidden = false;
+}
+$("shareRights").onchange = (e) => ($("shareGo").disabled = !e.target.checked);
+$("shareCancel").onclick = () => ($("shareDlg").hidden = true);
+$("shareGo").onclick = async () => {
+  const m = shareItem; if (!m) return;
+  $("shareGo").disabled = true; $("shareMsg").textContent = "Uploading…";
+  try {
+    const blob = m.file ? await WickedMediaDB.get(m.id) : await (await fetch(m.src)).blob();
+    if (!blob) throw new Error("file not found");
+    if (!WS_SHARE_TYPES.includes(blob.type)) throw new Error("the Workshop takes MP4, WebM, PNG, JPG, WebP, GIF or AVIF. Videos converted here are WebM and work.");
+    if (blob.size > 50 * 1024 * 1024) throw new Error("the Workshop limit is 50 MB per file.");
+    const thumb = m.thumb ? await (await fetch(m.thumb)).blob() : null;
+    const r = await W().share({ blob, thumb, title: $("shareTitle").value.trim() || m.name, kind: m.type });
+    $("shareDlg").hidden = true;
+    toast(r.status === "approved" ? "Shared: it's live in the Workshop." : "Shared: it'll appear after review. See Workshop → Mine.");
+  } catch (e) { $("shareMsg").textContent = "Couldn't share: " + e.message; $("shareGo").disabled = false; }
+};
+// accounts
+$("wsSignBtn").onclick = async () => {
+  if (W().me()) { await W().signOut(); wsSort = "popular"; return wsLoad(true); }
+  wsAuthOpen = !wsAuthOpen; wsAccount();
+};
+const authMsg = (t) => ($("wsAuthMsg").textContent = t);
+const creds = () => ({ email: $("wsEmail").value.trim(), password: $("wsPass").value });
+async function afterSignIn() { wsAuthOpen = false; $("wsPass").value = ""; $("wsCodeBox").hidden = true; await wsLoad(true); toast(`Signed in as ${W().me().name}.`); }
+$("wsSignIn").onclick = async () => { const c = creds(); if (!c.email || !c.password) return authMsg("Enter your email and password.");
+  try { authMsg("Signing in…"); await W().signIn(c.email, c.password); await afterSignIn(); } catch (e) { authMsg(e.message); } };
+$("wsSignUp").onclick = async () => { const c = creds(); if (!c.email || c.password.length < 8) return authMsg("Use your email and a password of at least 8 characters.");
+  try { authMsg("Creating your account…"); const r = await W().signUp(c.email, c.password);
+    if (r.needsConfirm) authMsg("Check your email to confirm your account, then sign in here."); else await afterSignIn(); } catch (e) { authMsg(e.message); } };
+$("wsGoogle").onclick = async () => { try { authMsg("Opening Google…"); await W().signInGoogle(); await afterSignIn(); } catch (e) { authMsg(e.message); } };
+$("wsForgot").onclick = async () => { const email = $("wsEmail").value.trim(); if (!email) return authMsg("Enter your email first.");
+  try { await W().sendCode(email); $("wsCodeBox").hidden = false; authMsg("We emailed you a sign-in code."); } catch (e) { authMsg(e.message); } };
+$("wsVerify").onclick = async () => { try { await W().verifyCode($("wsEmail").value.trim(), $("wsCode").value.trim()); await afterSignIn();
+  const pw = prompt("Set a new password? (leave empty to skip)", ""); if (pw && pw.length >= 8) { await W().setPassword(pw); toast("Password updated."); } } catch (e) { authMsg(e.message); } };
+$("wsMore").onclick = () => { wsPage++; wsLoad(false); };
+function initWorkshop() {
+  const on = !!(window.Workshop && Workshop.configured);
+  $("wsOff").hidden = on; $("wsOn").hidden = !on;
+  if (!on) return;
+  Workshop.onAuth(() => { wsAccount(); wsTabs(); });
+  let loaded = false;
+  document.querySelector('#nav [data-tab="workshop"]').addEventListener("click", () => { if (!loaded) { loaded = true; wsLoad(true); } });
+}
 
 // ---------- saved looks ----------
 const snapshot = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, cfg[k]]));
@@ -704,7 +851,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop();
   siteBar();
   updates();
   const q = new URLSearchParams(location.search);
