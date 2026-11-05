@@ -72,4 +72,10 @@ jobs:
         shell: bash
         run: echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
       - name: Build installers and attach them to the release
-        run: npx electron-builder --publish always
+        shell: bash
+        run: |
+          case "${{ matrix.os }}" in
+            macos-latest)   npx electron-builder --mac --publish always ;;
+            windows-latest) npx electron-builder --win --publish always ;;
+            *)              npx electron-builder --linux --publish always ;;
+          esac
