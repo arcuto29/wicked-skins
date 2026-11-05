@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.5 (2026-11-05)
+- P&L readout: a big, bold open-P&L number while you're in a trade — green/red or an animated rainbow, in any corner. Much easier to see than the default pill.
+
 ## 0.1.4 (2026-11-05)
 - Match wallpaper: candle colours, glow and the price scale can follow your own uploaded wallpaper's colours.
 - Interface: restyle TradingView's panels — font, size and an accent colour for the watchlist, top/bottom timeframe bars and toolbars. The left drawing tool rail is left as-is.
