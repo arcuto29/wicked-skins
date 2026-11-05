@@ -30,6 +30,8 @@
     symbolOn: false, symbolSkins: {},
     // Auto quality: drop resolution / frame rate by itself if the computer starts dropping frames.
     autoQuality: true,
+    // Auto-match: pull candle colours, glow and scale tint from your own wallpaper's colours.
+    autoMatch: false,
     // Glow on indicators / lines / P&L, and price scale styling
     lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
     scaleSize: 0, scaleFont: "default",
@@ -381,7 +383,7 @@
     layer.appendChild(pillEl);
     document.documentElement.appendChild(layer);
     placeViews();
-    resetQuality();
+    resetQuality(); lastMatch = "";
     if (views.some((v) => v.skin)) startLoop();
     applyLook();
   }
@@ -527,8 +529,77 @@
         const l = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255 * (d[i + 3] / 255);
         grid[i / 4] = l; sum += l; sq += l * l;
       }
-      const n = GW * GH, mean = sum / n; return { mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), grid };
+      const n = GW * GH, mean = sum / n;
+      return { mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), grid, palette: paletteFromData(d) };
     } catch { return null; }                    // cross-origin media: the player iframe reports instead
+  }
+
+  // ---------- Auto-match: derive a colour palette from the wallpaper ----------
+  // Pick the wallpaper's most-present vivid hue as the accent, then an up/down pair that stays readable and
+  // clearly different from each other. Returns { up, down, accent } as #hex, or null if the art is too grey.
+  function paletteFromData(d) {
+    const bins = new Array(24).fill(null).map(() => ({ n: 0, r: 0, g: 0, b: 0, sat: 0 }));
+    let colourful = 0, total = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3] / 255; if (a < 0.4) continue;
+      const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+      const sat = mx === mn ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1));
+      total++;
+      if (sat < 0.18 || l < 0.08 || l > 0.95) continue;        // skip greys / near-black / near-white
+      colourful++;
+      let hue = 0;
+      if (mx !== mn) { const dd = mx - mn;
+        hue = mx === r ? (g - b) / dd + (g < b ? 6 : 0) : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; hue *= 60; }
+      const bi = Math.floor(hue / 15) % 24, wt = sat * (0.4 + 0.6 * (1 - Math.abs(l - 0.5) * 2));
+      const bn = bins[bi]; bn.n += wt; bn.r += r * wt; bn.g += g * wt; bn.b += b * wt; bn.sat += sat * wt;
+    }
+    if (colourful < total * 0.04) return null;                 // mostly grey wallpaper: nothing to match
+    const avg = (bi) => { const bn = bins[bi]; return bn.n > 0 ? [bn.r / bn.n, bn.g / bn.n, bn.b / bn.n] : null; };
+    const ranked = bins.map((b, i) => ({ i, n: b.n })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n);
+    if (!ranked.length) return null;
+    const top = ranked[0].i, accent = punch(avg(top));
+    // Second colour = the strongest hue cluster that's clearly different from the first (>= ~90° away on the wheel).
+    const far = (a, b) => { const d = Math.abs(a - b) * 15; return Math.min(d, 360 - d) >= 90; };
+    let second = ranked.find((x) => far(x.i, top));
+    const c1 = avg(top), c2 = second ? avg(second.i) : null;
+    // Two distinct wallpaper colours → use both (greener one becomes "up"). One dominant colour → derive a
+    // complementary pair around it so up/down stay clearly different and readable.
+    let upRgb, downRgb;
+    if (c2) {
+      const greener = (c) => c[1] - (c[0] + c[2]) / 2;          // how green-leaning
+      [upRgb, downRgb] = greener(c1) >= greener(c2) ? [c1, c2] : [c2, c1];
+      upRgb = punch(upRgb); downRgb = punch(downRgb);
+    } else {
+      const accHue = top * 15;
+      upRgb = punch(hslRgb(nearestNice(accHue, true)));
+      downRgb = punch(hslRgb(nearestNice((accHue + 150) % 360, false)));
+    }
+    return { up: hex(upRgb), down: hex(downRgb), accent: hex(accent) };
+  }
+  const clampc = (v) => Math.max(0, Math.min(255, Math.round(v)));
+  // rgb channels are 0..1 floats
+  const hex = (rgb) => "#" + rgb.map((v) => clampc(v * 255).toString(16).padStart(2, "0")).join("");
+  // boost saturation + set a readable lightness so candles pop on any art
+  function punch(rgb) {
+    if (!rgb) return [0, 0.88, 0.64];
+    let [r, g, b] = rgb; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let l = (mx + mn) / 2;
+    let h = 0, s = 0;
+    if (mx !== mn) { const dd = mx - mn; s = l > 0.5 ? dd / (2 - mx - mn) : dd / (mx + mn);
+      h = mx === r ? (g - b) / dd + (g < b ? 6 : 0) : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; h /= 6; }
+    s = Math.min(1, s * 1.5 + 0.35); l = Math.min(0.72, Math.max(0.5, l));
+    return hslRgb([h * 360, s, l]);
+  }
+  // pick an "up" (green-leaning) or "down" (warm-leaning) hue near the accent but in a readable zone
+  function nearestNice(hue, up) {
+    const s = 0.85, l = 0.6;
+    if (up) { const h = hue > 60 && hue < 200 ? hue : 150; return [h, s, l]; }
+    const h = hue > 300 || hue < 60 ? hue : 340; return [h, s, l];
+  }
+  function hslRgb(hsl) {
+    let [h, s, l] = hsl; h = ((h % 360) + 360) % 360 / 360;
+    const f = (n) => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+    return [f(0), f(8), f(4)];
   }
   // Brightness behind one chart's price scale (its right-hand ~64px), top to bottom in 18 steps.
   function scaleProfile(v, r) {
@@ -544,9 +615,29 @@
     }
     return out;
   }
+  // When Auto-match is on and a custom wallpaper is showing, set candle colours + scale tint from its palette.
+  let lastMatch = "";
+  function applyAutoMatch() {
+    if (!cfg.autoMatch) { lastMatch = ""; return; }
+    const v = views[0];                                            // the main chart's wallpaper
+    const src = v && (cfg.multi === "mix" ? sourceFor(v.n) : mainSource());
+    const isMedia = typeof src === "string" && src.startsWith("media:");
+    const pal = v && v.lum && v.lum.palette;
+    if (!isMedia || !pal) return;                                  // only match your own uploads, only when we have colours
+    const sig = pal.up + pal.down;
+    if (sig === lastMatch) return;                                 // colours haven't meaningfully changed
+    lastMatch = sig;
+    const next = { candleOn: true, candleUp: pal.up, candleDown: pal.down, candlePreset: "custom",
+      lineGlow: Math.max(cfg.lineGlow, 0.25), scaleText: pal.accent, scaleGlow: Math.max(cfg.scaleGlow, 0.25) };
+    cfg = { ...cfg, ...next };
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) chrome.storage.local.set(next);
+    pushCandles(); pushFx();
+  }
+
   function updateBackdrop() {
     const lit = views.filter((v) => v.lum);
     if (!lit.length) return;
+    applyAutoMatch();
     const mean = lit.reduce((a, v) => a + v.lum.mean, 0) / lit.length, std = lit.reduce((a, v) => a + v.lum.std, 0) / lit.length;
     const rects = charts.length ? charts.map((c) => c.r) : [chartsBox()];
     const profs = rects.map((r, i) => {
@@ -580,7 +671,8 @@
     const v = views.find((x) => x.content.tagName === "IFRAME" && e.source === x.content.contentWindow);
     if (!v) return;
     const grid = Array.isArray(e.data.grid) && e.data.grid.length === GW * GH ? e.data.grid.map(Number) : null;
-    v.lum = { mean: +e.data.mean || 0, std: +e.data.std || 0, grid, prof: Array.isArray(e.data.prof) ? e.data.prof.slice(0, 18).map(Number) : [] };
+    const palette = Array.isArray(e.data.rgb) && e.data.rgb.length === GW * GH * 4 ? paletteFromData(e.data.rgb) : null;
+    v.lum = { mean: +e.data.mean || 0, std: +e.data.std || 0, grid, palette, prof: Array.isArray(e.data.prof) ? e.data.prof.slice(0, 18).map(Number) : [] };
     updateBackdrop();
   });
 
@@ -689,6 +781,7 @@
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
     if (keys.includes("sides") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
+    if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||

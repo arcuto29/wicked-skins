@@ -18,7 +18,7 @@ const DEFAULTS = {
   react: "off", reactStrength: 0.6,
   wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, sides: "off", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
-  symbolOn: false, symbolSkins: {}, autoQuality: true,
+  symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
@@ -114,6 +114,11 @@ const LOOK_HINT = {
 };
 function renderCandles() {
   $("candleOn").checked = cfg.candleOn;
+  seg("autoMatch", [[false, "Off"], [true, "On"]], () => !!cfg.autoMatch, (v) => { set({ autoMatch: v, ...(v ? { candleOn: true } : {}) }); if (v) $("candleOn").checked = true; });
+  // Match-wallpaper only makes sense on your own uploaded wallpaper.
+  const onMedia = cfg.skin === "media";
+  $("autoMatchRow").hidden = !onMedia;
+  $("autoMatchHint").hidden = !onMedia;
   seg("candleLook", [["solid", "Solid"], ["neon", "Tube"], ["prism", "Rainbow"], ["shift", "Cycle"]], () => cfg.candleLook,
     (v) => { set({ candleLook: v, candleOn: true }); $("candleOn").checked = true; renderCandles(); });
   $("shiftRow").hidden = cfg.candleLook !== "shift";
