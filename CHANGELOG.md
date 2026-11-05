@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.8 (2026-11-05)
+- Fixed: Trade brackets didn't restyle on some setups — including HiDPI / retina / scaled displays and the wide multi-part broker pills (quantity + P&L + close button). Detection is now display-density aware and keys off the pill's font, so every bracket variant is caught.
+
 ## 0.1.7 (2026-11-05)
 - Trade brackets, fully customisable: recolour every part of your broker's on-chart TP / Stop / entry / P&L pills — the box, the number, the outline and the horizontal level line — in any colour you want, each independently (or leave any part as-is). The number now always stays readable (it picks black or white automatically on a recoloured box) and never spills out of the box when enlarged.
 - Fixed: the TP / P&L numbers could be hard to see or the level line wouldn't restyle on some charts. Both are resolved.
