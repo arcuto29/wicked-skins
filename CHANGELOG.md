@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 (2026-11-05)
+- Skin per symbol: map a wallpaper to a ticker (BTCUSDT, NQ, AAPL…) and it switches by itself when you change symbol.
+- Auto quality: on Smooth, the wallpaper lowers its detail by itself if your computer lags, then raises it again.
+- Android app (beta): a build for phones and tablets — TradingView with Priism Skins built in.
+
 ## 0.1.1 (2026-11-05)
 - Watermark: add your @handle, a Tiled style and Drift so your clips are harder to repost without credit, plus a strength slider.
 - Sides: flow the wallpaper across the panels around the chart (watchlist and toolbars) — Glass keeps them readable, Clear is see-through.
