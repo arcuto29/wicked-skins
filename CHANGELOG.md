@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.13 (2026-11-05)
+- Six bold new "glow in the dark" one-click looks: Glowstick, Blacklight, Vaporwave, Molten, Warp and Spectrum (a full-rainbow prism). Luminous neon-tube candles with strong glow over a dimmed dark wallpaper — the opposite end from the calm set. Every look now has its own wallpaper.
+
 ## 0.1.12 (2026-11-05)
 - Six new one-click looks, all calm and easy on the eyes (candles, glow, price scale and wallpaper matched in one tap): Nightfall, Daybreak (a bright/light theme), Sterling, Firefly, Harbor, and Dune. Each uses its own wallpaper — no repeats.
 
