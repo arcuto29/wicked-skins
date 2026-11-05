@@ -131,30 +131,39 @@ html.bd-sides [class*="layout__area--top"] { border-color: rgba(255,255,255,.08)
 
 /* --- UI style: font / size / accent for TradingView's own HTML panels --- */
 /* Font: applied to the panels around the chart (not the canvas chart itself). */
+/* Font: the watchlist panel, the top toolbar (symbol + timeframes) and the bottom time bar.
+   The left drawing-tool rail (layout__area--left) is deliberately left untouched. */
 html.bd-ui-font .widgetbar-pages,
 html.bd-ui-font .widgetbar-tabs,
-html.bd-ui-font [class*="layout__area--left"],
 html.bd-ui-font [class*="layout__area--right"],
 html.bd-ui-font [class*="layout__area--top"],
 html.bd-ui-font [class*="layout__area--bottom"],
 html.bd-ui-font [class*="chart-controls-bar"],
+html.bd-ui-font #header-toolbar,
 html.bd-ui-font [class*="header-toolbar"] {
   font-family: var(--bd-ui-font) !important;
 }
 html.bd-ui-font .widgetbar-pages *,
+html.bd-ui-font [class*="layout__area--top"] *,
 html.bd-ui-font [class*="chart-controls-bar"] *,
 html.bd-ui-font [class*="header-toolbar"] * { font-family: inherit !important; }
 /* Larger text in the watchlist + timeframe bar */
 html.bd-ui-big .widgetbar-pages { font-size: 15px; }
-html.bd-ui-big [class*="chart-controls-bar"] button { font-size: 14px; }
+html.bd-ui-big [class*="chart-controls-bar"] button,
+html.bd-ui-big [class*="layout__area--top"] [class*="title-"] { font-size: 14px; }
 /* Accent: tint key labels (watchlist symbols, timeframe buttons, toolbar text) with your colour */
+/* Accent: tint the timeframe buttons in the TOP toolbar and the BOTTOM bar, plus watchlist headers.
+   The left drawing-tool rail (layout__area--left) is never selected here, so it stays grey/default. */
 html.bd-ui-accent [class*="chart-controls-bar"] button,
+html.bd-ui-accent [class*="layout__area--top"] [class*="toolbar-"] button,
+html.bd-ui-accent [class*="layout__area--top"] [class*="toolbar-"] [class*="button-"],
 html.bd-ui-accent .widgetbar-pages [class*="symbol-"],
 html.bd-ui-accent .widgetbar-pages [class*="title"],
 html.bd-ui-accent .widgetbar-tabs [class*="active"] {
   color: var(--bd-ui-accent) !important;
 }
 html.bd-ui-accent [class*="chart-controls-bar"] button[class*="isActive"],
-html.bd-ui-accent [class*="chart-controls-bar"] button[class*="active"] {
+html.bd-ui-accent [class*="chart-controls-bar"] button[class*="active"],
+html.bd-ui-accent [class*="layout__area--top"] [class*="isActive"] {
   color: var(--bd-ui-accent) !important; filter: brightness(1.15);
 }
