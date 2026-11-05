@@ -197,6 +197,9 @@ const QUICK_LOOKS = [
     set: { candleOn: true, candleUp: "#8be9ff", candleDown: "#3d5afe", candleLook: "solid", candleGlow: 0.2, candlePreset: "ice", lineGlow: 0.15, scaleText: "", scaleGlow: 0, scaleBg: "auto", dim: 0.3 } },
   { id: "flow", name: "Colour Flow", sub: "Polar Lights · Cycle", skin: "aurora",
     set: { candleOn: true, candleUp: "#00ffa3", candleDown: "#ff2e97", candleLook: "shift", shiftSpeed: 12, candleGlow: 0.3, candlePreset: "neon", lineGlow: 0.3, scaleText: "", scaleGlow: 0.2, scaleBg: "auto", dim: 0.3 } },
+  // Nexus Match: dark Deep Field so Nexus "Priisma Neon" glass zones pop; candles + scale in the same cyan→magenta family.
+  { id: "nexus-match", name: "Nexus Match", sub: "Deep Field · for Priisma Neon zones", skin: "starfield",
+    set: { candleOn: true, candleUp: "#00eeff", candleDown: "#ff36bc", candleLook: "solid", candleGlow: 0.3, candlePreset: "custom", lineGlow: 0.2, scaleText: "#7ef0ff", scaleGlow: 0.3, scaleBg: "glass", dim: 0.5 } },
   // Monochrome: a live black background with crisp white (up) and dark (down) candles. Clean for streams.
   { id: "mono-black", name: "Blackout", sub: "Deep Field · White & Black", skin: "starfield",
     set: { candleOn: true, candleUp: "#ffffff", candleDown: "#2a2d36", candleLook: "solid", candleGlow: 0, candlePreset: "mono", lineGlow: 0.1, scaleText: "#ffffff", scaleGlow: 0, scaleBold: true, scaleBg: "auto", scaleLabels: false, dim: 0.55 } },
