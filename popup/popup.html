@@ -124,6 +124,8 @@
         <div id="sliders"></div>
         <div class="row" data-only="media"><span>Fit</span><div class="seg" id="fit"></div></div>
         <div class="row"><span>Smoothness</span><div class="seg" id="smooth"></div></div>
+        <div class="row" id="autoQRow"><span>Quality</span><div class="seg" id="autoQuality"></div></div>
+        <p class="hint" id="autoQHint">Auto: lowers the wallpaper's detail by itself if your computer starts lagging, then raises it again. Max: always full quality.</p>
       </details>
       <details class="grp" data-grp="motion">
         <summary>Motion &amp; mood</summary>
@@ -148,6 +150,16 @@
         <summary>Sessions <label class="switch" title="Session skins on/off"><input type="checkbox" id="sessionOn" /><span></span></label></summary>
         <p class="hint">A different wallpaper for each market session, switching by itself (New York time).</p>
         <div id="sessionRows"></div>
+      </details>
+      <details class="grp" data-grp="symbols">
+        <summary>Per symbol <label class="switch" title="Symbol skins on/off"><input type="checkbox" id="symbolOn" /><span></span></label></summary>
+        <p class="hint">A wallpaper per ticker — it switches by itself when you change symbol. Takes priority over Sessions.</p>
+        <div id="symbolRows"></div>
+        <div class="row" style="margin-top:8px">
+          <input type="text" id="symbolInput" class="field" maxlength="24" placeholder="Add a ticker (BTCUSDT, NQ, AAPL…)" />
+          <button id="symbolAdd" class="primary">Add</button>
+        </div>
+        <button id="symbolCurrent" class="link">Add the chart's current symbol</button>
       </details>
       <details class="grp" data-grp="placement">
         <summary>Placement</summary>

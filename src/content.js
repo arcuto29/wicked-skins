@@ -26,6 +26,10 @@
     vignette: 0, calm: false,            // darker edges; dim + slow down while your cursor is on the chart
     // Session skins: a different wallpaper per market session ("" = keep your normal skin)
     sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
+    // Symbol skins: a wallpaper per ticker, e.g. { "BTCUSDT": "galaxy", "NQ": "media:<id>" }. Switches by itself.
+    symbolOn: false, symbolSkins: {},
+    // Auto quality: drop resolution / frame rate by itself if the computer starts dropping frames.
+    autoQuality: true,
     // Glow on indicators / lines / P&L, and price scale styling
     lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
     scaleSize: 0, scaleFont: "default",
@@ -51,12 +55,25 @@
     return "off";
   }
   let session = currentSession();
-  const skinNow = () => {
-    if (!cfg.sessionOn) return cfg.skin;
-    const pick = (cfg.sessionSkins || {})[session];
-    return pick && window.WickedSkins[pick] ? pick : cfg.skin;
-  };
-  setInterval(() => { const s2 = currentSession(); if (s2 !== session) { session = s2; if (cfg.sessionOn && layer) build(); } }, 30000);
+
+  // ---------- symbol skins ----------
+  // Match the live chart symbol against your map. Tickers vary by platform (BTCUSDT, BINANCE:BTCUSDT, NQ1!),
+  // so we match loosely: exact first, then ignoring the exchange prefix, then a contained-word match.
+  let curSymbol = "";
+  const normSym = (s) => String(s || "").toUpperCase().replace(/^[A-Z0-9]+:/, "").replace(/[^A-Z0-9]/g, "");
+  function symbolSkin() {
+    const map = cfg.symbolSkins || {}, keys = Object.keys(map);
+    if (!curSymbol || !keys.length) return null;
+    const cur = normSym(curSymbol);
+    let best = map[curSymbol];                                   // exact raw key
+    if (!best) for (const k of keys) { if (normSym(k) === cur) { best = map[k]; break; } }
+    if (!best) for (const k of keys) { const nk = normSym(k); if (nk && (cur.startsWith(nk) || nk.startsWith(cur))) { best = map[k]; break; } }
+    return validSource(best) ? best : null;
+  }
+  // Does the chosen source ("skin" or "media:<id>") resolve to a real, usable wallpaper?
+
+  // Priority (resolved in mainSource): symbol skin (most specific) > session skin > your normal skin.
+  setInterval(() => { const s2 = currentSession(); if (s2 !== session) { session = s2; if (cfg.sessionOn && !(cfg.symbolOn && symbolSkin()) && layer) build(); } }, 30000);
   // ---------- charts on the page (multi-chart layouts) ----------
   // Every visible chart, in reading order (top row left to right, then the next row). Chart 1 is top-left.
   function chartEls() {
@@ -123,7 +140,12 @@
   const chartCount = () => (charts.length || frameRects().reduce((a, f) => a + f.count, 0));
 
   // What wallpaper does chart n show? A built-in skin id, or "media:<id>" for one of your uploads.
-  function mainSource() { const s = skinNow(); return s === "media" ? "media:" + cfg.mediaId : s; }
+  function mainSource() {
+    if (cfg.symbolOn) { const s = symbolSkin(); if (s) return s; }   // symbol match is a full source (skin id or "media:<id>")
+    const n = cfg.sessionOn ? ((cfg.sessionSkins || {})[session]) : null;
+    if (n && window.WickedSkins[n]) return n;
+    return cfg.skin === "media" ? "media:" + cfg.mediaId : cfg.skin;
+  }
   function validSource(s) {
     if (typeof s !== "string" || !s) return false;
     if (s.startsWith("media:")) return cfg.media.some((m) => m.id === s.slice(6) && !m.pending);
@@ -211,6 +233,12 @@
       tick = q.price > lastPrice ? 1 : -1;
     }
     quote = q; lastPrice = q.price;
+    // Symbol changed: if a per-symbol skin applies, rebuild so the wallpaper switches with the ticker.
+    if (q.sym !== curSymbol) {
+      const before = mainSource();
+      curSymbol = q.sym;
+      if (cfg.enabled && cfg.symbolOn && layer && !tiled() && mainSource() !== before) build();
+    }
     updateReact(tick);
   }
   new MutationObserver(() => { if (cfg.react === "pnl") updateReact(0); })
@@ -353,6 +381,7 @@
     layer.appendChild(pillEl);
     document.documentElement.appendChild(layer);
     placeViews();
+    resetQuality();
     if (views.some((v) => v.skin)) startLoop();
     applyLook();
   }
@@ -388,10 +417,19 @@
 
   function sizeCanvas(v) {
     if (!v.skin) return;
-    const scale = cfg.powerSaver ? 0.5 : 0.75; // it's a background; lower res saves GPU
+    // Auto quality steps the resolution down when the computer struggles (res 1 = full, 0 = lowest).
+    const base = cfg.powerSaver ? 0.5 : 0.75;
+    const scale = Math.max(0.35, base * QLEVELS[qLevel].res);
     const w = Math.max(2, (v.w * scale) | 0), h = Math.max(2, (v.h * scale) | 0);
     if (v.content.width !== w || v.content.height !== h) { v.content.width = w; v.content.height = h; v.skin.resize(w, h); }
   }
+
+  // ---------- auto quality ----------
+  // If the machine can't keep up, step down (fewer fps, then lower resolution); when it's smooth again, step back up.
+  // Levels from best to lightest; res multiplies sizeCanvas's scale, fps caps the loop.
+  const QLEVELS = [{ res: 1, fps: 60 }, { res: 1, fps: 40 }, { res: 0.8, fps: 30 }, { res: 0.6, fps: 20 }];
+  let qLevel = 0, fpsAccum = 0, fpsCount = 0, fpsWindowStart = 0, smoothFor = 0;
+  function resetQuality() { qLevel = 0; fpsAccum = fpsCount = fpsWindowStart = smoothFor = 0; }
 
   // One animation loop drives every animated wallpaper on the page.
   function startLoop() {
@@ -401,13 +439,32 @@
       if (!running) return;
       raf = requestAnimationFrame(step);
       if (document.hidden || cfg.paused) { last = now; return; }
-      const target = cfg.powerSaver ? 15 : cfg.fps === "auto" ? 60 : +cfg.fps;
-      if (now - last < 1000 / target - 2) return;
-      const dt = Math.min(0.1, (now - last) / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
+      // Target fps: user setting, power saver, or the current auto-quality cap (whichever is lowest).
+      let target = cfg.powerSaver ? 15 : cfg.fps === "auto" ? 60 : +cfg.fps;
+      if (cfg.autoQuality && !cfg.powerSaver) target = Math.min(target, QLEVELS[qLevel].fps);
+      const gap = now - last;
+      if (gap < 1000 / target - 2) return;
+      // Measure how well we're actually keeping up (only while animating), over ~2s windows.
+      if (cfg.autoQuality && !cfg.powerSaver && cfg.fps === "auto") measureQuality(now, gap, target);
+      const dt = Math.min(0.1, gap / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
       last = now;
       for (const v of views) if (v.skin) { v.clock += dt; v.skin.frame(v.clock, dt); }
     };
     raf = requestAnimationFrame(step);
+  }
+  function measureQuality(now, gap, target) {
+    if (!fpsWindowStart) { fpsWindowStart = now; fpsAccum = fpsCount = 0; return; }
+    fpsAccum += 1000 / gap; fpsCount++;
+    if (now - fpsWindowStart < 2000) return;
+    const avg = fpsAccum / Math.max(1, fpsCount);
+    fpsWindowStart = now; fpsAccum = fpsCount = 0;
+    // Struggling: hitting under ~75% of the level's target -> step down.
+    if (avg < QLEVELS[qLevel].fps * 0.75 && qLevel < QLEVELS.length - 1) {
+      qLevel++; smoothFor = 0; views.forEach(sizeCanvas);
+    } else if (avg > QLEVELS[Math.max(0, qLevel - 1)].fps * 0.92 && qLevel > 0) {
+      // Comfortably smooth for ~8s at a reduced level -> try stepping back up.
+      if (++smoothFor >= 4) { qLevel--; smoothFor = 0; views.forEach(sizeCanvas); }
+    } else smoothFor = 0;
   }
 
   function teardown() {
@@ -439,6 +496,7 @@
       if (!msg || typeof msg.ws !== "string") return;
       if (msg.ws === "layout") reply({ count: chartCount() });
       if (msg.ws === "numbers") { showNumbers(+msg.n || 0); reply({ count: chartCount() }); }
+      if (msg.ws === "symbol") { const q = parseTitle(); reply({ symbol: q ? q.sym : "" }); }
     });
   }
 
@@ -543,7 +601,7 @@
   }
 
   // Keys that need a rebuild vs. ones we can apply live.
-  const REBUILD = new Set(["enabled", "skin", "mediaId", "powerSaver", "sessionOn", "sessionSkins", "multi", "chartSkins"]);
+  const REBUILD = new Set(["enabled", "skin", "mediaId", "powerSaver", "sessionOn", "sessionSkins", "multi", "chartSkins", "symbolOn", "symbolSkins", "autoQuality"]);
   // ---------- watermark ----------
   // Sits ON TOP of the chart (so it shows in screenshots/streams) but never takes clicks.
   // Kept clear of the price axis (right) and time axis (bottom).

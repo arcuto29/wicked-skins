@@ -18,6 +18,7 @@ const DEFAULTS = {
   react: "off", reactStrength: 0.6,
   wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, sides: "off", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
+  symbolOn: false, symbolSkins: {}, autoQuality: true,
   candleLook: "solid", shiftSpeed: 10,
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
@@ -180,7 +181,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncCharts(); }
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 const QUICK_LOOKS = [
@@ -645,7 +646,10 @@ function syncTune() {
   document.querySelectorAll("[data-only=media]").forEach((el) => (el.hidden = cfg.skin !== "media"));
   seg("smooth", [["eco", "Eco"], ["balanced", "Balanced"], ["smooth", "Smooth"]],
     () => (cfg.powerSaver ? "eco" : String(cfg.fps) === "60" || cfg.fps === "auto" ? "smooth" : "balanced"),
-    (v) => set(v === "eco" ? { powerSaver: true, fps: 30 } : v === "balanced" ? { powerSaver: false, fps: 30 } : { powerSaver: false, fps: 60 }));
+    (v) => set(v === "eco" ? { powerSaver: true, fps: 30 } : v === "balanced" ? { powerSaver: false, fps: 30 } : { powerSaver: false, fps: "auto" }));
+  // Auto quality: only meaningful on Smooth (auto fps). Eco/Balanced already cap things.
+  $("autoQRow").hidden = cfg.powerSaver || cfg.fps !== "auto";
+  seg("autoQuality", [[true, "Auto"], [false, "Max"]], () => (cfg.autoQuality !== false), (v) => set({ autoQuality: v }));
   seg("fit", [["cover", "Cover"], ["fit", "Contain"], ["stretch", "Stretch"]], () => cfg.fit, (v) => set({ fit: v }));
   seg("calm", [[false, "Off"], [true, "On"]], () => cfg.calm, (v) => set({ calm: v }));
   seg("motion", [[false, "On"], [true, "Paused"]], () => cfg.paused, (v) => set({ paused: v }));
@@ -690,6 +694,43 @@ function syncSessions() {
   }
 }
 $("sessionOn").onchange = (e) => set({ sessionOn: e.target.checked });
+
+// ---------- symbol skins (a wallpaper per ticker) ----------
+// Unlike sessions (fixed 4), symbols are open-ended, so you add rows. "Add current" grabs the chart's symbol.
+function skinOptions(sel) {
+  const opts = `<option value="">Your normal skin</option>` +
+    `<optgroup label="Skins">` + Object.entries(WickedSkins).map(([id, sk]) => `<option value="${id}">${esc(sk.name)}</option>`).join("") + `</optgroup>` +
+    (cfg.media.filter((m) => !m.pending).length ? `<optgroup label="Your uploads">` + cfg.media.filter((m) => !m.pending).map((m) => `<option value="media:${m.id}">${esc(m.name)}</option>`).join("") + `</optgroup>` : "");
+  return opts;
+}
+function syncSymbols() {
+  $("symbolOn").checked = cfg.symbolOn;
+  const box = $("symbolRows"); if (!box) return; box.innerHTML = "";
+  const map = cfg.symbolSkins || {}, keys = Object.keys(map);
+  if (!keys.length) box.insertAdjacentHTML("beforeend", `<p class="hint" style="margin:4px 0">No tickers yet. Add one below (e.g. BTCUSDT, NQ, AAPL) and pick its wallpaper.</p>`);
+  for (const sym of keys) {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<span>${esc(sym)}</span><select class="field">${skinOptions()}</select><button class="x" title="Remove">${ICON_X}</button>`;
+    const selEl = row.querySelector("select"); selEl.value = map[sym] || "";
+    selEl.onchange = () => { set({ symbolSkins: { ...cfg.symbolSkins, [sym]: selEl.value }, symbolOn: true }); $("symbolOn").checked = true; };
+    row.querySelector(".x").onclick = () => { const m = { ...cfg.symbolSkins }; delete m[sym]; set({ symbolSkins: m }); syncSymbols(); };
+    box.appendChild(row);
+  }
+}
+async function addSymbol(sym) {
+  sym = (sym || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!sym) return;
+  if ((cfg.symbolSkins || {})[sym] !== undefined) { $("symbolInput").value = ""; return; }
+  set({ symbolSkins: { ...cfg.symbolSkins, [sym]: "" }, symbolOn: true });
+  $("symbolInput").value = ""; syncSymbols();
+}
+$("symbolOn").onchange = (e) => set({ symbolOn: e.target.checked });
+$("symbolAdd").onclick = () => addSymbol($("symbolInput").value);
+$("symbolInput").onkeydown = (e) => { if (e.key === "Enter") addSymbol($("symbolInput").value); };
+$("symbolCurrent").onclick = async () => {
+  const r = await tabMsg({ ws: "symbol" });
+  if (r && r.symbol) addSymbol(r.symbol); else hint && hint("Open a TradingView chart to grab its symbol.");
+};
 
 // ---------- multi-chart layouts ----------
 // "Stretch" = one wallpaper across the layout, "Each chart" = a copy per chart, "Mix" = a skin per chart.
@@ -908,7 +949,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncCharts();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts();
   siteBar();
   detectCharts();
   updates();
