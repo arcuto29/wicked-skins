@@ -582,6 +582,11 @@
         }).catch((e) => reply({ ok: false, reason: String(e && e.message || e) }));
         return true;   // async reply
       }
+      if (msg.ws === "clip") {
+        if (!owner || standDown) return;
+        captureClip(+msg.seconds || 5).then((r) => reply(r)).catch((e) => reply({ ok: false, reason: String(e && e.message || e) }));
+        return true;   // async reply (takes a few seconds while recording)
+      }
     });
   }
 
@@ -882,28 +887,22 @@
   // image/video wallpaper lives in a sandboxed player frame whose pixels we can't read, so for those the snapshot
   // keeps the chart + watermark and notes the wallpaper couldn't be included. Nothing is uploaded anywhere.
   function loadImage(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; }); }
-  async function captureSnapshot() {
-    if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
-    const box = chartsBox();
-    const dpr = Math.min(2, devicePixelRatio || 1);
-    const W = Math.max(1, Math.round(box.width * dpr)), H = Math.max(1, Math.round(box.height * dpr));
-    const out = document.createElement("canvas"); out.width = W; out.height = H;
-    const g = out.getContext("2d");
+  // Draw ONE composed frame (wallpaper + chart canvases + watermark) into g, cropped to box, at scale dpr.
+  // wmImg = a preloaded watermark image (corner logo or tiled pattern) so this stays synchronous for the clip loop.
+  // Returns { mediaMissed } so the still path can tell the user if an uploaded wallpaper couldn't be read.
+  function compositeFrame(g, box, dpr, wmImg) {
+    const W = g.canvas.width, H = g.canvas.height;
     let mediaMissed = false;
-    // 1) wallpaper — built-in skin canvases are readable; media players (iframe) are not
-    const bg = cfg.layer === "over" ? null : "#0b0e16";
-    if (bg) { g.fillStyle = bg; g.fillRect(0, 0, W, H); }
+    g.clearRect(0, 0, W, H);
+    if (cfg.layer !== "over") { g.fillStyle = "#0b0e16"; g.fillRect(0, 0, W, H); }
     for (const v of views) {
       const dx = (v.x - box.left) * dpr, dy = (v.y - box.top) * dpr, dw = v.w * dpr, dh = v.h * dpr;
       try {
-        if (v.content && v.content.tagName === "CANVAS") { g.drawImage(v.content, dx, dy, dw, dh); }
-        else if (v.content && (v.content.tagName === "VIDEO" || v.content.tagName === "IMG")) { g.drawImage(v.content, dx, dy, dw, dh); }
-        else { mediaMissed = true; }   // iframe player: can't read its pixels
+        if (v.content && (v.content.tagName === "CANVAS" || v.content.tagName === "VIDEO" || v.content.tagName === "IMG")) g.drawImage(v.content, dx, dy, dw, dh);
+        else mediaMissed = true;   // iframe player: can't read its pixels
       } catch { mediaMissed = true; }
-      // darken to match the on-screen "dim"
       if (cfg.layer !== "over" && +cfg.dim > 0) { g.fillStyle = `rgba(0,0,0,${Math.min(0.9, +cfg.dim)})`; g.fillRect(dx, dy, dw, dh); }
     }
-    // 2) the chart itself — TradingView's own canvases, positioned within the crop
     for (const c of charts) {
       const canv = c.el.querySelectorAll ? c.el.querySelectorAll("canvas") : [];
       for (const cv of canv) {
@@ -912,32 +911,43 @@
         try { g.drawImage(cv, (r.left - box.left) * dpr, (r.top - box.top) * dpr, r.width * dpr, r.height * dpr); } catch {}
       }
     }
-    // 3) watermark — redraw the corner mark (logo + label) or the tiled pattern so it's baked into the shot
-    try {
-      if (cfg.wmOn) {
-        const op = Math.max(0.1, Math.min(1, +cfg.wmOpacity || 0.85));
-        if (cfg.wmStyle === "tiled") {
-          const pat = await loadImage(tilePattern());
-          g.globalAlpha = op * 0.22;
-          for (let y = 0; y < H; y += 170 * dpr) for (let x = 0; x < W; x += 300 * dpr) g.drawImage(pat, x, y, 300 * dpr, 170 * dpr);
-          g.globalAlpha = 1;
-        } else {
-          const logo = await loadImage(BRAND_LOGO), label = wmLabel();
-          const pad = 16 * dpr, h = 22 * dpr;
-          g.font = `600 ${15 * dpr}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-          const tw = g.measureText(label).width, bw = h + 8 * dpr + tw;
-          let bx = cfg.wmPos[1] === "l" ? pad : W - bw - 72 * dpr - pad;
-          let by = cfg.wmPos[0] === "t" ? pad + 34 * dpr : H - h - 30 * dpr - pad;
-          if (cfg.wmPos === "center") { bx = (W - bw) / 2; by = (H - h) / 2; }
-          g.globalAlpha = op;
-          g.drawImage(logo, bx, by, h, h);
-          g.fillStyle = "#fff"; g.textBaseline = "middle"; g.shadowColor = "rgba(0,0,0,.6)"; g.shadowBlur = 4 * dpr;
-          g.fillText(label, bx + h + 8 * dpr, by + h / 2);
-          g.shadowBlur = 0; g.globalAlpha = 1;
-        }
+    if (cfg.wmOn && wmImg) {
+      const op = Math.max(0.1, Math.min(1, +cfg.wmOpacity || 0.85));
+      if (cfg.wmStyle === "tiled") {
+        g.globalAlpha = op * 0.22;
+        for (let y = 0; y < H; y += 170 * dpr) for (let x = 0; x < W; x += 300 * dpr) g.drawImage(wmImg, x, y, 300 * dpr, 170 * dpr);
+        g.globalAlpha = 1;
+      } else {
+        const label = wmLabel(), pad = 16 * dpr, h = 22 * dpr;
+        g.font = `600 ${15 * dpr}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+        const tw = g.measureText(label).width, bw = h + 8 * dpr + tw;
+        let bx = cfg.wmPos[1] === "l" ? pad : W - bw - 72 * dpr - pad;
+        let by = cfg.wmPos[0] === "t" ? pad + 34 * dpr : H - h - 30 * dpr - pad;
+        if (cfg.wmPos === "center") { bx = (W - bw) / 2; by = (H - h) / 2; }
+        g.globalAlpha = op;
+        g.drawImage(wmImg, bx, by, h, h);
+        g.fillStyle = "#fff"; g.textBaseline = "middle"; g.shadowColor = "rgba(0,0,0,.6)"; g.shadowBlur = 4 * dpr;
+        g.fillText(label, bx + h + 8 * dpr, by + h / 2);
+        g.shadowBlur = 0; g.globalAlpha = 1;
       }
-    } catch {}
-    // 4) export
+    }
+    return { mediaMissed };
+  }
+  // preload the right watermark image for compositing (corner logo, or the tiled pattern), or null if wm is off
+  async function watermarkImage() {
+    if (!cfg.wmOn) return null;
+    try { return await loadImage(cfg.wmStyle === "tiled" ? tilePattern() : BRAND_LOGO); } catch { return null; }
+  }
+  async function captureSnapshot() {
+    if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
+    const box = chartsBox();
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    const W = Math.max(1, Math.round(box.width * dpr)), H = Math.max(1, Math.round(box.height * dpr));
+    const out = document.createElement("canvas"); out.width = W; out.height = H;
+    const g = out.getContext("2d");
+    const wmImg = await watermarkImage();
+    const { mediaMissed } = compositeFrame(g, box, dpr, wmImg);
+    // export
     return await new Promise((res) => {
       try { out.toBlob((blob) => { if (!blob) return res({ ok: false, reason: "The browser blocked reading the chart pixels (a cross-origin chart)." });
         res({ ok: true, blob, mediaMissed, w: W, h: H }); }, "image/png"); }
@@ -946,6 +956,53 @@
   }
   // popup asks for a snapshot; we reply with a data URL it can download/preview (blobs don't cross the messaging port)
   function blobToDataURL(blob) { return new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); }
+
+  // ---------- Live Clip: a short animated WebM of the chart with the live wallpaper moving ----------
+  // Re-composes a frame (wallpaper + chart + watermark) ~30x/sec onto a capture canvas and records it with
+  // MediaRecorder. Captures the MOTION of a built-in animated skin. Uploaded media (iframe player) still can't be
+  // read, so for those the clip shows the chart + watermark moving but not the uploaded wallpaper. A clip is bigger
+  // than a PNG, so we cap it (default ~5s) and downscale to keep it shareable.
+  let clipRec = null;
+  async function captureClip(seconds) {
+    if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
+    if (clipRec) return { ok: false, reason: "Already recording a clip." };
+    if (typeof MediaRecorder === "undefined") return { ok: false, reason: "Your browser can't record clips." };
+    const box = chartsBox();
+    // downscale so the clip stays small/shareable (cap the long edge ~900px of composite, times a modest dpr)
+    const scale = Math.min(1, 900 / Math.max(1, box.width));
+    const dpr = Math.min(1.5, (devicePixelRatio || 1)) * scale;
+    const W = Math.max(2, Math.round(box.width * dpr)) & ~1, H = Math.max(2, Math.round(box.height * dpr)) & ~1;  // even dims for encoders
+    const cap = document.createElement("canvas"); cap.width = W; cap.height = H;
+    const g = cap.getContext("2d");
+    const wmImg = await watermarkImage();
+    // first frame to check we can actually read the pixels (a tainted/cross-origin chart will throw on record)
+    const { mediaMissed } = compositeFrame(g, box, dpr, wmImg);
+    let stream;
+    try { stream = cap.captureStream(30); } catch { return { ok: false, reason: "Your browser can't record this chart." }; }
+    const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+    const mime = mimes.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+    let rec;
+    try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 6_000_000 } : undefined); }
+    catch { return { ok: false, reason: "Your browser can't record clips." }; }
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    clipRec = rec;
+    const dur = Math.max(2, Math.min(10, +seconds || 5));
+    return await new Promise((resolve) => {
+      let rafId = 0, done = false;
+      const draw = () => { if (done) return; try { compositeFrame(g, box, dpr, wmImg); } catch {} rafId = requestAnimationFrame(draw); };
+      rec.onstop = async () => {
+        done = true; cancelAnimationFrame(rafId); clipRec = null;
+        try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+        if (!chunks.length) return resolve({ ok: false, reason: "The browser blocked recording (a cross-origin chart)." });
+        const blob = new Blob(chunks, { type: mime || "video/webm" });
+        resolve({ ok: true, url: await blobToDataURL(blob), mediaMissed, bytes: blob.size, w: W, h: H });
+      };
+      rec.onerror = () => { done = true; cancelAnimationFrame(rafId); clipRec = null; resolve({ ok: false, reason: "Recording failed." }); };
+      try { rec.start(); draw(); setTimeout(() => { try { rec.state !== "inactive" && rec.stop(); } catch {} }, dur * 1000); }
+      catch { done = true; clipRec = null; resolve({ ok: false, reason: "Recording failed." }); }
+    });
+  }
 
   // ---------- Alt+Shift+W: everything on/off, right on the chart ----------
   function flash(msg) {
