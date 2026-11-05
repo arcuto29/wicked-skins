@@ -144,3 +144,33 @@ html.bd-sides.bd-bg-dark .widgetbar-tabs { color: #e9ebf2; }
 html.bd-sides [class*="widgetbar"] [class*="apply-common-tooltip"] { text-shadow: 0 0 3px rgba(0,0,0,.6); }
 /* The hairline borders TradingView draws between panels look odd over art; soften them. */
 html.bd-sides [class*="layout__area"] { border-color: rgba(255,255,255,.08) !important; }
+
+/* --- UI style: font / size / accent for TradingView's own HTML panels --- */
+/* Font: applied to the panels around the chart (not the canvas chart itself). */
+html.bd-ui-font .widgetbar-pages,
+html.bd-ui-font .widgetbar-tabs,
+html.bd-ui-font [class*="layout__area--left"],
+html.bd-ui-font [class*="layout__area--right"],
+html.bd-ui-font [class*="layout__area--top"],
+html.bd-ui-font [class*="layout__area--bottom"],
+html.bd-ui-font [class*="chart-controls-bar"],
+html.bd-ui-font [class*="header-toolbar"] {
+  font-family: var(--bd-ui-font) !important;
+}
+html.bd-ui-font .widgetbar-pages *,
+html.bd-ui-font [class*="chart-controls-bar"] *,
+html.bd-ui-font [class*="header-toolbar"] * { font-family: inherit !important; }
+/* Larger text in the watchlist + timeframe bar */
+html.bd-ui-big .widgetbar-pages { font-size: 15px; }
+html.bd-ui-big [class*="chart-controls-bar"] button { font-size: 14px; }
+/* Accent: tint key labels (watchlist symbols, timeframe buttons, toolbar text) with your colour */
+html.bd-ui-accent [class*="chart-controls-bar"] button,
+html.bd-ui-accent .widgetbar-pages [class*="symbol-"],
+html.bd-ui-accent .widgetbar-pages [class*="title"],
+html.bd-ui-accent .widgetbar-tabs [class*="active"] {
+  color: var(--bd-ui-accent) !important;
+}
+html.bd-ui-accent [class*="chart-controls-bar"] button[class*="isActive"],
+html.bd-ui-accent [class*="chart-controls-bar"] button[class*="active"] {
+  color: var(--bd-ui-accent) !important; filter: brightness(1.15);
+}
