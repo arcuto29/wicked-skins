@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.14 (2026-11-05)
+- Look codes: copy a short code of your whole look (skin, candles, glow, price scale, brackets) and share it anywhere — anyone pastes it to get your exact setup in one tap. Under Saved → Look code.
+- Snapshot: one-click capture a clean PNG of your chart with the skin and your watermark baked in, ready to share. Under Saved → Snapshot. (Animated wallpaper is captured as a single still frame; an uploaded image/video wallpaper can't be included because it renders in a protected frame — the chart and watermark still are.)
+
 ## 0.1.13 (2026-11-05)
 - Six bold new "glow in the dark" one-click looks: Glowstick, Blacklight, Vaporwave, Molten, Warp and Spectrum (a full-rainbow prism). Luminous neon-tube candles with strong glow over a dimmed dark wallpaper — the opposite end from the calm set. Every look now has its own wallpaper.
 
