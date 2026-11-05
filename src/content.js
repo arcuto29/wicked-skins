@@ -34,6 +34,9 @@
     autoQuality: true,
     // Auto-match: pull candle colours, glow and scale tint from your own wallpaper's colours.
     autoMatch: false,
+    // P&L readout: a big, legible open-P&L number we draw ourselves (TradingView's own pill is tiny/hard to see
+    // on busy wallpapers). style: "color" (green/red) | "rainbow"; pos: "tc"|"tl"|"tr"|"bl"|"br"; size 0..2.
+    pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1,
     // Glow on indicators / lines / P&L, and price scale styling
     lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
     scaleSize: 0, scaleFont: "default",
@@ -184,6 +187,8 @@
 
   // Position: the open P&L TradingView already shows on your chart's position line(s), read by hook.js.
   // Strength is relative to the biggest swing seen this session, so there's nothing to set up.
+  const fmtPnl = (v, u) => { const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
+    return `${v >= 0 ? "+" : "\u2212"}${unit}${Math.abs(v).toFixed(2)}${code}`; };
   let pnlMaxAbs = 0;
   function readPnl() {
     try {
@@ -245,9 +250,45 @@
     }
     updateReact(tick);
   }
-  new MutationObserver(() => { if (cfg.react === "pnl") updateReact(0); })
+  new MutationObserver(() => { if (cfg.react === "pnl") updateReact(0); renderPnl(); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-ws-pnl"] });
-  setInterval(() => { if (cfg.react === "pnl") updateReact(0); }, 2000);     // clears the glow when the position closes
+  setInterval(() => { if (cfg.react === "pnl") updateReact(0); renderPnl(); }, 2000);     // clears the glow when the position closes
+
+  // ---------- big P&L readout ----------
+  // Our own large, animated open-P&L number, drawn on top of the chart so it's readable on any wallpaper.
+  // Reads the same P&L the hook already publishes. Independent of the "Live mood" glow.
+  let pnlEl, pnlLastV = null, pnlFlashT = 0;
+  function renderPnl() {
+    const show = cfg.enabled && cfg.pnlShow;
+    const p = show ? readPnl() : null;
+    if (!p) { if (pnlEl) { pnlEl.remove(); pnlEl = null; } pnlLastV = null; return; }
+    if (!pnlEl) {
+      pnlEl = document.createElement("div"); pnlEl.id = "bd-pnl"; pnlEl.dataset.bdOwner = ME.token;
+      document.documentElement.appendChild(pnlEl);
+    }
+    const up = p.v >= 0;
+    pnlEl.textContent = "P&L " + fmtPnl(p.v, p.unit);
+    pnlEl.className = "bd-pnl-" + (cfg.pnlStyle === "rainbow" ? "rainbow" : (up ? "up" : "down"));
+    const sizeMap = [26, 36, 52], fs = sizeMap[Math.max(0, Math.min(2, +cfg.pnlSize || 1))];
+    pnlEl.style.fontSize = fs + "px";
+    pnlEl.style.setProperty("--pc", cfg.pnlStyle === "rainbow" ? "#fff" : (up ? upColor() : downColor()));
+    placePnl();
+    // pulse the number when it changes
+    if (pnlLastV !== null && p.v !== pnlLastV && performance.now() - pnlFlashT > 250) {
+      pnlFlashT = performance.now();
+      pnlEl.classList.remove("bd-pnl-bump"); void pnlEl.offsetWidth; pnlEl.classList.add("bd-pnl-bump");
+    }
+    pnlLastV = p.v;
+  }
+  function placePnl() {
+    if (!pnlEl) return;
+    const r = chartsBox(), pad = 16, st = pnlEl.style; st.left = st.right = st.top = st.bottom = st.transform = "";
+    const pos = cfg.pnlPos || "tc";
+    if (pos === "tc") { st.left = r.left + r.width / 2 + "px"; st.top = r.top + pad + 34 + "px"; st.setProperty("--tf", "translateX(-50%)"); st.transform = "translateX(-50%)"; return; }
+    st.setProperty("--tf", "none");
+    if (pos[0] === "t") st.top = r.top + pad + 34 + "px"; else st.top = r.bottom - 50 - pad + "px";
+    if (pos[1] === "l") st.left = r.left + pad + "px"; else { st.right = (innerWidth - r.right) + 80 + pad + "px"; }
+  }
   const watchTitle = () => {
     const t = document.querySelector("title");
     if (!t) return setTimeout(watchTitle, 1000);
@@ -403,6 +444,7 @@
     resetQuality(); lastMatch = "";
     if (views.some((v) => v.skin)) startLoop();
     applyLook();
+    renderPnl();
   }
 
   // Keep every wallpaper on top of its chart as the layout changes (resize, 1 -> 4 charts, panels opening...).
@@ -418,6 +460,7 @@
     });
     clipToChart();
     placeWatermark();
+    placePnl();
   }
   function trackLayout() {
     if (!layer || standDown || document.querySelector(".chart-container[data-bd-repaint]")) return;   // mid-redraw: charts hidden for 2 frames
@@ -492,6 +535,8 @@
     if (layer) {
       layer.remove();
       layer = reactEl = pillEl = null;
+    }
+    if (pnlEl) { pnlEl.remove(); pnlEl = null; pnlLastV = null;
     }
     views = [];
   }
@@ -800,7 +845,8 @@
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !FX_KEYS.includes(k));
+    if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));

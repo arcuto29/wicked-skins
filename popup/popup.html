@@ -68,6 +68,14 @@
         <p class="hint">Lines = indicators, drawings, the price line, position lines and your P&amp;L pill. Grid and crosshair never glow.</p>
       </details>
 
+      <details class="grp" data-grp="pnl">
+        <summary>P&amp;L readout <label class="switch" title="Big P&amp;L readout on/off"><input type="checkbox" id="pnlShow" /><span></span></label></summary>
+        <p class="hint">A big, bold open-P&amp;L number we draw ourselves, so it's readable on any wallpaper. It reads the P&amp;L already on your position line — nothing is sent anywhere.</p>
+        <div class="row"><span>Colour</span><div class="seg" id="pnlStyle"></div></div>
+        <div class="row"><span>Size</span><div class="seg" id="pnlSize"></div></div>
+        <div class="row"><span>Position</span><div class="seg" id="pnlPos"></div></div>
+      </details>
+
       <details class="grp" data-grp="scale">
         <summary>Price scale</summary>
         <div class="row"><span>Text</span><div class="seg" id="scaleTextMode"></div><input type="color" id="scaleText" title="Text colour" /></div>

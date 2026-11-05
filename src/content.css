@@ -167,3 +167,16 @@ html.bd-ui-accent [class*="chart-controls-bar"] button[class*="active"],
 html.bd-ui-accent [class*="layout__area--top"] [class*="isActive"] {
   color: var(--bd-ui-accent) !important; filter: brightness(1.15);
 }
+
+/* Big P&L readout — our own large, readable open-P&L number (over the chart, click-through) */
+#bd-pnl { position: fixed; z-index: 2147483001; pointer-events: none; font-weight: 900; letter-spacing: .01em;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace; white-space: nowrap;
+  color: var(--pc, #fff); text-shadow: 0 0 2px rgba(0,0,0,.9), 0 2px 10px rgba(0,0,0,.7), 0 0 18px color-mix(in srgb, var(--pc) 55%, transparent); }
+#bd-pnl.bd-pnl-up { --pc: #00e08a; } #bd-pnl.bd-pnl-down { --pc: #ff3355; }
+#bd-pnl.bd-pnl-rainbow { background: linear-gradient(90deg, #ff3b3b, #ffb13b, #f7ff3b, #3bff6a, #3bd4ff, #7a5bff, #ff5bd4, #ff3b3b);
+  background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+  animation: bd-pnl-rainbow 3s linear infinite; text-shadow: 0 2px 10px rgba(0,0,0,.6); }
+@keyframes bd-pnl-rainbow { from { background-position: 0% 0; } to { background-position: 300% 0; } }
+#bd-pnl.bd-pnl-bump { animation: bd-pnl-bump .32s ease-out; }
+#bd-pnl.bd-pnl-rainbow.bd-pnl-bump { animation: bd-pnl-rainbow 3s linear infinite, bd-pnl-bump .32s ease-out; }
+@keyframes bd-pnl-bump { 0% { transform: var(--tf, none) scale(1); } 40% { transform: var(--tf, none) scale(1.12); } 100% { transform: var(--tf, none) scale(1); } }
