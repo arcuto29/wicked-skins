@@ -12,7 +12,7 @@ Chrome Web Store Developer Dashboard → **New item** → upload `priism-skins-<
 **Summary (132 chars max):**
 Live wallpapers, your own videos, candle colours, glow and a readable price scale behind your TradingView charts.
 
-**Description:**
+**Description** (paste into the big "Description" box — this field allows up to 16,000 chars; it is NOT the 132-char manifest description):
 ```
 Your charts, in full spectrum. Priism Skins puts live wallpapers behind your TradingView candles and lets you restyle the chart, without touching your data.
 
@@ -22,10 +22,10 @@ LIVE WALLPAPERS
 • Workshop: browse community wallpapers, use them in one tap, share your own
 
 CANDLES & GLOW
-• 18 colour presets in Clean, Neon, Warm, Cool and Rich
+• Colour presets in Clean, Neon, Warm, Cool and Rich
 • Styles: Solid, Tube (glowing outlines), Rainbow, Cycle
 • Glow for candles, indicators, drawings, price and position lines
-• Works with your own TradingView colours and with candles, hollow candles, Heikin Ashi and bars
+• Works with your own TradingView colours, and with candles, hollow candles, Heikin Ashi and bars
 
 READABLE & CALM
 • Price scale text turns light or dark per label to stay readable on any wallpaper
@@ -33,9 +33,11 @@ READABLE & CALM
 • Darken, blur, vignette, Calm mode (dims while your cursor is on the chart), Eco mode
 
 MORE
-• One-click looks with Undo, saved looks you can share
+• One-click looks with Undo, plus saved looks and shareable look codes
+• Trade brackets: recolour your broker's on-chart TP / Stop / entry pills
+• Snapshot and Live Clip: save a shareable image or short clip of your chart with the skin on
 • Live mood: the chart glows with the day's move or with the open P&L on your position lines
-• Watermark with the Priism Skins logo for recordings
+• Watermark for recordings
 • Works on TopstepX and other platforms that embed TradingView charts ("Turn on here")
 • Alt+Shift+W toggles everything
 
@@ -44,13 +46,31 @@ Purely cosmetic. Priism Skins never reads your orders, positions or account and 
 
 Not affiliated with, endorsed or sponsored by TradingView, Inc. Not financial advice.
 ```
-**Category:** Productivity (or "Fun")  ·  **Language:** English
+**Category:** Productivity  ·  **Language:** English (United States)
 
-**Images** (in `store/`):
-- Store icon 128×128: `icons/icon-128.png`
-- Screenshots 1280×800: `store/screenshot-1-neon-night.png`, `-2-blackout`, `-3-interface`, `-4-ocean`
-- Small promo tile 440×280: `store/promo-small.png`
-- Marquee 1400×560 (optional): `store/promo-marquee.png`
+**Images** — all staged, exact sizes, in `store/submit/`:
+- Store icon 128×128: `store/submit/store-icon-128.png`
+- Screenshots 1280×800: `store/submit/screenshot-1-neon-night.png`, `-2-blackout`, `-3-interface`, `-4-ocean`
+- Small promo tile 440×280: `store/submit/promo-small.png`
+- Marquee 1400×560 (optional): `store/submit/promo-marquee.png`
+
+## 2a. Privacy tab — single purpose (paste)
+```
+Restyle TradingView charts — live wallpapers, candle colours, glow and price-scale styling — on tradingview.com and on sites the user turns it on for.
+```
+Per-permission justifications (one box each):
+- **storage:** `Save the user's settings (chosen wallpaper, candle colours, adjustments, saved looks) on their own computer.`
+- **unlimitedStorage:** `Store the user's own wallpaper images and videos locally; these can be large, so the default storage quota is not enough.`
+- **scripting:** `When the user taps "Turn on here" on another site that embeds a TradingView chart (e.g. TopstepX), register the same chart-styling scripts for that site.`
+- **activeTab:** `When the user opens the extension panel, check the current tab for a TradingView chart so the panel can offer to turn styling on there.`
+- **host https://*.tradingview.com/*:** `Draw the wallpaper behind the chart and restyle the chart canvas on tradingview.com.`
+- **optional host (any site):** `Requested only when the user explicitly taps "Turn on here" on a site that shows a TradingView chart. The user can remove it from the panel at any time.`
+- **Remote code:** No.
+Data usage: **do not collect or use user data**; certify not sold, not used for unrelated purposes, not used for creditworthiness.
+Privacy policy URL: `https://arcuto29.github.io/wicked-skins/privacy.html`
+
+## 2b. Distribution tab
+Visibility **Unlisted** to start · All regions · Free
 
 **Website:** https://arcuto29.github.io/wicked-skins/  ·  **Support:** arcuto2978@gmail.com
 
