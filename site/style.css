@@ -70,3 +70,16 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; } footer a { color: va
 #share { width: 100%; justify-content: center; }
 #share:disabled { opacity: .5; cursor: not-allowed; }
 .lightbox { cursor: zoom-out; }
+
+/* Homepage live demo */
+.demo-wrap { max-width: 920px; margin: 10px auto 0; }
+.demo { position: relative; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; border: 1px solid var(--line);
+  box-shadow: 0 30px 80px -30px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.03) inset; background: #04060c; }
+.demo canvas { width: 100%; height: 100%; display: block; }
+.demo-presets { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+.demo-chip { padding: 8px 16px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  cursor: pointer; font: inherit; font-size: 14px; transition: border-color .15s, transform .1s; }
+.demo-chip:hover { border-color: #2c3647; }
+.demo-chip.on { background: linear-gradient(90deg, var(--a1), var(--a2) 55%, var(--a3)); color: #04130f; border: none; font-weight: 700; }
+.demo-chip:active { transform: translateY(1px); }
+.demo-note { text-align: center; color: var(--muted); font-size: 13px; margin: 12px 0 0; }
