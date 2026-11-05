@@ -82,13 +82,17 @@
       </details>
 
       <details class="grp" data-grp="brackets">
-        <summary>Trade brackets <label class="switch" title="Restyle the broker's TP / Stop / entry pills"><input type="checkbox" id="bracketOn" /><span></span></label></summary>
-        <p class="hint">Makes your broker's on-chart Take profit, Stop and entry pills bigger and easier to read on a busy wallpaper. We only restyle the pills TradingView already draws — nothing is sent anywhere.</p>
-        <div class="row"><span>Size</span><div class="seg" id="bracketSize"></div></div>
-        <div class="row"><span>Backing</span><div class="seg" id="bracketBack"></div></div>
-        <div class="row" id="bracketColsRow"><span>Profit · Loss</span>
-          <input type="color" id="bracketProfit" title="Profit pill text" /> <input type="color" id="bracketLoss" title="Loss pill text" />
-          <small class="hint" style="margin:0">blank = keep TradingView's</small></div>
+        <summary>Trade brackets <label class="switch" title="Recolour the broker's TP / Stop / entry pills"><input type="checkbox" id="bracketOn" /><span></span></label></summary>
+        <p class="hint">Fully recolour your broker's on-chart Take profit, Stop and entry pills — box, number, outline and the level line — in any colour, and make the number bigger so it's easy to read on a busy wallpaper. We only restyle the pills TradingView already draws; nothing is sent anywhere.</p>
+        <div class="row"><span>Number size</span><div class="seg" id="bracketSize"></div></div>
+        <div class="row"><span>Box colour</span><div class="seg bk-mode" id="bracketFillMode"></div><input type="color" id="bracketFill" title="Box colour" /></div>
+        <div class="row"><span>Number colour</span><div class="seg bk-mode" id="bracketTextMode"></div><input type="color" id="bracketText" title="Number colour" /></div>
+        <div class="row" id="bracketPLRow"><span>Profit · Loss</span>
+          <input type="color" id="bracketProfit" title="Profit number" /> <input type="color" id="bracketLoss" title="Loss number" /></div>
+        <div class="row"><span>Outline</span><div class="seg bk-mode" id="bracketBorderMode"></div><input type="color" id="bracketBorderColor" title="Outline colour" /></div>
+        <div class="row" id="bracketBorderWRow"><span>Outline width</span><div class="seg" id="bracketBorderW"></div></div>
+        <div class="row"><span>Level line</span><div class="seg bk-mode" id="bracketLineMode"></div><input type="color" id="bracketLineColor" title="Level line colour" /></div>
+        <div class="row" id="bracketLineWRow"><span>Line width</span><div class="seg" id="bracketLineW"></div></div>
       </details>
 
       <details class="grp" data-grp="scale">
