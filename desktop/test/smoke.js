@@ -10,8 +10,14 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), "wicked-"));
   fs.writeFileSync(path.join(userData, "settings.json"), JSON.stringify({ skin: "galaxy", candleOn: true, candleUp: "#00ffa3", candleDown: "#ff2e97", wmOn: true }));
   const app = await _electron.launch({ args: [DESK, "--no-sandbox", `--user-data-dir=${userData}`], timeout: 60000 });
+  // The app opens to its settings window (it no longer pops a chart open by itself).
+  const settingsEarly = await app.waitForEvent("window", { predicate: (w) => w.url().includes("popup.html"), timeout: 60000 }).catch(() => app.windows().find((w) => w.url().includes("popup.html")));
+  ok("app opens to the settings window (no auto chart)", !!settingsEarly);
+  ok("no chart window opened on launch", !app.windows().some((w) => w.url().includes("tradingview")));
+  // Trigger "Open with skins" via the exposed desktop bridge.
+  if (settingsEarly) { await settingsEarly.waitForTimeout(1500); await settingsEarly.evaluate(() => window.wickedStore.tv.open()); }
   const tv = await app.waitForEvent("window", { predicate: (w) => w.url().includes("tradingview"), timeout: 60000 }).catch(() => app.windows().find((w) => w.url().includes("tradingview")));
-  ok("TradingView window opens", !!tv);
+  ok("Open with skins launches the chart", !!tv);
   if (!tv) { await app.close(); process.exit(1); }
   const errors = []; tv.on("pageerror", (e) => errors.push(e.message));
   await tv.waitForSelector(".chart-markup-table canvas", { timeout: 60000 }).catch(() => {});

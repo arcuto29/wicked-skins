@@ -31,26 +31,44 @@ async function inject() {
   );
 }
 
-function createTV() {
+// Open TradingView WITH skins in its own window. Called from the app's "Open with skins" button — the app no
+// longer pops a chart open by itself on launch (you choose when). Reusing an open window just focuses it.
+function openTV() {
+  if (tvWin && !tvWin.isDestroyed()) { tvWin.show(); tvWin.focus(); notifyTV(); return; }
   tvWin = new BrowserWindow({
-    width: 1440, height: 900, backgroundColor: "#000000", icon: ICON, title: "Priism Skins",
+    width: 1440, height: 900, backgroundColor: "#000000", icon: ICON, title: "TradingView · Priism Skins",
     webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, "tv-preload.js") }, // no node access for remote content
   });
   tvWin.loadURL("https://www.tradingview.com/chart/");
   tvWin.webContents.on("did-finish-load", inject);
   tvWin.webContents.on("did-navigate-in-page", inject);
+  tvWin.on("closed", () => { tvWin = null; notifyTV(); });
   // links that open new windows (news, help) go to the normal browser
   tvWin.webContents.setWindowOpenHandler(({ url }) => { if (/^https:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
+  notifyTV();
+}
+function closeTV() { if (tvWin && !tvWin.isDestroyed()) tvWin.close(); }
+const tvOpen = () => !!(tvWin && !tvWin.isDestroyed());
+// Tell the settings window whether the skinned chart is open, so it can show the right button (like ChartSkins).
+function notifyTV() {
+  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send("tv:state", { open: tvOpen() });
 }
 
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) return settingsWin.focus();
   settingsWin = new BrowserWindow({
-    width: 420, height: 640, title: "Priism Skins", icon: ICON, autoHideMenuBar: true, resizable: false,
+    width: 460, height: 720, minWidth: 380, title: "Priism Skins", icon: ICON, autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: false },
   });
   settingsWin.loadFile(POPUP);
+  settingsWin.webContents.on("did-finish-load", notifyTV);
+  settingsWin.on("closed", () => { settingsWin = null; });
 }
+
+// Commands from the settings window's "Open with skins" / "Turn off" buttons.
+ipcMain.handle("tv:open", () => { openTV(); return tvOpen(); });
+ipcMain.handle("tv:close", () => { closeTV(); return false; });
+ipcMain.handle("tv:state", () => ({ open: tvOpen() }));
 
 ipcMain.handle("store:get", (_e, defaults) => ({ ...defaults, ...cfg }));
 ipcMain.handle("store:set", (_e, obj) => {
@@ -99,6 +117,7 @@ app.whenReady().then(() => {
   });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: "Priism Skins", submenu: [
+      { label: "Open TradingView with skins", accelerator: "CmdOrCtrl+O", click: openTV },
       { label: "Skins & wallpapers…", accelerator: "CmdOrCtrl+,", click: openSettings },
       { label: "Check for updates…", click: checkNow },
       { label: `Version ${app.getVersion()}`, enabled: false },
@@ -106,8 +125,8 @@ app.whenReady().then(() => {
     ] },
     { role: "viewMenu" }, { role: "editMenu" },
   ]));
-  createTV();
-  openSettings();
+  openSettings();            // the app opens to its settings/gallery — it no longer pops a chart open by itself
   setupUpdates();
 });
+app.on("activate", () => { if (!settingsWin || settingsWin.isDestroyed()) openSettings(); });
 app.on("window-all-closed", () => app.quit());
