@@ -36,7 +36,9 @@
     autoMatch: false,
     // P&L readout: a big, legible open-P&L number we draw ourselves (TradingView's own pill is tiny/hard to see
     // on busy wallpapers). style: "color" (green/red) | "rainbow"; pos: "tc"|"tl"|"tr"|"bl"|"br"; size 0..2.
-    pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1,
+    // style: "color" (your up/down colours) | "rainbow". back: "none"|"glass"|"solid" = a panel behind the number
+    // so it's readable on any wallpaper. pnlUp/pnlDown: custom colours ("" = use candle colours).
+    pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
     // Glow on indicators / lines / P&L, and price scale styling
     lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
     scaleSize: 0, scaleFont: "default",
@@ -267,11 +269,14 @@
       document.documentElement.appendChild(pnlEl);
     }
     const up = p.v >= 0;
+    const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v) ? v : null);
+    const col = cfg.pnlStyle === "rainbow" ? "#fff" : (up ? (hex(cfg.pnlUp) || upColor()) : (hex(cfg.pnlDown) || downColor()));
     pnlEl.textContent = "P&L " + fmtPnl(p.v, p.unit);
-    pnlEl.className = "bd-pnl-" + (cfg.pnlStyle === "rainbow" ? "rainbow" : (up ? "up" : "down"));
-    const sizeMap = [26, 36, 52], fs = sizeMap[Math.max(0, Math.min(2, +cfg.pnlSize || 1))];
+    const back = ["glass", "solid"].includes(cfg.pnlBack) ? cfg.pnlBack : "none";
+    pnlEl.className = "bd-pnl-" + (cfg.pnlStyle === "rainbow" ? "rainbow" : (up ? "up" : "down")) + (back !== "none" ? " bd-pnl-box bd-pnl-" + back : "");
+    const sizeMap = [24, 34, 50], fs = sizeMap[Math.max(0, Math.min(2, +cfg.pnlSize || 1))];
     pnlEl.style.fontSize = fs + "px";
-    pnlEl.style.setProperty("--pc", cfg.pnlStyle === "rainbow" ? "#fff" : (up ? upColor() : downColor()));
+    pnlEl.style.setProperty("--pc", col);
     placePnl();
     // pulse the number when it changes
     if (pnlLastV !== null && p.v !== pnlLastV && performance.now() - pnlFlashT > 250) {

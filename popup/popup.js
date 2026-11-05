@@ -22,7 +22,7 @@ const DEFAULTS = {
   candleLook: "solid", shiftSpeed: 10,
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
-  multi: "span", chartSkins: {}, pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1,
+  multi: "span", chartSkins: {}, pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -857,12 +857,17 @@ $("showNums").onclick = () => flashNumbers(typeof target === "number" ? target :
 // ---------- watermark (logo + name) ----------
 function syncPnl() {
   $("pnlShow").checked = !!cfg.pnlShow;
-  seg("pnlStyle", [["color", "Green / Red"], ["rainbow", "Rainbow"]], () => cfg.pnlStyle || "color", (v) => { set({ pnlStyle: v, pnlShow: true }); $("pnlShow").checked = true; });
+  seg("pnlStyle", [["color", "Colour"], ["rainbow", "Rainbow"]], () => cfg.pnlStyle || "color", (v) => { set({ pnlStyle: v, pnlShow: true }); $("pnlShow").checked = true; syncPnl(); });
+  $("pnlColsRow").hidden = cfg.pnlStyle === "rainbow";
+  $("pnlUp").value = cfg.pnlUp || cfg.candleUp || "#00e08a"; $("pnlDown").value = cfg.pnlDown || cfg.candleDown || "#ff3355";
+  seg("pnlBack", [["none", "None"], ["glass", "Glass"], ["solid", "Solid"]], () => cfg.pnlBack || "glass", (v) => set({ pnlBack: v }));
   seg("pnlSize", [[0, "S"], [1, "M"], [2, "L"]], () => (+cfg.pnlSize || 1), (v) => set({ pnlSize: v }));
   seg("pnlPos", [["tl", cornerIcon(2.5, 2.5)], ["tc", cornerIcon(5.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]],
     () => cfg.pnlPos || "tc", (v) => set({ pnlPos: v }));
 }
 $("pnlShow").onchange = (e) => set({ pnlShow: e.target.checked });
+$("pnlUp").oninput = (e) => set({ pnlUp: e.target.value });
+$("pnlDown").oninput = (e) => set({ pnlDown: e.target.value });
 
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;

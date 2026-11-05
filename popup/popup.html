@@ -72,6 +72,11 @@
         <summary>P&amp;L readout <label class="switch" title="Big P&amp;L readout on/off"><input type="checkbox" id="pnlShow" /><span></span></label></summary>
         <p class="hint">A big, bold open-P&amp;L number we draw ourselves, so it's readable on any wallpaper. It reads the P&amp;L already on your position line — nothing is sent anywhere.</p>
         <div class="row"><span>Colour</span><div class="seg" id="pnlStyle"></div></div>
+        <div class="row" id="pnlColsRow"><span>Up · Down</span>
+          <input type="color" id="pnlUp" title="Up / profit" /> <input type="color" id="pnlDown" title="Down / loss" />
+          <small class="hint" style="margin:0">blank = candle colours</small></div>
+        <div class="row"><span>Backing</span><div class="seg" id="pnlBack"></div></div>
+        <p class="hint">A panel behind the number keeps it readable on busy or dark wallpapers.</p>
         <div class="row"><span>Size</span><div class="seg" id="pnlSize"></div></div>
         <div class="row"><span>Position</span><div class="seg" id="pnlPos"></div></div>
       </details>
