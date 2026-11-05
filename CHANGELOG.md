@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.16 (2026-11-05)
+- Fix: shortened the extension's description so it meets the Chrome Web Store's 132-character limit (the store rejected the upload otherwise). No feature changes.
+
 ## 0.1.15 (2026-11-05)
 - Live clip: record a short animated clip (WebM) of your chart with the live wallpaper moving — the animated companion to Snapshot, for sharing a vibe a still can't show. Pick 3/5/8 seconds under Saved → Live clip. (Built-in animated skins record their motion; an uploaded image/video wallpaper renders in a protected frame so it isn't in the clip — the chart and watermark are.)
 

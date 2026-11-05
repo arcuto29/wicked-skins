@@ -1,7 +1,7 @@
 {
   "name": "priism-skins-desktop",
   "productName": "Priism Skins",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Priism Skins desktop app: TradingView with live wallpapers (Windows, macOS, Linux)",
   "author": "arcuto29",
   "main": "main.js",

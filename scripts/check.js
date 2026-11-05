@@ -18,6 +18,11 @@ const manifest = read("manifest.json"), root = read("package.json"), desk = read
 const versions = { "manifest.json": manifest.version, "package.json": root.version, "desktop/package.json": desk.version };
 if (new Set(Object.values(versions)).size !== 1) { bad++; console.error("✗ versions differ:", versions); }
 
+// Chrome Web Store rejects a manifest "description" longer than 132 characters — catch it before upload.
+if (manifest.description && manifest.description.length > 132) {
+  bad++; console.error(`✗ manifest description is ${manifest.description.length} chars (Chrome Web Store max is 132)`);
+}
+
 // every file the manifest points at must exist
 const refs = [
   ...manifest.content_scripts.flatMap((c) => [...(c.js || []), ...(c.css || [])]),
