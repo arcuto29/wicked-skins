@@ -221,6 +221,27 @@ const QUICK_LOOKS = [
   // Soft pastel on falling petals — calm, pretty.
   { id: "blossom", name: "Blossom", sub: "Petal Drift · Pastel", skin: "sakura",
     set: { candleOn: true, candleUp: "#7cf7d4", candleDown: "#ff8fd8", candleLook: "solid", candleGlow: 0.2, candlePreset: "bubblegum", lineGlow: 0.15, scaleText: "", scaleGlow: 0, scaleBg: "glass", dim: 0.25 } },
+
+  // ----- Calm, low-distraction "matching everything" looks. Each uses a DIFFERENT wallpaper (no skin reused across
+  // these), solid candles, little/no glow, and the wallpaper dimmed back so the chart stays the focus. -----
+  // Nightfall: muted teal up / dusty rose down over Night Drizzle. Quiet, rainy-city calm.
+  { id: "nightfall", name: "Nightfall", sub: "Night Drizzle · Muted", skin: "rain",
+    set: { candleOn: true, candleUp: "#5fb0a8", candleDown: "#cf8a8f", candleLook: "solid", candleGlow: 0, candlePreset: "custom", lineGlow: 0, scaleText: "#aebccb", scaleGlow: 0, scaleBg: "auto", dim: 0.5 } },
+  // Daybreak: a LIGHT look — deep teal up / clay down on Snowfall. Clean and bright (like ChartSkins' light themes).
+  { id: "daybreak", name: "Daybreak", sub: "Snowfall · Light", skin: "snow",
+    set: { candleOn: true, candleUp: "#2f8f78", candleDown: "#c75d4d", candleLook: "solid", candleGlow: 0, candlePreset: "custom", lineGlow: 0, scaleText: "#39404c", scaleGlow: 0, scaleBg: "glass", dim: 0.12 } },
+  // Sterling: soft platinum up / slate down on Stardust. Barely-there glow, elegant and understated.
+  { id: "sterling", name: "Sterling", sub: "Stardust · Platinum", skin: "nebula",
+    set: { candleOn: true, candleUp: "#d7dce4", candleDown: "#7b8392", candleLook: "solid", candleGlow: 0.08, candlePreset: "custom", lineGlow: 0.06, scaleText: "#d7dce4", scaleGlow: 0, scaleBg: "auto", dim: 0.5 } },
+  // Firefly: warm amber up / deep moss down on Glowbugs. Cozy and gentle, low glow.
+  { id: "firefly", name: "Firefly", sub: "Glowbugs · Amber", skin: "fireflies",
+    set: { candleOn: true, candleUp: "#e8b864", candleDown: "#5f7a4e", candleLook: "solid", candleGlow: 0.15, candlePreset: "custom", lineGlow: 0.12, scaleText: "#e8cf9a", scaleGlow: 0.1, scaleBg: "glass", dim: 0.45 } },
+  // Harbor: steel-blue up / slate-grey down on Thunderstorm, toned right down. Moody but calm, not flashy.
+  { id: "harbor", name: "Harbor", sub: "Thunderstorm · Steel", skin: "storm",
+    set: { candleOn: true, candleUp: "#7fa8c9", candleDown: "#566273", candleLook: "solid", candleGlow: 0.1, candlePreset: "custom", lineGlow: 0.08, scaleText: "#b9c6d6", scaleGlow: 0, scaleBg: "auto", dim: 0.5 } },
+  // Dune: a loud skin (Retro Sun) deliberately made CALM — warm sand up / terracotta down, low glow. The surprise one.
+  { id: "dune", name: "Dune", sub: "Retro Sun · Sand", skin: "synthwave",
+    set: { candleOn: true, candleUp: "#e6c391", candleDown: "#c2734e", candleLook: "solid", candleGlow: 0.12, candlePreset: "custom", lineGlow: 0.1, scaleText: "#ecd6b0", scaleGlow: 0.1, scaleBg: "glass", dim: 0.5 } },
 ];
 function renderQuick() {
   const box = $("quickLooks"); if (!box) return;
