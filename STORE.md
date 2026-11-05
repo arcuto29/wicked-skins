@@ -40,7 +40,7 @@ MORE
 • Alt+Shift+W toggles everything
 
 PRIVACY
-Purely cosmetic. Priism Skins never reads your orders, positions or account and sends nothing from the chart anywhere. The Workshop account (optional) only stores your email and what you share.
+Purely cosmetic. Priism Skins never reads your orders, positions or account and sends nothing from the chart anywhere. Your settings and your own wallpapers stay on your computer. Browsing and using Workshop wallpapers needs no account; sharing your own is done on the website.
 
 Not affiliated with, endorsed or sponsored by TradingView, Inc. Not financial advice.
 ```
@@ -65,11 +65,12 @@ Not affiliated with, endorsed or sponsored by TradingView, Inc. Not financial ad
 | scripting | When the user taps "Turn on here" on another chart site (e.g. TopstepX), register the same chart styling for that site. |
 | optional host permissions (any site) | Requested only when the user taps "Turn on here" on a site with a TradingView chart; can be removed in the panel. |
 | activeTab | Check the current page for a TradingView chart when the user opens the panel. |
-| identity | Optional "Continue with Google" sign-in for the Workshop. |
 | Remote code | **No.** All code is in the package (ffmpeg.wasm and supabase-js are bundled). |
 
-**Data usage:** tick **Personally identifiable information** (email) and **User-generated content** (only for Workshop accounts/uploads).
-Certify: not sold, not used for unrelated purposes, not used for creditworthiness.
+**Data usage:** the extension collects **no** personal data — settings and uploaded wallpapers stay on the user's
+computer, and browsing/using the Workshop needs no account. (Sharing a wallpaper happens on the website, not the
+extension.) So you can answer "I don't collect user data" for the extension; certify not sold, not used for unrelated
+purposes, not used for creditworthiness.
 **Privacy policy URL:** https://arcuto29.github.io/wicked-skins/privacy.html
 
 ## 4. Automatic updates afterwards
