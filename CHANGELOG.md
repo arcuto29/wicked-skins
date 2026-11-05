@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 (2026-11-05)
+- Watermark: add your @handle, a Tiled style and Drift so your clips are harder to repost without credit, plus a strength slider.
+- Sides: flow the wallpaper across the panels around the chart (watchlist and toolbars) — Glass keeps them readable, Clear is see-through.
+- Four new one-click looks: Blackout (white & black candles on black), Terminal, Midas and Blossom.
+- The macOS desktop app now builds.
+- The Workshop no longer asks you to sign in inside the extension — browse and use wallpapers with no account; sharing happens on the website.
+
 ## 0.1.0
 First release of Priism Skins.
 - 24 live wallpapers behind your TradingView charts, plus your own images, GIFs and videos (any format).
