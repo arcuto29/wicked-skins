@@ -92,7 +92,9 @@
   // ---------- charts on the page (multi-chart layouts) ----------
   // Every visible chart, in reading order (top row left to right, then the next row). Chart 1 is top-left.
   function chartEls() {
-    const all = [...document.querySelectorAll(".chart-container")];
+    // Advanced Charts panes; if none, fall back to Lightweight Charts container(s) so the wallpaper still places.
+    let all = [...document.querySelectorAll(".chart-container")];
+    if (!all.length) all = [...document.querySelectorAll(".tv-lightweight-charts, [class*='lightweight']")];
     return all
       .filter((el) => !all.some((o) => o !== el && o.contains(el)))
       .map((el) => ({ el, r: el.getBoundingClientRect() }))
@@ -104,7 +106,7 @@
   // the area covered by all charts together (watermark, P&L pill, over-chart clipping)
   function chartsBox() {
     if (!charts.length) {
-      const el = document.querySelector(".layout__area--center");
+      const el = document.querySelector(".layout__area--center") || document.querySelector(".tv-lightweight-charts, [class*='lightweight']");
       const r = el ? el.getBoundingClientRect() : null;
       return r && r.width > 80 ? r : { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth, height: innerHeight };
     }
@@ -924,7 +926,9 @@
 
   // Only switch on in a frame that actually contains a TradingView-style chart (tradingview.com, or a
   // platform's embedded chart iframe). Other frames / pages of an enabled site are left untouched.
-  const CHART_SEL = ".chart-markup-table, .chart-container";
+  // Advanced Charts (.chart-container) OR Lightweight Charts (.tv-lightweight-charts) — the wallpaper layer and
+  // activation work for both; the candle recolour engine for each lives in hook.js / lw.js respectively.
+  const CHART_SEL = ".chart-markup-table, .chart-container, .tv-lightweight-charts, [class*='lightweight']";
   const bigChart = () => [...document.querySelectorAll(CHART_SEL)].some((el) => { const r = el.getBoundingClientRect(); return r.width >= 400 && r.height >= 250; });
   function whenChart(start) {
     const go = () => { if (!claim()) return; sweep(); start(); setTimeout(announceFrame, 300); };
