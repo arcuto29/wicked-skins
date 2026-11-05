@@ -13,4 +13,11 @@ contextBridge.exposeInMainWorld("wickedStore", {
       remove: () => Promise.resolve(),
     },
   },
+  // Desktop-only: open / close the skinned TradingView window, and hear when it opens or closes.
+  tv: {
+    open: () => ipcRenderer.invoke("tv:open"),
+    close: () => ipcRenderer.invoke("tv:close"),
+    state: () => ipcRenderer.invoke("tv:state"),
+    onState: (cb) => ipcRenderer.on("tv:state", (_e, s) => cb(s)),
+  },
 });

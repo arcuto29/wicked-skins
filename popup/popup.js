@@ -248,6 +248,24 @@ document.querySelectorAll("summary .switch").forEach((sw) => sw.addEventListener
 // Extension: files are stored as Blobs in IndexedDB (src/mediadb.js) and played by player/player.html,
 // so big videos are fine. Desktop app (no chrome.runtime): falls back to data URLs, 50 MB each.
 const EXT_MODE = !!(chrome.runtime && chrome.runtime.id);
+
+// Desktop app only: a status card like ChartSkins — "Open TradingView with skins" / "Close". The app no longer
+// pops a chart open by itself; you open it from here.
+const DESK = window.wickedStore && window.wickedStore.tv;
+function renderDesk(open) {
+  if (!DESK) return;
+  $("deskCard").hidden = false;
+  $("deskTitle").textContent = open ? "TradingView is open — skins are on" : "TradingView is closed";
+  $("deskHint").textContent = open ? "Your wallpaper and candle colours are live on the chart." : "Open it here and your skin loads in.";
+  const btn = $("deskBtn");
+  btn.textContent = open ? "Focus chart" : "Open with skins";
+  btn.onclick = () => (open ? DESK.open() : DESK.open());   // both focus/open; close is via the chart window
+}
+function deskCard() {
+  if (!DESK) { const c = $("deskCard"); if (c) c.hidden = true; return; }
+  DESK.state().then((s) => renderDesk(!!(s && s.open)));
+  DESK.onState((s) => renderDesk(!!(s && s.open)));
+}
 const IS_TAB = new URLSearchParams(location.search).has("page");
 const MAX_FILE_MB = EXT_MODE ? 2048 : MAX_MB;
 const converting = {}; // id -> progress 0..1
@@ -966,6 +984,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
   renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts();
   siteBar();
+  deskCard();
   detectCharts();
   updates();
   const q = new URLSearchParams(location.search);
