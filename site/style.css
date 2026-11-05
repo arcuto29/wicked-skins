@@ -83,3 +83,47 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; } footer a { color: va
 .demo-chip.on { background: linear-gradient(90deg, var(--a1), var(--a2) 55%, var(--a3)); color: #04130f; border: none; font-weight: 700; }
 .demo-chip:active { transform: translateY(1px); }
 .demo-note { text-align: center; color: var(--muted); font-size: 13px; margin: 12px 0 0; }
+
+/* ===== Polish pass ===== */
+body { background:
+  radial-gradient(900px 500px at 50% -120px, rgba(46,242,176,.10), transparent 70%),
+  radial-gradient(700px 400px at 100% 10%, rgba(25,211,255,.07), transparent 70%),
+  var(--bg); background-attachment: fixed; }
+.hero { padding: 92px 0 36px; position: relative; }
+.hero h1 { font-weight: 850; }
+.hero .logo { animation: floaty 6s ease-in-out infinite; }
+@keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.btn { transition: transform .12s ease, border-color .15s, box-shadow .15s; }
+.btn.primary { box-shadow: 0 10px 30px -10px rgba(46,242,176,.6); }
+.btn:hover { transform: translateY(-2px); }
+.btn.primary:hover { box-shadow: 0 16px 40px -10px rgba(46,242,176,.75); }
+
+/* section eyebrow + centered headings */
+section.block { padding: 72px 0; border-top: none; position: relative; }
+section.block::before { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 120px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line), transparent); }
+section.block h2 { font-size: clamp(26px,3.4vw,34px); letter-spacing: -.01em; }
+
+/* feature cards: accent top line + hover lift */
+.feat { position: relative; overflow: hidden; transition: transform .15s ease, border-color .15s, background .15s; }
+.feat::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: linear-gradient(90deg, var(--a1), var(--a2), var(--a3)); opacity: 0; transition: opacity .18s; }
+.feat:hover { transform: translateY(-3px); border-color: #2c3647; background: #141924; }
+.feat:hover::before { opacity: 1; }
+.feat b { font-size: 15px; }
+
+/* download cards */
+.dl a.card { position: relative; transition: transform .15s ease, border-color .15s, box-shadow .15s; }
+.dl a.card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px -20px rgba(46,242,176,.5); }
+.dl a.card b { font-size: 15px; }
+
+/* FAQ hover */
+.faq details { transition: border-color .15s; } .faq details[open] { border-color: #2c3647; }
+
+/* a thin brand strip under the footer */
+footer { background: linear-gradient(180deg, transparent, rgba(46,242,176,.04)); }
+
+@media (max-width: 640px) {
+  .hero { padding: 64px 0 24px; }
+  section.block { padding: 52px 0; }
+  .demo-chip { padding: 7px 13px; font-size: 13px; }
+}
