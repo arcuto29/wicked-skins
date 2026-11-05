@@ -53,8 +53,9 @@ jobs:
     defaults:
       run:
         working-directory: desktop
+    permissions:
+      contents: write
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Optional code signing. Without it the apps still install and update on Windows/Linux;
       # macOS needs signing + notarization for silent auto-updates (see RELEASING.md).
       CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -71,11 +72,23 @@ jobs:
         if: env.CSC_LINK == ''
         shell: bash
         run: echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
-      - name: Build installers and attach them to the release
+      # Build only (no publish). electron-builder's own uploader hit 403s here; we attach with the
+      # same action the extension job uses, which works reliably.
+      - name: Build installers
         shell: bash
         run: |
           case "${{ matrix.os }}" in
-            macos-latest)   npx electron-builder --mac --publish always ;;
-            windows-latest) npx electron-builder --win --publish always ;;
-            *)              npx electron-builder --linux --publish always ;;
+            macos-latest)   npx electron-builder --mac --publish never ;;
+            windows-latest) npx electron-builder --win --publish never ;;
+            *)              npx electron-builder --linux --publish never ;;
           esac
+      - name: Attach installers + update manifests to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            desktop/dist/*.exe
+            desktop/dist/*.exe.blockmap
+            desktop/dist/*.AppImage
+            desktop/dist/*.zip
+            desktop/dist/*.zip.blockmap
+            desktop/dist/latest*.yml
