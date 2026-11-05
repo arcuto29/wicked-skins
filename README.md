@@ -82,8 +82,10 @@ Note: this wraps tradingview.com; it does not modify the official TradingView De
 ## Mobile (planned)
 - **iOS / iPadOS / macOS Safari**: Safari Web Extension. Xcode can convert this folder
   (`xcrun safari-web-extension-converter wicked-skins/`). Needs an Apple Developer account.
-- **Android**: Chrome for Android has no extensions. Options are Firefox for Android (supports WebExtensions)
-  or a small WebView app that loads tradingview.com and injects `src/` (same approach as `desktop/`).
+- **Android (phones + tablets)**: a native WebView app lives in **[`android/`](android/)**. It loads
+  tradingview.com and injects the same `src/` code as the desktop app, with the shared `popup/` as a settings
+  sheet. Build it in Android Studio (`./gradlew assembleRelease`); see `android/README.md`. The official
+  TradingView Android app can't run add-ons, so this shell is how mobile gets skins.
 - The official TradingView mobile apps cannot be modified, so mobile means web-in-browser or our own wrapper app.
 
 ## Logo

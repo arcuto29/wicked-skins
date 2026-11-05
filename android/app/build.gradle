@@ -1,0 +1,62 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.priism.skins'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.priism.skins"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.1"
+    }
+
+    // Load the keystore from gradle.properties if present; otherwise debug-sign so the build still runs.
+    signingConfigs {
+        release {
+            if (project.hasProperty('PRIISM_KEYSTORE')) {
+                storeFile file(PRIISM_KEYSTORE)
+                storePassword PRIISM_KEYSTORE_PASSWORD
+                keyAlias PRIISM_KEY_ALIAS
+                keyPassword PRIISM_KEY_PASSWORD
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (project.hasProperty('PRIISM_KEYSTORE')) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+    buildFeatures { viewBinding true }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.webkit:webkit:1.11.0'
+    implementation 'com.google.android.material:material:1.12.0'
+}
+
+// Keep one copy of the skin code: copy the shared JS/CSS + the settings popup into assets before building.
+tasks.register('syncShared', Copy) {
+    into layout.projectDirectory.dir('src/main/assets/shared')
+    into('src') { from(rootProject.file('../src')) { include '*.js', '*.css' } }
+    into('popup') { from(rootProject.file('../popup')) }
+    into('vendor') { from(rootProject.file('../vendor')) }
+    into('player') { from(rootProject.file('../player')) }
+    into('icons') { from(rootProject.file('../icons')) { include '*.png' } }
+}
+tasks.named('preBuild') { dependsOn 'syncShared' }
