@@ -42,6 +42,8 @@
     // Glow on indicators / lines / P&L, and price scale styling
     lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
     scaleSize: 0, scaleFont: "default",
+    // Bracket pills: restyle the broker's on-chart TP / Stop / entry / P&L boxes (bigger + readable backing + colours).
+    bracketOn: false, bracketSize: 1, bracketBack: "solid", bracketProfit: "", bracketLoss: "",
     // Multi-chart layouts: "span" = one wallpaper across the whole layout, "each" = every chart gets its own copy,
     // "mix" = pick a wallpaper per chart (chartSkins: { "2": "galaxy", "3": "media:<id>" }; chart 1 = your main skin)
     multi: "span", chartSkins: {},
@@ -582,7 +584,8 @@
   }
 
   // Line glow + price scale styling, also drawn by hook.js
-  const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont"];
+  const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
+    "bracketOn", "bracketSize", "bracketBack", "bracketProfit", "bracketLoss"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
