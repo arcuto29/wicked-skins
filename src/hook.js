@@ -468,12 +468,18 @@
   // text in "bold 9px Verdana", centered. We can't read these through the chart API (they belong to the broker's
   // trading integration, not our drawings), but they DO pass through this canvas hook, so we restyle them here:
   // a stronger box behind the text (readable on busy wallpapers), a bigger font, and optional +/- colours.
-  const BRACKET_FONT = /^(?:bold\s+)?\d+(?:\.\d+)?px\s+Verdana$/i;
+  // Every broker pill (TP, Stop, entry, quantity, P&L) draws its text in Verdana — regular chart text uses a
+  // sans-serif stack, so the font is the reliable signal. The box is only used so we have something to restyle;
+  // we keep its size test loose and DPR-correct so wide multi-part pills and HiDPI screens still match.
+  const BRACKET_FONT = /\bVerdana\b/i;
   const lastPill = new WeakMap();   // ctx -> { used, box:{x,y,w,h} } of the last pill-shaped box drawn
   function pillBox(ctx, x, y, w, h) {
+    // convert the box to CSS px: the canvas transform's scale already folds in devicePixelRatio
     const sx = ctx.getTransform().a || 1, sy = ctx.getTransform().d || 1;
-    const pw = Math.abs(w * sx), ph = Math.abs(h * sy);
-    return ph >= 13 && ph <= 30 && pw >= 14 && pw <= 180 && pw >= ph * 0.8;   // pill = short, wide-ish box
+    const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
+    const pw = Math.abs(w * sx) / dpr, ph = Math.abs(h * sy) / dpr;
+    // a pill is a short, wide-ish box — generous bounds so every variant/DPI is caught (font gate does the rest)
+    return ph >= 8 && ph <= 40 && pw >= 10 && pw <= 460 && pw >= ph * 0.7;
   }
   // Per-canvas list of y-centres (device px) where a pill box was drawn this frame — used to spot the bracket's
   // own horizontal "level line" (a wide stroke at a pill's height) so we can thicken / recolour the whole level.
