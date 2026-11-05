@@ -81,6 +81,16 @@
         <div class="row"><span>Position</span><div class="seg" id="pnlPos"></div></div>
       </details>
 
+      <details class="grp" data-grp="brackets">
+        <summary>Trade brackets <label class="switch" title="Restyle the broker's TP / Stop / entry pills"><input type="checkbox" id="bracketOn" /><span></span></label></summary>
+        <p class="hint">Makes your broker's on-chart Take profit, Stop and entry pills bigger and easier to read on a busy wallpaper. We only restyle the pills TradingView already draws — nothing is sent anywhere.</p>
+        <div class="row"><span>Size</span><div class="seg" id="bracketSize"></div></div>
+        <div class="row"><span>Backing</span><div class="seg" id="bracketBack"></div></div>
+        <div class="row" id="bracketColsRow"><span>Profit · Loss</span>
+          <input type="color" id="bracketProfit" title="Profit pill text" /> <input type="color" id="bracketLoss" title="Loss pill text" />
+          <small class="hint" style="margin:0">blank = keep TradingView's</small></div>
+      </details>
+
       <details class="grp" data-grp="scale">
         <summary>Price scale</summary>
         <div class="row"><span>Text</span><div class="seg" id="scaleTextMode"></div><input type="color" id="scaleText" title="Text colour" /></div>

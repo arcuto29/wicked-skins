@@ -23,6 +23,7 @@ const DEFAULTS = {
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
   multi: "span", chartSkins: {}, pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
+  bracketOn: false, bracketSize: 1, bracketBack: "solid", bracketProfit: "", bracketLoss: "",
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -187,7 +188,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); }
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 const QUICK_LOOKS = [
@@ -869,6 +870,18 @@ $("pnlShow").onchange = (e) => set({ pnlShow: e.target.checked });
 $("pnlUp").oninput = (e) => set({ pnlUp: e.target.value });
 $("pnlDown").oninput = (e) => set({ pnlDown: e.target.value });
 
+// ---------- trade brackets (restyle the broker's TP / Stop / entry pills) ----------
+function syncBracket() {
+  $("bracketOn").checked = !!cfg.bracketOn;
+  seg("bracketSize", [[0, "Normal"], [1, "Large"], [2, "XL"], [3, "Huge"]], () => (+cfg.bracketSize || 0), (v) => { set({ bracketSize: v, bracketOn: true }); $("bracketOn").checked = true; syncBracket(); });
+  seg("bracketBack", [["keep", "Keep"], ["glass", "Glass"], ["solid", "Solid"]], () => cfg.bracketBack || "keep", (v) => { set({ bracketBack: v, bracketOn: true }); $("bracketOn").checked = true; syncBracket(); });
+  $("bracketProfit").value = cfg.bracketProfit || cfg.candleUp || "#00e08a";
+  $("bracketLoss").value = cfg.bracketLoss || cfg.candleDown || "#ff3355";
+}
+$("bracketOn").onchange = (e) => set({ bracketOn: e.target.checked });
+$("bracketProfit").oninput = (e) => set({ bracketProfit: e.target.value, bracketOn: true });
+$("bracketLoss").oninput = (e) => set({ bracketLoss: e.target.value, bracketOn: true });
+
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
   $("wmText").value = cfg.wmText || "";
@@ -886,7 +899,7 @@ $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cf
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
 const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","sides","uiFont","uiSize","uiAccent","react","reactStrength","vignette","calm"];
-const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont"];
+const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketProfit","bracketLoss"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
 
@@ -996,7 +1009,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket();
   siteBar();
   deskCard();
   detectCharts();

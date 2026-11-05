@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 4;
+  const HOOK_VERSION = 5;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -57,7 +57,12 @@
 
   // Line glow + price scale styling
   const FX0 = { lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
-    scaleSize: 0, scaleFont: "default", bg: null, busy: false, prof: [], profs: [] };
+    scaleSize: 0, scaleFont: "default",
+    // Bracket pills = the broker's on-chart TP / Stop / entry / P&L boxes (drawn by TradingView, "bold 9px Verdana").
+    // bracketOn: restyle them · bracketSize 0..3 px bigger · bracketBack keep|glass|solid (stronger box so text pops)
+    // bracketProfit/bracketLoss: recolour the +/- money text ("" = leave TradingView's colour).
+    bracketOn: false, bracketSize: 0, bracketBack: "keep", bracketProfit: "", bracketLoss: "",
+    bg: null, busy: false, prof: [], profs: [] };
   let fx = { ...FX0 };
   function readFx() {
     try {
@@ -72,6 +77,11 @@
         scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
         scaleFont: ["default", "mono", "rounded"].includes(f.scaleFont) ? f.scaleFont : "default",
         scaleLabels: !!f.scaleLabels,
+        bracketOn: !!f.bracketOn,
+        bracketSize: Math.max(0, Math.min(3, +f.bracketSize || 0)),
+        bracketBack: ["keep", "glass", "solid"].includes(f.bracketBack) ? f.bracketBack : "keep",
+        bracketProfit: /^#[0-9a-f]{6}$/i.test(f.bracketProfit || "") ? f.bracketProfit : "",
+        bracketLoss: /^#[0-9a-f]{6}$/i.test(f.bracketLoss || "") ? f.bracketLoss : "",
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
         prof: Array.isArray(f.prof) ? f.prof.slice(0, 18).map(Number) : [],  // brightness behind the price scale, top->bottom
@@ -81,7 +91,8 @@
       };
     } catch { fx = { ...FX0 }; }
     remapCache.clear();
-    const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont]);
+    const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
+      fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketProfit, fx.bracketLoss]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -414,9 +425,48 @@
     }
   }
 
+  // ---------- bracket pills (the broker's TP / Stop / entry / P&L boxes TradingView draws on the chart) ----------
+  // TradingView draws each pill as a small rounded box (a fillRect ~15-28px tall, <~170px wide) and then its
+  // text in "bold 9px Verdana", centered. We can't read these through the chart API (they belong to the broker's
+  // trading integration, not our drawings), but they DO pass through this canvas hook, so we restyle them here:
+  // a stronger box behind the text (readable on busy wallpapers), a bigger font, and optional +/- colours.
+  const BRACKET_FONT = /^(?:bold\s+)?\d+(?:\.\d+)?px\s+Verdana$/i;
+  const lastPill = new WeakMap();   // ctx -> { x, y, w, h, t } of the last pill-shaped box drawn
+  function pillBox(ctx, x, y, w, h) {
+    const sx = ctx.getTransform().a || 1, sy = ctx.getTransform().d || 1;
+    const pw = Math.abs(w * sx), ph = Math.abs(h * sy);
+    return ph >= 13 && ph <= 30 && pw >= 14 && pw <= 180 && pw >= ph * 0.8;   // pill = short, wide-ish box
+  }
+  // A pill's money/price text (what the user wants to see): has a digit, and a $/currency or +/- sign, or is a bare
+  // number/qty. We only *recolour* the ones that read as profit/loss (have a sign); size applies to all pills.
+  const MONEY_RE = /[$€£¥]|[+\-\u2212]?\s*\d/;
+  function pillSign(text) {
+    const t = String(text).trim();
+    if (/^[+＋]|\+\s*[$€£¥]/.test(t)) return 1;                       // +$1170.00
+    if (/^[-\u2212]|[-\u2212]\s*[$€£¥]/.test(t)) return -1;           // -$133.00
+    return 0;
+  }
+
   proto.fillText = function (...a) {
     const c = this.canvas;
     notePnl(a[0], c);
+
+    // Bracket pill text: bigger + optional +/- recolour. Font + centered + in-pane + a pill box just drawn.
+    if (on && fx.bracketOn && c && isPane(c) && this.textAlign === "center" && BRACKET_FONT.test(this.font || "")
+        && MONEY_RE.test(String(a[0]))) {
+      const pill = lastPill.get(this);
+      if (pill && !pill.used) {              // a pill box was drawn just before this text — this is its label
+        pill.used = true;
+        const pFont = this.font, pFill = this.fillStyle;
+        if (fx.bracketSize > 0) this.font = pFont.replace(/(\d+(?:\.\d+)?)px/, (m, n) => (+n + fx.bracketSize) + "px");
+        const sign = pillSign(a[0]);
+        if (sign > 0 && fx.bracketProfit) this.fillStyle = fx.bracketProfit;
+        else if (sign < 0 && fx.bracketLoss) this.fillStyle = fx.bracketLoss;
+        origText.apply(this, a);
+        this.font = pFont; this.fillStyle = pFill;
+        return;
+      }
+    }
     // Live-price tags (and other price boxes): same font/weight/size as the scale, text kept inside its box.
     const tagsRecoloured = candles && fx.scaleLabels;
     if (on && c && isAxis(c) && !isScaleLabel(this.fillStyle) && (tagsRecoloured || fx.scaleFont !== "default" || fx.scaleSize > 0 || fx.scaleBold)) {
@@ -511,6 +561,23 @@
   proto.fillRect = function (x, y, w, h) {
     const c = this.canvas;
     if (on && c && w * (this.getTransform().a || 1) <= 40 && isPane(c)) noteFill(this.__bdFill);
+    // Bracket pills: record the box so the text drawn next knows it belongs to a pill. Optionally strengthen the
+    // box backing so the TP/Stop/P&L number stays readable on busy wallpapers.
+    if (on && fx.bracketOn && c && isPane(c) && pillBox(this, x, y, w, h)) {
+      lastPill.set(this, { used: false });
+      if (fx.bracketBack !== "keep") {
+        const r = rgbKey(this.fillStyle), isLight = r && (r.key.split(",").reduce((s, n) => s + +n, 0) / 3) > 150;
+        // "glass" = a touch stronger than TradingView's own faint box; "solid" = opaque for max contrast.
+        const a = fx.bracketBack === "solid" ? 1 : 0.9;
+        const pA = this.globalAlpha, pF = this.fillStyle;
+        // keep the box's own hue (blue qty badge stays blue), just make it more opaque
+        if (r) this.fillStyle = `rgba(${r.key},${a})`;
+        else this.fillStyle = isLight ? `rgba(20,22,31,${a})` : `rgba(255,255,255,${a})`;
+        origFill.call(this, x, y, w, h);
+        this.fillStyle = pF; this.globalAlpha = pA;
+        return;
+      }
+    }
     if (on && c && c.width > 20 && c.height > 20) {
       const s = this.getTransform().a || 1;
       // covers (nearly) the whole canvas => it's the pane background
