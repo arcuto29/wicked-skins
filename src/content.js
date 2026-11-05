@@ -47,6 +47,7 @@
     bracketOn: false, bracketSize: 1, bracketBack: "keep",
     bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
     bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
+    bracketDebug: true,   // records caught pills to window.__bdBracketDebug for troubleshooting (no data leaves)
     // Multi-chart layouts: "span" = one wallpaper across the whole layout, "each" = every chart gets its own copy,
     // "mix" = pick a wallpaper per chart (chartSkins: { "2": "galaxy", "3": "media:<id>" }; chart 1 = your main skin)
     multi: "span", chartSkins: {},
@@ -589,7 +590,7 @@
   // Line glow + price scale styling, also drawn by hook.js
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
-    "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW"];
+    "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
