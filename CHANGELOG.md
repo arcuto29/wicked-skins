@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.3 (2026-11-05)
+- Privacy: removed a browser permission the extension no longer needs. No feature changes.
+
 ## 0.1.2 (2026-11-05)
 - Skin per symbol: map a wallpaper to a ticker (BTCUSDT, NQ, AAPL…) and it switches by itself when you change symbol.
 - Auto quality: on Smooth, the wallpaper lowers its detail by itself if your computer lags, then raises it again.
