@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guide · Priism Skins</title>
+  <meta name="description" content="How to install and use Priism Skins on Chrome, the desktop app, Android and prop platforms like TopstepX.">
+  <link rel="icon" href="img/icon-32.png"><link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap guide">
+    <h1 style="margin:0 0 6px">Getting started</h1>
+    <p style="color:var(--muted);margin:0 0 10px">Install it, open a TradingView chart, pick a look. It's purely visual — it never reads your orders, positions or account.</p>
+
+    <!-- platform picker -->
+    <div class="gtabs" id="gtabs">
+      <button class="chip on" data-g="chrome">Chrome / Edge / Brave</button>
+      <button class="chip" data-g="desktop">Desktop app</button>
+      <button class="chip" data-g="android">Android</button>
+      <button class="chip" data-g="platforms">Prop platforms</button>
+    </div>
+
+    <!-- CHROME -->
+    <section class="gpanel" data-g="chrome">
+      <ol class="steps">
+        <li><b>Install.</b> Click <a data-chrome href="#">Add to Chrome</a> (works in Edge, Brave, Opera and Arc too) and confirm <b>Add extension</b>.</li>
+        <li><b>Pin it (optional).</b> Click the puzzle-piece icon in the toolbar, then the pin next to Priism Skins, so its icon is always there.</li>
+        <li><b>Open a chart.</b> Go to <b>tradingview.com</b> and open any chart.</li>
+        <li><b>Pick a look.</b> Click the Priism Skins icon → the panel opens → tap a <b>One-click look</b> (Neon Night, Blackout, Cosmic…). Your wallpaper and candle colours apply instantly.</li>
+        <li><b>Tweak it.</b> Use the tabs — <b>Skins</b>, <b>Style</b> (candles, glow, price scale), <b>Uploads</b> (your own images/videos), <b>Adjust</b> (darken, blur, Sides, Interface).</li>
+      </ol>
+      <p class="tip">Tip: <b>Alt+Shift+W</b> on the chart turns everything on or off instantly.</p>
+    </section>
+
+    <!-- DESKTOP -->
+    <section class="gpanel" data-g="desktop" hidden>
+      <ol class="steps">
+        <li><b>Download</b> the app for your system from the <a href="index.html#download">Download</a> section — Windows (.exe), macOS or Linux (.AppImage).</li>
+        <li><b>Install &amp; open it.</b> On first launch it opens to the <b>Skins &amp; settings</b> window.</li>
+        <li><b>Open your chart.</b> Click <b>Open TradingView with skins</b>. TradingView opens in its own window with your skin already applied.</li>
+        <li><b>Choose a look</b> in the settings window; it updates the chart live. Your settings are saved on your computer.</li>
+        <li><b>Updates</b> install themselves — you'll be asked to restart when a new version is ready.</li>
+      </ol>
+      <p class="tip">Windows may show a “Windows protected your PC” box on first run — click <b>More info → Run anyway</b>. On macOS, if it says it can't verify the app, open <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b>.</p>
+    </section>
+
+    <!-- ANDROID -->
+    <section class="gpanel" data-g="android" hidden>
+      <p class="badge">Beta</p>
+      <ol class="steps">
+        <li><b>Download the APK</b> from the <a href="index.html#download">Download</a> section (the Android card).</li>
+        <li><b>Allow the install.</b> Android will ask to allow installing from your browser/files — approve it, then tap the APK to install.</li>
+        <li><b>Open the app.</b> It loads TradingView with Priism Skins built in.</li>
+        <li><b>Tap the settings button</b> (bottom-right) to pick skins and candle colours.</li>
+      </ol>
+      <p class="tip">TradingView's own app can't run add-ons, which is why this is a separate app. A Play Store version is coming.</p>
+    </section>
+
+    <!-- PROP PLATFORMS -->
+    <section class="gpanel" data-g="platforms" hidden>
+      <ol class="steps">
+        <li><b>Open your platform's chart</b> (e.g. TopstepX, or any site that uses TradingView charts) in Chrome.</li>
+        <li><b>Click the Priism Skins icon.</b> If it finds a chart, you'll see <b>“Chart found on …” → Turn on here</b>.</li>
+        <li><b>Approve once.</b> Chrome asks to allow the extension on that site — that's its standard wording for drawing on a page. The page reloads skinned.</li>
+        <li><b>Turn off</b> in the same place whenever you want; it removes the skin and the permission.</li>
+      </ol>
+      <p class="tip">Some prop firms have rules about browser extensions on funded or evaluation accounts — check yours first. Priism Skins only changes how the chart looks and never touches your orders.</p>
+    </section>
+
+    <h2 style="margin-top:40px">Sharing a wallpaper (Workshop)</h2>
+    <ol class="steps">
+      <li><b>Browse &amp; use</b> community wallpapers in the extension's <b>Workshop</b> tab — no account needed. Tap <b>Use</b> and it's on your chart.</li>
+      <li><b>Share your own</b> on the <a href="workshop.html">Workshop page</a>: sign in, drag in an image or video, add a title, and submit. Uploads are reviewed before they appear.</li>
+    </ol>
+
+    <h2 style="margin-top:40px">Quick fixes</h2>
+    <div class="qfix">
+      <details><summary>I don't see any change on my chart</summary><p>Make sure the panel's top switch is <b>On</b>, and that you're on an actual chart page (tradingview.com/chart). Try <b>Alt+Shift+W</b>.</p></details>
+      <details><summary>The candles are hard to see on a busy wallpaper</summary><p>In <b>Adjust → Picture</b>, raise <b>Darken</b>, or lower the wallpaper's <b>Opacity</b>. Or turn on <b>Match wallpaper</b> (Style → Candles) so the candles take colours that stand out.</p></details>
+      <details><summary>The price scale text is hard to read</summary><p>It auto-adjusts, but you can set it manually in <b>Style → Price scale</b> (text colour, glass backing, size).</p></details>
+      <details><summary>Two copies installed</summary><p>If you loaded it unpacked and also installed from the store, remove one at <b>chrome://extensions</b> so they don't both draw.</p></details>
+      <details><summary>Does it slow things down?</summary><p>It pauses in background tabs and has an <b>Eco</b> mode and <b>Auto quality</b> that lower detail if your computer struggles. Set it in <b>Adjust → Picture</b>.</p></details>
+    </div>
+
+    <p style="color:var(--muted);margin-top:36px">Still stuck? Email <span data-contact></span>.</p>
+  </main>
+
+  <script src="site-config.js"></script><script src="common.js"></script>
+  <script>
+  (function () {
+    const tabs = document.getElementById("gtabs");
+    tabs.addEventListener("click", (e) => { const b = e.target.closest("[data-g]"); if (!b) return;
+      [...tabs.children].forEach((c) => c.classList.toggle("on", c === b));
+      document.querySelectorAll(".gpanel").forEach((p) => (p.hidden = p.dataset.g !== b.dataset.g));
+    });
+  })();
+  </script>
+</body>
+</html>

@@ -48,7 +48,7 @@ Not affiliated with, endorsed or sponsored by TradingView, Inc. Not financial ad
 
 **Images** (in `store/`):
 - Store icon 128×128: `icons/icon-128.png`
-- Screenshots 1280×800: `store/screenshot-1-neon-night.png`, `-2-cosmic`, `-3-inferno`, `-4-ocean`
+- Screenshots 1280×800: `store/screenshot-1-neon-night.png`, `-2-blackout`, `-3-interface`, `-4-ocean`
 - Small promo tile 440×280: `store/promo-small.png`
 - Marquee 1400×560 (optional): `store/promo-marquee.png`
 

@@ -127,3 +127,17 @@ footer { background: linear-gradient(180deg, transparent, rgba(46,242,176,.04));
   section.block { padding: 52px 0; }
   .demo-chip { padding: 7px 13px; font-size: 13px; }
 }
+
+/* Guide page */
+.guide { max-width: 820px; padding: 48px 20px 70px; }
+.guide h1 { font-size: clamp(30px,4vw,40px); letter-spacing: -.01em; }
+.guide h2 { font-size: 22px; }
+.gtabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 26px; }
+.gpanel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; }
+.steps { margin: 0; padding-left: 22px; } .steps li { margin: 0 0 14px; line-height: 1.6; }
+.steps b { color: var(--text); }
+.tip { margin: 18px 0 0; padding: 12px 14px; border-radius: 10px; background: rgba(46,242,176,.08); border: 1px solid rgba(46,242,176,.25); color: #cfe9df; font-size: 14px; }
+.badge { display: inline-block; margin: 0 0 12px; padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; background: rgba(25,211,255,.15); color: #7fdcff; }
+.qfix details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; margin-bottom: 10px; }
+.qfix summary { cursor: pointer; font-weight: 700; } .qfix p { color: var(--muted); margin: 10px 0 0; }
+.qfix details[open] { border-color: #2c3647; }
