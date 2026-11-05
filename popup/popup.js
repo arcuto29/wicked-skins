@@ -22,7 +22,7 @@ const DEFAULTS = {
   candleLook: "solid", shiftSpeed: 10,
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
-  multi: "span", chartSkins: {},
+  multi: "span", chartSkins: {}, pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1,
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -187,7 +187,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); }
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 const QUICK_LOOKS = [
@@ -855,6 +855,15 @@ function syncCharts() {
 $("showNums").onclick = () => flashNumbers(typeof target === "number" ? target : 0);
 
 // ---------- watermark (logo + name) ----------
+function syncPnl() {
+  $("pnlShow").checked = !!cfg.pnlShow;
+  seg("pnlStyle", [["color", "Green / Red"], ["rainbow", "Rainbow"]], () => cfg.pnlStyle || "color", (v) => { set({ pnlStyle: v, pnlShow: true }); $("pnlShow").checked = true; });
+  seg("pnlSize", [[0, "S"], [1, "M"], [2, "L"]], () => (+cfg.pnlSize || 1), (v) => set({ pnlSize: v }));
+  seg("pnlPos", [["tl", cornerIcon(2.5, 2.5)], ["tc", cornerIcon(5.5, 2.5)], ["tr", cornerIcon(8.5, 2.5)], ["bl", cornerIcon(2.5, 6.5)], ["br", cornerIcon(8.5, 6.5)]],
+    () => cfg.pnlPos || "tc", (v) => set({ pnlPos: v }));
+}
+$("pnlShow").onchange = (e) => set({ pnlShow: e.target.checked });
+
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
   $("wmText").value = cfg.wmText || "";
@@ -982,7 +991,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl();
   siteBar();
   deskCard();
   detectCharts();
