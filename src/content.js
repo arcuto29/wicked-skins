@@ -20,6 +20,8 @@
     // Sides: let the wallpaper flow across the panels around the chart (watchlist, toolbars, the grey areas).
     // "off" = only the chart; "glass" = frosted panels; "clear" = fully see-through panels.
     sides: "off",
+    // UI style: font + accent for TradingView's own panels (watchlist, toolbars, order area, timeframe bar).
+    uiFont: "default", uiSize: 0, uiAccent: "",     // font: default|mono|rounded ; size: 0|1 ; accent: "" or #hex
     // Watermark: the Priism Skins logo + your name/handle, for recordings and streams.
     // style: "corner" (clean logo + text in a corner) or "tiled" (faint repeated mark across the chart, hard to crop out)
     wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false,
@@ -344,6 +346,21 @@
     h.classList.toggle("bd-sides-clear", on && mode === "clear");
   }
 
+  // UI style: font / size / accent for TradingView's own HTML panels (watchlist, toolbars, order area, timeframes).
+  const UI_FONTS = { mono: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace', rounded: '"SF Pro Rounded", "Nunito", "Varela Round", ui-rounded, system-ui, sans-serif' };
+  function applyUiStyle() {
+    const h = document.documentElement;
+    const font = ["mono", "rounded"].includes(cfg.uiFont) ? cfg.uiFont : "";
+    const accent = /^#[0-9a-f]{6}$/i.test(cfg.uiAccent || "") ? cfg.uiAccent : "";
+    const on = cfg.enabled && (font || cfg.uiSize > 0 || accent);
+    h.classList.toggle("bd-ui", !!on);
+    h.classList.toggle("bd-ui-font", !!font);
+    h.classList.toggle("bd-ui-big", on && cfg.uiSize > 0);
+    h.style.setProperty("--bd-ui-font", font ? UI_FONTS[font] : "");
+    h.style.setProperty("--bd-ui-accent", accent || "");
+    h.classList.toggle("bd-ui-accent", !!(on && accent));
+  }
+
   function build() {
     teardown();
     const was = document.documentElement.classList.contains("bd-on");
@@ -353,7 +370,7 @@
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
     document.documentElement.classList.toggle("bd-on", cfg.enabled);
-    applySides();
+    applySides(); applyUiStyle();
     if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
@@ -780,9 +797,10 @@
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
     if (keys.includes("sides") || keys.includes("enabled") || keys.includes("layer")) applySides();
+    if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
