@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.6 (2026-11-05)
+- Trade brackets: customise your broker's on-chart Take profit / Stop / entry / P&L pills — make the text bigger (Large / XL / Huge), add a stronger backing (Glass or Solid) so it stays readable on a busy wallpaper, and optionally recolour the profit/loss number. Find it under Style → Trade brackets.
+
 ## 0.1.5 (2026-11-05)
 - P&L readout: a big, bold open-P&L number while you're in a trade — green/red or an animated rainbow, in any corner. Much easier to see than the default pill.
 
