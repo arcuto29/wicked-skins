@@ -23,7 +23,9 @@ const DEFAULTS = {
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
   multi: "span", chartSkins: {}, pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
-  bracketOn: false, bracketSize: 1, bracketBack: "solid", bracketProfit: "", bracketLoss: "",
+  bracketOn: false, bracketSize: 1, bracketBack: "keep",
+  bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
+  bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -870,17 +872,52 @@ $("pnlShow").onchange = (e) => set({ pnlShow: e.target.checked });
 $("pnlUp").oninput = (e) => set({ pnlUp: e.target.value });
 $("pnlDown").oninput = (e) => set({ pnlDown: e.target.value });
 
-// ---------- trade brackets (restyle the broker's TP / Stop / entry pills) ----------
+// ---------- trade brackets (fully recolour the broker's TP / Stop / entry pills) ----------
+// Each colour is Keep (leave TradingView's) or Custom (any colour). The number can also be Profit/Loss (green/red).
+function bkOn() { set({ bracketOn: true }); $("bracketOn").checked = true; syncBracket(); }
 function syncBracket() {
   $("bracketOn").checked = !!cfg.bracketOn;
-  seg("bracketSize", [[0, "Normal"], [1, "Large"], [2, "XL"], [3, "Huge"]], () => (+cfg.bracketSize || 0), (v) => { set({ bracketSize: v, bracketOn: true }); $("bracketOn").checked = true; syncBracket(); });
-  seg("bracketBack", [["keep", "Keep"], ["glass", "Glass"], ["solid", "Solid"]], () => cfg.bracketBack || "keep", (v) => { set({ bracketBack: v, bracketOn: true }); $("bracketOn").checked = true; syncBracket(); });
+  seg("bracketSize", [[0, "Normal"], [1, "Large"], [2, "XL"], [3, "Huge"]], () => (+cfg.bracketSize || 0), (v) => { set({ bracketSize: v }); bkOn(); });
+
+  // Box colour: Keep | Custom
+  seg("bracketFillMode", [["keep", "Keep"], ["custom", "Custom"]], () => (cfg.bracketFill ? "custom" : "keep"),
+    (v) => { set({ bracketFill: v === "custom" ? ($("bracketFill").value || "#1e2130") : "" }); bkOn(); });
+  $("bracketFill").value = cfg.bracketFill || "#1e2130"; $("bracketFill").hidden = !cfg.bracketFill;
+
+  // Number colour: Keep | Custom | Profit/Loss
+  const textMode = (cfg.bracketProfit || cfg.bracketLoss) ? "pl" : (cfg.bracketText ? "custom" : "keep");
+  seg("bracketTextMode", [["keep", "Keep"], ["custom", "Custom"], ["pl", "Profit/Loss"]], () => textMode, (v) => {
+    if (v === "keep") set({ bracketText: "", bracketProfit: "", bracketLoss: "" });
+    else if (v === "custom") set({ bracketText: $("bracketText").value || "#ffffff", bracketProfit: "", bracketLoss: "" });
+    else set({ bracketText: "", bracketProfit: $("bracketProfit").value || cfg.candleUp || "#00e08a", bracketLoss: $("bracketLoss").value || cfg.candleDown || "#ff3355" });
+    bkOn();
+  });
+  $("bracketText").value = cfg.bracketText || "#ffffff"; $("bracketText").hidden = textMode !== "custom";
+  $("bracketPLRow").hidden = textMode !== "pl";
   $("bracketProfit").value = cfg.bracketProfit || cfg.candleUp || "#00e08a";
   $("bracketLoss").value = cfg.bracketLoss || cfg.candleDown || "#ff3355";
+
+  // Outline: Keep | Custom (+ width)
+  seg("bracketBorderMode", [["keep", "Keep"], ["custom", "Custom"]], () => (cfg.bracketBorderColor ? "custom" : "keep"),
+    (v) => { set({ bracketBorderColor: v === "custom" ? ($("bracketBorderColor").value || "#4094e8") : "", bracketBorderW: v === "custom" && !cfg.bracketBorderW ? 1 : cfg.bracketBorderW }); bkOn(); });
+  $("bracketBorderColor").value = cfg.bracketBorderColor || "#4094e8"; $("bracketBorderColor").hidden = !cfg.bracketBorderColor;
+  $("bracketBorderWRow").hidden = !cfg.bracketBorderColor;
+  seg("bracketBorderW", [[0, "Thin"], [1, "Medium"], [2, "Thick"], [3, "Thicker"]], () => (+cfg.bracketBorderW || 0), (v) => { set({ bracketBorderW: v }); bkOn(); });
+
+  // Level line: Keep | Custom (+ width)
+  seg("bracketLineMode", [["keep", "Keep"], ["custom", "Custom"]], () => (cfg.bracketLineColor ? "custom" : "keep"),
+    (v) => { set({ bracketLineColor: v === "custom" ? ($("bracketLineColor").value || "#4094e8") : "", bracketLineW: v === "custom" && !cfg.bracketLineW ? 1 : cfg.bracketLineW }); bkOn(); });
+  $("bracketLineColor").value = cfg.bracketLineColor || "#4094e8"; $("bracketLineColor").hidden = !cfg.bracketLineColor;
+  $("bracketLineWRow").hidden = !cfg.bracketLineColor;
+  seg("bracketLineW", [[0, "Thin"], [1, "Medium"], [2, "Thick"], [3, "Thicker"]], () => (+cfg.bracketLineW || 0), (v) => { set({ bracketLineW: v }); bkOn(); });
 }
 $("bracketOn").onchange = (e) => set({ bracketOn: e.target.checked });
-$("bracketProfit").oninput = (e) => set({ bracketProfit: e.target.value, bracketOn: true });
-$("bracketLoss").oninput = (e) => set({ bracketLoss: e.target.value, bracketOn: true });
+$("bracketFill").oninput = (e) => { set({ bracketFill: e.target.value }); bkOn(); };
+$("bracketText").oninput = (e) => { set({ bracketText: e.target.value, bracketProfit: "", bracketLoss: "" }); bkOn(); };
+$("bracketProfit").oninput = (e) => { set({ bracketProfit: e.target.value, bracketText: "", bracketOn: true }); };
+$("bracketLoss").oninput = (e) => { set({ bracketLoss: e.target.value, bracketText: "", bracketOn: true }); };
+$("bracketBorderColor").oninput = (e) => { set({ bracketBorderColor: e.target.value, bracketBorderW: cfg.bracketBorderW || 1 }); bkOn(); };
+$("bracketLineColor").oninput = (e) => { set({ bracketLineColor: e.target.value, bracketLineW: cfg.bracketLineW || 1 }); bkOn(); };
 
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
@@ -899,7 +936,7 @@ $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cf
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
 const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","sides","uiFont","uiSize","uiAccent","react","reactStrength","vignette","calm"];
-const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketProfit","bracketLoss"];
+const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
 

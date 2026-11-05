@@ -58,10 +58,18 @@
   // Line glow + price scale styling
   const FX0 = { lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: false,
     scaleSize: 0, scaleFont: "default",
-    // Bracket pills = the broker's on-chart TP / Stop / entry / P&L boxes (drawn by TradingView, "bold 9px Verdana").
-    // bracketOn: restyle them · bracketSize 0..3 px bigger · bracketBack keep|glass|solid (stronger box so text pops)
-    // bracketProfit/bracketLoss: recolour the +/- money text ("" = leave TradingView's colour).
-    bracketOn: false, bracketSize: 0, bracketBack: "keep", bracketProfit: "", bracketLoss: "",
+    // Bracket pills = the broker's on-chart TP / Stop / entry / P&L boxes (drawn by TradingView, "bold Npx Verdana").
+    // We can fully recolour every part, at draw time (the API can't reach these). All colours are "" = keep as-is.
+    //   bracketSize 0..3  px bigger text
+    //   bracketFill       box background colour      ("" keep; else any hex)
+    //   bracketText       number colour              ("" keep/auto; a single colour for all pills)
+    //   bracketProfit/Loss  +/- number colours        (override bracketText by sign; green/red style)
+    //   bracketBorderColor  box outline colour        ("" keep)   + bracketBorderW 0..3 thickness
+    //   bracketLineColor    level-line colour         ("" keep)   + bracketLineW   0..3 thickness
+    //   bracketBack keep|glass|solid  box opacity (only when bracketFill is "", to strengthen TradingView's box)
+    bracketOn: false, bracketSize: 0, bracketBack: "keep",
+    bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
+    bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
     bg: null, busy: false, prof: [], profs: [] };
   let fx = { ...FX0 };
   function readFx() {
@@ -80,8 +88,14 @@
         bracketOn: !!f.bracketOn,
         bracketSize: Math.max(0, Math.min(3, +f.bracketSize || 0)),
         bracketBack: ["keep", "glass", "solid"].includes(f.bracketBack) ? f.bracketBack : "keep",
+        bracketFill: /^#[0-9a-f]{6}$/i.test(f.bracketFill || "") ? f.bracketFill : "",
+        bracketText: /^#[0-9a-f]{6}$/i.test(f.bracketText || "") ? f.bracketText : "",
         bracketProfit: /^#[0-9a-f]{6}$/i.test(f.bracketProfit || "") ? f.bracketProfit : "",
         bracketLoss: /^#[0-9a-f]{6}$/i.test(f.bracketLoss || "") ? f.bracketLoss : "",
+        bracketBorderColor: /^#[0-9a-f]{6}$/i.test(f.bracketBorderColor || "") ? f.bracketBorderColor : "",
+        bracketBorderW: Math.max(0, Math.min(3, +f.bracketBorderW || 0)),
+        bracketLineColor: /^#[0-9a-f]{6}$/i.test(f.bracketLineColor || "") ? f.bracketLineColor : "",
+        bracketLineW: Math.max(0, Math.min(3, +f.bracketLineW || 0)),
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
         prof: Array.isArray(f.prof) ? f.prof.slice(0, 18).map(Number) : [],  // brightness behind the price scale, top->bottom
@@ -92,7 +106,8 @@
     } catch { fx = { ...FX0 }; }
     remapCache.clear();
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
-      fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketProfit, fx.bracketLoss]);
+      fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
+      fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -271,9 +286,13 @@
   //  - any colourful, visible line can glow; grid (faint) and crosshair (grey) never do
   const segs = new WeakMap();
   const origBegin = proto.beginPath, origMove = proto.moveTo, origLine = proto.lineTo, origStroke = proto.stroke;
-  proto.beginPath = function () { segs.set(this, [0, 0]); return origBegin.call(this); };
-  proto.moveTo = function (x, y) { const k = segs.get(this); if (k) k[0]++; return origMove.call(this, x, y); };
-  proto.lineTo = function (x, y) { const k = segs.get(this); if (k) k[1]++; return origLine.call(this, x, y); };
+  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && fx.bracketOn) lastSeg.set(this, null); return origBegin.call(this); };
+  proto.moveTo = function (x, y) { const k = segs.get(this); if (k) k[0]++;
+    if (on && fx.bracketOn) { const t = this.getTransform(); lastSeg.set(this, { x0: x * (t.a || 1) + t.e, y0: y * (t.d || 1) + t.f, x1: null, y1: null }); }
+    return origMove.call(this, x, y); };
+  proto.lineTo = function (x, y) { const k = segs.get(this); if (k) k[1]++;
+    if (on && fx.bracketOn) { const s = lastSeg.get(this), t = this.getTransform(); if (s) { s.x1 = x * (t.a || 1) + t.e; s.y1 = y * (t.d || 1) + t.f; } }
+    return origLine.call(this, x, y); };
 
   const glowCache = new Map();
   function glowable(col) {
@@ -292,6 +311,25 @@
 
   proto.stroke = function (path) {
     const c = this.canvas;
+    // Bracket level line: a wide, horizontal stroke sitting at a pill's height. Recolour / thicken it so the whole
+    // bracket level is easy to see. Done before the candle/glow path because it can be on when those are off.
+    if (on && fx.bracketOn && (fx.bracketLineColor || fx.bracketLineW > 0) && c && path === undefined && isPane(c)) {
+      const s = lastSeg.get(this);
+      // horizontal segment (any width) whose y lands exactly on a pill row — the pill-row match is the real filter
+      // (so grid lines, which never sit on a pill row, are left alone), covering both stubs either side of the box.
+      if (s && s.x1 !== null && Math.abs(s.y0 - s.y1) <= 1.5 && Math.abs(s.x1 - s.x0) >= 20
+          && bracketRowSign(this, (s.y0 + s.y1) / 2) !== null) {
+        const sx = this.getTransform().a || 1, cur = strokeDesc.get.call(this);
+        const col = fx.bracketLineColor || cur;
+        const pS = cur, pLW = this.lineWidth;
+        if (col !== cur) strokeDesc.set.call(this, col);
+        if (fx.bracketLineW > 0) this.lineWidth = Math.max(pLW, (fx.bracketLineW + 1) / sx);
+        origStroke.apply(this, arguments);
+        if (col !== cur) strokeDesc.set.call(this, pS);
+        this.lineWidth = pLW;
+        return;
+      }
+    }
     if (!on || !c || !(candles || fx.lineGlow > 0) || !isPane(c)) return origStroke.apply(this, arguments);
     const k = segs.get(this) || [0, 0];
     // only paths we SAW built from short segments (bars, last-price line) count as candle strokes;
@@ -431,12 +469,34 @@
   // trading integration, not our drawings), but they DO pass through this canvas hook, so we restyle them here:
   // a stronger box behind the text (readable on busy wallpapers), a bigger font, and optional +/- colours.
   const BRACKET_FONT = /^(?:bold\s+)?\d+(?:\.\d+)?px\s+Verdana$/i;
-  const lastPill = new WeakMap();   // ctx -> { x, y, w, h, t } of the last pill-shaped box drawn
+  const lastPill = new WeakMap();   // ctx -> { used, box:{x,y,w,h} } of the last pill-shaped box drawn
   function pillBox(ctx, x, y, w, h) {
     const sx = ctx.getTransform().a || 1, sy = ctx.getTransform().d || 1;
     const pw = Math.abs(w * sx), ph = Math.abs(h * sy);
     return ph >= 13 && ph <= 30 && pw >= 14 && pw <= 180 && pw >= ph * 0.8;   // pill = short, wide-ish box
   }
+  // Per-canvas list of y-centres (device px) where a pill box was drawn this frame — used to spot the bracket's
+  // own horizontal "level line" (a wide stroke at a pill's height) so we can thicken / recolour the whole level.
+  // Pill rows are matched by time, not frame: the level line is stroked BEFORE the pill text in the same paint
+  // (so this paint's row isn't known yet when the line draws), and TradingView repaints often — so we keep the
+  // rows seen in the last ~400ms and match against those. The y positions barely move between paints.
+  const pillRows = new WeakMap();   // ctx -> [{ y, sign, t }]
+  function notePillRow(ctx, yDev, sign) {
+    let a = pillRows.get(ctx); if (!a) { a = []; pillRows.set(ctx, a); }
+    const now = performance.now();
+    // replace a near-duplicate row (same height) rather than growing without bound
+    const i = a.findIndex((e) => Math.abs(e.y - yDev) <= 3);
+    if (i >= 0) a[i] = { y: yDev, sign, t: now };
+    else { a.push({ y: yDev, sign, t: now }); if (a.length > 40) a.shift(); }
+  }
+  function bracketRowSign(ctx, yDev) {     // is yDev on a recently-seen pill row? returns its +/- sign, or null
+    const a = pillRows.get(ctx); if (!a) return null;
+    const now = performance.now();
+    for (const e of a) if (now - e.t < 500 && Math.abs(e.y - yDev) <= 5) return e.sign;
+    return null;
+  }
+  // minimal path geometry (just the first move + last line) so stroke() can tell a wide horizontal line apart
+  const lastSeg = new WeakMap();   // ctx -> { x0, y0, x1, y1 }
   // A pill's money/price text (what the user wants to see): has a digit, and a $/currency or +/- sign, or is a bare
   // number/qty. We only *recolour* the ones that read as profit/loss (have a sign); size applies to all pills.
   const MONEY_RE = /[$€£¥]|[+\-\u2212]?\s*\d/;
@@ -446,6 +506,15 @@
     if (/^[-\u2212]|[-\u2212]\s*[$€£¥]/.test(t)) return -1;           // -$133.00
     return 0;
   }
+  // readable text (black or white) for a given box colour, so a recoloured/opaque box never hides its number
+  function readableOn(hexOrRgb) {
+    const r = rgbKey(hexOrRgb); if (!r) return null;
+    const [R, G, B] = r.key.split(",").map((n) => { n /= 255; return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); });
+    return 0.2126 * R + 0.7152 * G + 0.0722 * B > 0.34 ? "#0a0e14" : "#ffffff";
+  }
+  // which fill colour did the box end up with (what we painted, or TradingView's own)? remembered per ctx so the
+  // text branch can auto-pick a readable colour when the user recoloured/strengthened the box but not the text.
+  const pillFill = new WeakMap();
 
   proto.fillText = function (...a) {
     const c = this.canvas;
@@ -457,11 +526,34 @@
       const pill = lastPill.get(this);
       if (pill && !pill.used) {              // a pill box was drawn just before this text — this is its label
         pill.used = true;
-        const pFont = this.font, pFill = this.fillStyle;
-        if (fx.bracketSize > 0) this.font = pFont.replace(/(\d+(?:\.\d+)?)px/, (m, n) => (+n + fx.bracketSize) + "px");
         const sign = pillSign(a[0]);
-        if (sign > 0 && fx.bracketProfit) this.fillStyle = fx.bracketProfit;
-        else if (sign < 0 && fx.bracketLoss) this.fillStyle = fx.bracketLoss;
+        // remember this pill's row (its box's vertical centre) so stroke() can find the level line at that height
+        if (pill.box) notePillRow(this, pill.box.y + pill.box.h / 2, sign);
+        const pFont = this.font, pFill = this.fillStyle, sx = this.getTransform().a || 1;
+        // Enlarge, but NEVER clip: TradingView centers text in a fixed-width box, so a bigger font can spill over
+        // the edges and look broken ("can't see the number"). Clamp the font so the text still fits the box.
+        const box = pill.box;
+        if (fx.bracketSize > 0) {
+          let nf = pFont.replace(/(\d+(?:\.\d+)?)px/, (m, n) => (+n + fx.bracketSize) + "px");
+          this.font = nf;
+          if (box) {
+            const avail = box.w / sx - 4;                 // room inside the box (css px)
+            let w = origMeasure.call(this, String(a[0])).width;
+            // shrink a step at a time until it fits (keeps the number fully visible)
+            let px = +nf.match(/(\d+(?:\.\d+)?)px/)[1];
+            while (w > avail && px > +pFont.match(/(\d+(?:\.\d+)?)px/)[1]) {
+              px -= 1; this.font = nf.replace(/\d+(?:\.\d+)?px/, px + "px"); w = origMeasure.call(this, String(a[0])).width;
+            }
+            if (a[3] === undefined) a[3] = Math.max(w, avail);   // let the engine letter-squeeze if still a hair wide
+          }
+        }
+        // text colour: profit/loss by sign, else a single custom colour, else auto-readable if we changed the box
+        let col = "";
+        if (sign > 0 && fx.bracketProfit) col = fx.bracketProfit;
+        else if (sign < 0 && fx.bracketLoss) col = fx.bracketLoss;
+        else if (fx.bracketText) col = fx.bracketText;
+        else { const boxCol = pillFill.get(this); if (boxCol) col = readableOn(boxCol) || ""; }  // keep it visible
+        if (col) this.fillStyle = col;
         origText.apply(this, a);
         this.font = pFont; this.fillStyle = pFill;
         return;
@@ -564,19 +656,28 @@
     // Bracket pills: record the box so the text drawn next knows it belongs to a pill. Optionally strengthen the
     // box backing so the TP/Stop/P&L number stays readable on busy wallpapers.
     if (on && fx.bracketOn && c && isPane(c) && pillBox(this, x, y, w, h)) {
-      lastPill.set(this, { used: false });
-      if (fx.bracketBack !== "keep") {
-        const r = rgbKey(this.fillStyle), isLight = r && (r.key.split(",").reduce((s, n) => s + +n, 0) / 3) > 150;
-        // "glass" = a touch stronger than TradingView's own faint box; "solid" = opaque for max contrast.
-        const a = fx.bracketBack === "solid" ? 1 : 0.9;
-        const pA = this.globalAlpha, pF = this.fillStyle;
-        // keep the box's own hue (blue qty badge stays blue), just make it more opaque
-        if (r) this.fillStyle = `rgba(${r.key},${a})`;
-        else this.fillStyle = isLight ? `rgba(20,22,31,${a})` : `rgba(255,255,255,${a})`;
+      const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1;
+      lastPill.set(this, { used: false, box: { x: x * sx + t.e, y: y * sy + t.f, w: Math.abs(w * sx), h: Math.abs(h * sy) } });
+      // Custom box colour wins; otherwise glass/solid just strengthens TradingView's own box so it pops on a skin.
+      if (fx.bracketFill) {
+        const pF = this.fillStyle;
+        this.fillStyle = fx.bracketFill; pillFill.set(this, fx.bracketFill);
         origFill.call(this, x, y, w, h);
-        this.fillStyle = pF; this.globalAlpha = pA;
+        this.fillStyle = pF;
         return;
       }
+      if (fx.bracketBack !== "keep") {
+        const r = rgbKey(this.fillStyle), isLight = r && (r.key.split(",").reduce((s, n) => s + +n, 0) / 3) > 150;
+        const al = fx.bracketBack === "solid" ? 1 : 0.9;       // glass = stronger; solid = opaque
+        const pF = this.fillStyle;
+        const fill = r ? `rgba(${r.key},${al})` : (isLight ? `rgba(20,22,31,${al})` : `rgba(255,255,255,${al})`);
+        this.fillStyle = fill; pillFill.set(this, fill);
+        origFill.call(this, x, y, w, h);
+        this.fillStyle = pF;
+        return;
+      }
+      // no box change: still remember TradingView's own box colour so the text branch can keep contrast if needed
+      pillFill.set(this, this.fillStyle);
     }
     if (on && c && c.width > 20 && c.height > 20) {
       const s = this.getTransform().a || 1;
@@ -609,5 +710,32 @@
       }
     }
     return origFill.call(this, x, y, w, h);
+  };
+
+  // ---------- bracket pill box border ----------
+  // TradingView outlines each pill with a 1px strokeRect right after the box fill. When bracket styling is on we
+  // restyle that outline: bolder, a glow, or a custom / profit-loss colour — so the whole pill level stands out.
+  const origStrokeRect = proto.strokeRect;
+  proto.strokeRect = function (x, y, w, h) {
+    const c = this.canvas;
+    if (on && fx.bracketOn && (fx.bracketBorderColor || fx.bracketBorderW > 0) && c && isPane(c)) {
+      const pill = lastPill.get(this), t = this.getTransform(), sx = t.a || 1;
+      const bx = x * sx + t.e, by = y * (t.d || 1) + t.f, bw = Math.abs(w * sx), bh = Math.abs(h * (t.d || 1));
+      // this strokeRect is the pill's outline if it sits on the box we just recorded (same place, ~same size)
+      const box = pill && pill.box;
+      const isPillBorder = box && Math.abs(bx - box.x) <= 3 && Math.abs(by - box.y) <= 3 && Math.abs(bw - box.w) <= 4 && Math.abs(bh - box.h) <= 4;
+      if (isPillBorder) {
+        const cur = strokeDesc.get.call(this);
+        const col = fx.bracketBorderColor || cur;
+        const pS = cur, pLW = this.lineWidth;
+        if (col !== cur) strokeDesc.set.call(this, col);
+        if (fx.bracketBorderW > 0) this.lineWidth = Math.max(pLW, (fx.bracketBorderW + 1) / sx);
+        origStrokeRect.call(this, x, y, w, h);
+        if (col !== cur) strokeDesc.set.call(this, pS);
+        this.lineWidth = pLW;
+        return;
+      }
+    }
+    return origStrokeRect.call(this, x, y, w, h);
   };
 })();
