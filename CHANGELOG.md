@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 (2026-11-05)
+- Match wallpaper: candle colours, glow and the price scale can follow your own uploaded wallpaper's colours.
+- Interface: restyle TradingView's panels — font, size and an accent colour for the watchlist, top/bottom timeframe bars and toolbars. The left drawing tool rail is left as-is.
+- Sides: the wallpaper now flows only across the chart's own top and bottom bars, not the watchlist or tool rail.
+- New one-click look: Nexus Match (pairs with the Priisma Neon zone theme).
+- Desktop app: opens to its settings/gallery and has an "Open TradingView with skins" button — it no longer pops a chart open by itself.
+
 ## 0.1.3 (2026-11-05)
 - Privacy: removed a browser permission the extension no longer needs. No feature changes.
 
