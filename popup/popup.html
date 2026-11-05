@@ -151,6 +151,29 @@
         <button id="loExport">Export all</button>
         <label class="btn">Import<input type="file" id="loImport" accept="application/json,.json" hidden /></label>
       </div>
+
+      <div class="box" style="margin-top:14px">
+        <div class="inline">
+          <strong style="font-size:13px">Look code</strong>
+          <button class="primary" id="codeCopy" style="margin-left:auto">Copy my look code</button>
+        </div>
+        <p class="hint">A short code for your whole look — share it anywhere and anyone can paste it below to get your exact setup in one tap. (Your uploaded wallpapers can't travel in a code; a built-in skin is used instead — everything else carries.)</p>
+        <div class="inline">
+          <input id="codeInput" placeholder="Paste a PRIISM1-… look code" spellcheck="false" />
+          <button id="codeApply">Apply</button>
+        </div>
+        <p class="hint" id="codeMsg" style="display:none"></p>
+      </div>
+
+      <div class="box" style="margin-top:14px">
+        <div class="inline">
+          <strong style="font-size:13px">Snapshot</strong>
+          <button class="primary" id="snapBtn" style="margin-left:auto">Capture my chart</button>
+        </div>
+        <p class="hint">Takes a clean PNG of your chart with the skin and your watermark baked in — great for sharing. Open it on a TradingView chart tab. (Animated wallpaper is captured as a single still frame.)</p>
+        <p class="hint" id="snapMsg" style="display:none"></p>
+        <a id="snapPreview" href="#" download="priism-chart.png" style="display:none"><img id="snapImg" alt="snapshot preview" style="width:100%;border-radius:8px;border:1px solid var(--line,#2a3142)" /></a>
+      </div>
     </section>
 
     <section id="tab-tune" hidden>

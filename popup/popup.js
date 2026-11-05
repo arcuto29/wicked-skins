@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins"];
+const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -608,6 +608,45 @@ function download(name, data) {
 // uploads (your own files) aren't put in shared files: size + they're yours
 const exportable = (lo) => ({ name: lo.name, skin: lo.skin === "media" ? "aurora" : lo.skin, look: lo.look });
 
+// ---------- Look Codes: a short, pasteable text version of a whole look (skin + candles + glow + scale + brackets).
+// Share it in chat and a friend pastes it to get your exact vibe. Uploaded wallpapers can't travel in a code, so
+// a code made on an upload falls back to a built-in skin; everything else (colours/glow/scale/brackets) carries. ----
+const LOOK_CODE_PREFIX = "PRIISM1-";
+// url-safe base64 of a UTF-8 JSON string
+function b64urlEncode(str) {
+  const bytes = new TextEncoder().encode(str); let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64urlDecode(s) {
+  s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "=";
+  const bin = atob(s), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function makeLookCode(name) {
+  // skip uploads; store the built-in skin (or aurora as a safe default) + only the keys that differ from defaults
+  const skin = cfg.skin === "media" ? "aurora" : cfg.skin;
+  const look = {};
+  for (const k of LOOK_KEYS) if (JSON.stringify(cfg[k]) !== JSON.stringify(DEFAULTS[k])) look[k] = cfg[k];
+  const payload = { v: 1, n: (name || "").slice(0, 40), s: skin, l: look };
+  return LOOK_CODE_PREFIX + b64urlEncode(JSON.stringify(payload));
+}
+function parseLookCode(code) {
+  const raw = String(code || "").trim();
+  if (!raw.startsWith(LOOK_CODE_PREFIX)) return null;
+  try {
+    const p = JSON.parse(b64urlDecode(raw.slice(LOOK_CODE_PREFIX.length)));
+    if (!p || p.v !== 1 || !WickedSkins[p.s]) return null;
+    const look = Object.fromEntries(LOOK_KEYS.filter((k) => p.l && k in p.l).map((k) => [k, p.l[k]]));
+    return { name: typeof p.n === "string" ? p.n.slice(0, 40) : "", skin: p.s, look };
+  } catch { return null; }
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; }
+  catch { try { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); return true; } catch { return false; } }
+}
+
 function renderLoadouts() {
   const box = $("loCards"); box.innerHTML = ""; lookPreviews.length = 0;
   $("loEmpty").hidden = cfg.loadouts.length > 0;
@@ -675,6 +714,44 @@ $("loImport").onchange = async (e) => {
     set({ loadouts: [...clean, ...cfg.loadouts] }); renderLoadouts(); hintToast(`Imported ${clean.length} look${clean.length > 1 ? "s" : ""}.`);
   } catch { hintToast("That file isn't a saved-looks file."); }
   e.target.value = "";
+};
+
+// ---------- look codes (copy / paste a short code of the whole look) ----------
+const codeMsg = (t, ok) => { const el = $("codeMsg"); if (!el) return; el.style.display = ""; el.textContent = t; el.style.color = ok === false ? "#ff8a8a" : ""; };
+if ($("codeCopy")) $("codeCopy").onclick = async () => {
+  const code = makeLookCode(($("loName") && $("loName").value.trim()) || "");
+  const done = await copyText(code);
+  if ($("codeInput")) $("codeInput").value = code;
+  codeMsg(done ? "Copied! Paste it anywhere to share your look." : "Couldn't copy — select the code above and copy it manually.", done);
+};
+if ($("codeApply")) {
+  const apply = () => {
+    const parsed = parseLookCode($("codeInput").value);
+    if (!parsed) return codeMsg("That isn't a valid look code (it should start with PRIISM1-).", false);
+    applyWithUndo({ ...parsed.look, enabled: true, skin: parsed.skin },
+      parsed.name ? `Applied look code “${parsed.name}”.` : "Applied look code.");
+    codeMsg("Applied! (Use the Undo in the toast to revert.)", true);
+  };
+  $("codeApply").onclick = apply;
+  $("codeInput").onkeydown = (e) => { if (e.key === "Enter") apply(); };
+}
+
+// ---------- snapshot (capture the chart with skin + watermark as a shareable PNG) ----------
+if ($("snapBtn")) $("snapBtn").onclick = async () => {
+  const msg = $("snapMsg"), prev = $("snapPreview"), img = $("snapImg");
+  const show = (t, ok) => { msg.style.display = ""; msg.textContent = t; msg.style.color = ok === false ? "#ff8a8a" : ""; };
+  if (!EXT_MODE || IS_TAB) return show("Open this on a TradingView chart tab to capture.", false);
+  show("Capturing…"); prev.style.display = "none";
+  const r = await tabMsgAnyFrame({ ws: "snapshot" });
+  if (!r) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
+  if (!r.ok) return show(r.reason || "Couldn't capture the chart.", false);
+  img.src = r.url; prev.href = r.url;
+  const sym = (await tabMsg({ ws: "symbol" }).catch(() => null)) || {};
+  prev.download = `priism-${(sym.symbol || "chart").replace(/[^\w-]+/g, "")}.png`;
+  prev.style.display = "";
+  show(r.mediaMissed
+    ? "Done — click the image to save. (Your uploaded wallpaper couldn't be included because it renders in a protected frame; the chart and watermark are captured.)"
+    : "Done — click the image to save or drag it out to share.", true);
 };
 
 // ---------- tune ----------
@@ -850,6 +927,10 @@ async function tabMsg(msg) {
   const tab = await activeTab(); if (!tab) return null;
   return new Promise((res) => { try { chrome.tabs.sendMessage(tab.id, msg, { frameId: 0 }, (r) => { void chrome.runtime.lastError; res(r || null); }); } catch { res(null); } });
 }
+// Snapshot: the owning instance (top frame on tradingview.com) answers. We message the top frame; the content
+// script only replies from the owning, non-stood-down instance. (Broadcast-to-all-frames would need extra
+// permissions we deliberately don't ask for, to keep the listing lean.)
+async function tabMsgAnyFrame(msg) { return tabMsg(msg); }
 async function detectCharts() {
   const r = await tabMsg({ ws: "layout" });
   if (r && r.count !== chartCount) { chartCount = r.count | 0; syncCharts(); }
