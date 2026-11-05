@@ -242,6 +242,27 @@ const QUICK_LOOKS = [
   // Dune: a loud skin (Retro Sun) deliberately made CALM — warm sand up / terracotta down, low glow. The surprise one.
   { id: "dune", name: "Dune", sub: "Retro Sun · Sand", skin: "synthwave",
     set: { candleOn: true, candleUp: "#e6c391", candleDown: "#c2734e", candleLook: "solid", candleGlow: 0.12, candlePreset: "custom", lineGlow: 0.1, scaleText: "#ecd6b0", scaleGlow: 0.1, scaleBg: "glass", dim: 0.5 } },
+
+  // ----- Glow-in-the-dark / bold crowd-favourite looks. Luminous neon-tube candles, strong glow, dark wallpaper
+  // pushed back so the candles light up the chart. Each on its own (previously-unused) wallpaper. -----
+  // Glowstick: electric lime up / hot-magenta down, neon tube, max glow. Literal rave glow-in-the-dark.
+  { id: "glowstick", name: "Glowstick", sub: "Plasma · Neon tube", skin: "plasma",
+    set: { candleOn: true, candleUp: "#b6ff00", candleDown: "#ff1fa5", candleLook: "neon", candleGlow: 0.7, candlePreset: "custom", lineGlow: 0.55, scaleText: "#d6ff6b", scaleGlow: 0.5, scaleBg: "auto", dim: 0.45 } },
+  // Blacklight: UV violet up / acid-cyan down — that blacklight-poster glow. Outside-the-box.
+  { id: "blacklight", name: "Blacklight", sub: "Circuit · UV glow", skin: "circuit",
+    set: { candleOn: true, candleUp: "#9b5cff", candleDown: "#2bf5d0", candleLook: "neon", candleGlow: 0.65, candlePreset: "custom", lineGlow: 0.5, scaleText: "#c6a3ff", scaleGlow: 0.5, scaleBg: "auto", dim: 0.5 } },
+  // Vaporwave: pink + cyan on a neon skyline, glowing. The aesthetic people love.
+  { id: "vaporwave", name: "Vaporwave", sub: "Skyline · Pink & Cyan", skin: "neoncity",
+    set: { candleOn: true, candleUp: "#2ff0ff", candleDown: "#ff4fd0", candleLook: "neon", candleGlow: 0.6, candlePreset: "custom", lineGlow: 0.45, scaleText: "#8ff6ff", scaleGlow: 0.45, scaleBg: "auto", dim: 0.4 } },
+  // Molten: glowing lava orange up / deep ember red down on Lava Lamp. Warm, radiant.
+  { id: "molten", name: "Molten", sub: "Lava Lamp · Lava glow", skin: "lavalamp",
+    set: { candleOn: true, candleUp: "#ffaa1d", candleDown: "#ff2b2b", candleLook: "neon", candleGlow: 0.65, candlePreset: "lava", lineGlow: 0.4, scaleText: "#ffcf7a", scaleGlow: 0.45, scaleBg: "auto", dim: 0.4 } },
+  // Warp: icy white up / electric blue down streaking through Lightspeed, glowing. Fast and cool.
+  { id: "warp", name: "Warp", sub: "Lightspeed · Ion glow", skin: "hyperspace",
+    set: { candleOn: true, candleUp: "#eafcff", candleDown: "#2b8bff", candleLook: "neon", candleGlow: 0.6, candlePreset: "custom", lineGlow: 0.5, scaleText: "#bfe8ff", scaleGlow: 0.5, scaleBg: "auto", dim: 0.35 } },
+  // Spectrum: candles cycle through the whole rainbow across the chart (prism), glowing, on Ticker Tape. Wild.
+  { id: "spectrum", name: "Spectrum", sub: "Ticker Tape · Rainbow", skin: "tickertape",
+    set: { candleOn: true, candleUp: "#00e5ff", candleDown: "#ff00a8", candleLook: "prism", candleGlow: 0.5, candlePreset: "custom", lineGlow: 0.4, scaleText: "", scaleGlow: 0.35, scaleBg: "glass", dim: 0.45 } },
 ];
 function renderQuick() {
   const box = $("quickLooks"); if (!box) return;
