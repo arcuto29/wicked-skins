@@ -70,6 +70,7 @@
     bracketOn: false, bracketSize: 0, bracketBack: "keep",
     bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
     bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
+    bracketDebug: false,
     bg: null, busy: false, prof: [], profs: [] };
   let fx = { ...FX0 };
   function readFx() {
@@ -96,6 +97,7 @@
         bracketBorderW: Math.max(0, Math.min(3, +f.bracketBorderW || 0)),
         bracketLineColor: /^#[0-9a-f]{6}$/i.test(f.bracketLineColor || "") ? f.bracketLineColor : "",
         bracketLineW: Math.max(0, Math.min(3, +f.bracketLineW || 0)),
+        bracketDebug: !!f.bracketDebug,
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
         prof: Array.isArray(f.prof) ? f.prof.slice(0, 18).map(Number) : [],  // brightness behind the price scale, top->bottom
@@ -522,23 +524,41 @@
   // text branch can auto-pick a readable colour when the user recoloured/strengthened the box but not the text.
   const pillFill = new WeakMap();
 
+  // Diagnostic: when bracketDebug is on, record a small sample of the pill text we see on the real chart so we can
+  // confirm the hook is catching the broker's pills. Readable from the page console as window.__bdBracketDebug.
+  function noteBracketDebug(text, font, align, fill, box) {
+    try {
+      const d = (window.__bdBracketDebug = window.__bdBracketDebug || { note: "Priism Skins bracket debug — pills the hook caught:", samples: [] });
+      const key = String(text).slice(0, 20) + "|" + font;
+      if (!d.samples.some((s) => s.key === key) && d.samples.length < 20) {
+        d.samples.push({ key, text: String(text).slice(0, 20), font, align, fill: String(fill).slice(0, 16), box: box ? { w: Math.round(box.w), h: Math.round(box.h) } : null });
+      }
+    } catch {}
+  }
+
   proto.fillText = function (...a) {
     const c = this.canvas;
     notePnl(a[0], c);
 
-    // Bracket pill text: bigger + optional +/- recolour. Font + centered + in-pane + a pill box just drawn.
-    if (on && fx.bracketOn && c && isPane(c) && this.textAlign === "center" && BRACKET_FONT.test(this.font || "")
-        && MONEY_RE.test(String(a[0]))) {
-      const pill = lastPill.get(this);
-      if (pill && !pill.used) {              // a pill box was drawn just before this text — this is its label
-        pill.used = true;
+    // Bracket pill text: bigger + optional +/- recolour. The reliable signal is the FONT (Verdana) — every TP /
+    // Stop / entry / P&L / quantity pill uses it, regular chart text doesn't. We do NOT require a preceding box:
+    // some pills draw their box with roundRect / a path (not fillRect), which we can't always catch, but the text
+    // still comes through here, so recolour + size always work. If we did record a box, we use it to clamp size
+    // and to feed the level-line row match.
+    if (on && fx.bracketOn && c && isPane(c) && (this.textAlign === "center" || this.textAlign === "end" || this.textAlign === "right")
+        && BRACKET_FONT.test(this.font || "") && MONEY_RE.test(String(a[0]))) {
+      {
+        const pill = lastPill.get(this);
+        if (pill) pill.used = true;
         const sign = pillSign(a[0]);
-        // remember this pill's row (its box's vertical centre) so stroke() can find the level line at that height
-        if (pill.box) notePillRow(this, pill.box.y + pill.box.h / 2, sign);
+        // remember this pill's row so stroke() can find the level line. Prefer the box centre; else the text's y.
+        const rowY = pill && pill.box ? pill.box.y + pill.box.h / 2 : (() => { const t = this.getTransform(); return (a[2] || 0) * (t.d || 1) + t.f; })();
+        if (fx.bracketDebug) noteBracketDebug(a[0], this.font, this.textAlign, String(this.fillStyle), pill && pill.box);
+        notePillRow(this, rowY, sign);
         const pFont = this.font, pFill = this.fillStyle, sx = this.getTransform().a || 1;
         // Enlarge, but NEVER clip: TradingView centers text in a fixed-width box, so a bigger font can spill over
         // the edges and look broken ("can't see the number"). Clamp the font so the text still fits the box.
-        const box = pill.box;
+        const box = pill && pill.box;
         if (fx.bracketSize > 0) {
           let nf = pFont.replace(/(\d+(?:\.\d+)?)px/, (m, n) => (+n + fx.bracketSize) + "px");
           this.font = nf;
