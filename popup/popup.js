@@ -754,6 +754,30 @@ if ($("snapBtn")) $("snapBtn").onclick = async () => {
     : "Done — click the image to save or drag it out to share.", true);
 };
 
+// ---------- live clip (short animated WebM of the chart + moving wallpaper) ----------
+let clipSecs = 5;
+if ($("clipLen")) seg("clipLen", [[3, "3s"], [5, "5s"], [8, "8s"]], () => clipSecs, (v) => { clipSecs = v; });
+if ($("clipBtn")) $("clipBtn").onclick = async () => {
+  const msg = $("clipMsg"), prev = $("clipPreview"), vid = $("clipVid"), btn = $("clipBtn");
+  const show = (t, ok) => { msg.style.display = ""; msg.textContent = t; msg.style.color = ok === false ? "#ff8a8a" : ""; };
+  if (!EXT_MODE || IS_TAB) return show("Open this on a TradingView chart tab to record.", false);
+  prev.style.display = "none"; btn.disabled = true;
+  let left = clipSecs; show(`Recording… ${left}s`);
+  const tick = setInterval(() => { left--; if (left > 0) show(`Recording… ${left}s`); }, 1000);
+  const r = await tabMsgAnyFrame({ ws: "clip", seconds: clipSecs });
+  clearInterval(tick); btn.disabled = false;
+  if (!r) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
+  if (!r.ok) return show(r.reason || "Couldn't record the clip.", false);
+  vid.src = r.url; prev.href = r.url;
+  const sym = (await tabMsg({ ws: "symbol" }).catch(() => null)) || {};
+  prev.download = `priism-${(sym.symbol || "chart").replace(/[^\w-]+/g, "")}.webm`;
+  prev.style.display = "";
+  const kb = Math.round((r.bytes || 0) / 1024);
+  show(r.mediaMissed
+    ? `Done (${kb} KB) — click to save. (Your uploaded wallpaper renders in a protected frame, so it's not in the clip; the chart + watermark are.)`
+    : `Done (${kb} KB) — click the clip to save, or drag it out to share.`, true);
+};
+
 // ---------- tune ----------
 const SLIDERS = [
   ["opacity", "Opacity", 0, 1, 0.05, (v) => Math.round(v * 100) + "%"],

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.15 (2026-11-05)
+- Live clip: record a short animated clip (WebM) of your chart with the live wallpaper moving — the animated companion to Snapshot, for sharing a vibe a still can't show. Pick 3/5/8 seconds under Saved → Live clip. (Built-in animated skins record their motion; an uploaded image/video wallpaper renders in a protected frame so it isn't in the clip — the chart and watermark are.)
+
 ## 0.1.14 (2026-11-05)
 - Look codes: copy a short code of your whole look (skin, candles, glow, price scale, brackets) and share it anywhere — anyone pastes it to get your exact setup in one tap. Under Saved → Look code.
 - Snapshot: one-click capture a clean PNG of your chart with the skin and your watermark baked in, ready to share. Under Saved → Snapshot. (Animated wallpaper is captured as a single still frame; an uploaded image/video wallpaper can't be included because it renders in a protected frame — the chart and watermark still are.)
