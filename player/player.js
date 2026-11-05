@@ -44,8 +44,8 @@
           if ((i / 4) % 32 >= 27) prof[Math.floor(i / 4 / 32)] += l / 5;
         }
         const mean = sum / n;
-        // grid = 32x18 brightness map, so the page can work out what's behind each chart's price scale
-        parent.postMessage({ __wicked: "lum", mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), prof, grid }, "*");
+        // grid = 32x18 brightness map; rgb = same pixels (r,g,b,a bytes) so the page can derive an Auto-match palette.
+        parent.postMessage({ __wicked: "lum", mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), prof, grid, rgb: Array.from(d) }, "*");
       } catch {}
     }, 1500);
   } catch (err) {
