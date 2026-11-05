@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Priism Skins for TradingView",
-  "version": "0.1.10",
-  "description": "Live wallpapers, candle styles, glow and watermarks for TradingView charts, on tradingview.com and platforms that embed TradingView charts (e.g. TopstepX).",
+  "version": "0.1.11",
+  "description": "Live wallpapers, candle styles, glow and watermarks for TradingView charts — on tradingview.com, platforms that embed TradingView charts (e.g. TopstepX), and sites built on TradingView Lightweight Charts.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -26,7 +26,8 @@
         "https://*.tradingview.com/*"
       ],
       "js": [
-        "src/hook.js"
+        "src/hook.js",
+        "src/lw.js"
       ],
       "run_at": "document_start",
       "world": "MAIN",

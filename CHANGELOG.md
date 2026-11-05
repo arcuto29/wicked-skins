@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11 (2026-11-05)
+- New: support for platforms built on TradingView **Lightweight Charts** (a different engine from TradingView's main charts), such as nq.vision. On those charts Priism Skins now applies your wallpaper behind the chart and recolours the candles to your chosen up/down colours. Turn it on for the site the same way as any other (open the panel there → Turn on). Note: the trade brackets and price-scale styling are specific to TradingView's main (Advanced) charts and don't apply on Lightweight Charts, which has no broker pills.
+- The Diagnose button now tells you which chart engine a site uses, so it's clear what will and won't apply.
+
 ## 0.1.10 (2026-11-05)
 - Trade brackets: added a "Diagnose on my chart" button (Style → Trade brackets). If the brackets aren't restyling, click it and the panel tells you whether the skin engine is seeing your pills — and if not, what text is on the chart — so the issue can be pinned down without opening a console.
 

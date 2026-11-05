@@ -961,13 +961,33 @@ if ($("bracketDiag")) $("bracketDiag").onclick = async () => {
       target: { tabId: tab.id, allFrames: true }, world: "MAIN",
       func: () => {
         const d = window.__bdBracketDebug;
-        return { hooked: !!window.__bdHooked, ver: window.__bdHookVer || null, caught: d ? d.samples : null, onChart: window.__bdDiagSeen || [] };
+        // Which chart engine is this? Advanced Charts has TradingViewApi + .chart-markup-table; Lightweight Charts
+        // has a .tv-lightweight-charts wrapper (and/or a LightweightCharts global) and no TradingViewApi.
+        let engine = "unknown";
+        try {
+          const adv = !!(window.TradingViewApi || window.tradingViewApi || document.querySelector(".chart-markup-table, .chart-container"));
+          const lw = !!(window.LightweightCharts || document.querySelector(".tv-lightweight-charts, [class*='lightweight']"))
+            || [...document.querySelectorAll("canvas")].some((c) => c.parentElement && /lightweight|tv-lw|lw-chart/i.test(c.parentElement.className || ""));
+          if (adv) engine = "advanced";
+          else if (lw) engine = "lightweight";
+        } catch {}
+        const canvases = (() => { try { return [...document.querySelectorAll("canvas")].filter((c) => { const r = c.getBoundingClientRect(); return r.width > 150 && r.height > 120; }).length; } catch { return 0; } })();
+        return { hooked: !!window.__bdHooked, ver: window.__bdHookVer || null, caught: d ? d.samples : null, onChart: window.__bdDiagSeen || [], engine, canvases };
       },
     });
-    const score = (x) => x && x.result ? ((x.result.caught ? x.result.caught.length * 100 : 0) + (x.result.onChart ? x.result.onChart.length : 0) + (x.result.hooked ? 1 : 0)) : -1;
+    const score = (x) => x && x.result ? ((x.result.caught ? x.result.caught.length * 100 : 0) + (x.result.onChart ? x.result.onChart.length : 0) + (x.result.engine && x.result.engine !== "unknown" ? 5 : 0) + (x.result.hooked ? 1 : 0)) : -1;
     const best = (results || []).sort((a, b) => score(b) - score(a))[0];
     const r = best && best.result;
     if (!r) { out.textContent = "Couldn't read the chart. Make sure Priism Skins is on for this tab."; return; }
+    // Engine check first — if it's Lightweight Charts, no amount of "turning on" will skin it with today's build.
+    if (r.engine === "lightweight") {
+      out.textContent = "This chart is TradingView Lightweight Charts — a different engine Priism Skins doesn't support yet (candles/brackets won't apply). Send me this message and I'll look at an adapter.";
+      return;
+    }
+    if (!r.hooked && r.engine !== "advanced") {
+      out.textContent = `No TradingView (Advanced Charts) chart detected here${r.canvases ? ` (${r.canvases} canvas chart(s) on the page, but not a supported engine)` : ""}. Priism Skins only skins TradingView's Advanced Charts. Paste me this line.`;
+      return;
+    }
     if (!r.hooked) { out.textContent = "The skin engine isn't active on this tab yet. Turn Priism Skins on here, let the chart load, then click again."; return; }
     if (r.caught && r.caught.length) {
       const list = r.caught.slice(0, 6).map((s) => `“${s.text}” (${s.font}${s.box ? "" : ", no box"})`).join("; ");
