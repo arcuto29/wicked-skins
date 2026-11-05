@@ -919,6 +919,68 @@ $("bracketLoss").oninput = (e) => { set({ bracketLoss: e.target.value, bracketTe
 $("bracketBorderColor").oninput = (e) => { set({ bracketBorderColor: e.target.value, bracketBorderW: cfg.bracketBorderW || 1 }); bkOn(); };
 $("bracketLineColor").oninput = (e) => { set({ bracketLineColor: e.target.value, bracketLineW: cfg.bracketLineW || 1 }); bkOn(); };
 
+// Diagnose: read, from the TradingView tab's page, which pills the hook actually caught — shown right here so the
+// user never needs the console. If it caught pills but they didn't restyle, that tells us it's a styling bug; if
+// it caught nothing, the pills draw in a way we don't yet detect (and we show what text IS on the chart).
+if ($("bracketDiag")) $("bracketDiag").onclick = async () => {
+  const out = $("bracketDiagOut");
+  out.style.display = ""; out.textContent = "Looking at your chart…";
+  if (!EXT_MODE || IS_TAB || !chrome.tabs || !chrome.scripting) { out.textContent = "Open this on a TradingView chart tab to diagnose."; return; }
+  let tab; try { [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); } catch {}
+  if (!tab || !/^https?:/.test(tab.url || "")) { out.textContent = "Open your TradingView chart, then click again."; return; }
+  // make sure brackets + debug are on so the hook is recording
+  set({ bracketOn: true, bracketDebug: true }); $("bracketOn").checked = true;
+  try {
+    // 1) install a one-shot probe in the page that samples in-chart text (and reset its buffer each run)
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true }, world: "MAIN",
+      func: () => {
+        try {
+          const C = CanvasRenderingContext2D.prototype;
+          window.__bdDiagSeen = [];
+          if (!window.__bdDiagProbe) {
+            window.__bdDiagProbe = 1; const o = C.fillText;
+            C.fillText = function (t) {
+              try {
+                const c = this.canvas, inPane = c && c.closest && c.closest(".chart-markup-table") && !c.closest("[class*=time-axis]");
+                if (inPane && /[0-9]/.test(String(t)) && window.__bdDiagSeen && window.__bdDiagSeen.length < 40) {
+                  const key = String(t).slice(0, 16) + this.font;
+                  if (!window.__bdDiagSeen.some((s) => s.k === key)) window.__bdDiagSeen.push({ k: key, t: String(t).slice(0, 16), f: this.font, a: this.textAlign });
+                }
+              } catch {}
+              return o.apply(this, arguments);
+            };
+          }
+        } catch {}
+      },
+    });
+    // nudge the chart so it repaints into our probe, then wait a beat
+    await new Promise((r) => setTimeout(r, 900));
+    // 2) read what the hook caught + what the probe saw (across all frames; pick the richest result)
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true }, world: "MAIN",
+      func: () => {
+        const d = window.__bdBracketDebug;
+        return { hooked: !!window.__bdHooked, ver: window.__bdHookVer || null, caught: d ? d.samples : null, onChart: window.__bdDiagSeen || [] };
+      },
+    });
+    const score = (x) => x && x.result ? ((x.result.caught ? x.result.caught.length * 100 : 0) + (x.result.onChart ? x.result.onChart.length : 0) + (x.result.hooked ? 1 : 0)) : -1;
+    const best = (results || []).sort((a, b) => score(b) - score(a))[0];
+    const r = best && best.result;
+    if (!r) { out.textContent = "Couldn't read the chart. Make sure Priism Skins is on for this tab."; return; }
+    if (!r.hooked) { out.textContent = "The skin engine isn't active on this tab yet. Turn Priism Skins on here, let the chart load, then click again."; return; }
+    if (r.caught && r.caught.length) {
+      const list = r.caught.slice(0, 6).map((s) => `“${s.text}” (${s.font}${s.box ? "" : ", no box"})`).join("; ");
+      out.textContent = `Caught ${r.caught.length} pill(s): ${list}. If these aren't restyling, tell me and paste this text.`;
+    } else if (r.onChart && r.onChart.length) {
+      const list = r.onChart.slice(0, 8).map((s) => `“${s.t}” [${s.f}]`).join("; ");
+      out.textContent = `No pills matched yet. Chart text seen: ${list}. Copy this and send it to me — it shows your pill's font so I can match it.`;
+    } else {
+      out.textContent = "No chart text seen yet. Make sure a position/order is open on the chart, wait a moment, then click again.";
+    }
+  } catch (e) { out.textContent = "Diagnose failed: " + (e && e.message ? e.message : "unknown") + ". Send me a screenshot of the pills instead."; }
+};
+
 function syncWatermark() {
   $("wmOn").checked = cfg.wmOn;
   $("wmText").value = cfg.wmText || "";

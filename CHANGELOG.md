@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.10 (2026-11-05)
+- Trade brackets: added a "Diagnose on my chart" button (Style → Trade brackets). If the brackets aren't restyling, click it and the panel tells you whether the skin engine is seeing your pills — and if not, what text is on the chart — so the issue can be pinned down without opening a console.
+
 ## 0.1.9 (2026-11-05)
 - Trade brackets now recolour/resize the pill number reliably even when the pill's box is drawn in a way we can't intercept (some broker pills do this). Detection keys off the pill's font instead of requiring its box, so the TP / Stop / entry / P&L numbers restyle on far more setups.
 
