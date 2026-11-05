@@ -4,7 +4,7 @@
   const link = (href, label) => `<a href="${href}"${here === href ? ' class="on"' : ""}>${label}</a>`;
   document.body.insertAdjacentHTML("afterbegin", `<header class="top"><div class="wrap">
     <a class="brand" href="index.html"><img src="img/icon-128.png" alt=""><span>${S.name}</span></a>
-    <nav class="links">${link("index.html#features", "Features")}${link("workshop.html", "Workshop")}${link("index.html#download", "Download")}${link("index.html#faq", "FAQ")}</nav>
+    <nav class="links">${link("index.html#features", "Features")}${link("workshop.html", "Workshop")}${link("guide.html", "Guide")}${link("index.html#download", "Download")}${link("index.html#faq", "FAQ")}</nav>
   </div></header>`);
   document.body.insertAdjacentHTML("beforeend", `<footer><div class="wrap">
     <span>© ${new Date().getFullYear()} ${S.name}</span>${link("privacy.html", "Privacy")}${link("terms.html", "Terms")}
