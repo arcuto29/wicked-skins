@@ -81,6 +81,15 @@
         <div class="row"><span>Position</span><div class="seg" id="pnlPos"></div></div>
       </details>
 
+      <details class="grp" data-grp="goal">
+        <summary>Daily goal &amp; limit <label class="switch" title="Track today's P&amp;L against a goal and a max loss"><input type="checkbox" id="goalOn" /><span></span></label></summary>
+        <p class="hint">A slim bar on your chart showing today's P&amp;L against your profit goal and your max loss. It adds up the P&amp;L drawn on your position line each time a trade closes, so it's an <b>estimate from what your chart shows, not your broker's statement</b>. Don't rely on it for a prop firm's official limits. Nothing is sent anywhere.</p>
+        <div class="row"><span>Profit goal</span><input class="field" id="goalTarget" type="number" min="0" step="10" style="max-width:110px" /></div>
+        <div class="row"><span>Max loss</span><input class="field" id="goalLimit" type="number" min="0" step="10" style="max-width:110px" /></div>
+        <div class="row"><span>Position</span><div class="seg" id="goalPos"></div></div>
+        <div class="row"><span>Today</span><b id="goalToday" style="font-weight:600">—</b><button id="goalReset" style="margin-left:auto">Reset today</button></div>
+      </details>
+
       <details class="grp" data-grp="brackets">
         <summary>Trade brackets <label class="switch" title="Recolour the broker's TP / Stop / entry pills"><input type="checkbox" id="bracketOn" /><span></span></label></summary>
         <p class="hint">Fully recolour your broker's on-chart Take profit, Stop and entry pills — box, number, outline and the level line — in any colour, and make the number bigger so it's easy to read on a busy wallpaper. We only restyle the pills TradingView already draws; nothing is sent anywhere.</p>
@@ -159,7 +168,7 @@
         </div>
         <p class="hint">A short code for your whole look — share it anywhere and anyone can paste it below to get your exact setup in one tap. (Your uploaded wallpapers can't travel in a code; a built-in skin is used instead — everything else carries.)</p>
         <div class="inline">
-          <input id="codeInput" placeholder="Paste a PRIISM1-… look code" spellcheck="false" />
+          <input class="field" id="codeInput" placeholder="Paste a PRIISM1-… look code" spellcheck="false" />
           <button id="codeApply">Apply</button>
         </div>
         <p class="hint" id="codeMsg" style="display:none"></p>
@@ -181,10 +190,20 @@
           <button class="primary" id="clipBtn" style="margin-left:auto">Record</button>
         </div>
         <div class="row"><span>Length</span><div class="seg" id="clipLen"></div></div>
-        <div class="row"><span>Custom</span><input id="clipCustom" type="number" min="2" max="120" step="1" placeholder="seconds (2–120)" style="width:140px" /><small class="hint" style="margin:0">overrides the length above</small></div>
+        <div class="row"><span>Custom</span><input class="field" id="clipCustom" type="number" min="2" max="120" step="1" placeholder="2–120 seconds" style="min-width:120px;max-width:150px" /><small class="hint" style="margin:0">overrides the length above</small></div>
         <p class="hint">Records an animated clip (WebM) of your chart with the live wallpaper moving, from 2 seconds up to 2 minutes. Keep the chart tab visible while it records. Click Record, then close this panel if you like: the clip downloads by itself when it ends. A badge on the chart shows the countdown; click it to stop and save early.</p>
         <p class="hint" id="clipMsg" style="display:none"></p>
         <a id="clipPreview" href="#" download="priism-chart.webm" style="display:none"><video id="clipVid" autoplay loop muted playsinline style="width:100%;border-radius:8px;border:1px solid var(--line,#2a3142)"></video></a>
+      </div>
+      <div class="box" style="margin-top:14px">
+        <div class="inline">
+          <strong style="font-size:13px">Trade journal</strong>
+          <label class="switch" style="margin-left:auto" title="Save a picture of your chart when a trade closes"><input type="checkbox" id="journalOn" /><span></span></label>
+        </div>
+        <p class="hint">When a trade closes, saves a picture of your chart as it looked while the trade was open (your entry, stop and target), stamped with the symbol, P&amp;L and time. Stored only on this computer; the latest 60 are kept.</p>
+        <p class="hint" id="journalEmpty">No trades saved yet. Turn it on, then take a trade.</p>
+        <div id="journalList"></div>
+        <div class="inline" style="margin-top:8px"><button id="journalClear" hidden>Clear journal</button></div>
       </div>
     </section>
 

@@ -26,6 +26,7 @@ const DEFAULTS = {
   bracketOn: false, bracketSize: 1, bracketBack: "keep",
   bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
   bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
+  goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false,
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -190,7 +191,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); }
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 const QUICK_LOOKS = [
@@ -785,6 +786,58 @@ if ($("clipBtn")) $("clipBtn").onclick = async () => {
     : `Done (${kb} KB) — click the clip to save, or drag it out to share.`, true);
 };
 
+// ---------- daily goal & limit + trade journal (the data lives in chrome.storage.local; the page writes it) ----------
+const dayKeyP = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+const fmtMoneyP = (v, u) => `${v >= 0 ? "+" : "\u2212"}${u && u.length === 1 ? u : ""}${Math.abs(v).toFixed(2)}${u && u.length > 1 ? " " + u : ""}`;
+const fmtDurP = (s) => (s < 90 ? s + "s" : s < 5400 ? Math.round(s / 60) + "m" : (s / 3600).toFixed(1) + "h");
+const storeGet = (defaults) => new Promise((res) => { try { chrome.storage.local.get(defaults, res); } catch { res(defaults); } });
+function syncGoal() {
+  if (!$("goalOn")) return;
+  $("goalOn").checked = !!cfg.goalOn;
+  if (document.activeElement !== $("goalTarget")) $("goalTarget").value = cfg.goalTarget;
+  if (document.activeElement !== $("goalLimit")) $("goalLimit").value = cfg.goalLimit;
+  seg("goalPos", [["bl", "Bottom left"], ["tl", "Top left"], ["tc", "Top"]], () => cfg.goalPos || "bl", (v) => set({ goalPos: v }));
+  storeGet({ dayPnl: null }).then((s) => {
+    const d = s.dayPnl && s.dayPnl.date === dayKeyP() ? s.dayPnl : null;
+    $("goalToday").textContent = d ? `${fmtMoneyP(d.realized, d.unit)} \u00B7 ${d.trades} closed trade${d.trades === 1 ? "" : "s"}` : "no closed trades yet";
+  });
+}
+if ($("goalOn")) {
+  $("goalOn").onchange = (e) => set({ goalOn: e.target.checked });
+  $("goalTarget").oninput = (e) => set({ goalTarget: Math.max(0, +e.target.value || 0) });
+  $("goalLimit").oninput = (e) => set({ goalLimit: Math.max(0, +e.target.value || 0) });
+  $("goalReset").onclick = () => { try { chrome.storage.local.remove("dayPnl", syncGoal); } catch {} hintToast("Today's total was reset."); };
+}
+function renderJournal() {
+  const box = $("journalList"); if (!box) return;
+  $("journalOn").checked = !!cfg.journalOn;
+  storeGet({ journal: [] }).then((s) => {
+    const list = Array.isArray(s.journal) ? s.journal : [];
+    box.innerHTML = ""; $("journalEmpty").hidden = list.length > 0; $("journalClear").hidden = list.length === 0;
+    for (const e of list) {
+      const row = document.createElement("div"); row.className = "jrow";
+      const when = new Date(e.t).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+      if (e.img) {
+        const a = document.createElement("a"), im = document.createElement("img");
+        im.src = e.img; im.alt = "trade"; a.href = e.img; a.title = "Click to save the picture";
+        a.download = `trade-${(e.sym || "chart").replace(/[^\w-]+/g, "")}-${new Date(e.t).toISOString().slice(0, 16).replace(/[:T]/g, "-")}.jpg`;
+        a.append(im); row.append(a);
+      }
+      const meta = document.createElement("div"); meta.className = "jmeta";
+      meta.innerHTML = `<b>${esc(e.sym || "Trade")}</b> <span class="${e.v >= 0 ? "jup" : "jdn"}">${esc(fmtMoneyP(e.v, e.unit))}</span><small>${esc(when)} \u00B7 held ${fmtDurP(e.secs || 0)}</small>`;
+      const del = document.createElement("button"); del.className = "x"; del.title = "Delete"; del.innerHTML = ICON_X;
+      del.onclick = async () => { const cur = (await storeGet({ journal: [] })).journal || []; chrome.storage.local.set({ journal: cur.filter((x) => x.id !== e.id) }, renderJournal); };
+      row.append(meta, del); box.append(row);
+    }
+  });
+}
+if ($("journalOn")) {
+  $("journalOn").onchange = (e) => set({ journalOn: e.target.checked });
+  $("journalClear").onclick = () => { try { chrome.storage.local.set({ journal: [] }, renderJournal); } catch {} };
+}
+// the page updates these while the panel is open (a trade just closed)
+try { chrome.storage.onChanged && chrome.storage.onChanged.addListener((ch, area) => { if (area !== "local") return; if (ch.dayPnl) syncGoal(); if (ch.journal) renderJournal(); }); } catch {}
+
 // ---------- tune ----------
 const SLIDERS = [
   ["opacity", "Opacity", 0, 1, 0.05, (v) => Math.round(v * 100) + "%"],
@@ -1282,7 +1335,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal();
   siteBar();
   deskCard();
   detectCharts();

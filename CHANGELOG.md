@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.18 (2026-11-06)
+- Daily goal & limit: an optional slim bar on your chart tracking today's P&L against a profit goal and a max loss. It turns amber at 80% of your limit and red at 100%, and tells you once when you hit your goal. Find it under Style → Daily goal & limit.
+- Trade journal: an optional journal that saves a picture of your chart, as it looked while the trade was open (your entry, stop and target), stamped with the symbol, P&L and time held, every time a trade closes. Stored only on your computer (latest 60). Find it under Saved → Trade journal.
+- Both work from the P&L your chart already shows on your position line, so they are estimates, not your broker's statement. They don't read your account, and nothing leaves your computer.
+
 ## 0.1.17 (2026-11-05)
 - Live clip: record for as long as you like, from 2 seconds up to 2 minutes. Pick 5s / 10s / 30s / 1 min / 2 min, or type your own length.
 - Live clip now downloads by itself the moment recording ends, so you can click Record and close the panel. A countdown badge on the chart shows the time left; click it to stop and save early.
