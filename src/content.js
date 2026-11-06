@@ -963,6 +963,7 @@
   // read, so for those the clip shows the chart + watermark moving but not the uploaded wallpaper. A clip is bigger
   // than a PNG, so we cap it (default ~5s) and downscale to keep it shareable.
   let clipRec = null;
+  const MAX_CLIP_SECONDS = 120;
   async function captureClip(seconds) {
     if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
     if (clipRec) return { ok: false, reason: "Already recording a clip." };
@@ -982,25 +983,50 @@
     const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
     const mime = mimes.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
     let rec;
-    try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 6_000_000 } : undefined); }
+    // Any length from 2s to 2 minutes. Longer clips use a lower bitrate so the file stays shareable
+    // (about 4.5 MB for 10s, 10 MB for 60s, 15 MB for 2 min).
+    const dur = Math.max(2, Math.min(MAX_CLIP_SECONDS, +seconds || 5));
+    const bps = dur <= 10 ? 6_000_000 : dur <= 30 ? 3_500_000 : dur <= 60 ? 2_000_000 : 1_000_000;
+    try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: bps } : undefined); }
     catch { return { ok: false, reason: "Your browser can't record clips." }; }
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
     clipRec = rec;
-    const dur = Math.max(2, Math.min(10, +seconds || 5));
+    // Every clip is saved by the page itself the moment it ends. The popup closes when you click away,
+    // so it must never be the thing that holds the file.
+    const autoSave = true;
+    // A small countdown badge on the chart. Click it to stop early. It is not part of the recording.
+    const badge = document.createElement("div");
+    badge.style.cssText = "position:fixed;z-index:2147483647;top:14px;left:50%;transform:translateX(-50%);padding:7px 14px;border-radius:999px;background:rgba(10,12,18,.88);color:#fff;font:600 13px system-ui,sans-serif;border:1px solid rgba(255,80,80,.7);cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.5)";
+    badge.title = "Click to stop and save now";
+    document.documentElement.appendChild(badge);
+    const t0 = performance.now();
+    const paint = () => { const left = Math.max(0, Math.ceil(dur - (performance.now() - t0) / 1000)); badge.textContent = `\u25CF Recording ${left}s \u00B7 click to stop`; };
+    paint(); const badgeTimer = setInterval(paint, 250);
     return await new Promise((resolve) => {
-      let rafId = 0, done = false;
+      let rafId = 0, done = false, stopTimer = 0;
+      const stop = () => { clearTimeout(stopTimer); try { rec.state !== "inactive" && rec.stop(); } catch {} };
+      badge.onclick = stop;
+      const cleanup = () => { done = true; cancelAnimationFrame(rafId); clearTimeout(stopTimer); clearInterval(badgeTimer); badge.remove(); clipRec = null; };
       const draw = () => { if (done) return; try { compositeFrame(g, box, dpr, wmImg); } catch {} rafId = requestAnimationFrame(draw); };
       rec.onstop = async () => {
-        done = true; cancelAnimationFrame(rafId); clipRec = null;
+        cleanup();
         try { stream.getTracks().forEach((t) => t.stop()); } catch {}
         if (!chunks.length) return resolve({ ok: false, reason: "The browser blocked recording (a cross-origin chart)." });
         const blob = new Blob(chunks, { type: mime || "video/webm" });
+        if (autoSave) {
+          const q = parseTitle(), name = `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${Math.round((performance.now() - t0) / 1000)}s.webm`;
+          const url = URL.createObjectURL(blob), a = document.createElement("a");
+          a.href = url; a.download = name; document.documentElement.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+          flash("Clip saved to your downloads");
+          return resolve({ ok: true, saved: true, name, mediaMissed, bytes: blob.size, w: W, h: H });
+        }
         resolve({ ok: true, url: await blobToDataURL(blob), mediaMissed, bytes: blob.size, w: W, h: H });
       };
-      rec.onerror = () => { done = true; cancelAnimationFrame(rafId); clipRec = null; resolve({ ok: false, reason: "Recording failed." }); };
-      try { rec.start(); draw(); setTimeout(() => { try { rec.state !== "inactive" && rec.stop(); } catch {} }, dur * 1000); }
-      catch { done = true; clipRec = null; resolve({ ok: false, reason: "Recording failed." }); }
+      rec.onerror = () => { cleanup(); resolve({ ok: false, reason: "Recording failed." }); };
+      try { rec.start(); draw(); stopTimer = setTimeout(stop, dur * 1000); }
+      catch { cleanup(); resolve({ ok: false, reason: "Recording failed." }); }
     });
   }
 

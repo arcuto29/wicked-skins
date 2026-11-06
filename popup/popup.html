@@ -178,10 +178,11 @@
       <div class="box" style="margin-top:14px">
         <div class="inline">
           <strong style="font-size:13px">Live clip</strong>
-          <div class="seg" id="clipLen" style="margin-left:auto"></div>
-          <button class="primary" id="clipBtn">Record</button>
+          <button class="primary" id="clipBtn" style="margin-left:auto">Record</button>
         </div>
-        <p class="hint">Records a short animated clip (WebM) of your chart with the live wallpaper moving — perfect for sharing a vibe that a still can't show. It records for the chosen length, then gives you the file.</p>
+        <div class="row"><span>Length</span><div class="seg" id="clipLen"></div></div>
+        <div class="row"><span>Custom</span><input id="clipCustom" type="number" min="2" max="120" step="1" placeholder="seconds (2–120)" style="width:140px" /><small class="hint" style="margin:0">overrides the length above</small></div>
+        <p class="hint">Records an animated clip (WebM) of your chart with the live wallpaper moving, from 2 seconds up to 2 minutes. Keep the chart tab visible while it records. Click Record, then close this panel if you like: the clip downloads by itself when it ends. A badge on the chart shows the countdown; click it to stop and save early.</p>
         <p class="hint" id="clipMsg" style="display:none"></p>
         <a id="clipPreview" href="#" download="priism-chart.webm" style="display:none"><video id="clipVid" autoplay loop muted playsinline style="width:100%;border-radius:8px;border:1px solid var(--line,#2a3142)"></video></a>
       </div>

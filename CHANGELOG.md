@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.17 (2026-11-05)
+- Live clip: record for as long as you like, from 2 seconds up to 2 minutes. Pick 5s / 10s / 30s / 1 min / 2 min, or type your own length.
+- Live clip now downloads by itself the moment recording ends, so you can click Record and close the panel. A countdown badge on the chart shows the time left; click it to stop and save early.
+
 ## 0.1.16 (2026-11-05)
 - Fix: shortened the extension's description so it meets the Chrome Web Store's 132-character limit (the store rejected the upload otherwise). No feature changes.
 
