@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 5;
+  const HOOK_VERSION = 6;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -376,6 +376,9 @@
     }, 120);
   }
   document.addEventListener("bd-repaint", () => forceRepaint(false));   // asked for by content.js
+  // asked for by content.js before it decides a position has closed: a quiet market stops the chart redrawing, so the
+  // position pill (our P&L signal) would go stale even though the trade is still open. A soft redraw refreshes it, no blink.
+  document.addEventListener("bd-softrepaint", () => { try { apiRepaint(); } catch {} });
 
   // ---------- helpers ----------
   const chartCache = new WeakMap();

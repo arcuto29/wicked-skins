@@ -23,7 +23,7 @@ h4 { margin: 14px 0 6px; font-size: 11px; letter-spacing: .08em; text-transform:
 .add:hover { border-color: #2ef2b0; }
 .box { padding: 10px; border: 1px solid #23252f; border-radius: 10px; background: #12141a; }
 .inline { display: flex; gap: 8px; }
-input[type=text], #loName { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid #2b2e3a; background: #0a0b0f; color: inherit; }
+input[type=text], #loName { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid #2b2e3a; background: #0a0b0f; color: inherit; }
 button, .btn { padding: 8px 12px; border-radius: 8px; border: 1px solid #2b2e3a; background: #181a22; color: inherit; cursor: pointer; }
 .primary { background: linear-gradient(90deg,#19d3ff,#2ef2b0 55%,#c6ff3d); color: #04130f; border: none; font-weight: 700; }
 .link { background: none; border: none; color: #9a9dab; margin-top: 12px; padding-left: 0; }
@@ -133,3 +133,9 @@ details.grp > summary .switch { margin-left: auto; }
 .chartpick .chip { padding: 4px 10px; font-size: 12px; }
 .chartpick .chip.on { background: #2ef2b0; color: #06110d; border-color: #2ef2b0; }
 .btn.block { display:block; width:100%; text-align:center; margin-top:10px; }
+
+/* trade journal list */
+.jrow { display: flex; gap: 10px; align-items: center; margin-top: 8px; padding: 6px; border: 1px solid #23252f; border-radius: 10px; background: #0f1117; }
+.jrow img { width: 96px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #2b2e3a; display: block; }
+.jrow .jmeta { flex: 1; min-width: 0; font-size: 12px; } .jrow .jmeta small { display: block; color: #6f7280; margin-top: 2px; }
+.jrow .jup { color: #00e08a; font-weight: 700; } .jrow .jdn { color: #ff5470; font-weight: 700; }

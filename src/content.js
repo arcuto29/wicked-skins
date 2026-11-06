@@ -39,6 +39,8 @@
     // style: "color" (your up/down colours) | "rainbow". back: "none"|"glass"|"solid" = a panel behind the number
     // so it's readable on any wallpaper. pnlUp/pnlDown: custom colours ("" = use candle colours).
     pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
+    // Daily goal / loss limit bar + automatic trade journal (both opt-in; estimates from the P&L drawn on the chart).
+    goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false,
     // Glow on indicators / lines / P&L, and price scale styling
     lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
     scaleSize: 0, scaleFont: "default",
@@ -302,6 +304,153 @@
     if (pos[0] === "t") st.top = r.top + pad + 34 + "px"; else st.top = r.bottom - 50 - pad + "px";
     if (pos[1] === "l") st.left = r.left + pad + "px"; else { st.right = (innerWidth - r.right) + 80 + pad + "px"; }
   }
+  // ---------- Trading tools: daily goal / loss limit + automatic trade journal ----------
+  // Both run off the open-P&L text hook.js already publishes (data-ws-pnl). A "trade" is that P&L appearing and then
+  // disappearing. When it disappears, its last value is added to today's total. That total is an ESTIMATE built from
+  // what the chart drew, not your broker's statement. Everything stays in this browser (chrome.storage.local);
+  // nothing is sent anywhere.
+  const HAS_STORE = typeof chrome !== "undefined" && chrome.storage && chrome.storage.local;
+  const JOURNAL_MAX = 60;
+  const dayKey = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  const freshDay = () => ({ date: dayKey(), realized: 0, trades: 0, unit: "", flags: {} });
+  let day = freshDay(), openTrade = null, lastNudge = 0, goalEl = null, jShot = null, jShotT = 0;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const fmtDur = (s) => (s < 90 ? s + "s" : s < 5400 ? Math.round(s / 60) + "m" : (s / 3600).toFixed(1) + "h");
+  const fmtAbs = (n, u) => { const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
+    return `${unit}${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}${code}`; };
+  const readPnlRaw = () => { try { const p = JSON.parse(document.documentElement.getAttribute("data-ws-pnl") || "null"); return p && typeof p.v === "number" ? p : null; } catch { return null; } };
+  const curSym = () => { const q = parseTitle(); return q ? q.sym : ""; };
+  const persistDay = () => { if (HAS_STORE) try { chrome.storage.local.set({ dayPnl: day }); } catch {} };
+  function rollDay() { if (day.date !== dayKey()) { day = freshDay(); persistDay(); } }
+  const totalToday = () => Math.round((day.realized + (openTrade ? openTrade.v : 0)) * 100) / 100;
+  if (HAS_STORE) chrome.storage.local.get({ dayPnl: null }, (s) => { if (s.dayPnl && s.dayPnl.date === dayKey()) day = { ...freshDay(), ...s.dayPnl }; });
+
+  function tickTrades() {
+    if (standDown || (EXT && !owner)) return;
+    if (!(cfg.enabled && (cfg.goalOn || cfg.journalOn))) { openTrade = null; jShot = null; return renderGoal(); }
+    // A hidden tab doesn't redraw its chart, so its P&L text goes stale. That must never look like a closed trade
+    // (otherwise tabbing away mid-trade would record a fake close, then a fake new trade when you come back).
+    if (document.hidden) return renderGoal();
+    rollDay();
+    const now = Date.now(), p = readPnlRaw(), age = p ? now - p.ts : Infinity;
+    if (p && age < 3000) {
+      if (!openTrade) openTrade = { since: now, sym: curSym(), v: p.v, unit: p.unit || "", seen: p.ts };
+      else { openTrade.v = p.v; openTrade.seen = p.ts; if (p.unit) openTrade.unit = p.unit; }
+      if (cfg.journalOn && now - openTrade.since >= 2500) refreshJournalShot();   // let the entry / stop / target lines settle first
+    } else if (openTrade) {
+      // The P&L text hasn't been drawn for a while. A quiet market stops the chart redrawing, so ask TradingView for a
+      // soft repaint first; only if nothing comes back do we believe the position is really gone.
+      if (age >= 6000 && now - lastNudge > 5000) { lastNudge = now; document.dispatchEvent(new CustomEvent("bd-softrepaint")); }
+      const sym = curSym(), otherSymbol = sym && openTrade.sym && sym !== openTrade.sym;   // pill hidden because you're on another symbol
+      // close only once a repaint was requested at least 2.5s ago and still nothing came back
+      if (age >= 8500 && now - lastNudge >= 2500 && !otherSymbol) { const t = openTrade; openTrade = null; closeTrade(t); }
+    }
+    renderGoal();
+  }
+  setInterval(tickTrades, 700);
+
+  // Add a finished trade to today's total. Two TradingView tabs showing the same trade must not count it twice, so
+  // the shared storage copy is checked first and only the tab that records it first goes on to write the journal.
+  function recordClose(v, sym, unit) {
+    return new Promise((resolve) => {
+      if (!HAS_STORE) { day.realized = Math.round((day.realized + v) * 100) / 100; day.trades++; return resolve(true); }
+      chrome.storage.local.get({ dayPnl: null }, (s) => {
+        const d = s.dayPnl && s.dayPnl.date === dayKey() ? { ...freshDay(), ...s.dayPnl } : freshDay(), now = Date.now();
+        if (d.last && d.last.sym === sym && d.last.v === v && now - d.last.t < 25000) { day = d; return resolve(false); }
+        d.realized = Math.round((d.realized + v) * 100) / 100; d.trades = (d.trades || 0) + 1; d.unit = unit || d.unit; d.last = { sym, v, t: now };
+        day = d; chrome.storage.local.set({ dayPnl: d }, () => resolve(true));
+      });
+    });
+  }
+  async function closeTrade(t) {
+    const secs = Math.max(0, Math.round((t.seen - t.since) / 1000));
+    if (secs < 4) { jShot = null; return; }                       // a flicker, not a trade
+    const v = Math.round(t.v * 100) / 100;
+    await sleep(Math.random() * 400);
+    const first = await recordClose(v, t.sym, t.unit);
+    if (first && cfg.journalOn) await saveJournal(t, v, secs);
+    jShot = null; jShotT = 0;
+    renderGoal();
+  }
+
+  // Journal pictures are taken WHILE the trade is open (first after ~2.5s, then refreshed about every 10s), because that's when your entry,
+  // stop and target are on the chart; by the time it closes they're gone.
+  async function composeChartCanvas(maxW) {
+    const box = chartsBox(), k = Math.min(1.5, devicePixelRatio || 1) * Math.min(1, maxW / Math.max(1, box.width));
+    const c = document.createElement("canvas"); c.width = Math.max(2, Math.round(box.width * k)); c.height = Math.max(2, Math.round(box.height * k));
+    compositeFrame(c.getContext("2d"), box, k, await watermarkImage());
+    return c;
+  }
+  async function refreshJournalShot() {
+    if (!HAS_STORE || Date.now() - jShotT < 10000) return;
+    jShotT = Date.now();
+    try { jShot = await composeChartCanvas(1100); } catch { jShot = null; }
+  }
+  async function saveJournal(t, v, secs) {
+    let c = jShot;
+    if (!c) { try { c = await composeChartCanvas(1100); } catch { c = null; } }
+    let img = null;
+    if (c) {
+      try {
+        // a header band above the chart (so nothing on the chart is covered): symbol, P&L, time held
+        const head = Math.max(30, Math.round(c.width * 0.042)), out = document.createElement("canvas");
+        out.width = c.width; out.height = c.height + head;
+        const g = out.getContext("2d"), fs = Math.round(head * 0.42), pad = Math.round(head * 0.4);
+        g.fillStyle = "#0b0e16"; g.fillRect(0, 0, out.width, out.height); g.drawImage(c, 0, head);
+        g.textBaseline = "middle"; g.font = `800 ${fs}px ui-monospace, "SF Mono", Menlo, Consolas, monospace`;
+        const name = t.sym || "Trade"; g.fillStyle = "#e9ecf5"; g.fillText(name, pad, head / 2);
+        g.fillStyle = v >= 0 ? "#00e08a" : "#ff3355"; g.fillText(fmtPnl(v, t.unit), pad * 2 + g.measureText(name).width, head / 2);
+        g.fillStyle = "#8f98ad"; g.font = `600 ${Math.round(fs * 0.8)}px system-ui, sans-serif`; g.textAlign = "right";
+        g.fillText(new Date().toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) + " \u00B7 held " + fmtDur(secs), out.width - pad, head / 2);
+        img = out.toDataURL("image/jpeg", 0.82);
+      } catch { img = null; }
+    }
+    const entry = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: Date.now(), sym: t.sym || "", v, unit: t.unit || "", secs, img };
+    await new Promise((res) => chrome.storage.local.get({ journal: [] }, (s) => {
+      const list = [entry, ...(Array.isArray(s.journal) ? s.journal : [])].slice(0, JOURNAL_MAX);
+      chrome.storage.local.set({ journal: list }, res);
+    }));
+  }
+
+  // The goal / limit bar. Left half of the track = how much of your max loss is used, right half = progress to the goal.
+  function checkFlags(total, T, L) {
+    const f = day.flags || (day.flags = {}); let changed = false;
+    if (L > 0 && total <= -L * 0.8 && !f.w80) { f.w80 = 1; flash("Daily loss limit: 80% used"); changed = true; }
+    if (L > 0 && total <= -L && !f.lim) { f.lim = 1; flash("Daily loss limit reached"); changed = true; }
+    if (T > 0 && total >= T && !f.goal) { f.goal = 1; flash("Daily goal reached"); changed = true; }
+    if (changed) persistDay();
+  }
+  function renderGoal() {
+    const T = Math.max(0, +cfg.goalTarget || 0), L = Math.max(0, +cfg.goalLimit || 0);
+    if (!(cfg.enabled && cfg.goalOn && (T || L))) { if (goalEl) { goalEl.remove(); goalEl = null; } return; }
+    if (!goalEl) {
+      goalEl = document.createElement("div"); goalEl.id = "bd-goal"; goalEl.dataset.bdOwner = ME.token;
+      goalEl.title = "Estimated from the P&L text drawn on your chart. Not your broker's statement.";
+      goalEl.innerHTML = '<div class="bd-g-top"><span class="bd-g-label"></span><span class="bd-g-val"></span></div><div class="bd-g-track"><i class="bd-g-fill"></i><u class="bd-g-mid"></u></div><div class="bd-g-meta"><span class="bd-g-l"></span><span class="bd-g-r"></span></div>';
+      document.documentElement.appendChild(goalEl);
+    }
+    const total = totalToday(), u = day.unit || (openTrade && openTrade.unit) || "";
+    checkFlags(total, T, L);
+    const state = L && total <= -L ? "limit" : L && total <= -L * 0.8 ? "warn" : T && total >= T ? "goal" : "";
+    goalEl.className = state ? "bd-g-" + state : "";
+    if (state) goalEl.style.removeProperty("--gc"); else goalEl.style.setProperty("--gc", total >= 0 ? upColor() : downColor());
+    const w = (total >= 0 ? (T ? Math.min(1, total / T) : 0) : (L ? Math.min(1, -total / L) : 0)) * 50, fill = goalEl.querySelector(".bd-g-fill");
+    fill.style.width = w + "%"; fill.style.left = (total >= 0 ? 50 : 50 - w) + "%";
+    goalEl.querySelector(".bd-g-label").textContent = "TODAY" + (openTrade ? " \u00B7 LIVE" : "") + (day.trades ? ` \u00B7 ${day.trades} trade${day.trades > 1 ? "s" : ""}` : "");
+    goalEl.querySelector(".bd-g-val").textContent = fmtPnl(total, u);
+    goalEl.querySelector(".bd-g-l").textContent = L ? `limit \u2212${fmtAbs(L, u)}` : "";
+    goalEl.querySelector(".bd-g-r").textContent = T ? `goal ${fmtAbs(T, u)}` : "";
+    placeGoal();
+  }
+  function placeGoal() {
+    if (!goalEl) return;
+    const r = chartsBox(), pad = 16, st = goalEl.style, pos = cfg.goalPos || "bl";
+    st.left = st.right = st.top = st.bottom = st.transform = "";
+    if (pos === "tc") { st.left = r.left + r.width / 2 + "px"; st.top = r.top + pad + "px"; st.transform = "translateX(-50%)"; }
+    else if (pos === "tl") { st.left = r.left + pad + "px"; st.top = r.top + pad + 34 + "px"; }              // below TradingView's legend row
+    else { st.left = r.left + pad + "px"; st.bottom = (innerHeight - r.bottom) + 30 + 44 + "px"; }           // above the time axis + logo
+  }
+
   const watchTitle = () => {
     const t = document.querySelector("title");
     if (!t) return setTimeout(watchTitle, 1000);
@@ -474,6 +623,7 @@
     clipToChart();
     placeWatermark();
     placePnl();
+    placeGoal();
   }
   function trackLayout() {
     if (!layer || standDown || document.querySelector(".chart-container[data-bd-repaint]")) return;   // mid-redraw: charts hidden for 2 frames
@@ -874,7 +1024,8 @@
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !FX_KEYS.includes(k));
+    if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -1104,8 +1255,11 @@
     whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); pushFx(); renderWatermark(); }));
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
-      for (const k in changes) cfg[k] = changes[k].newValue;
-      apply(Object.keys(changes));
+      // today's total is shared between tabs (and reset from the panel); the journal is just stored data
+      if (changes.dayPnl) { const nv = changes.dayPnl.newValue; day = nv && nv.date ? { ...freshDay(), ...nv } : freshDay(); renderGoal(); }
+      const keys = Object.keys(changes).filter((k) => k !== "dayPnl" && k !== "journal");
+      for (const k of keys) cfg[k] = changes[k].newValue;
+      if (keys.length) apply(keys);
     });
   } else {
     // Desktop app: host injects window.__BD_CFG and calls window.__bdUpdate on change.

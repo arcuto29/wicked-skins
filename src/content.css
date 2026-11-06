@@ -185,3 +185,19 @@ html.bd-ui-accent [class*="layout__area--top"] [class*="isActive"] {
 #bd-pnl.bd-pnl-bump { animation: bd-pnl-bump .32s ease-out; }
 #bd-pnl.bd-pnl-rainbow.bd-pnl-bump { animation: bd-pnl-rainbow 3s linear infinite, bd-pnl-bump .32s ease-out; }
 @keyframes bd-pnl-bump { 0% { transform: var(--tf, none) scale(1); } 40% { transform: var(--tf, none) scale(1.12); } 100% { transform: var(--tf, none) scale(1); } }
+
+/* Daily goal / loss-limit bar (opt-in). Left half of the track = loss limit used, right half = progress to goal. */
+#bd-goal { position: fixed; z-index: 2147483001; pointer-events: none; min-width: 236px; padding: 9px 13px 10px; border-radius: 12px;
+  --gc: #8a93a6; color: #dfe5f1; background: rgba(8,11,18,.62); -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--gc) 55%, transparent); box-shadow: 0 8px 30px -8px rgba(0,0,0,.7);
+  font: 700 12px/1.2 ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace; transition: border-color .3s; }
+#bd-goal .bd-g-top { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
+#bd-goal .bd-g-label { opacity: .6; letter-spacing: .08em; font-size: 10px; }
+#bd-goal .bd-g-val { font-size: 19px; font-weight: 900; color: var(--gc); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+#bd-goal .bd-g-track { position: relative; height: 6px; margin-top: 8px; border-radius: 99px; background: rgba(255,255,255,.12); overflow: hidden; }
+#bd-goal .bd-g-fill { position: absolute; top: 0; bottom: 0; background: var(--gc); border-radius: 99px; transition: left .35s, width .35s; }
+#bd-goal .bd-g-mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: rgba(255,255,255,.55); }
+#bd-goal .bd-g-meta { display: flex; justify-content: space-between; gap: 14px; margin-top: 6px; font-size: 10px; opacity: .75; }
+#bd-goal.bd-g-warn { --gc: #ffb13b; } #bd-goal.bd-g-goal { --gc: #00e08a; }
+#bd-goal.bd-g-limit { --gc: #ff3355; animation: bd-g-pulse 1.5s ease-in-out infinite; }
+@keyframes bd-g-pulse { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, #ff3355 35%, transparent), 0 8px 30px -8px rgba(0,0,0,.7); } }
