@@ -26,7 +26,7 @@ const DEFAULTS = {
   bracketOn: false, bracketSize: 1, bracketBack: "keep",
   bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
   bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
-  goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false,
+  goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false, clipMode: "chart",
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -191,7 +191,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); }
+function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 const QUICK_LOOKS = [
@@ -757,6 +757,18 @@ if ($("snapBtn")) $("snapBtn").onclick = async () => {
 
 // ---------- live clip (short animated WebM of the chart + moving wallpaper) ----------
 let clipSecs = 5;
+// Chart only = we redraw the chart + effects ourselves (fast, no prompts). Whole screen = Chrome's screen share,
+// which records exactly what you see (every effect, uploaded wallpapers, the lot) after you pick what to share.
+const CLIP_HINTS = {
+  chart: "Records an animated clip (WebM) of your chart with the live wallpaper and effects moving, from 2 seconds up to 2 minutes. Click Record, then close this panel if you like: it downloads by itself when it ends. A badge on the chart shows the countdown; click it to stop and save early. Keep the chart tab visible. An uploaded wallpaper can't be read this way; use Whole screen for that.",
+  screen: "Records exactly what you see, so every effect and any uploaded wallpaper is in it. After you click Record, a card appears on your chart: click \u201cChoose what to record\u201d and pick Entire Screen (or a window / this tab) in Chrome's box. It records for the length below, then downloads by itself. Stop early with Chrome's \u201cStop sharing\u201d button.",
+};
+const syncClipMode = () => {
+  seg("clipMode", [["chart", "Chart only"], ["screen", "Whole screen"]], () => cfg.clipMode || "chart", (v) => { set({ clipMode: v }); syncClipMode(); });
+  if ($("clipHint")) $("clipHint").textContent = CLIP_HINTS[cfg.clipMode === "screen" ? "screen" : "chart"];
+  if ($("clipBtn")) $("clipBtn").textContent = cfg.clipMode === "screen" ? "Record screen" : "Record";
+};
+if ($("clipMode")) syncClipMode();
 if ($("clipLen")) seg("clipLen", [[5, "5s"], [10, "10s"], [30, "30s"], [60, "1 min"], [120, "2 min"]], () => clipSecs, (v) => { clipSecs = v; if ($("clipCustom")) $("clipCustom").value = ""; });
 // a custom length (2-120 s) overrides the preset
 const clipLength = () => { const c = Math.round(+($("clipCustom") && $("clipCustom").value)); return c >= 2 ? Math.min(120, c) : clipSecs; };
@@ -765,6 +777,12 @@ if ($("clipBtn")) $("clipBtn").onclick = async () => {
   const show = (t, ok) => { msg.style.display = ""; msg.textContent = t; msg.style.color = ok === false ? "#ff8a8a" : ""; };
   if (!EXT_MODE || IS_TAB) return show("Open this on a TradingView chart tab to record.", false);
   const secs = clipLength();
+  if (cfg.clipMode === "screen") {
+    const r0 = await tabMsgAnyFrame({ ws: "clip", seconds: secs, mode: "screen" });
+    if (!r0) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
+    if (!r0.ok) return show(r0.reason || "Couldn't start the screen recording.", false);
+    return show(`Now click \u201cChoose what to record\u201d on your chart and pick what to share. It records ${secs}s, then downloads by itself.`, true);
+  }
   prev.style.display = "none"; btn.disabled = true;
   let left = secs; show(`Recording ${secs}s. You can close this panel; the clip downloads by itself when it ends.`);
   const tick = setInterval(() => { left--; }, 1000);
@@ -1335,7 +1353,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal();
+  renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode();
   siteBar();
   deskCard();
   detectCharts();

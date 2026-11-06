@@ -734,6 +734,7 @@
       }
       if (msg.ws === "clip") {
         if (!owner || standDown) return;
+        if (msg.mode === "screen") { reply(startScreenFlow(+msg.seconds || 5)); return; }   // the user finishes this on the page
         captureClip(+msg.seconds || 5).then((r) => reply(r)).catch((e) => reply({ ok: false, reason: String(e && e.message || e) }));
         return true;   // async reply (takes a few seconds while recording)
       }
@@ -1038,22 +1039,67 @@
   // image/video wallpaper lives in a sandboxed player frame whose pixels we can't read, so for those the snapshot
   // keeps the chart + watermark and notes the wallpaper couldn't be included. Nothing is uploaded anywhere.
   function loadImage(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; }); }
-  // Draw ONE composed frame (wallpaper + chart canvases + watermark) into g, cropped to box, at scale dpr.
-  // wmImg = a preloaded watermark image (corner logo or tiled pattern) so this stays synchronous for the clip loop.
-  // Returns { mediaMissed } so the still path can tell the user if an uploaded wallpaper couldn't be read.
-  function compositeFrame(g, box, dpr, wmImg) {
-    const W = g.canvas.width, H = g.canvas.height;
+  // Draw ONE composed frame into g, cropped to box, at scale dpr. It re-draws what the page shows, in the same
+  // order: page colour, wallpaper (with blur / saturation / hue / B&W, fit mode, opacity), dim, vignette, mood glow,
+  // TradingView's own chart canvases (candles, glow, brackets...), then our overlays (P&L readout, goal bar, mood
+  // pill, watermark at its real position, so Drift is captured too). wmImg = preloaded watermark image so this stays
+  // synchronous for the clip loop. Returns { mediaMissed }: an uploaded image/video wallpaper lives in a sandboxed
+  // player frame whose pixels we can't read. (Recording the whole screen captures that too.)
+  const rr = (g, x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  function drawFit(g, el, dx, dy, dw, dh) {
+    const nw = el.videoWidth || el.naturalWidth || el.width, nh = el.videoHeight || el.naturalHeight || el.height;
+    if (!nw || !nh || cfg.fit === "stretch" || el.tagName === "CANVAS") return g.drawImage(el, dx, dy, dw, dh);
+    const k = cfg.fit === "fit" ? Math.min(dw / nw, dh / nh) : Math.max(dw / nw, dh / nh), w = nw * k, h = nh * k;
+    g.drawImage(el, dx + (dw - w) * (Math.max(0, Math.min(100, +cfg.posX)) / 100), dy + (dh - h) * (Math.max(0, Math.min(100, +cfg.posY)) / 100), w, h);
+  }
+  function wallFilter(dpr) {
+    const f = [];
+    if (cfg.blur) f.push(`blur(${cfg.blur * dpr}px)`);
+    if (cfg.vividness !== 1) f.push(`saturate(${cfg.vividness})`);
+    if (cfg.tint) f.push(`hue-rotate(${cfg.tint}deg)`);
+    if (cfg.bw) f.push("grayscale(1)");
+    return f.join(" ") || "none";
+  }
+  function drawMoodGlow(g, x, y, w, h, dpr) {
+    if (!reactEl) return;
+    const op = parseFloat(reactEl.style.opacity) || 0; if (op <= 0.01) return;
+    const col = reactEl.style.getPropertyValue("--bd-react") || upColor(), k = Math.abs(mood) * cfg.reactStrength;
+    g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip(); g.globalAlpha *= op;
+    // soft colour pool from the top or bottom edge, like the page's radial gradient
+    const cy = y + (mood >= 0 ? 1.1 : -0.1) * h, gr = g.createRadialGradient(x + w / 2, cy, 0, x + w / 2, cy, Math.max(w, h) * 0.75);
+    gr.addColorStop(0, col + "55"); gr.addColorStop(0.6, col + "00");
+    g.fillStyle = gr; g.fillRect(x, y, w, h);
+    // inset glow around the edges (CSS: inset 0 0 B S colour)
+    // CSS draws ONLY the shadow. Canvas draws the shape as well, so the shape is placed far off-canvas and its
+    // shadow is offset back into view: what's left is the soft glow, with no hard frame.
+    const B = (40 + 160 * k) * dpr, S = (10 + 40 * k) * dpr, OFF = 20000;
+    g.shadowColor = col; g.shadowBlur = B; g.shadowOffsetX = -OFF; g.fillStyle = "#000";
+    g.beginPath(); g.rect(x - 4 * B + OFF, y - 4 * B, w + 8 * B, h + 8 * B); g.rect(x + S + OFF, y + S, w - 2 * S, h - 2 * S); g.fill("evenodd");
+    g.restore();
+  }
+  function drawWallpaper(g, box, dpr) {
     let mediaMissed = false;
-    g.clearRect(0, 0, W, H);
-    if (cfg.layer !== "over") { g.fillStyle = "#0b0e16"; g.fillRect(0, 0, W, H); }
+    const filt = wallFilter(dpr), dim = Math.min(0.95, +cfg.dim + (cfg.calm && calmActive ? 0.3 : 0)), over = cfg.layer === "over";
     for (const v of views) {
       const dx = (v.x - box.left) * dpr, dy = (v.y - box.top) * dpr, dw = v.w * dpr, dh = v.h * dpr;
+      g.save(); g.beginPath(); g.rect(dx, dy, dw, dh); g.clip();
       try {
-        if (v.content && (v.content.tagName === "CANVAS" || v.content.tagName === "VIDEO" || v.content.tagName === "IMG")) g.drawImage(v.content, dx, dy, dw, dh);
-        else mediaMissed = true;   // iframe player: can't read its pixels
+        const t = v.content && v.content.tagName;
+        if (t === "CANVAS" || t === "VIDEO" || t === "IMG") { g.filter = filt; drawFit(g, v.content, dx, dy, dw, dh); g.filter = "none"; }
+        else mediaMissed = true;
       } catch { mediaMissed = true; }
-      if (cfg.layer !== "over" && +cfg.dim > 0) { g.fillStyle = `rgba(0,0,0,${Math.min(0.9, +cfg.dim)})`; g.fillRect(dx, dy, dw, dh); }
+      if (!over && dim > 0) { g.fillStyle = `rgba(0,0,0,${dim})`; g.fillRect(dx, dy, dw, dh); }
+      if (cfg.vignette > 0) {       // CSS: radial-gradient(ellipse at center, transparent X%, rgba(0,0,0,a) 100%)
+        const inner = (70 - cfg.vignette * 40) / 100, a = 0.35 + cfg.vignette * 0.55;
+        g.translate(dx + dw / 2, dy + dh / 2); g.scale(dw / 2 * Math.SQRT2, dh / 2 * Math.SQRT2);
+        const vg = g.createRadialGradient(0, 0, 0, 0, 0, 1); vg.addColorStop(inner, "rgba(0,0,0,0)"); vg.addColorStop(1, `rgba(0,0,0,${a})`);
+        g.fillStyle = vg; g.fillRect(-1, -1, 2, 2);
+      }
+      g.restore();
     }
+    return mediaMissed;
+  }
+  function drawChartCanvases(g, box, dpr) {
     for (const c of charts) {
       const canv = c.el.querySelectorAll ? c.el.querySelectorAll("canvas") : [];
       for (const cv of canv) {
@@ -1062,26 +1108,96 @@
         try { g.drawImage(cv, (r.left - box.left) * dpr, (r.top - box.top) * dpr, r.width * dpr, r.height * dpr); } catch {}
       }
     }
-    if (cfg.wmOn && wmImg) {
-      const op = Math.max(0.1, Math.min(1, +cfg.wmOpacity || 0.85));
-      if (cfg.wmStyle === "tiled") {
-        g.globalAlpha = op * 0.22;
-        for (let y = 0; y < H; y += 170 * dpr) for (let x = 0; x < W; x += 300 * dpr) g.drawImage(wmImg, x, y, 300 * dpr, 170 * dpr);
-        g.globalAlpha = 1;
-      } else {
-        const label = wmLabel(), pad = 16 * dpr, h = 22 * dpr;
-        g.font = `600 ${15 * dpr}px system-ui, -apple-system, "Segoe UI", sans-serif`;
-        const tw = g.measureText(label).width, bw = h + 8 * dpr + tw;
-        let bx = cfg.wmPos[1] === "l" ? pad : W - bw - 72 * dpr - pad;
-        let by = cfg.wmPos[0] === "t" ? pad + 34 * dpr : H - h - 30 * dpr - pad;
-        if (cfg.wmPos === "center") { bx = (W - bw) / 2; by = (H - h) / 2; }
-        g.globalAlpha = op;
-        g.drawImage(wmImg, bx, by, h, h);
-        g.fillStyle = "#fff"; g.textBaseline = "middle"; g.shadowColor = "rgba(0,0,0,.6)"; g.shadowBlur = 4 * dpr;
-        g.fillText(label, bx + h + 8 * dpr, by + h / 2);
-        g.shadowBlur = 0; g.globalAlpha = 1;
-      }
+  }
+  function drawPnlOverlay(g, box, dpr) {
+    if (!pnlEl || !pnlEl.isConnected) return;
+    const r = pnlEl.getBoundingClientRect(); if (r.width < 2) return;
+    const x = (r.left - box.left) * dpr, y = (r.top - box.top) * dpr, w = r.width * dpr, h = r.height * dpr;
+    const rainbow = pnlEl.classList.contains("bd-pnl-rainbow"), boxed = pnlEl.classList.contains("bd-pnl-box");
+    const col = rainbow ? null : (pnlEl.style.getPropertyValue("--pc") || "#fff"), fs = parseFloat(pnlEl.style.fontSize) || 34;
+    g.save();
+    if (boxed) {
+      rr(g, x, y, w, h, 12 * dpr); g.fillStyle = pnlEl.classList.contains("bd-pnl-solid") ? "#0b0e16" : "rgba(8,11,18,.55)"; g.fill();
+      g.lineWidth = dpr; g.strokeStyle = rainbow ? "rgba(255,255,255,.35)" : col + "8c"; g.stroke();
     }
+    g.font = `900 ${fs * dpr}px ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace`;
+    g.textBaseline = "middle"; g.textAlign = "center";
+    if (rainbow) {
+      const gr = g.createLinearGradient(x, 0, x + w, 0), ph = (performance.now() / 3000) % 1;
+      for (let i = 0; i <= 6; i++) gr.addColorStop(i / 6, `hsl(${Math.round(((i / 6 + ph) % 1) * 360)} 100% 62%)`);
+      g.fillStyle = gr;
+    } else { g.shadowColor = col; g.shadowBlur = 12 * dpr; g.fillStyle = col; }
+    g.fillText(pnlEl.textContent, x + w / 2, y + h / 2 + dpr);
+    g.restore();
+  }
+  function drawGoalOverlay(g, box, dpr) {
+    if (!goalEl || !goalEl.isConnected) return;
+    const r = goalEl.getBoundingClientRect(); if (r.width < 2) return;
+    const x = (r.left - box.left) * dpr, y = (r.top - box.top) * dpr, w = r.width * dpr, h = r.height * dpr;
+    const col = getComputedStyle(goalEl).getPropertyValue("--gc").trim() || "#8a93a6", pad = 13 * dpr;
+    g.save();
+    rr(g, x, y, w, h, 12 * dpr); g.fillStyle = "rgba(8,11,18,.78)"; g.fill(); g.lineWidth = dpr; g.strokeStyle = col + "8c"; g.stroke();
+    g.textBaseline = "alphabetic";
+    g.font = `700 ${10 * dpr}px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = "rgba(223,229,241,.6)"; g.textAlign = "left";
+    g.fillText(goalEl.querySelector(".bd-g-label").textContent, x + pad, y + 20 * dpr);
+    g.font = `900 ${19 * dpr}px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = col; g.textAlign = "right";
+    g.fillText(goalEl.querySelector(".bd-g-val").textContent, x + w - pad, y + 24 * dpr);
+    const tx = x + pad, tw = w - 2 * pad, ty = y + 34 * dpr, th = 6 * dpr;
+    rr(g, tx, ty, tw, th, th / 2); g.fillStyle = "rgba(255,255,255,.12)"; g.fill();
+    const fill = goalEl.querySelector(".bd-g-fill"), fl = parseFloat(fill.style.left) || 50, fw = parseFloat(fill.style.width) || 0;
+    if (fw > 0) { rr(g, tx + tw * fl / 100, ty, Math.max(th, tw * fw / 100), th, th / 2); g.fillStyle = col; g.fill(); }
+    g.fillStyle = "rgba(255,255,255,.55)"; g.fillRect(tx + tw / 2 - dpr, ty, 2 * dpr, th);
+    g.font = `700 ${10 * dpr}px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = "rgba(223,229,241,.75)";
+    g.textAlign = "left"; g.fillText(goalEl.querySelector(".bd-g-l").textContent, tx, y + h - 9 * dpr);
+    g.textAlign = "right"; g.fillText(goalEl.querySelector(".bd-g-r").textContent, tx + tw, y + h - 9 * dpr);
+    g.restore();
+  }
+  function drawMoodPill(g, box, dpr) {
+    if (!pillEl || pillEl.hidden || !pillEl.textContent) return;
+    const r = pillEl.getBoundingClientRect(); if (r.width < 2) return;
+    const x = (r.left - box.left) * dpr, y = (r.top - box.top) * dpr, w = r.width * dpr, h = r.height * dpr, col = pillEl.style.color || "#fff";
+    g.save(); rr(g, x, y, w, h, h / 2); g.fillStyle = "rgba(0,0,0,.55)"; g.fill(); g.lineWidth = dpr; g.strokeStyle = col; g.stroke();
+    g.font = `700 ${12 * dpr}px system-ui, sans-serif`; g.fillStyle = col; g.textBaseline = "middle"; g.textAlign = "center";
+    g.shadowColor = col; g.shadowBlur = 6 * dpr; g.fillText(pillEl.textContent, x + w / 2, y + h / 2 + dpr);
+    g.restore();
+  }
+  function drawWatermark(g, box, dpr, wmImg) {
+    if (!cfg.wmOn || !wmImg) return;
+    const W = g.canvas.width, H = g.canvas.height, op = Math.max(0.1, Math.min(1, +cfg.wmOpacity || 0.85));
+    if (cfg.wmStyle === "tiled") {
+      g.globalAlpha = op * 0.22;
+      for (let y = 0; y < H; y += 170 * dpr) for (let x = 0; x < W; x += 300 * dpr) g.drawImage(wmImg, x, y, 300 * dpr, 170 * dpr);
+      g.globalAlpha = 1; return;
+    }
+    const label = wmLabel(), big = cfg.wmPos === "center", h = (big ? 48 : 22) * dpr, gap = (big ? 14 : 7) * dpr;
+    g.font = `600 ${(big ? 34 : 15) * dpr}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+    const tw = g.measureText(label).width, bw = h + gap + tw;
+    // use the real on-page position when we have it, so a drifting mark is captured where it actually is
+    let bx, by;
+    if (wmEl && wmEl.isConnected) { const r = wmEl.getBoundingClientRect(); bx = (r.left - box.left) * dpr; by = (r.top - box.top) * dpr + (r.height * dpr - h) / 2; }
+    else { const pad = 16 * dpr; bx = cfg.wmPos[1] === "l" ? pad : W - bw - 72 * dpr - pad; by = cfg.wmPos[0] === "t" ? pad + 34 * dpr : H - h - 30 * dpr - pad; if (big) { bx = (W - bw) / 2; by = (H - h) / 2; } }
+    g.save(); g.globalAlpha = op; g.drawImage(wmImg, bx, by, h, h);
+    g.fillStyle = "#fff"; g.textBaseline = "middle"; g.shadowColor = "rgba(0,0,0,.6)"; g.shadowBlur = 4 * dpr;
+    g.fillText(label, bx + h + gap, by + h / 2); g.restore();
+  }
+  function compositeFrame(g, box, dpr, wmImg) {
+    const W = g.canvas.width, H = g.canvas.height, over = cfg.layer === "over";
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bd-page-bg").trim() || "#0b0e16"; g.fillRect(0, 0, W, H);
+    let mediaMissed = false;
+    const layerAlpha = Math.max(0, Math.min(1, +(over ? cfg.overOpacity : cfg.opacity)));
+    if (!over) {
+      g.save(); g.globalAlpha = layerAlpha;
+      mediaMissed = drawWallpaper(g, box, dpr); drawMoodGlow(g, 0, 0, W, H, dpr);
+      g.restore();
+      drawChartCanvases(g, box, dpr);
+    } else {                       // "On top": the wallpaper sits over the chart, clipped to the chart panes
+      drawChartCanvases(g, box, dpr);
+      g.save(); g.globalAlpha = layerAlpha; g.beginPath();
+      for (const c of (charts.length ? charts : [{ r: box }])) g.rect((c.r.left - box.left) * dpr, (c.r.top - box.top) * dpr, c.r.width * dpr, c.r.height * dpr);
+      g.clip(); mediaMissed = drawWallpaper(g, box, dpr); drawMoodGlow(g, 0, 0, W, H, dpr); g.restore();
+    }
+    drawMoodPill(g, box, dpr); drawPnlOverlay(g, box, dpr); drawGoalOverlay(g, box, dpr); drawWatermark(g, box, dpr, wmImg);
     return { mediaMissed };
   }
   // preload the right watermark image for compositing (corner logo, or the tiled pattern), or null if wm is off
@@ -1179,6 +1295,67 @@
       try { rec.start(); draw(); stopTimer = setTimeout(stop, dur * 1000); }
       catch { cleanup(); resolve({ ok: false, reason: "Recording failed." }); }
     });
+  }
+
+  // ---------- Whole-screen recording ----------
+  // Records exactly what you see (through Chrome's own screen-share picker), so EVERY effect is in it, uploaded
+  // wallpapers included. A page may only start a screen capture from a click on the page itself, so asking from the
+  // panel shows a small card on the chart; clicking it opens Chrome's picker (pick "Entire screen", a window, or this
+  // tab). It saves by itself when it ends, like the chart-only clip. The card is removed before recording starts.
+  let screenAsk = null, screenBusy = false;
+  function cancelScreenAsk() { if (screenAsk) { screenAsk.remove(); screenAsk = null; } }
+  function startScreenFlow(seconds) {
+    if (screenBusy || clipRec) return { ok: false, reason: "Already recording." };
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return { ok: false, reason: "Your browser can't record the screen on this page." };
+    cancelScreenAsk();
+    const dur = Math.max(2, Math.min(MAX_CLIP_SECONDS, +seconds || 5));
+    const card = document.createElement("div"); card.id = "bd-screenask"; screenAsk = card;
+    card.style.cssText = "position:fixed;z-index:2147483647;top:70px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:rgba(10,12,18,.96);color:#fff;font:600 13px system-ui,sans-serif;border:1px solid rgba(46,242,176,.6);box-shadow:0 12px 40px rgba(0,0,0,.6)";
+    const txt = document.createElement("span"); txt.textContent = `Priism Skins \u00B7 record the screen for ${dur}s`;
+    const go = document.createElement("button"), no = document.createElement("button");
+    go.textContent = "Choose what to record"; no.textContent = "Cancel";
+    go.style.cssText = "all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;background:linear-gradient(90deg,#19d3ff,#2ef2b0);color:#04140f;font:800 13px system-ui,sans-serif";
+    no.style.cssText = "all:unset;cursor:pointer;padding:8px 10px;opacity:.7;font:600 13px system-ui,sans-serif";
+    card.append(txt, go, no); document.documentElement.appendChild(card);
+    no.onclick = cancelScreenAsk;
+    go.onclick = async () => {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30, displaySurface: "monitor" }, audio: false,
+          selfBrowserSurface: "include", surfaceSwitching: "include", monitorTypeSurfaces: "include" });
+      } catch (e) {
+        txt.textContent = e && e.name === "NotAllowedError" ? "Not started: sharing was cancelled or isn't allowed on this page." : "Couldn't start the screen recording.";
+        go.remove(); setTimeout(cancelScreenAsk, 3500); return;
+      }
+      cancelScreenAsk();                       // keep our card out of the recording
+      recordScreenStream(stream, dur);
+    };
+    setTimeout(() => { if (screenAsk === card) cancelScreenAsk(); }, 90000);
+    return { ok: true, awaiting: true };
+  }
+  function recordScreenStream(stream, dur) {
+    screenBusy = true;
+    const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+    const mime = mimes.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+    const bps = dur <= 10 ? 8_000_000 : dur <= 30 ? 5_000_000 : dur <= 60 ? 3_500_000 : 2_000_000;
+    let rec; try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: bps } : undefined); }
+    catch { stream.getTracks().forEach((t) => t.stop()); screenBusy = false; return; }
+    const chunks = [], t0 = performance.now(); let timer = 0, finished = false;
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    const stop = () => { clearTimeout(timer); try { rec.state !== "inactive" && rec.stop(); } catch {} };
+    rec.onstop = () => {
+      if (finished) return; finished = true; screenBusy = false; clearTimeout(timer);
+      stream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+      if (!chunks.length) return;
+      const secs = Math.round((performance.now() - t0) / 1000), q = parseTitle();
+      const blob = new Blob(chunks, { type: mime || "video/webm" }), url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url; a.download = `priism-screen-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${secs}s.webm`;
+      document.documentElement.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+      flash("Screen clip saved to your downloads");
+    };
+    // "Stop sharing" in Chrome's own bar ends the capture early; we still save what was recorded
+    stream.getVideoTracks().forEach((t) => t.addEventListener("ended", stop));
+    rec.start(1000); timer = setTimeout(stop, dur * 1000);
   }
 
   // ---------- Alt+Shift+W: everything on/off, right on the chart ----------

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.19 (2026-11-06)
+- Snapshots and chart-only clips now include your effects: wallpaper blur, saturation, hue and black & white, opacity and "On top" mode, vignette, the mood glow, the big P&L readout, the daily goal bar and the watermark (even while it drifts). Before, they only had the wallpaper, the chart and the watermark.
+- Live clip can now record your whole screen. Pick "Whole screen" under Saved → Live clip, press Record, click the card that appears on your chart, and choose what to share in Chrome's box. It records exactly what you see, so everything is in it, including uploaded wallpapers that chart-only clips can't read. It downloads by itself when it ends; Chrome's "Stop sharing" button ends it early.
+- Fix: the Saved tab no longer scrolls sideways, and the look-code and custom-length boxes match the rest of the panel.
+
 ## 0.1.18 (2026-11-06)
 - Daily goal & limit: an optional slim bar on your chart tracking today's P&L against a profit goal and a max loss. It turns amber at 80% of your limit and red at 100%, and tells you once when you hit your goal. Find it under Style → Daily goal & limit.
 - Trade journal: an optional journal that saves a picture of your chart, as it looked while the trade was open (your entry, stop and target), stamped with the symbol, P&L and time held, every time a trade closes. Stored only on your computer (latest 60). Find it under Saved → Trade journal.
