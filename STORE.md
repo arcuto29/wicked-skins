@@ -35,7 +35,7 @@ READABLE & CALM
 MORE
 • One-click looks with Undo, plus saved looks and shareable look codes
 • Trade brackets: recolour your broker's on-chart TP / Stop / entry pills
-• Snapshot and Live Clip: save a shareable image or short clip of your chart with the skin on
+• Snapshot and Live Clip: save a shareable image or a clip of up to 2 minutes, with your effects in it, or record your whole screen
 • Live mood: the chart glows with the day's move or with the open P&L on your position lines
 • Daily goal & limit bar and an automatic trade journal (estimated from the P&L your chart already shows; nothing leaves your computer)
 • Watermark for recordings
