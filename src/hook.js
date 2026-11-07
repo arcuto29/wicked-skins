@@ -137,14 +137,14 @@
   readFx();
 
   const settingsObserver = new MutationObserver((muts) => {
-    let repaint = false, soft = false;
+    let redraw = false, rebuild = false;
     for (const m of muts) {
-      if (m.attributeName === "class") on = htmlEl().classList.contains("bd-on");
-      if (m.attributeName === "data-ws-candles") readCandles();
-      if (m.attributeName === "data-ws-fx") { if (readFx()) repaint = true; else soft = true; }
+      if (m.attributeName === "class") { const was = on; on = htmlEl().classList.contains("bd-on"); if (was !== on) rebuild = true; }
+      if (m.attributeName === "data-ws-candles") { const before = candles ? candles.upHex + candles.downHex : ""; readCandles(); redraw = true;
+        if ((candles ? candles.upHex + candles.downHex : "") !== before) rebuild = true; }   // new colours: volume bars are cached by TradingView
+      if (m.attributeName === "data-ws-fx") { readFx(); redraw = true; }
     }
-    if (repaint) forceRepaint(false);
-    else if (soft) forceRepaint(true);   // brightness-only update: redraw only if it can be done without a blink
+    if (rebuild) forceRepaint(false); else if (redraw) forceRepaint(true);
   });
   (function watchSettings() {
     const el = document.documentElement;
@@ -468,21 +468,24 @@
     }
     return done;
   }
-  let rpT;
+  // Redraws are made to feel instant: every change gets TradingView's own light redraw on the very next frame (no
+  // blink). The heavier rebuild (hide the chart for two frames) is only needed for things TradingView caches, like
+  // volume-bar colours, so it runs ONCE, after you stop changing things, instead of on every step of a colour drag.
+  let softRaf = 0, hardT = 0;
+  function hardRebuild() {
+    document.querySelectorAll(".chart-container").forEach((el) => {
+      if (el.dataset.bdRepaint) return;
+      el.dataset.bdRepaint = "1";
+      el.style.display = "none";
+      requestAnimationFrame(() => requestAnimationFrame(() => { el.style.display = ""; delete el.dataset.bdRepaint; }));
+    });
+  }
   function forceRepaint(softOnly) {
-    clearTimeout(rpT);
-    rpT = setTimeout(() => {
-      // soft: brightness updates -> TradingView's own redraw, never a blink.
-      // hard: your setting changed -> full rebuild, because TradingView caches some colours (e.g. volume bars)
-      //       that only a rebuild picks up.
-      if (softOnly) { apiRepaint(); return; }
-      document.querySelectorAll(".chart-container").forEach((el) => {
-        if (el.dataset.bdRepaint) return;
-        el.dataset.bdRepaint = "1";
-        el.style.display = "none";
-        requestAnimationFrame(() => requestAnimationFrame(() => { el.style.display = ""; delete el.dataset.bdRepaint; }));
-      });
-    }, 120);
+    if (!softRaf) softRaf = requestAnimationFrame(() => {
+      softRaf = 0;
+      if (!apiRepaint()) { clearTimeout(hardT); hardT = setTimeout(hardRebuild, 160); }   // no API here (some platforms): rebuild instead
+    });
+    if (!softOnly) { clearTimeout(hardT); hardT = setTimeout(hardRebuild, 700); }
   }
   document.addEventListener("bd-repaint", () => forceRepaint(false));   // asked for by content.js
   // asked for by content.js before it decides a position has closed: a quiet market stops the chart redrawing, so the

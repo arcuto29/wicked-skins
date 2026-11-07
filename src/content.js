@@ -582,39 +582,54 @@
       return "#" + r.map((v, i) => Math.round([11, 13, 19][i] + (v - [11, 13, 19][i]) * 0.14).toString(16).padStart(2, "0")).join(""); }
     return "";
   }
-  let panelTextVars = [], panelApplied = null;
+  let panelApplied = null;
   function applyPanels() {
     const h = document.documentElement, col = cfg.enabled ? panelColour() : "";
     if (col === panelApplied) return;            // nothing changed: never restyle the page for nothing (keeps it smooth)
     panelApplied = col;
     h.classList.toggle("bd-panels", !!col);
-    const all = [...PANEL_VARS, ...PANEL_VARS2, ...PANEL_HOVER, ...PANEL_TEXT, ...panelTextVars, "--bd-panel", "--bd-panel-text"];
-    all.forEach((n) => h.style.removeProperty(n)); panelTextVars = [];
-    if (!col) return;
+    // ONE stylesheet holds every override, written in a single update (setting hundreds of properties one by one made
+    // the browser restyle TradingView's whole page each time: a multi-second freeze while picking a colour).
+    let st = document.getElementById("bd-panels-css");
+    if (!col) { if (st) st.textContent = ""; return; }
+    if (!st) { st = document.createElement("style"); st.id = "bd-panels-css"; (document.head || h).appendChild(st); }
     const rgb = [1, 3, 5].map((i) => parseInt(col.slice(i, i + 2), 16));
     const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255, dark = lum < 0.5;
     const shade = (f) => "#" + rgb.map((v) => Math.max(0, Math.min(255, Math.round(dark ? v + (255 - v) * f : v * (1 - f)))).toString(16).padStart(2, "0")).join("");
     const text = dark ? "#e6e9f0" : "#14161c";
-    PANEL_VARS.forEach((n) => h.style.setProperty(n, col, "important"));
-    PANEL_VARS2.forEach((n) => h.style.setProperty(n, shade(0.05), "important"));
-    PANEL_HOVER.forEach((n) => h.style.setProperty(n, shade(0.12), "important"));
-    PANEL_TEXT.forEach((n) => h.style.setProperty(n, text, "important"));
-    // Every neutral text / icon colour TradingView uses (100+ variables): flip the ones that would vanish on this panel
-    // colour to a readable shade, keeping their strong/soft difference. Coloured ones (green/red/accent) are kept.
+    const decl = [];
+    PANEL_VARS.forEach((n) => decl.push(`${n}:${col}!important`));
+    PANEL_VARS2.forEach((n) => decl.push(`${n}:${shade(0.05)}!important`));
+    PANEL_HOVER.forEach((n) => decl.push(`${n}:${shade(0.12)}!important`));
+    PANEL_TEXT.forEach((n) => decl.push(`${n}:${text}!important`));
+    // TradingView's neutral text / icon colours that would vanish on this panel colour (read once per theme, cached)
+    for (const [n, L] of panelTextCandidates()) {
+      if (dark ? L > 0.55 : L < 0.45) continue;
+      const soft = dark ? L > 0.2 : L < 0.8;
+      decl.push(`${n}:${dark ? (soft ? "#a9b0bf" : "#e6e9f0") : (soft ? "#4a4f5c" : "#14161c")}!important`);
+    }
+    decl.push(`--bd-panel:${col}`, `--bd-panel-text:${text}`);
+    st.textContent = `html.bd-panels{${decl.join(";")}}`;
+  }
+  // [name, lightness] of TradingView's neutral text colour variables, read once per theme (reading 1900 computed
+  // properties is the expensive part, so it never happens while you're picking colours).
+  let ptCache = null, ptTheme = "";
+  function panelTextCandidates() {
+    const h = document.documentElement, theme = /theme-dark/.test(h.className) ? "dark" : "light";
+    if (ptCache && ptTheme === theme) return ptCache;
+    const st = document.getElementById("bd-panels-css"), keep = st ? st.textContent : ""; if (st) st.textContent = "";   // read TradingView's own values
+    const out = [];
     try {
       const cs = getComputedStyle(h), skip = /positive|negative|success|danger|warning|accent|heatmap|fill|border|bg|background|rating|social|twitter|inverse|white|primary-button/i;
-      for (let i = 0; i < cs.length; i++) {
+      for (let i = 0; i < cs.length && out.length < 400; i++) {
         const n = cs[i]; if (!n.startsWith("--color-") || !/text|content|icon|default-gray|list-item-text/i.test(n) || skip.test(n)) continue;
-        const v = cs.getPropertyValue(n).trim(), m = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i); if (!m) continue;
+        const m = cs.getPropertyValue(n).trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i); if (!m) continue;
         const hx = m[1].length === 3 ? m[1].split("").map((c) => c + c).join("") : m[1];
-        const L = (parseInt(hx.slice(0, 2), 16) + parseInt(hx.slice(2, 4), 16) + parseInt(hx.slice(4, 6), 16)) / 765;
-        if (dark ? L > 0.55 : L < 0.45) continue;                       // already readable on this panel
-        const soft = dark ? L > 0.2 : L < 0.8;                          // TradingView's secondary (greyer) text
-        h.style.setProperty(n, dark ? (soft ? "#a9b0bf" : "#e6e9f0") : (soft ? "#4a4f5c" : "#14161c"), "important"); panelTextVars.push(n);
-        if (panelTextVars.length > 400) break;
+        out.push([n, (parseInt(hx.slice(0, 2), 16) + parseInt(hx.slice(2, 4), 16) + parseInt(hx.slice(4, 6), 16)) / 765]);
       }
     } catch {}
-    h.style.setProperty("--bd-panel", col); h.style.setProperty("--bd-panel-text", text);
+    if (st) st.textContent = keep;
+    ptCache = out; ptTheme = theme; return out;
   }
 
   // UI style: font / size / accent for TradingView's own HTML panels (watchlist, toolbars, order area, timeframes).
@@ -886,7 +901,7 @@
     const shift = cfg.enabled && cfg.candleOn && cfg.candleLook === "shift";
     h.classList.toggle("bd-shift", shift);
     h.style.setProperty("--bd-shift-dur", Math.max(2, Math.min(60, +cfg.shiftSpeed || 10)) + "s");
-    repaint();
+    // no forced rebuild here: hook.js sees the new attribute, redraws instantly, and rebuilds once only if the colours changed
   }
 
   // Line glow + price scale styling, also drawn by hook.js

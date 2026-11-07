@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.29 (2026-11-04)
+- **Changes now show instantly.** Dragging through colours or clicking through options keeps up with you instead of stepping slowly through every colour.
+  - Every change gets TradingView's own light redraw on the very next frame, with no blink. In tests the chart showed the final colour 12–18 ms after the last step, down from 130–200 ms.
+  - The full chart rebuild (only needed for new candle colours, because TradingView caches volume-bar colours) now runs once, after you stop changing things.
+  - Grid, crosshair, price line, panels, wallpaper, brackets, glow and candle looks no longer make the chart blink at all.
+- Fixed a 2.8-second freeze when picking a panel colour (Interface → Panels). The colours are now applied in one step.
+
 ## 0.1.28 (2026-11-04)
 - Crosshair price and time labels can match your crosshair colour (Chart styling → Crosshair → Price & time labels). The text stays readable.
 - Session breaks are now recognised by the colour set in TradingView's own settings. They're grey dashed lines by default, and could be mixed up with the grid before.
