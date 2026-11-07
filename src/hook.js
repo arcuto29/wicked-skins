@@ -73,6 +73,7 @@
     bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
     bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
     bracketDebug: false,
+    privacy: false,           // Streamer mode: the numbers in TradingView's trade labels are drawn as dots
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chLabels: false,
@@ -107,7 +108,7 @@
         bracketBorderW: Math.max(0, Math.min(3, +f.bracketBorderW || 0)),
         bracketLineColor: /^#[0-9a-f]{6}$/i.test(f.bracketLineColor || "") ? f.bracketLineColor : "",
         bracketLineW: Math.max(0, Math.min(3, +f.bracketLineW || 0)),
-        bracketDebug: !!f.bracketDebug,
+        bracketDebug: !!f.bracketDebug, privacy: !!f.privacy,
         gridOn: !!f.gridOn, gridColor: colOpt(f.gridColor), gridAlpha: Math.max(0.03, Math.min(1, f.gridAlpha === undefined ? 0.35 : +f.gridAlpha || 0)),
         gridW: Math.max(0, Math.min(2, +f.gridW || 0)), gridStyle: ["solid", "dotted", "dashed", "none"].includes(f.gridStyle) ? f.gridStyle : "dotted",
         chOn: !!f.chOn, chColor: colOpt(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)),
@@ -128,7 +129,7 @@
     remapCache.clear();
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
-      fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW,
+      fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy,
       fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
@@ -318,13 +319,13 @@
   //  - any colourful, visible line can glow; grid (faint) and crosshair (grey) never do
   const segs = new WeakMap();
   const origBegin = proto.beginPath, origMove = proto.moveTo, origLine = proto.lineTo, origStroke = proto.stroke;
-  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && (fx.bracketOn || styling())) lastSeg.set(this, null); if (on && fx.bracketOn) pathBox.delete(this); return origBegin.call(this); };
+  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && (fx.bracketOn || styling())) lastSeg.set(this, null); if (on && (fx.bracketOn || fx.privacy)) pathBox.delete(this); return origBegin.call(this); };
   proto.moveTo = function (x, y) { const k = segs.get(this); if (k) k[0]++;
-    if (on && fx.bracketOn) growBox(this, x, y);
+    if (on && (fx.bracketOn || fx.privacy)) growBox(this, x, y);
     if (on && (fx.bracketOn || styling())) { const t = this.getTransform(); lastSeg.set(this, { x0: x * (t.a || 1) + t.e, y0: y * (t.d || 1) + t.f, x1: null, y1: null }); }
     return origMove.call(this, x, y); };
   proto.lineTo = function (x, y) { const k = segs.get(this); if (k) k[1]++;
-    if (on && fx.bracketOn) growBox(this, x, y);
+    if (on && (fx.bracketOn || fx.privacy)) growBox(this, x, y);
     if (on && (fx.bracketOn || styling())) { const s = lastSeg.get(this), t = this.getTransform(); if (s) { s.x1 = x * (t.a || 1) + t.e; s.y1 = y * (t.d || 1) + t.f; } }
     return origLine.call(this, x, y); };
 
@@ -610,6 +611,7 @@
   function notePillBox(ctx, box) {
     const own = String(ctx.fillStyle);
     lastPill.set(ctx, { used: false, t: performance.now(), box, sign: boxSign(own) });
+    if (!fx.bracketOn) { pillFill.delete(ctx); return null; }          // Streamer mode only: find the labels, don't restyle them
     if (fx.bracketFill) { pillFill.set(ctx, fx.bracketFill); return fx.bracketFill; }
     if (fx.bracketBack !== "keep") {
       const r = rgbKey(own), base = [16, 19, 28], rgb = r ? r.key.split(",").map(Number) : base;
@@ -619,6 +621,8 @@
     }
     pillFill.delete(ctx); return null;     // box unchanged: TradingView's own text already reads on it
   }
+  // Streamer mode: a label's number becomes dots (keeping roughly its width, so the label doesn't jump)
+  const maskNum = (t) => { const s = String(t); return s.replace(/[+\-\u2212]?\s*[$\u20ac\u00a3\u00a5]?\s*[\d][\d.,\s]*/g, (m) => "\u2022".repeat(Math.max(3, Math.min(7, m.replace(/\D/g, "").length)))); };
   function boxSign(col) {
     const r = rgbKey(col); if (!r) return 0; const [R, G, B] = r.key.split(",").map(Number);
     if (G > R + 40 && G >= B - 20) return 1;           // green-ish box: in profit
@@ -634,10 +638,10 @@
   }
   for (const name of ["rect", "roundRect"]) {
     const o = proto[name]; if (typeof o !== "function") continue;
-    proto[name] = function (x, y, w, h) { if (on && fx.bracketOn) { growBox(this, x, y); growBox(this, x + w, y + h); } return o.apply(this, arguments); };
+    proto[name] = function (x, y, w, h) { if (on && (fx.bracketOn || fx.privacy)) { growBox(this, x, y); growBox(this, x + w, y + h); } return o.apply(this, arguments); };
   }
-  { const o = proto.arcTo; proto.arcTo = function (x1, y1, x2, y2) { if (on && fx.bracketOn) { growBox(this, x1, y1); growBox(this, x2, y2); } return o.apply(this, arguments); }; }
-  { const o = proto.quadraticCurveTo; proto.quadraticCurveTo = function (cx, cy, x, y) { if (on && fx.bracketOn) { growBox(this, cx, cy); growBox(this, x, y); } return o.apply(this, arguments); }; }
+  { const o = proto.arcTo; proto.arcTo = function (x1, y1, x2, y2) { if (on && (fx.bracketOn || fx.privacy)) { growBox(this, x1, y1); growBox(this, x2, y2); } return o.apply(this, arguments); }; }
+  { const o = proto.quadraticCurveTo; proto.quadraticCurveTo = function (cx, cy, x, y) { if (on && (fx.bracketOn || fx.privacy)) { growBox(this, cx, cy); growBox(this, x, y); } return o.apply(this, arguments); }; }
   // Font-independent pill test: this text sits inside the pill box drawn a moment ago (so a font change on
   // TradingView's side can't leave a restyled box with unstyled, invisible text on it).
   function textInPill(ctx, x, y) {
@@ -749,7 +753,7 @@
   const origDrawImage = proto.drawImage;
   proto.drawImage = function (img, ...r) {
     const c = this.canvas;
-    if (on && fx.bracketOn && c && img && (img instanceof HTMLCanvasElement || (typeof OffscreenCanvas !== "undefined" && img instanceof OffscreenCanvas)) && bracketCanvas(c)) {
+    if (on && (fx.bracketOn || fx.privacy) && c && img && (img instanceof HTMLCanvasElement || (typeof OffscreenCanvas !== "undefined" && img instanceof OffscreenCanvas)) && bracketCanvas(c)) {
       const info = srcInfo.get(img);
       if (info && info.text && (info.box || BRACKET_FONT.test(info.font || ""))) {
         let dx, dy, dw, dh;
@@ -776,6 +780,7 @@
     origFillDesc.set.call(ctx, fill); origFillRect.call(ctx, x, y, w, h);
     if (fx.bracketBorderColor || fx.bracketBorderW > 0) { strokeDesc.set.call(ctx, fx.bracketBorderColor || info.fill || "#ffffff"); ctx.lineWidth = (fx.bracketBorderW + 1) / sx; origStrokeRectRaw.call(ctx, x, y, w, h); }
     // number: profit / loss colour, or your colour, or a readable colour for the box
+    if (fx.privacy) info = { ...info, text: maskNum(info.text) };
     let col = sign > 0 && fx.bracketProfit ? fx.bracketProfit : sign < 0 && fx.bracketLoss ? fx.bracketLoss : fx.bracketText || "";
     if (!col || lowContrast(col, fill, fx.bracketProfit || fx.bracketLoss || fx.bracketText ? 2.2 : 3)) col = readableOn(fill) || "#ffffff";
     const basePx = +((info.font || "").match(/(\d+(?:\.\d+)?)px/) || [0, 11])[1];
@@ -802,13 +807,15 @@
     // still comes through here, so recolour + size always work. If we did record a box, we use it to clamp size
     // and to feed the level-line row match.
     if (c && !c.isConnected && c.height <= 120) noteSrcText(c, a[0], this.font, this.fillStyle);   // labels can be cached before we switch on   // label drawn into a hidden canvas first
-    if (on && fx.bracketOn && c && bracketCanvas(c) && MONEY_RE.test(String(a[0]))
+    if (on && (fx.bracketOn || fx.privacy) && c && bracketCanvas(c) && MONEY_RE.test(String(a[0]))
         && (((this.textAlign === "center" || this.textAlign === "end" || this.textAlign === "right") && BRACKET_FONT.test(this.font || ""))
             || textInPill(this, a[1], a[2]))) {
       {
         const pill = lastPill.get(this);
         if (pill) pill.used = true;
         const sign = pillSign(a[0]) || (pill && pill.sign) || 0;   // "40.75" on a green box = profit
+        if (fx.privacy) a[0] = maskNum(a[0]);                         // Streamer mode: hide the amount, on screen and in recordings
+        if (!fx.bracketOn) { origText.apply(this, a); return; }
         // remember this pill's row so stroke() can find the level line. Prefer the box centre; else the text's y.
         const rowY = pill && pill.box ? pill.box.y + pill.box.h / 2 : (() => { const t = this.getTransform(); return (a[2] || 0) * (t.d || 1) + t.f; })();
         if (fx.bracketDebug) noteBracketDebug(a[0], this.font, this.textAlign, String(this.fillStyle), pill && pill.box);
@@ -923,7 +930,7 @@
   proto.fill = function (...a) {
     const c = this.canvas;
     // rounded pill box (TradingView's newer trading labels draw their box as a path, not a rect)
-    if (on && fx.bracketOn && c && a.length === 0 && bracketCanvas(c)) {
+    if (on && (fx.bracketOn || fx.privacy) && c && a.length === 0 && bracketCanvas(c)) {
       const b = pathBox.get(this);
       if (b) {
         const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1, w = (b.x1 - b.x0) / dpr, h = (b.y1 - b.y0) / dpr;
@@ -980,7 +987,7 @@
     // Bracket pills: record the box so the text drawn next knows it belongs to a pill. Optionally strengthen the
     // box backing so the TP/Stop/P&L number stays readable on busy wallpapers.
     if (c && !c.isConnected && c.height <= 120 && h >= 6) noteSrcBox(c, this.fillStyle, w, h);
-    if (on && fx.bracketOn && c && bracketCanvas(c) && pillBox(this, x, y, w, h)) {
+    if (on && (fx.bracketOn || fx.privacy) && c && bracketCanvas(c) && pillBox(this, x, y, w, h)) {
       const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1;
       const fill = notePillBox(this, { x: x * sx + t.e, y: y * sy + t.f, w: Math.abs(w * sx), h: Math.abs(h * sy) });
       if (fill) { const pF = this.fillStyle; origFillDesc.set.call(this, fill); origFill.call(this, x, y, w, h); origFillDesc.set.call(this, pF); return; }

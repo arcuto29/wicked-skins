@@ -14,7 +14,6 @@
     <button data-tab="interface"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 8.5h18M8 8.5V20"/></svg><span>TradingView</span></button>
     <button data-tab="trading"><svg viewBox="0 0 24 24"><path d="M4 17l5-5 4 3 7-8"/><path d="M15 7h5v5"/></svg><span>Trading</span></button>
     <button data-tab="capture"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3"/></svg><span>Capture</span></button>
-    <button data-tab="media"><svg viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Uploads</span></button>
     <button data-tab="workshop"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.3A4.5 4.5 0 0 1 21 19"/></svg><span>Workshop</span></button>
     <button data-tab="loadouts"><svg viewBox="0 0 24 24"><path d="M7 3h10a1 1 0 0 1 1 1v17l-6-4-6 4V4a1 1 0 0 1 1-1z"/></svg><span>Saved</span></button>
     <button data-tab="tune"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg><span>Adjust</span></button>
@@ -54,6 +53,16 @@
         <div class="chips" id="lookChips"></div>
         <div class="quick" id="quickLooks"></div>
       </div>
+      <div id="tab-media" hidden>
+      <div class="chartpick" hidden></div>
+      <div class="cards" id="mediaCards"></div>
+      <label class="add" id="addMedia">
+        <input type="file" id="file" multiple hidden
+          accept="image/*,video/*,.png,.jpg,.jpeg,.jfif,.gif,.webp,.avif,.apng,.bmp,.ico,.svg,.mp4,.m4v,.webm,.mov,.ogv,.ogg,.mkv" />
+        <b>+</b> Add video / image / GIF<small class="hint" style="margin-top:4px">or drop files here · any video (MP4, MOV, MKV, AVI, WMV, WebM…) · GIF PNG JPG WebP AVIF SVG</small>
+      </label>
+      <p class="hint" id="mediaHint">Files stay on your computer. Videos the browser can't play are converted automatically.</p>
+      </div>
       <div id="viewWalls" hidden>
         <div class="chartpick" hidden></div>
         <div class="chips" id="chips"></div>
@@ -75,7 +84,7 @@
           <input type="color" id="candleUp" title="Up candles" /> <input type="color" id="candleDown" title="Down candles" />
           <small class="hint" style="margin:0">up · down</small></div>
         <div class="row" id="autoMatchRow"><span>Match wallpaper</span><div class="seg" id="autoMatch"></div></div>
-        <p class="hint" id="autoMatchHint">Pulls candle colours, glow and the price scale from your own uploaded wallpaper's colours, and updates if the wallpaper changes. Use an image or video from Uploads.</p>
+        <p class="hint" id="autoMatchHint">Pulls candle colours, glow and the price scale from your own uploaded wallpaper's colours, and updates if the wallpaper changes. Use an image or video from Skins › My uploads.</p>
         <div class="chips" id="candleChips"></div>
         <div class="cards" id="candleCards"></div>
         <div class="row"><span>Glow</span><input type="range" id="candleGlow" min="0" max="1" step="0.05" /><output id="candleGlowOut"></output></div>
@@ -133,7 +142,7 @@
       <details class="grp" data-grp="brackets" open>
         <summary>Trade brackets <label class="switch" title="Recolour the broker's TP / Stop / entry pills"><input type="checkbox" id="bracketOn" /><span></span></label></summary>
         <p class="hint">Fully recolour your broker's on-chart Take profit, Stop and entry pills — box, number, outline and the level line — in any colour, and make the number bigger so it's easy to read on a busy wallpaper. We only restyle the pills TradingView already draws; nothing is sent anywhere.</p>
-        <button id="bracketEasy" class="primary" style="width:100%;margin:4px 0 8px">Make TP / Stop / P&amp;L easy to see</button>
+        <button id="bracketEasy" class="primary keep" style="width:100%;margin:4px 0 8px">Make TP / Stop / P&amp;L easy to see</button>
         <div class="row"><span>Number size</span><div class="seg" id="bracketSize"></div></div>
         <div class="row"><span>Box colour</span><div class="seg bk-mode" id="bracketFillMode"></div><input type="color" id="bracketFill" title="Box colour" /></div>
         <div class="row"><span>Number colour</span><div class="seg bk-mode" id="bracketTextMode"></div><input type="color" id="bracketText" title="Number colour" /></div>
@@ -179,7 +188,10 @@
         <div class="row"><span>Position</span><div class="seg" id="timerPos"></div></div>
       </details>
       <details class="grp" data-grp="journal">
-        <summary>Trade journal <label class="switch" title="Save a picture of your chart when a trade closes"><input type="checkbox" id="journalOn" /><span></span></label></summary>
+        <summary>After each trade</summary>
+        <div class="row"><span>Save a picture</span><label class="switch" title="Save a picture of your chart when a trade closes"><input type="checkbox" id="journalOn" /><span></span></label></div>
+        <div class="row"><span>Save a clip</span><label class="switch" title="Save a short clip of the trade when it closes"><input type="checkbox" id="tradeClipOn" /><span></span></label></div>
+        <div class="row" id="tradeClipLenRow"><span>Clip length</span><div class="seg" id="tradeClipLen"></div></div>
         
         
         <p class="hint">When a trade closes, saves a picture of your chart as it looked while the trade was open (your entry, stop and target), stamped with the symbol, P&amp;L and time. Stored only on this computer; the latest 60 are kept.</p>
@@ -190,6 +202,11 @@
       </details>
     </section>
     <section id="tab-capture" hidden>
+      <details class="grp" data-grp="privacy">
+        <summary>Streamer mode <label class="switch" title="Hide your money on screen and in recordings"><input type="checkbox" id="privacyOn" /><span></span></label></summary>
+        <p class="hint">Hides your money while you stream or record: the numbers in your TP / Stop / P&amp;L labels become dots, Priism's readouts too, and TradingView's account and order panels are blurred.</p>
+        <div class="row"><span>Panels under your mouse</span><div class="seg" id="privacyPeek"></div></div>
+      </details>
       <details class="grp" data-grp="snap" open>
         <summary>Snapshot</summary>
         <div style="margin:2px 0 6px"><button class="primary" style="width:100%" id="snapBtn">Capture my chart</button></div>
@@ -224,16 +241,6 @@
         <div class="row"><span>Strength</span><input type="range" id="wmOpacity" min="0.1" max="1" step="0.05" /><output id="wmOpacityOut"></output></div>
         <p class="hint">Puts your logo + handle on the chart for recordings. <b>Corner</b> is a clean mark (try <b>Drift</b> so it's harder to crop out); <b>Tiled</b> repeats it faintly across the chart so a reposter can't remove it without wrecking the clip.</p>
       </details>
-    </section>
-    <section id="tab-media" hidden>
-      <div class="chartpick" hidden></div>
-      <div class="cards" id="mediaCards"></div>
-      <label class="add" id="addMedia">
-        <input type="file" id="file" multiple hidden
-          accept="image/*,video/*,.png,.jpg,.jpeg,.jfif,.gif,.webp,.avif,.apng,.bmp,.ico,.svg,.mp4,.m4v,.webm,.mov,.ogv,.ogg,.mkv" />
-        <b>+</b> Add video / image / GIF<small class="hint" style="margin-top:4px">or drop files here · any video (MP4, MOV, MKV, AVI, WMV, WebM…) · GIF PNG JPG WebP AVIF SVG</small>
-      </label>
-      <p class="hint" id="mediaHint">Files stay on your computer. Videos the browser can't play are converted automatically.</p>
     </section>
 
     <section id="tab-workshop" hidden>
@@ -322,6 +329,7 @@
         <p class="hint">Press these on your chart. Click a key to change it; Backspace turns a shortcut off.</p>
         <div class="row"><span>Focus mode</span><button class="keybtn" data-key="focusKey"></button></div>
         <div class="row"><span>Focus hides</span><div class="seg" id="focusHides"></div></div>
+        <div class="row"><span>Streamer mode</span><button class="keybtn" data-key="privacyKey"></button></div>
         <div class="row"><span>Record a clip</span><button class="keybtn" data-key="recordKey"></button></div>
         <div class="row"><span>Snapshot</span><button class="keybtn" data-key="snapKey"></button></div>
         <div class="row"><span>Turn everything on/off</span><button class="keybtn" data-key="toggleKey"></button></div>
