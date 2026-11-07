@@ -16,7 +16,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, sides: "off", uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, sides: "off", leftBar: "off", uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
@@ -910,9 +910,10 @@ function syncTune() {
   seg("motion", [[false, "On"], [true, "Paused"]], () => cfg.paused, (v) => set({ paused: v }));
   seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => { set({ layer: v }); syncTune(); });
   // Sides only makes sense under the chart (On top already floats over everything).
-  $("sidesRow").hidden = cfg.layer === "over";
+  $("sidesRow").hidden = cfg.layer === "over"; if ($("leftBarRow")) $("leftBarRow").hidden = cfg.layer === "over";
   $("sidesHint").hidden = cfg.layer === "over";
   seg("sides", [["off", "Chart only"], ["glass", "Glass"], ["clear", "Clear"]], () => cfg.sides || "off", (v) => set({ sides: v }));
+  if ($("leftBar")) seg("leftBar", [["off", "Default"], ["glass", "Glass"], ["clear", "Clear"]], () => cfg.leftBar || "off", (v) => set({ leftBar: v }));
   // Interface (fonts / size / accent for TradingView's own panels)
   seg("uiFont", [["default", "Default"], ["mono", "Mono"], ["rounded", "Rounded"]], () => cfg.uiFont || "default", (v) => set({ uiFont: v }));
   seg("uiSize", [[0, "Normal"], [1, "Large"]], () => (+cfg.uiSize || 0), (v) => set({ uiSize: v }));
@@ -1272,7 +1273,7 @@ $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
 $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cfg.wmOn || !!e.target.value });
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
-const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","sides","uiFont","uiSize","uiAccent","react","reactStrength","vignette","calm"];
+const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","vignette","calm"];
 const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");

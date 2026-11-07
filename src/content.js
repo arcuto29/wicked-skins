@@ -20,6 +20,7 @@
     // Sides: let the wallpaper flow across the panels around the chart (watchlist, toolbars, the grey areas).
     // "off" = only the chart; "glass" = frosted panels; "clear" = fully see-through panels.
     sides: "off",
+    leftBar: "off",           // the left drawing-tool rail: off (TradingView's own) | glass | clear
     // UI style: font + accent for TradingView's own panels (watchlist, toolbars, order area, timeframe bar).
     uiFont: "default", uiSize: 0, uiAccent: "",     // font: default|mono|rounded ; size: 0|1 ; accent: "" or #hex
     // Watermark: the Priism Skins logo + your name/handle, for recordings and streams.
@@ -95,20 +96,22 @@
   // Every visible chart, in reading order (top row left to right, then the next row). Chart 1 is top-left.
   function chartEls() {
     // Advanced Charts panes; if none, fall back to Lightweight Charts container(s) so the wallpaper still places.
-    let all = [...document.querySelectorAll(".chart-container")];
-    if (!all.length) all = [...document.querySelectorAll(".tv-lightweight-charts, [class*='lightweight']")];
+    // ".chart-container" is a common class name, so only count it as TradingView's own chart when it holds one.
+    let all = [...document.querySelectorAll(".chart-container")].filter((el) => el.querySelector(".chart-markup-table"));
+    if (!all.length) all = [...document.querySelectorAll(LW_SEL)];
     return all
       .filter((el) => !all.some((o) => o !== el && o.contains(el)))
       .map((el) => ({ el, r: el.getBoundingClientRect() }))
       .filter(({ r }) => r.width > 80 && r.height > 60)
       .sort((a, b) => (Math.abs(a.r.top - b.r.top) > 20 ? a.r.top - b.r.top : a.r.left - b.r.left));
   }
+  const LW_SEL = "[data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight']";
   let charts = [];
   const tiled = () => cfg.multi !== "span" && charts.length > 1;
   // the area covered by all charts together (watermark, P&L pill, over-chart clipping)
   function chartsBox() {
     if (!charts.length) {
-      const el = document.querySelector(".layout__area--center") || document.querySelector(".tv-lightweight-charts, [class*='lightweight']");
+      const el = document.querySelector(".layout__area--center") || document.querySelector(LW_SEL);
       const r = el ? el.getBoundingClientRect() : null;
       return r && r.width > 80 ? r : { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth, height: innerHeight };
     }
@@ -547,6 +550,10 @@
     h.classList.toggle("bd-sides", on);
     h.classList.toggle("bd-sides-glass", on && mode === "glass");
     h.classList.toggle("bd-sides-clear", on && mode === "clear");
+    const lm = ["glass", "clear"].includes(cfg.leftBar) ? cfg.leftBar : "off", lon = cfg.enabled && lm !== "off" && cfg.layer !== "over";
+    h.classList.toggle("bd-left", lon);
+    h.classList.toggle("bd-left-glass", lon && lm === "glass");
+    h.classList.toggle("bd-left-clear", lon && lm === "clear");
   }
 
   // UI style: font / size / accent for TradingView's own HTML panels (watchlist, toolbars, order area, timeframes).
@@ -568,11 +575,11 @@
   // backgrounds we can't know about, so a layer behind the whole page would be hidden. Instead the wallpaper goes INSIDE the
   // chart's own container, directly under the chart (whose background lw.js clears). Single chart + "behind" mode only.
   let embeddedHost = null, lastRebuild = 0;
-  function lwHost() {
-    if (document.querySelector(".chart-container, .chart-markup-table")) return null;
-    if (charts.length !== 1) return null;
-    const el = charts[0].el;
-    const host = el.classList.contains("tv-lightweight-charts") ? el.parentElement : el;
+  function lwHost(list = charts) {
+    if (document.querySelector(".chart-markup-table")) return null;          // TradingView's own charts: not a LW page
+    if (list.length !== 1) return null;
+    const el = list[0].el;
+    const host = el.classList.contains("tv-lightweight-charts") || (el.hasAttribute("data-bd-lwroot") && el.tagName === "TABLE") ? el.parentElement : el;
     return host && host !== document.body && host !== document.documentElement ? host : null;
   }
   function claimStack(host) {      // the chart wrapper must be positioned so it paints ABOVE the wallpaper (a positioned sibling)
@@ -660,6 +667,11 @@
       return;
     }
     const next = chartEls(), sig = sigOf(next);
+    // a Lightweight chart appeared (or was replaced) after we built: move the wallpaper into it
+    if (cfg.layer !== "over" && !(cfg.multi !== "span" && next.length > 1)) {
+      const want = lwHost(next);
+      if (want && want !== embeddedHost && Date.now() - lastRebuild > 1500) { lastRebuild = Date.now(); charts = next; build(); return; }
+    }
     if (sig === layoutSig) return;
     const before = charts.length, wasTiled = tiled();
     charts = next; layoutSig = sig;
@@ -1083,7 +1095,7 @@
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
-    if (keys.includes("sides") || keys.includes("enabled") || keys.includes("layer")) applySides();
+    if (keys.includes("sides") || keys.includes("leftBar") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
@@ -1483,14 +1495,15 @@
   // platform's embedded chart iframe). Other frames / pages of an enabled site are left untouched.
   // Advanced Charts (.chart-container) OR Lightweight Charts (.tv-lightweight-charts) — the wallpaper layer and
   // activation work for both; the candle recolour engine for each lives in hook.js / lw.js respectively.
-  const CHART_SEL = ".chart-markup-table, .chart-container, .tv-lightweight-charts, [class*='lightweight']";
+  const CHART_SEL = ".chart-markup-table, .chart-container, [data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight']";
   const bigChart = () => [...document.querySelectorAll(CHART_SEL)].some((el) => { const r = el.getBoundingClientRect(); return r.width >= 400 && r.height >= 250; });
   function whenChart(start) {
     const go = () => { if (!claim()) return; sweep(); start(); setTimeout(announceFrame, 300); };
     if (bigChart()) return go();
     // charts render late and small widgets (mini charts) never qualify; check for a while
-    const iv = setInterval(() => { if (bigChart()) { clearInterval(iv); go(); } }, 500);
-    setTimeout(() => clearInterval(iv), 180000); // charts that load later than 3 min: reload the page
+    // keep checking (login-gated / single-page apps can show the chart much later), slower after the first 3 minutes
+    let iv = setInterval(() => { if (bigChart()) { clearInterval(iv); go(); } }, 500);
+    setTimeout(() => { if (!bigChart()) { clearInterval(iv); iv = setInterval(() => { if (bigChart()) { clearInterval(iv); go(); } }, 2000); } }, 180000);
   }
 
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {

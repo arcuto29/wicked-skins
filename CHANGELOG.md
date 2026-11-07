@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.23 (2026-11-04)
+- Custom trading apps built on TradingView Lightweight Charts (like nq.vision): candle colours and glow now work, not just the wallpaper and watermark.
+  - Candle colours are learned even when the app uses slightly see-through colours, or draws candles as shapes instead of plain boxes.
+  - The chart is found even if it shows up long after the page loads, for example after you log in. Before, the candle part gave up after 30 seconds.
+  - The chart is recognised by its layout, so it's found even when the app renames TradingView's chart parts or uses a generic "chart-container" name.
+  - Candle glow now works on these apps too.
+- New: **Left toolbar** setting (Style → Placement): Glass or Clear lets the wallpaper show through TradingView's drawing-tool bar. It's off by default, so nothing changes unless you turn it on.
+
 ## 0.1.22 (2026-11-04)
 - Fixed TP / Stop / P&L numbers that could turn invisible ("fully white") with trade-bracket styling on.
   - A strengthened box used to become TradingView's own pill colour at full strength, often the same colour as its number. It is now a dark box tinted with that colour.
