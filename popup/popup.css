@@ -256,3 +256,14 @@ input[type=checkbox] { accent-color: var(--acc); width: 15px; height: 15px; }
 .news .tour-bar { display: flex; align-items: center; justify-content: space-between; }
 .news .dots { display: flex; gap: 5px; } .news .dots i { width: 6px; height: 6px; border-radius: 6px; background: #2c3140; } .news .dots i.on { width: 16px; background: var(--grad); }
 .news .tour-bar .primary { padding: 6px 12px; }
+/* chart-styling cards: label above its controls so every option reads in full */
+.cpart-b .row { flex-wrap: wrap; gap: 5px 8px; margin-top: 8px; min-height: 0; }
+.cpart-b .row > span { width: 100%; font-size: 12px; color: #aeb4c3; }
+.cpart-b .row .seg { flex: 1 1 auto; }
+.cpart-b .row input[type=range] { flex: 1; }
+.seg button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* every row with a set of option buttons: label on top, buttons full width (no cut-off text anywhere) */
+.row:has(> .seg) { flex-wrap: wrap; gap: 5px 8px; min-height: 0; }
+.row:has(> .seg) > span { width: 100%; font-size: 12px; color: #aeb4c3; }
+.row:has(> .seg) > .seg { flex: 1 1 auto; }
+.seg button { padding-left: 4px; padding-right: 4px; }

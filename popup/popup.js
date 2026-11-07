@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -22,7 +22,7 @@ const DEFAULTS = {
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
-  chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false,
+  chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chLabels: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
   sbOn: false, sbColor: "", sbW: 0, sbStyle: "dashed", axOn: false, axColor: "", axW: 0, axStyle: "solid",
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
@@ -1056,7 +1056,7 @@ function renderChartStyle() {
       <div class="row"><span>Width</span><div class="seg" id="cs-${p.k}-w"></div></div>
       <div class="row"><span>Style</span><div class="seg" id="cs-${p.k}-st"></div></div>` +
       (p.k === "grid" ? `<div class="row"><span>Strength</span><input type="range" id="cs-grid-a" min="0.05" max="1" step="0.05" /><output id="cs-grid-ao"></output></div>` : "") +
-      (p.glow ? `<div class="row"><span>Glow at the pointer</span><div class="seg" id="cs-ch-glow"></div></div>` : "");
+      (p.glow ? `<div class="row"><span>Glow at the pointer</span><div class="seg" id="cs-ch-glow"></div></div><div class="row"><span>Price &amp; time labels</span><div class="seg" id="cs-ch-lab"></div></div>` : "");
     card.appendChild(body);
     seg(`cs-${p.k}-cm`, [["", "Skin colour"], ["candle", "Candle"], ["custom", "Custom"]], () => (/^#/.test(cfg[colKey] || "") ? "custom" : cfg[colKey] || ""),
       (v) => { set({ [colKey]: v === "custom" ? ($(`cs-${p.k}-col`).value || "#7df9ff") : v }); renderChartStyle(); });
@@ -1065,7 +1065,8 @@ function renderChartStyle() {
     seg(`cs-${p.k}-st`, p.styles, () => cfg[p.k + "Style"], (v) => set({ [p.k + "Style"]: v }));
     if (p.k === "grid") { const r = $("cs-grid-a"); r.value = cfg.gridAlpha; $("cs-grid-ao").textContent = Math.round(cfg.gridAlpha * 100) + "%";
       r.oninput = (e) => { set({ gridAlpha: +e.target.value }); $("cs-grid-ao").textContent = Math.round(+e.target.value * 100) + "%"; }; }
-    if (p.glow) seg("cs-ch-glow", [[false, "Off"], [true, "On"]], () => !!cfg.chGlow, (v) => set({ chGlow: v }));
+    if (p.glow) { seg("cs-ch-glow", [[false, "Off"], [true, "On"]], () => !!cfg.chGlow, (v) => set({ chGlow: v }));
+      seg("cs-ch-lab", [[false, "Own"], [true, "Match crosshair"]], () => !!cfg.chLabels, (v) => set({ chLabels: v })); }
   }
 }
 function syncPanels() {
@@ -1653,8 +1654,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
 const WHATS_NEW = ["Community looks: share your whole setup, browse Top / New / Mine (Workshop)",
-  "Session breaks and scale borders join grid, crosshair and price line in Chart styling",
-  "A cleaner, modern panel, plus \u201cFind any setting\u201d at the top"];
+  "Crosshair labels in your crosshair colour, plus session breaks and scale borders in Chart styling",
+  "A cleaner, modern panel where every option reads in full"];
 (function onboarding() {
   let ver = ""; try { ver = chrome.runtime.getManifest().version; } catch {}
   const seen = localStorage.getItem("seenVer");

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.28 (2026-11-04)
+- Crosshair price and time labels can match your crosshair colour (Chart styling → Crosshair → Price & time labels). The text stays readable.
+- Session breaks are now recognised by the colour set in TradingView's own settings. They're grey dashed lines by default, and could be mixed up with the grid before.
+- Panel: no option text is cut off any more ("Skin c…", "Ca…"). Rows with option buttons show their label on top, so every choice reads in full. Checked automatically across every tab.
+- New store screenshots showing the new design and chart styling.
+- Stability: a stress test switched wallpapers, candle looks, chart styling and panel colours dozens of times. Memory, page size and canvases stayed flat, and it held 60 fps.
+
 ## 0.1.27 (2026-11-04)
 - **Community looks** (Workshop → Community looks): browse whole setups other traders shared (wallpaper, candles, chart styling, panels) by Top, New or Mine, each with a live preview and an "ON" count. One tap puts a look on, and Undo is one tap too.
   - **Share my current look** sends your setup to the website, where you sign in and post it. Shares are reviewed before they appear.

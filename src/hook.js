@@ -75,7 +75,7 @@
     bracketDebug: false,
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
-    chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false,
+    chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chLabels: false,
     plOn: false, plColor: "", plW: 0, plStyle: "dotted",
     sbOn: false, sbColor: "", sbW: 0, sbStyle: "dashed",          // session breaks (vertical lines between sessions)
     axOn: false, axColor: "", axW: 0, axStyle: "solid",           // the border lines of the price / time scales
@@ -111,7 +111,7 @@
         gridOn: !!f.gridOn, gridColor: colOpt(f.gridColor), gridAlpha: Math.max(0.03, Math.min(1, f.gridAlpha === undefined ? 0.35 : +f.gridAlpha || 0)),
         gridW: Math.max(0, Math.min(2, +f.gridW || 0)), gridStyle: ["solid", "dotted", "dashed", "none"].includes(f.gridStyle) ? f.gridStyle : "dotted",
         chOn: !!f.chOn, chColor: colOpt(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)),
-        chStyle: ["solid", "dotted", "dashed"].includes(f.chStyle) ? f.chStyle : "dashed", chGlow: !!f.chGlow,
+        chStyle: ["solid", "dotted", "dashed"].includes(f.chStyle) ? f.chStyle : "dashed", chGlow: !!f.chGlow, chLabels: !!f.chLabels,
         plOn: !!f.plOn, plColor: colOpt(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)),
         plStyle: ["solid", "dotted", "dashed"].includes(f.plStyle) ? f.plStyle : "dotted",
         sbOn: !!f.sbOn, sbColor: colOpt(f.sbColor), sbW: Math.max(0, Math.min(2, +f.sbW || 0)), sbStyle: ["solid", "dotted", "dashed", "none"].includes(f.sbStyle) ? f.sbStyle : "dashed",
@@ -129,7 +129,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW,
-      fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -338,6 +338,24 @@
   const DASH = { solid: [], dotted: [1, 3], dashed: [5, 5] };
   function pick(opt, cur) { return opt === "candle" ? (candles ? candles.upHex : cur) : opt || fx.accent || (candles ? candles.upHex : cur); }
   const xhair = new WeakMap();      // top canvas -> { x, y, t } of the crosshair lines drawn this frame
+  // TradingView's own configured colours for each line kind (read from the chart, refreshed every few seconds).
+  // Exact colour matches beat the shape heuristics: session breaks, for example, are grey dashed lines like the grid.
+  let tvLines = { grid: new Set(), sb: new Set(), ch: new Set(), t: 0 };
+  function knownLines() {
+    const now = performance.now(); if (now - tvLines.t < 3000) return tvLines;
+    const next = { grid: new Set(), sb: new Set(), ch: new Set(), t: now };
+    const add = (set, v) => { try { const r = rgbKey(typeof v === "function" ? v() : v); if (r) set.add(r.key); } catch {} };
+    for (const w of chartWidgets()) {
+      try {
+        const cw = w._chartWidget || w, m = cw.model().model ? cw.model().model() : cw.model(), P = m.properties().childs();
+        const pp = P.paneProperties.childs();
+        add(next.grid, pp.vertGridProperties.childs().color.value()); add(next.grid, pp.horzGridProperties.childs().color.value());
+        add(next.ch, pp.crossHairProperties.childs().color.value());
+        add(next.sb, P.chartEventsSourceProperties.childs().breaks.childs().color.value());
+      } catch {}
+    }
+    tvLines = next; return tvLines;
+  }
   function styleLine(ctx, c, args) {
     const k = segs.get(ctx); if (!k || k[0] !== 1 || k[1] !== 1) return false;
     const s = lastSeg.get(ctx); if (!s || s.x1 === null) return false;
@@ -350,7 +368,8 @@
       const edge = vert ? Math.min(s.x0, c.width - s.x0) <= 3 : Math.min(s.y0, c.height - s.y0) <= 3;
       if (!edge || !fx.axOn) return false; part = "ax";
     }
-    else if (top) { if (fx.chOn && greyish(cur)) part = "ch"; }
+    else if (top) { if (fx.chOn && (greyish(cur) || knownLines().ch.has((rgbKey(cur) || {}).key))) part = "ch"; }
+    else if (vert && knownLines().sb.has((rgbKey(cur) || {}).key) && !knownLines().grid.has((rgbKey(cur) || {}).key)) { if (!fx.sbOn) return false; part = "sb"; }
     else if (vert && fx.sbOn && !greyish(cur) && !candleCol(cur) && ctx.getLineDash().length) part = "sb";
     else if (horiz && fx.plOn && candleCol(cur) && ctx.getLineDash().length) part = "pl";
     else if (fx.gridOn && greyish(cur)) part = "grid";
@@ -720,6 +739,10 @@
 
   proto.fillText = function (...a) {
     const c = this.canvas;
+    if (on && fx.chOn && fx.chLabels && c && isAxis(c) && isTop(c) && chLabel.get(this)) {
+      const pF = this.fillStyle; origFillDesc.set.call(this, readableOn(chLabel.get(this)) || "#ffffff");
+      const r = origText.apply(this, a); origFillDesc.set.call(this, pF); return r;
+    }
     notePnl(a[0], c);
 
     // Bracket pill text: bigger + optional +/- recolour. The reliable signal is the FONT (Verdana) — every TP /
@@ -844,9 +867,16 @@
 
   // ---------- price tags glow with the scale glow ----------
   const origFillPath = proto.fill;
+  const chLabel = new WeakMap();      // axis top canvas -> colour we gave the crosshair label box
   const lastTag = new WeakMap();   // colour of the last price box drawn on each scale canvas
   proto.fill = function (...a) {
     const c = this.canvas;
+    // crosshair price / time labels (the boxes that follow your pointer on the scales): your crosshair colour
+    if (on && fx.chOn && fx.chLabels && c && isAxis(c) && isTop(c)) {
+      const col = pick(fx.chColor, String(this.fillStyle)), pF = this.fillStyle;
+      origFillDesc.set.call(this, col); chLabel.set(this, col);
+      const r = origFillPath.apply(this, a); origFillDesc.set.call(this, pF); return r;
+    }
     if (on && c && isAxis(c)) lastTag.set(this, this.fillStyle);
     if (on && c && fx.scaleGlow > 0 && isAxis(c)) {
       const col = this.fillStyle;
