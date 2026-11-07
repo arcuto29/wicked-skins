@@ -1599,18 +1599,32 @@
         v.pause(); v.currentTime = t0; await new Promise((res) => v.addEventListener("seeked", res, { once: true }));
         g.drawImage(v, sx, sy, W, H, 0, 0, OW, OH);
         rec.start(500); await v.play();
+        // Finish reliably: the browser can stop handing out frames a hair before the very end of a clip, a hidden
+        // tab pauses frame callbacks, and the video may end early, so we stop on ANY of: reached the end point
+        // (within a frame), the video ended or paused, or a hard deadline. A timer also keeps frames coming.
+        const frameDur = 1 / (fps || 30), deadline = performance.now() + ((t1 - t0) / Math.max(0.25, v.playbackRate || 1)) * 1000 + 4000;
         await new Promise((res) => {
-          const step = () => {
-            if (!busy) return res();
-            g.drawImage(v, sx, sy, W, H, 0, 0, OW, OH);
+          let done2 = false, iv = 0;
+          const finish = () => { if (done2) return; done2 = true; clearInterval(iv); v.removeEventListener("ended", finish); res(); };
+          const draw = () => {
+            if (done2) return;
+            if (!busy) return finish();
+            try { g.drawImage(v, sx, sy, W, H, 0, 0, OW, OH); } catch {}
+            const left = Math.max(0, t1 - v.currentTime);
             bar.style.width = Math.min(100, ((v.currentTime - t0) / Math.max(0.01, t1 - t0)) * 100) + "%";
-            msg.textContent = `Saving… ${Math.max(0, Math.ceil(t1 - v.currentTime))}s left (keep this tab open)`;
-            if (v.currentTime >= t1 || v.ended) return res();
-            if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(step); else requestAnimationFrame(step);
+            msg.textContent = `Saving… ${Math.ceil(left)}s left (keep this tab open)`;
+            if (v.currentTime >= t1 - frameDur || v.ended || (v.paused && v.currentTime > t0 + 0.1) || performance.now() > deadline) return finish();
           };
-          step();
+          const step = () => { draw(); if (!done2 && v.requestVideoFrameCallback) v.requestVideoFrameCallback(step); };
+          v.addEventListener("ended", finish);
+          iv = setInterval(draw, 100);                          // backup when frame callbacks pause
+          if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(step); else draw();
         });
-        v.pause(); rec.stop(); await done;
+        v.pause();
+        bar.style.width = "100%"; msg.textContent = "Finishing…";
+        try { rec.requestData(); } catch {}
+        rec.stop();
+        await Promise.race([done, new Promise((r) => setTimeout(r, 3000))]);   // never hang waiting for the recorder
         const out = new Blob(chunks, { type: mime || "video/webm" });
         saveBlob(out, name.replace(/\.webm$/, "") + "-edited.webm");
         flash("Edited clip saved to your downloads");

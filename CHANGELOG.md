@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.32 (2026-11-04)
+- Fixed saving an edited clip getting stuck at the end. When the end point was at the very end of the clip, the browser could stop delivering frames a moment before it, so the save never finished.
+  - Saving now finishes when the end point is reached (within one frame), when the video ends or pauses, or at a hard deadline.
+  - A timer keeps frames coming if the browser pauses them, and it never waits forever for the recorder.
+  - Tested: a 10 s clip at 30 fps and a 30 s clip at 60 fps, cropped and trimmed to the end, both save at the right length. On the previous version the 10 s case hung.
+
 ## 0.1.31 (2026-11-04)
 - **TradingView's windows & menus in your style** (Style → Interface → Windows & menus): the Settings window, other dialogs and dropdown menus can be **Glass** (frosted, your wallpaper glows through) or **Colour** (your own), with a Strength slider. Everything inside follows and text stays readable.
 - **Clip quality** (Clip → Quality): High, Balanced or Small file. Small keeps long clips under ~20 MB, handy for Discord. Long clips no longer get a lower bitrate automatically.

@@ -11,8 +11,8 @@ android {
         applicationId "com.priism.skins"
         minSdk 24
         targetSdk 34
-        versionCode 31
-        versionName "0.1.31"
+        versionCode 32
+        versionName "0.1.32"
     }
 
     // Load the keystore from gradle.properties if present; otherwise debug-sign so the build still runs.
