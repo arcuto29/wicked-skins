@@ -477,7 +477,14 @@
   // sans-serif stack, so the font is the reliable signal. The box is only used so we have something to restyle;
   // we keep its size test loose and DPR-correct so wide multi-part pills and HiDPI screens still match.
   const BRACKET_FONT = /\bVerdana\b/i;
-  const lastPill = new WeakMap();   // ctx -> { used, box:{x,y,w,h} } of the last pill-shaped box drawn
+  const lastPill = new WeakMap();
+  // Font-independent pill test: this text sits inside the pill box drawn a moment ago (so a font change on
+  // TradingView's side can't leave a restyled box with unstyled, invisible text on it).
+  function textInPill(ctx, x, y) {
+    const p = lastPill.get(ctx); if (!p || !p.box || performance.now() - p.t > 250) return false;
+    const t = ctx.getTransform(), tx = (x || 0) * (t.a || 1) + t.e, ty = (y || 0) * (t.d || 1) + t.f, b = p.box, m = b.h * 0.6;
+    return tx >= b.x - m && tx <= b.x + b.w + m && ty >= b.y - m && ty <= b.y + b.h + m;
+  }   // ctx -> { used, box:{x,y,w,h} } of the last pill-shaped box drawn
   function pillBox(ctx, x, y, w, h) {
     // convert the box to CSS px: the canvas transform's scale already folds in devicePixelRatio
     const sx = ctx.getTransform().a || 1, sy = ctx.getTransform().d || 1;
@@ -523,6 +530,15 @@
     const [R, G, B] = r.key.split(",").map((n) => { n /= 255; return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); });
     return 0.2126 * R + 0.7152 * G + 0.0722 * B > 0.34 ? "#0a0e14" : "#ffffff";
   }
+  function lum(v) {
+    const r = rgbKey(v); if (!r) return null;
+    const [R, G, B] = r.key.split(",").map((n) => { n /= 255; return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); });
+    return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+  }
+  function lowContrast(a, b) {             // WCAG contrast < 3:1
+    const A = lum(a), B = lum(b); if (A === null || B === null) return false;
+    return (Math.max(A, B) + 0.05) / (Math.min(A, B) + 0.05) < 3;
+  }
   // which fill colour did the box end up with (what we painted, or TradingView's own)? remembered per ctx so the
   // text branch can auto-pick a readable colour when the user recoloured/strengthened the box but not the text.
   const pillFill = new WeakMap();
@@ -548,8 +564,9 @@
     // some pills draw their box with roundRect / a path (not fillRect), which we can't always catch, but the text
     // still comes through here, so recolour + size always work. If we did record a box, we use it to clamp size
     // and to feed the level-line row match.
-    if (on && fx.bracketOn && c && isPane(c) && (this.textAlign === "center" || this.textAlign === "end" || this.textAlign === "right")
-        && BRACKET_FONT.test(this.font || "") && MONEY_RE.test(String(a[0]))) {
+    if (on && fx.bracketOn && c && isPane(c) && MONEY_RE.test(String(a[0]))
+        && (((this.textAlign === "center" || this.textAlign === "end" || this.textAlign === "right") && BRACKET_FONT.test(this.font || ""))
+            || textInPill(this, a[1], a[2]))) {
       {
         const pill = lastPill.get(this);
         if (pill) pill.used = true;
@@ -581,7 +598,10 @@
         if (sign > 0 && fx.bracketProfit) col = fx.bracketProfit;
         else if (sign < 0 && fx.bracketLoss) col = fx.bracketLoss;
         else if (fx.bracketText) col = fx.bracketText;
-        else { const boxCol = pillFill.get(this); if (boxCol) col = readableOn(boxCol) || ""; }  // keep it visible
+        // never let the number match its box: if the chosen (or TradingView's) colour is too close to the box we
+        // painted, switch to black/white so TP / Stop / P&L always read
+        const boxCol = pillFill.get(this);
+        if (boxCol && lowContrast(col || String(pFill), boxCol)) col = readableOn(boxCol) || col;
         if (col) this.fillStyle = col;
         origText.apply(this, a);
         this.font = pFont; this.fillStyle = pFill;
@@ -686,7 +706,7 @@
     // box backing so the TP/Stop/P&L number stays readable on busy wallpapers.
     if (on && fx.bracketOn && c && isPane(c) && pillBox(this, x, y, w, h)) {
       const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1;
-      lastPill.set(this, { used: false, box: { x: x * sx + t.e, y: y * sy + t.f, w: Math.abs(w * sx), h: Math.abs(h * sy) } });
+      lastPill.set(this, { used: false, t: performance.now(), box: { x: x * sx + t.e, y: y * sy + t.f, w: Math.abs(w * sx), h: Math.abs(h * sy) } });
       // Custom box colour wins; otherwise glass/solid just strengthens TradingView's own box so it pops on a skin.
       if (fx.bracketFill) {
         const pF = this.fillStyle;
@@ -696,17 +716,20 @@
         return;
       }
       if (fx.bracketBack !== "keep") {
-        const r = rgbKey(this.fillStyle), isLight = r && (r.key.split(",").reduce((s, n) => s + +n, 0) / 3) > 150;
-        const al = fx.bracketBack === "solid" ? 1 : 0.9;       // glass = stronger; solid = opaque
-        const pF = this.fillStyle;
-        const fill = r ? `rgba(${r.key},${al})` : (isLight ? `rgba(20,22,31,${al})` : `rgba(255,255,255,${al})`);
+        // Strengthen as a DARK box tinted with the pill's own colour. (Making TradingView's colour opaque turned the
+        // box the same colour as its number -> "fully white", nothing readable.) Text is then forced to contrast.
+        const r = rgbKey(this.fillStyle), base = [16, 19, 28];
+        const rgb = r ? r.key.split(",").map(Number) : base;
+        const k = fx.bracketBack === "solid" ? 0.22 : 0.3, al = fx.bracketBack === "solid" ? 1 : 0.88;
+        const mix = rgb.map((v, i) => Math.round(base[i] + (v - base[i]) * k));
+        const pF = this.fillStyle, fill = `rgba(${mix.join(",")},${al})`;
         this.fillStyle = fill; pillFill.set(this, fill);
         origFill.call(this, x, y, w, h);
         this.fillStyle = pF;
         return;
       }
-      // no box change: still remember TradingView's own box colour so the text branch can keep contrast if needed
-      pillFill.set(this, this.fillStyle);
+      // box unchanged: TradingView's own text already reads on it, so don't override the colour
+      pillFill.delete(this);
     }
     if (on && c && c.width > 20 && c.height > 20) {
       const s = this.getTransform().a || 1;
