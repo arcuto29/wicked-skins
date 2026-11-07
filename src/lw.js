@@ -34,6 +34,7 @@
 
   // ---------- settings (same channel as hook.js) ----------
   const cache = new Map();          // colour-string -> { key:"r,g,b", a } | null   (declared early: readCandles clears it)
+  const remapCache = new Map();
   let on = htmlEl().classList.contains("bd-on");
   let candles = null;   // { up:[r,g,b], down:[r,g,b], upHex, downHex, glow, look }
   const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -48,8 +49,28 @@
       } else candles = null;
     } catch { candles = null; }
   }
+  // A Lightweight Charts chart only redraws when something about the chart changes, NOT when our settings change, so
+  // after a settings change the old colours would stay until you next scroll. Nudge it: tell the page the window resized
+  // (apps that listen for that call chart.resize), and shave 1px off the chart's container for two frames (charts that
+  // auto-size themselves with a ResizeObserver redraw on that). Live price updates redraw the chart anyway.
+  let repaintT = 0;
+  function repaint() {
+    clearTimeout(repaintT);
+    repaintT = setTimeout(() => {
+      if (!active) return;
+      try { window.dispatchEvent(new Event("resize")); } catch {}
+      const hosts = [...document.querySelectorAll(".tv-lightweight-charts")].map((e) => e.parentElement).filter(Boolean);
+      for (const h of hosts) {
+        const r = h.getBoundingClientRect(); if (r.width < 50) continue;
+        const was = h.style.width, wasMax = h.style.maxWidth;
+        h.style.width = (r.width - 1) + "px"; h.style.maxWidth = (r.width - 1) + "px";
+        requestAnimationFrame(() => requestAnimationFrame(() => { h.style.width = was; h.style.maxWidth = wasMax; }));
+      }
+    }, 150);
+  }
+  window.__bdLwRepaint = repaint;
   const settingsObserver = new MutationObserver(() => {
-    on = htmlEl().classList.contains("bd-on"); readCandles();
+    on = htmlEl().classList.contains("bd-on"); readCandles(); remapCache.clear(); repaint();
   });
   (function watch() {
     const el = document.documentElement;
@@ -109,7 +130,8 @@
     if (mx === mn) return 0; let h = mx === R ? (G - B) / (mx - mn) : mx === G ? 2 + (B - R) / (mx - mn) : 4 + (R - G) / (mx - mn); return (h * 60 + 360) % 360; }
   function colourful(key) { const [R, G, B] = key.split(",").map(Number); const mx = Math.max(R, G, B), mn = Math.min(R, G, B); return mx - mn > 28 && mx > 40; }
   function learnFromDrawing() {
-    const cands = [...tally].filter(([c, n]) => n >= 15).map(([c, n]) => [rgbKey(c), n]).filter(([r]) => r && r.a === null && colourful(r.key))
+    lastTally = [...tally].sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const cands = [...tally].filter(([c, n]) => n >= 6).map(([c, n]) => [rgbKey(c), n]).filter(([r]) => r && r.a === null && colourful(r.key))
       .sort((a, b) => b[1] - a[1]).slice(0, 2);
     tally.clear();
     if (cands.length < 2) return [];
@@ -118,6 +140,7 @@
     return dGreen(a) <= dGreen(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]];
   }
 
+  const learnedDrawn = new Map();   // colour key -> "up" | "down", learned from what the chart really draws; kept once learned
   function learnSides() {
     if (!active) return;
     const best = new Map();
@@ -125,14 +148,16 @@
       if (!cur || rank > cur.rank) best.set(r.key, { side, rank, tie: false }); else if (rank === cur.rank && side !== cur.side) cur.tie = true; };
     for (const [c, s] of DEFAULTS) add(c, s, 0);
     const api = learnFromApi(); for (const [c, s] of api) add(c, s, 3);
-    if (!api.length) for (const [k, s] of learnFromDrawing()) { const cur = best.get(k); if (!cur) best.set(k, { side: s, rank: 2, tie: false }); }
+    if (!api.length) {
+      for (const [k, s] of learnFromDrawing()) if (!learnedDrawn.has(k) && learnedDrawn.size < 8) learnedDrawn.set(k, s);
+      for (const [k, s] of learnedDrawn) { const cur = best.get(k); if (!cur) best.set(k, { side: s, rank: 2, tie: false }); }
+    }
     const next = new Map(); for (const [k, v] of best) if (!v.tie) next.set(k, v.side);
     const sig = [...next].sort().join("|");
-    if (sig !== sidesSig) { sides = next; sidesSig = sig; cache.clear(); }
+    if (sig !== sidesSig) { sides = next; sidesSig = sig; cache.clear(); remapCache.clear(); repaint(); }   // new colours learned: the chart has to redraw to show them
   }
 
   // ---------- remap ----------
-  const remapCache = new Map();
   function remap(v) {
     if (!candles || typeof v !== "string") return v;
     let out = remapCache.get(v);
@@ -158,6 +183,9 @@
     return v;
   }
 
+  const lwTableCache = new WeakMap();
+  function inLwTable(c) { let v = lwTableCache.get(c); if (v === undefined) { try { v = !!(c.closest && c.closest(".tv-lightweight-charts")); } catch { v = false; } lwTableCache.set(c, v); } return v; }
+
   // ---------- install the canvas hooks (once, when this is a LW page) ----------
   let active = false;
   function install() {
@@ -166,7 +194,7 @@
 
     const d = Object.getOwnPropertyDescriptor(proto, "fillStyle");
     Object.defineProperty(proto, "fillStyle", { configurable: true, enumerable: d.enumerable, get: d.get,
-      set(v) { if (on && candles && isChart(this.canvas)) { noteFill(typeof v === "string" ? v : null); d.set.call(this, remap(v)); } else d.set.call(this, v); } });
+      set(v) { this.__bdLwOrig = v; if (on && candles && isChart(this.canvas)) d.set.call(this, remap(v)); else d.set.call(this, v); } });
     const sd = Object.getOwnPropertyDescriptor(proto, "strokeStyle");
     Object.defineProperty(proto, "strokeStyle", { configurable: true, enumerable: sd.enumerable, get: sd.get,
       set(v) { if (on && candles && isChart(this.canvas)) sd.set.call(this, remap(v)); else sd.set.call(this, v); } });
@@ -174,17 +202,31 @@
     const origFillRect = proto.fillRect;
     proto.fillRect = function (x, y, w, h) {
       const c = this.canvas;
+      if (on && c && typeof this.__bdLwOrig === "string" && Math.abs(w) < c.width * 0.5 && Math.abs(h) < c.height * 0.5 && (inLwTable(c) || isChart(c))) noteFill(this.__bdLwOrig);
       if (on && c && isChart(c) && c.width > 200 && c.height > 120) {
         const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1;
         // a (near) full-canvas rect = the chart background; clear it so a wallpaper shows through
         if (Math.abs(w * sx) >= c.width * 0.9 && Math.abs(h * sy) >= c.height * 0.9) return this.clearRect(x, y, w, h);
+      } else if (on && c && inLwTable(c)) {
+        // the price / time scale strips: a translucent dark panel instead of solid, so the wallpaper shows through but the numbers stay readable
+        const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1;
+        if (Math.abs(w * sx) >= c.width * 0.9 && Math.abs(h * sy) >= c.height * 0.9) {
+          const prev = this.fillStyle; fillDesc.set.call(this, "rgba(6,9,16,0.5)"); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, prev); return;
+        }
       }
       return origFillRect.call(this, x, y, w, h);
     };
 
     setInterval(learnSides, 1500);
-    learnSides();
+    learnSides(); setTimeout(learnSides, 400); setTimeout(learnSides, 900);
+    htmlEl().setAttribute && htmlEl().setAttribute("data-bd-lw", "on");   // diagnostics: the Lightweight Charts adapter is active on this page
+    repaint();
   }
+
+  // Diagnostics (read by the panel's Diagnose button): what the adapter currently believes about this page.
+  window.__bdLwInfo = () => ({ active, on, candles: candles ? { up: candles.upHex, down: candles.downHex } : null,
+    sides: [...sides].slice(0, 12), learned: [...learnedDrawn], lastTally: lastTally, canvases: document.querySelectorAll(".tv-lightweight-charts canvas").length });
+  let lastTally = [];
 
   // Wait until the page actually has a Lightweight Charts chart (and isn't an Advanced Charts page).
   let tries = 0;

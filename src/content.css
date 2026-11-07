@@ -9,6 +9,8 @@
   background: #000;
 }
 #bd-layer.bd-over { z-index: 2147483000; background: transparent; }
+/* Lightweight Charts apps: the layer lives inside the chart's own container, under the chart */
+#bd-layer.bd-embedded { position: absolute; inset: 0; z-index: 0; background: transparent; }
 /* One tile per wallpaper: the whole screen, or one per chart in a multi-chart layout */
 #bd-layer .bd-tile { position: absolute; overflow: hidden; }
 #bd-layer.bd-tiled { background: var(--bd-page-bg, #131722); }
