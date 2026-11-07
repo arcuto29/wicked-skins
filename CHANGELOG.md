@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.26 (2026-11-04)
+- Trade brackets: added support for charts where TradingView draws TP / Stop / P&L labels once into a hidden canvas and pastes that picture onto the chart. Bracket styling never saw these labels, so it had no effect there.
+  - Pasted labels are now redrawn as a styled pill: dark box, bigger number, profit green / loss red.
+  - Labels on a separate overlay canvas in the chart area are covered too.
+- Light labels (for example white) get a darker box, so profit and loss numbers keep their colour instead of turning white.
+- Diagnose (Style → Trade brackets) now reports where the numbers on your chart are drawn: chart, overlay, hidden canvases, or page elements. It also reports which site the chart is on, to fix anything left quickly.
+
 ## 0.1.25 (2026-11-04)
 - **Chart styling** (Style → Chart styling): grid, crosshair and price line, each Own or Styled. Pick the colour (Skin colour follows your wallpaper; Candle, or any colour), width and style (solid, dotted, dashed, or no grid). Grid strength, plus a soft glow where the crosshair meets your pointer.
 - **TradingView's panels in your colours** (Style → Interface → Panels): the watchlist, toolbars, menus and dialogs, in a tint of your wallpaper or any colour. Text stays readable.

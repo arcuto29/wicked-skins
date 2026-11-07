@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 6;
+  const HOOK_VERSION = 7;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -615,10 +615,12 @@
     const [R, G, B] = r.key.split(",").map((n) => { n /= 255; return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); });
     return 0.2126 * R + 0.7152 * G + 0.0722 * B;
   }
-  function lowContrast(a, b) {             // WCAG contrast < 3:1
+  function lowContrast(a, b, min = 3) {    // WCAG contrast below min:1 (3 for automatic colours; your own colours get a bit more leeway)
     const A = lum(a), B = lum(b); if (A === null || B === null) return false;
-    return (Math.max(A, B) + 0.05) / (Math.min(A, B) + 0.05) < 3;
+    return (Math.max(A, B) + 0.05) / (Math.min(A, B) + 0.05) < min;
   }
+  // how much of the label's own colour tints the dark box: light labels (white / pale) only a hint, so numbers pop
+  function tintK(rgb) { const L = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255; return (fx.bracketBack === "solid" ? 0.22 : 0.3) * (L > 0.6 ? 0.3 : 1); }
   // which fill colour did the box end up with (what we painted, or TradingView's own)? remembered per ctx so the
   // text branch can auto-pick a readable colour when the user recoloured/strengthened the box but not the text.
   const pillFill = new WeakMap();
@@ -635,6 +637,77 @@
     } catch {}
   }
 
+  // ---------- where bracket labels can live ----------
+  // Usually on the chart pane's canvas. But some TradingView builds / broker setups draw trading lines on a separate
+  // overlay canvas inside the chart area, or draw each label ONCE into a hidden canvas and then paste that picture onto
+  // the chart (drawImage). We cover all three.
+  const bcCache = new WeakMap();
+  function bracketCanvas(c) {
+    let v = bcCache.get(c);
+    if (v === undefined) { v = isPane(c) || (!!(c.closest && c.closest(".chart-container, .layout__area--center")) && !isAxis(c)); bcCache.set(c, v); }
+    return v;
+  }
+  const srcInfo = new WeakMap();   // hidden canvas -> { text, font, fill, box } of the label drawn into it
+  function noteSrcText(c, t, font, fill) {
+    const s = String(t); if (!MONEY_RE.test(s)) return;
+    const o = srcInfo.get(c) || {}; o.text = o.text && o.text !== s && o.font === font ? o.text + " " + s : s; o.font = font; o.fill = String(fill); o.t = performance.now();
+    if (o.text.length > 40) o.text = s;
+    srcInfo.set(c, o); if (on && fx.bracketOn) diagNote("hidden", s, font);
+  }
+  function noteSrcBox(c, fill, w, h) { const o = srcInfo.get(c) || {}; o.box = String(fill); srcInfo.set(c, o); }
+  // what the panel's Diagnose shows: labels seen on hidden canvases / pasted onto the chart (proves which path is used)
+  function diagNote(kind, t, font) {
+    try { const d = (window.__bdBracketPaths = window.__bdBracketPaths || { hidden: [], pasted: [], overlay: [] }), L = d[kind];
+      const k = String(t).slice(0, 18); if (L.length < 12 && !L.some((x) => x.t === k)) L.push({ t: k, f: String(font || "").slice(0, 60) }); } catch {}
+  }
+  if (typeof OffscreenCanvasRenderingContext2D !== "undefined") {
+    const OP = OffscreenCanvasRenderingContext2D.prototype, ot = OP.fillText, ofr = OP.fillRect;
+    OP.fillText = function (t) { try { if (this.canvas.height <= 120) noteSrcText(this.canvas, t, this.font, this.fillStyle); } catch {} return ot.apply(this, arguments); };
+    OP.fillRect = function (x, y, w, h) { try { if (this.canvas.height <= 120 && h >= 6) noteSrcBox(this.canvas, this.fillStyle, w, h); } catch {} return ofr.apply(this, arguments); };
+  }
+  // A pasted label: redraw it as a styled pill (box + number) instead of the cached picture.
+  const origDrawImage = proto.drawImage;
+  proto.drawImage = function (img, ...r) {
+    const c = this.canvas;
+    if (on && fx.bracketOn && c && img && (img instanceof HTMLCanvasElement || (typeof OffscreenCanvas !== "undefined" && img instanceof OffscreenCanvas)) && bracketCanvas(c)) {
+      const info = srcInfo.get(img);
+      if (info && info.text && (info.box || BRACKET_FONT.test(info.font || ""))) {
+        let dx, dy, dw, dh;
+        if (r.length >= 8) [, , , , dx, dy, dw, dh] = r; else if (r.length >= 4) [dx, dy, dw, dh] = r; else { [dx, dy] = r; dw = img.width; dh = img.height; }
+        const t = this.getTransform(), sy = t.d || 1, dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
+        const hCss = Math.abs(dh * sy) / dpr;
+        if (hCss >= 8 && hCss <= 44) {
+          diagNote("pasted", info.text, info.font);
+          drawStyledPill(this, dx, dy, dw, dh, info);
+          return;
+        }
+      }
+    }
+    if (on && fx.bracketOn && c && bracketCanvas(c) && !isPane(c)) { /* overlay canvas in the chart area */ }
+    return origDrawImage.call(this, img, ...r);
+  };
+  function drawStyledPill(ctx, x, y, w, h, info) {
+    const sign = pillSign(info.text), sx = ctx.getTransform().a || 1;
+    ctx.save();
+    // box: your colour, or the label's own colour strengthened into a dark tinted box (same rule as drawn pills)
+    let fill = fx.bracketFill;
+    if (!fill) { const r = rgbKey(info.box || info.fill || "#1e2130"), base = [16, 19, 28], rgb = r ? r.key.split(",").map(Number) : base;
+      const k = tintK(rgb); fill = `rgba(${rgb.map((v, i) => Math.round(base[i] + (v - base[i]) * k)).join(",")},${fx.bracketBack === "keep" ? 0.92 : 1})`; }
+    origFillDesc.set.call(ctx, fill); origFillRect.call(ctx, x, y, w, h);
+    if (fx.bracketBorderColor || fx.bracketBorderW > 0) { strokeDesc.set.call(ctx, fx.bracketBorderColor || info.fill || "#ffffff"); ctx.lineWidth = (fx.bracketBorderW + 1) / sx; origStrokeRectRaw.call(ctx, x, y, w, h); }
+    // number: profit / loss colour, or your colour, or a readable colour for the box
+    let col = sign > 0 && fx.bracketProfit ? fx.bracketProfit : sign < 0 && fx.bracketLoss ? fx.bracketLoss : fx.bracketText || "";
+    if (!col || lowContrast(col, fill, fx.bracketProfit || fx.bracketLoss || fx.bracketText ? 2.2 : 3)) col = readableOn(fill) || "#ffffff";
+    const basePx = +((info.font || "").match(/(\d+(?:\.\d+)?)px/) || [0, 11])[1];
+    let px = basePx + fx.bracketSize, font = (info.font || "bold 11px Verdana").replace(/(\d+(?:\.\d+)?)px/, px + "px");
+    ctx.font = font; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    while (px > basePx && origMeasure.call(ctx, info.text).width > w - 4 / sx) { px -= 1; ctx.font = font.replace(/\d+(?:\.\d+)?px/, px + "px"); }
+    origFillDesc.set.call(ctx, col); origText.call(ctx, info.text, x + w / 2, y + h / 2, w - 2 / sx);
+    ctx.restore();
+    const tt = ctx.getTransform(); notePillRow(ctx, (y + h / 2) * (tt.d || 1) + tt.f, sign);
+  }
+  const origFillRect = proto.fillRect;
+
   proto.fillText = function (...a) {
     const c = this.canvas;
     notePnl(a[0], c);
@@ -644,7 +717,8 @@
     // some pills draw their box with roundRect / a path (not fillRect), which we can't always catch, but the text
     // still comes through here, so recolour + size always work. If we did record a box, we use it to clamp size
     // and to feed the level-line row match.
-    if (on && fx.bracketOn && c && isPane(c) && MONEY_RE.test(String(a[0]))
+    if (c && !c.isConnected && c.height <= 120) noteSrcText(c, a[0], this.font, this.fillStyle);   // labels can be cached before we switch on   // label drawn into a hidden canvas first
+    if (on && fx.bracketOn && c && bracketCanvas(c) && MONEY_RE.test(String(a[0]))
         && (((this.textAlign === "center" || this.textAlign === "end" || this.textAlign === "right") && BRACKET_FONT.test(this.font || ""))
             || textInPill(this, a[1], a[2]))) {
       {
@@ -681,7 +755,7 @@
         // never let the number match its box: if the chosen (or TradingView's) colour is too close to the box we
         // painted, switch to black/white so TP / Stop / P&L always read
         const boxCol = pillFill.get(this);
-        if (boxCol && lowContrast(col || String(pFill), boxCol)) col = readableOn(boxCol) || col;
+        if (boxCol && lowContrast(col || String(pFill), boxCol, col ? 2.2 : 3)) col = readableOn(boxCol) || col;
         if (col) this.fillStyle = col;
         origText.apply(this, a);
         this.font = pFont; this.fillStyle = pFill;
@@ -793,7 +867,8 @@
     if (on && c && w * (this.getTransform().a || 1) <= 40 && isPane(c)) noteFill(this.__bdFill);
     // Bracket pills: record the box so the text drawn next knows it belongs to a pill. Optionally strengthen the
     // box backing so the TP/Stop/P&L number stays readable on busy wallpapers.
-    if (on && fx.bracketOn && c && isPane(c) && pillBox(this, x, y, w, h)) {
+    if (c && !c.isConnected && c.height <= 120 && h >= 6) noteSrcBox(c, this.fillStyle, w, h);
+    if (on && fx.bracketOn && c && bracketCanvas(c) && pillBox(this, x, y, w, h)) {
       const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1;
       lastPill.set(this, { used: false, t: performance.now(), box: { x: x * sx + t.e, y: y * sy + t.f, w: Math.abs(w * sx), h: Math.abs(h * sy) } });
       // Custom box colour wins; otherwise glass/solid just strengthens TradingView's own box so it pops on a skin.
@@ -809,7 +884,7 @@
         // box the same colour as its number -> "fully white", nothing readable.) Text is then forced to contrast.
         const r = rgbKey(this.fillStyle), base = [16, 19, 28];
         const rgb = r ? r.key.split(",").map(Number) : base;
-        const k = fx.bracketBack === "solid" ? 0.22 : 0.3, al = fx.bracketBack === "solid" ? 1 : 0.88;
+        const k = tintK(rgb), al = fx.bracketBack === "solid" ? 1 : 0.88;
         const mix = rgb.map((v, i) => Math.round(base[i] + (v - base[i]) * k));
         const pF = this.fillStyle, fill = `rgba(${mix.join(",")},${al})`;
         this.fillStyle = fill; pillFill.set(this, fill);

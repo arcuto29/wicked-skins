@@ -1304,25 +1304,31 @@ if ($("bracketDiag")) $("bracketDiag").onclick = async () => {
       func: () => {
         try {
           const C = CanvasRenderingContext2D.prototype;
-          window.__bdDiagSeen = [];
+          window.__bdDiagSeen = []; window.__bdDiagWhere = {};
+          // where is each number drawn? pane = the chart, overlay = another canvas in the chart area,
+          // axis = price/time scale, hidden = a canvas not on the page (drawn once, pasted later), other = elsewhere
+          const where = (c) => { try { if (!c || !c.isConnected) return "hidden"; if (c.closest("[class*=price-axis],[class*=time-axis]")) return "axis";
+            if (c.closest(".chart-markup-table")) return "pane"; if (c.closest(".chart-container, .layout__area--center")) return "overlay"; return "other"; } catch { return "hidden"; } };
+          const note = (t, font, align, c) => {
+            const s = String(t); if (!/[0-9]/.test(s) || !window.__bdDiagSeen) return;
+            const w = where(c); window.__bdDiagWhere[w] = (window.__bdDiagWhere[w] || 0) + 1;
+            if (w === "axis" && window.__bdDiagSeen.filter((x) => x.w === "axis").length >= 3) return;   // a few scale labels are enough
+            const key = s.slice(0, 16) + font + w;
+            if (window.__bdDiagSeen.length < 40 && !window.__bdDiagSeen.some((x) => x.k === key)) window.__bdDiagSeen.push({ k: key, t: s.slice(0, 16), f: font, a: align, w });
+          };
           if (!window.__bdDiagProbe) {
             window.__bdDiagProbe = 1; const o = C.fillText;
-            C.fillText = function (t) {
-              try {
-                const c = this.canvas, inPane = c && c.closest && c.closest(".chart-markup-table") && !c.closest("[class*=time-axis]");
-                if (inPane && /[0-9]/.test(String(t)) && window.__bdDiagSeen && window.__bdDiagSeen.length < 40) {
-                  const key = String(t).slice(0, 16) + this.font;
-                  if (!window.__bdDiagSeen.some((s) => s.k === key)) window.__bdDiagSeen.push({ k: key, t: String(t).slice(0, 16), f: this.font, a: this.textAlign });
-                }
-              } catch {}
-              return o.apply(this, arguments);
-            };
-          }
-        } catch {}
+            C.fillText = function (t) { try { note(t, this.font, this.textAlign, this.canvas); } catch {} return o.apply(this, arguments); };
+            if (typeof OffscreenCanvasRenderingContext2D !== "undefined") { const OP = OffscreenCanvasRenderingContext2D.prototype, oo = OP.fillText;
+              OP.fillText = function (t) { try { note(t, this.font, this.textAlign, null); } catch {} return oo.apply(this, arguments); }; }
+            const di = C.drawImage;
+            C.drawImage = function (img) { try { if (img && img.tagName === "CANVAS" && !img.isConnected && this.canvas && this.canvas.isConnected) { const w = where(this.canvas); window.__bdDiagWhere["pasted-" + w] = (window.__bdDiagWhere["pasted-" + w] || 0) + 1; } } catch {} return di.apply(this, arguments); };
+          }        } catch {}
       },
     });
-    // nudge the chart so it repaints into our probe, then wait a beat
-    await new Promise((r) => setTimeout(r, 900));
+    // nudge the chart so it repaints into our probe (TradingView's own soft redraw), then wait a beat
+    await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, world: "MAIN", func: () => { try { document.dispatchEvent(new Event("bd-softrepaint")); window.dispatchEvent(new Event("resize")); } catch {} } }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 2200));
     // 2) read what the hook caught + what the probe saw (across all frames; pick the richest result)
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id, allFrames: true }, world: "MAIN",
@@ -1350,7 +1356,14 @@ if ($("bracketDiag")) $("bracketDiag").onclick = async () => {
           if (cv) { const r = cv.getBoundingClientRect(); let e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2), n = 0;
             while (e && n++ < 7) { const bg = getComputedStyle(e).backgroundColor; stack.push(e.tagName.toLowerCase() + (e.id ? "#" + e.id : "") + (typeof e.className === "string" && e.className ? "." + e.className.split(" ")[0].slice(0, 24) : "") + (bg && !/rgba?\(0, 0, 0, 0\)|transparent/.test(bg) ? " [" + bg + "]" : "")); e = e.parentElement; } }
         } catch {}
-        return { hooked: !!window.__bdHooked, ver: window.__bdHookVer || null, caught: d ? d.samples : null, onChart: window.__bdDiagSeen || [], engine, canvases, lw, layer, stack, frame: location.hostname };
+        // labels made of page elements (HTML) over the chart, instead of canvas drawing
+        const dom = [];
+        try { const area = document.querySelector(".chart-container, .layout__area--center"); const ar = area && area.getBoundingClientRect();
+          if (ar) for (const e of area.querySelectorAll("div, span")) { if (e.children.length || dom.length >= 6) continue; const t = (e.textContent || "").trim();
+            if (!/^[+\-\u2212]?\s*[$\u20ac\u00a3]?\s*[\d,.]+/.test(t) || t.length > 16) continue; const r = e.getBoundingClientRect();
+            if (r.width > 4 && r.height > 6 && r.height < 40 && r.left >= ar.left && r.right <= ar.right - 40) dom.push(t + " [" + getComputedStyle(e).font.slice(0, 40) + "]"); } } catch {}
+        return { hooked: !!window.__bdHooked, ver: window.__bdHookVer || null, caught: d ? d.samples : null, onChart: window.__bdDiagSeen || [], where: window.__bdDiagWhere || {},
+          paths: window.__bdBracketPaths || null, dom, engine, canvases, lw, layer, stack, frame: location.hostname };
       },
     });
     const score = (x) => x && x.result ? ((x.result.caught ? x.result.caught.length * 100 : 0) + (x.result.onChart ? x.result.onChart.length : 0) + (x.result.engine && x.result.engine !== "unknown" ? 5 : 0) + (x.result.hooked ? 1 : 0)) : -1;
@@ -1379,9 +1392,13 @@ if ($("bracketDiag")) $("bracketDiag").onclick = async () => {
     if (r.caught && r.caught.length) {
       const list = r.caught.slice(0, 6).map((s) => `“${s.text}” (${s.font}${s.box ? "" : ", no box"})`).join("; ");
       out.textContent = `Caught ${r.caught.length} pill(s): ${list}. If these aren't restyling, tell me and paste this text.`;
-    } else if (r.onChart && r.onChart.length) {
-      const list = r.onChart.slice(0, 8).map((s) => `“${s.t}” [${s.f}]`).join("; ");
-      out.textContent = `No pills matched yet. Chart text seen: ${list}. Copy this and send it to me — it shows your pill's font so I can match it.`;
+    } else if (r.paths && (r.paths.pasted.length || r.paths.hidden.length)) {
+      const p = r.paths;
+      out.textContent = `Your labels are drawn once and pasted onto the chart; restyling now handles that${p.pasted.length ? ` (${p.pasted.length} styled: ${p.pasted.slice(0, 4).map((x) => "\u201c" + x.t + "\u201d").join(", ")})` : ""}. If they still look unchanged, copy this and send it to me. Site: ${r.frame}. Seen: ${JSON.stringify(r.where)}.`;
+    } else if ((r.onChart && r.onChart.length) || (r.dom && r.dom.length)) {
+      const nonAxis = (r.onChart || []).filter((s) => s.w !== "axis");
+      const list = (nonAxis.length ? nonAxis : r.onChart || []).slice(0, 8).map((s) => `\u201c${s.t}\u201d [${s.w}, ${s.f}]`).join("; ");
+      out.textContent = `No pills matched yet. Site: ${r.frame}. Numbers drawn: ${JSON.stringify(r.where)}. ${list ? "Samples: " + list + "." : ""}${r.dom && r.dom.length ? " Labels made of page elements: " + r.dom.join("; ") + "." : ""} Keep a trade or order open, click Diagnose again, then copy this and send it to me.`;
     } else {
       out.textContent = "No chart text seen yet. Make sure a position/order is open on the chart, wait a moment, then click again.";
     }
