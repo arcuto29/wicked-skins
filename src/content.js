@@ -20,7 +20,15 @@
     // Sides: let the wallpaper flow across the panels around the chart (watchlist, toolbars, the grey areas).
     // "off" = only the chart; "glass" = frosted panels; "clear" = fully see-through panels.
     sides: "off",
-    leftBar: "off",           // the left drawing-tool rail: off (TradingView's own) | glass | clear
+    leftBar: "off",
+    // TradingView's own panels (watchlist, toolbars, menus): off = TradingView's colours | skin = a dark tint of the
+    // wallpaper's colour | color = your colour. Text switches light/dark to stay readable.
+    panelMode: "off", panelColor: "#10131c",
+    clipEdit: true,           // after a recording: open the crop / trim editor (false = download right away)
+    // Chart styling — each part off = TradingView's own. Colour "" = skin colour, "candle" = your up-candle colour.
+    gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
+    chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false,
+    plOn: false, plColor: "", plW: 0, plStyle: "dotted",           // the left drawing-tool rail: off (TradingView's own) | glass | clear
     // UI style: font + accent for TradingView's own panels (watchlist, toolbars, order area, timeframe bar).
     uiFont: "default", uiSize: 0, uiAccent: "",     // font: default|mono|rounded ; size: 0|1 ; accent: "" or #hex
     // Watermark: the Priism Skins logo + your name/handle, for recordings and streams.
@@ -556,6 +564,58 @@
     h.classList.toggle("bd-left-clear", lon && lm === "clear");
   }
 
+  // TradingView panels colour: override TradingView's own theme colour variables (every panel uses them), so the
+  // watchlist, toolbars, menus and dialogs all take the colour. Text flips light/dark for contrast.
+  const PANEL_VARS = ["--color-bg-primary", "--color-background-primary", "--color-pane-bg", "--color-widget-pages-bg", "--color-header-bg",
+    "--color-body-bg", "--color-background-page-platform", "--color-legacy-bg-widget", "--color-popup-background", "--color-input-bg",
+    "--color-background-dialog-simple", "--color-background-dialog-complicated", "--color-background-special-primary", "--color-screener-header-bg"];
+  const PANEL_VARS2 = ["--color-background-secondary", "--color-background-tertiary", "--color-pane-secondary-bg", "--color-body-secondary-bg",
+    "--color-bg-highlight", "--color-list-nth-child-bg", "--color-chart-page-bg", "--color-bg-scroll-buttons", "--color-background-primary-neutral-extra-light"];
+  const PANEL_HOVER = ["--color-bg-primary-hover", "--color-toolbar-button-background-hover", "--color-popup-menu-item-hover-bg", "--color-row-hover-active-bg",
+    "--color-button-hover-bg", "--color-tv-dropdown-item-hover-bg", "--color-popup-element-background-hover", "--color-background-primary-neutral-light",
+    "--color-toolbar-opened-element-bg", "--color-background-primary-neutral-normal", "--color-toolbar-divider-background"];
+  const PANEL_TEXT = ["--color-text-primary", "--color-default-gray", "--color-text-regular"];
+  function panelColour() {
+    if (cfg.panelMode === "color" && /^#[0-9a-f]{6}$/i.test(cfg.panelColor || "")) return cfg.panelColor;
+    if (cfg.panelMode === "skin") { const a = skinAccent() || cfg.candleUp || "#3a4256"; const r = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+      return "#" + r.map((v, i) => Math.round([11, 13, 19][i] + (v - [11, 13, 19][i]) * 0.14).toString(16).padStart(2, "0")).join(""); }
+    return "";
+  }
+  let panelTextVars = [], panelApplied = null;
+  function applyPanels() {
+    const h = document.documentElement, col = cfg.enabled ? panelColour() : "";
+    if (col === panelApplied) return;            // nothing changed: never restyle the page for nothing (keeps it smooth)
+    panelApplied = col;
+    h.classList.toggle("bd-panels", !!col);
+    const all = [...PANEL_VARS, ...PANEL_VARS2, ...PANEL_HOVER, ...PANEL_TEXT, ...panelTextVars, "--bd-panel", "--bd-panel-text"];
+    all.forEach((n) => h.style.removeProperty(n)); panelTextVars = [];
+    if (!col) return;
+    const rgb = [1, 3, 5].map((i) => parseInt(col.slice(i, i + 2), 16));
+    const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255, dark = lum < 0.5;
+    const shade = (f) => "#" + rgb.map((v) => Math.max(0, Math.min(255, Math.round(dark ? v + (255 - v) * f : v * (1 - f)))).toString(16).padStart(2, "0")).join("");
+    const text = dark ? "#e6e9f0" : "#14161c";
+    PANEL_VARS.forEach((n) => h.style.setProperty(n, col, "important"));
+    PANEL_VARS2.forEach((n) => h.style.setProperty(n, shade(0.05), "important"));
+    PANEL_HOVER.forEach((n) => h.style.setProperty(n, shade(0.12), "important"));
+    PANEL_TEXT.forEach((n) => h.style.setProperty(n, text, "important"));
+    // Every neutral text / icon colour TradingView uses (100+ variables): flip the ones that would vanish on this panel
+    // colour to a readable shade, keeping their strong/soft difference. Coloured ones (green/red/accent) are kept.
+    try {
+      const cs = getComputedStyle(h), skip = /positive|negative|success|danger|warning|accent|heatmap|fill|border|bg|background|rating|social|twitter|inverse|white|primary-button/i;
+      for (let i = 0; i < cs.length; i++) {
+        const n = cs[i]; if (!n.startsWith("--color-") || !/text|content|icon|default-gray|list-item-text/i.test(n) || skip.test(n)) continue;
+        const v = cs.getPropertyValue(n).trim(), m = v.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i); if (!m) continue;
+        const hx = m[1].length === 3 ? m[1].split("").map((c) => c + c).join("") : m[1];
+        const L = (parseInt(hx.slice(0, 2), 16) + parseInt(hx.slice(2, 4), 16) + parseInt(hx.slice(4, 6), 16)) / 765;
+        if (dark ? L > 0.55 : L < 0.45) continue;                       // already readable on this panel
+        const soft = dark ? L > 0.2 : L < 0.8;                          // TradingView's secondary (greyer) text
+        h.style.setProperty(n, dark ? (soft ? "#a9b0bf" : "#e6e9f0") : (soft ? "#4a4f5c" : "#14161c"), "important"); panelTextVars.push(n);
+        if (panelTextVars.length > 400) break;
+      }
+    } catch {}
+    h.style.setProperty("--bd-panel", col); h.style.setProperty("--bd-panel-text", text);
+  }
+
   // UI style: font / size / accent for TradingView's own HTML panels (watchlist, toolbars, order area, timeframes).
   const UI_FONTS = { mono: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace', rounded: '"SF Pro Rounded", "Nunito", "Varela Round", ui-rounded, system-ui, sans-serif' };
   function applyUiStyle() {
@@ -602,7 +662,7 @@
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
     document.documentElement.classList.toggle("bd-on", cfg.enabled);
-    applySides(); applyUiStyle();
+    applySides(); applyUiStyle(); applyPanels();
     if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
@@ -831,7 +891,8 @@
   // Line glow + price scale styling, also drawn by hook.js
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
-    "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug"];
+    "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug",
+    "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "plOn", "plColor", "plW", "plStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
@@ -950,7 +1011,18 @@
     pushCandles(); pushFx();
   }
 
+  // The skin's own colour (for "Skin colour" in chart styling and the panel tint): the wallpaper's strongest hue.
+  // Kept STABLE: an animated wallpaper's measured colour drifts a little every reading; we only move to a new
+  // accent when the hue really changes (or it appears/disappears), so nothing restyles or repaints for no reason.
+  let lastAccent = "";
+  function rawAccent() { const v = views[0], p = v && v.lum && v.lum.palette; return (p && p.accent) || ""; }
+  function hueOfHex(x) { const [r, g, b] = [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16) / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx === mn) return 0; const d = mx - mn; let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return h * 60; }
+  function skinAccent() { return lastAccent; }
   function updateBackdrop() {
+    const acc = rawAccent();
+    const moved = !acc !== !lastAccent || (acc && lastAccent && Math.min(Math.abs(hueOfHex(acc) - hueOfHex(lastAccent)), 360 - Math.abs(hueOfHex(acc) - hueOfHex(lastAccent))) > 25);
+    if (moved) { lastAccent = acc; pushFx(); applyPanels(); }
     const lit = views.filter((v) => v.lum);
     if (!lit.length) return;
     applyAutoMatch();
@@ -994,7 +1066,7 @@
 
   function pushFx() {
     const h = document.documentElement;
-    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [] }));
+    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent() }));
     else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     // Scale backing = real frosted glass behind the price + time scales
@@ -1095,6 +1167,7 @@
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
+    if (keys.some((k) => k === "panelMode" || k === "panelColor" || k === "candleUp")) applyPanels();
     if (keys.includes("sides") || keys.includes("leftBar") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
@@ -1102,7 +1175,7 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -1297,6 +1370,167 @@
       catch { res({ ok: false, reason: "The browser blocked reading the chart pixels (a cross-origin chart)." }); }
     });
   }
+  // ---------- clip editor: crop + trim a finished recording before saving ----------
+  // Opens on the chart page when a recording ends (unless "After recording" is set to download right away).
+  // Everything happens on this computer: the clip is re-recorded from a hidden canvas, nothing is uploaded.
+  function saveBlob(blob, name) {
+    const url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.documentElement.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  function openClipEditor(blob, name, fps) {
+    const host = document.createElement("div"); host.id = "bd-clip-editor";
+    host.style.cssText = "position:fixed;inset:0;z-index:2147483646";
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `<style>
+      *{box-sizing:border-box;font-family:system-ui,sans-serif}
+      .bg{position:absolute;inset:0;background:rgba(4,6,10,.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center}
+      .card{width:min(980px,94vw);max-height:94vh;background:#0f1117;border:1px solid #262a36;border-radius:14px;padding:14px 16px;color:#e9ebf2;display:flex;flex-direction:column;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+      .top{display:flex;align-items:center;justify-content:space-between}.top b{font-size:15px}.top small{color:#8b8fa0;margin-left:8px}
+      .stage{position:relative;align-self:center;max-width:100%;line-height:0;background:#000;border-radius:8px;overflow:hidden;user-select:none}
+      video{display:block;max-width:100%;max-height:58vh}
+      .shade{position:absolute;z-index:1;background:rgba(0,0,0,.62);pointer-events:none}
+      .crop{position:absolute;z-index:2;border:2px solid #2ef2b0;box-shadow:0 0 0 1px #000;cursor:move}
+      .crop i{position:absolute;width:14px;height:14px;background:#2ef2b0;border:2px solid #04130f;border-radius:3px}
+      .crop i[data-h=tl]{left:-8px;top:-8px;cursor:nwse-resize}.crop i[data-h=br]{right:-8px;bottom:-8px;cursor:nwse-resize}
+      .crop i[data-h=tr]{right:-8px;top:-8px;cursor:nesw-resize}.crop i[data-h=bl]{left:-8px;bottom:-8px;cursor:nesw-resize}
+      .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#aab0bf}
+      .row>span{min-width:62px;color:#8b8fa0}
+      button{background:#181b24;border:1px solid #2a2e3a;color:#dfe2ea;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+      button.on{background:#2a2f3d;border-color:#e9ebf2;color:#fff}
+      button.go{background:linear-gradient(90deg,#19d3ff,#2ef2b0 55%,#c6ff3d);color:#04130f;border:none;font-weight:700}
+      button:disabled{opacity:.5;cursor:default}
+      .trim{position:relative;flex:1;min-width:240px;height:28px}
+      .trim input{position:absolute;inset:0;width:100%;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}
+      .trim input::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:14px;height:24px;border-radius:4px;background:#2ef2b0;border:2px solid #04130f;cursor:ew-resize}
+      .trim .bar{position:absolute;left:0;right:0;top:12px;height:4px;background:#262a36;border-radius:2px}
+      .trim .sel{position:absolute;top:12px;height:4px;background:#2ef2b0;border-radius:2px}
+      .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+      .prog{height:6px;background:#262a36;border-radius:3px;overflow:hidden;display:none}.prog div{height:100%;width:0;background:#2ef2b0}
+      .msg{font-size:12px;color:#8b8fa0}
+    </style>
+    <div class="bg"><div class="card">
+      <div class="top"><div><b>Edit your clip</b><small>Drag the box to crop · drag the green handles to trim</small></div><button data-a="discard">Discard</button></div>
+      <div class="stage"><video muted playsinline></video><div class="shade s1"></div><div class="shade s2"></div><div class="shade s3"></div><div class="shade s4"></div>
+        <div class="crop"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i></div></div>
+      <div class="row"><span>Crop</span><button data-r="free" class="on">Free</button><button data-r="full">Whole video</button><button data-r="16:9">16:9 (YouTube)</button><button data-r="9:16">9:16 (TikTok / Reels)</button><button data-r="1:1">1:1 (square)</button><button data-r="4:5">4:5</button></div>
+      <div class="row"><span>Trim</span><div class="trim"><div class="bar"></div><div class="sel"></div><input type="range" class="t0" min="0" max="1000" value="0"><input type="range" class="t1" min="0" max="1000" value="1000"></div><b class="tl">0.0s – 0.0s</b></div>
+      <div class="prog"><div></div></div>
+      <div class="acts"><span class="msg"></span><button data-a="orig">Save original</button><button data-a="save" class="go">Save edited clip</button></div>
+    </div></div>`;
+    document.documentElement.appendChild(host);
+    const $q = (s) => root.querySelector(s), v = $q("video"), stage = $q(".stage"), box = $q(".crop"), msg = $q(".msg");
+    const url = URL.createObjectURL(blob); v.src = url; v.loop = false;
+    let dur = 0, t0 = 0, t1 = 0, ratio = "free", crop = { x: 0, y: 0, w: 1, h: 1 }, busy = false;   // crop in 0..1 of the video
+    const close = () => { busy = false; try { v.pause(); } catch {} URL.revokeObjectURL(url); host.remove(); removeEventListener("keydown", onKey, true); };
+    const onKey = (e) => { if (e.key === "Escape" && !busy) { e.stopPropagation(); close(); } };
+    addEventListener("keydown", onKey, true);
+    // MediaRecorder WebM files don't store their length: seek far ahead once so the browser works it out
+    const ready = new Promise((res) => {
+      v.addEventListener("loadedmetadata", () => {
+        if (isFinite(v.duration) && v.duration > 0) return res();
+        v.addEventListener("durationchange", function f() { if (isFinite(v.duration)) { v.removeEventListener("durationchange", f); v.currentTime = 0; res(); } });
+        v.currentTime = 1e7;
+      }, { once: true });
+    });
+    ready.then(() => { dur = v.duration; t1 = dur; layout(); trimUi(); v.currentTime = 0; v.play().catch(() => {}); });
+    // preview loops inside the trimmed range
+    v.addEventListener("timeupdate", () => { if (!busy && dur && (v.currentTime >= t1 - 0.03 || v.currentTime < t0 - 0.2)) { v.currentTime = t0; v.play().catch(() => {}); } });
+    const vw = () => v.videoWidth || 1, vh = () => v.videoHeight || 1;
+    function fitRatio(r) {
+      if (r === "full") return { x: 0, y: 0, w: 1, h: 1 };
+      const [a, b] = r.split(":").map(Number), want = a / b, cur = vw() / vh();
+      let w = 1, h = 1; if (want < cur) w = (want / cur); else h = (cur / want);
+      return { x: (1 - w) / 2, y: (1 - h) / 2, w, h };
+    }
+    function layout() {
+      const W = v.clientWidth, H = v.clientHeight, c = crop;
+      Object.assign(box.style, { left: c.x * W + "px", top: c.y * H + "px", width: c.w * W + "px", height: c.h * H + "px" });
+      const s = [[0, 0, W, c.y * H], [0, (c.y + c.h) * H, W, H - (c.y + c.h) * H], [0, c.y * H, c.x * W, c.h * H], [(c.x + c.w) * W, c.y * H, W - (c.x + c.w) * W, c.h * H]];
+      ["s1", "s2", "s3", "s4"].forEach((k, i) => Object.assign($q("." + k).style, { left: s[i][0] + "px", top: s[i][1] + "px", width: Math.max(0, s[i][2]) + "px", height: Math.max(0, s[i][3]) + "px" }));
+    }
+    addEventListener("resize", layout);
+    root.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => {
+      ratio = b.dataset.r === "full" ? "free" : b.dataset.r; crop = b.dataset.r === "free" ? crop : fitRatio(b.dataset.r);
+      root.querySelectorAll("[data-r]").forEach((x) => x.classList.toggle("on", x.dataset.r === (b.dataset.r === "full" ? "free" : b.dataset.r))); layout();
+    });
+    // drag to move / resize (keeps the chosen ratio when one is picked)
+    let drag = null;
+    box.addEventListener("pointerdown", (e) => { if (busy) return; e.preventDefault(); box.setPointerCapture(e.pointerId);
+      drag = { h: e.target.dataset.h || "move", sx: e.clientX, sy: e.clientY, c: { ...crop } }; });
+    box.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const W = v.clientWidth, H = v.clientHeight, dx = (e.clientX - drag.sx) / W, dy = (e.clientY - drag.sy) / H, o = drag.c, MIN = 0.06;
+      let { x, y, w, h } = o;
+      if (drag.h === "move") { x = Math.min(1 - w, Math.max(0, o.x + dx)); y = Math.min(1 - h, Math.max(0, o.y + dy)); }
+      else {
+        if (drag.h.includes("l")) { x = Math.min(o.x + o.w - MIN, Math.max(0, o.x + dx)); w = o.x + o.w - x; }
+        if (drag.h.includes("r")) { w = Math.min(1 - o.x, Math.max(MIN, o.w + dx)); }
+        if (drag.h.includes("t")) { y = Math.min(o.y + o.h - MIN, Math.max(0, o.y + dy)); h = o.y + o.h - y; }
+        if (drag.h.includes("b")) { h = Math.min(1 - o.y, Math.max(MIN, o.h + dy)); }
+        if (ratio !== "free") {                                 // keep the picked shape: height follows width
+          const [a, b] = ratio.split(":").map(Number), want = (a / b) * (vh() / vw());
+          h = w / want; if (drag.h.includes("t")) y = o.y + o.h - h;
+          if (y < 0 || y + h > 1) { h = Math.min(h, drag.h.includes("t") ? o.y + o.h : 1 - y); w = h * want; if (drag.h.includes("l")) x = o.x + o.w - w; y = drag.h.includes("t") ? o.y + o.h - h : y; }
+        }
+      }
+      crop = { x, y, w, h }; layout();
+    });
+    box.addEventListener("pointerup", () => { drag = null; });
+    const r0 = $q(".t0"), r1 = $q(".t1");
+    function trimUi() {
+      const a = +r0.value / 1000, b = +r1.value / 1000;
+      if (b - a < 0.02) { if (this === r0) r0.value = +r1.value - 20; else r1.value = +r0.value + 20; }
+      t0 = (+r0.value / 1000) * dur; t1 = (+r1.value / 1000) * dur;
+      Object.assign($q(".sel").style, { left: (+r0.value / 10) + "%", width: ((+r1.value - +r0.value) / 10) + "%" });
+      $q(".tl").textContent = `${t0.toFixed(1)}s – ${t1.toFixed(1)}s  (${(t1 - t0).toFixed(1)}s)`;
+    }
+    r0.oninput = function () { trimUi.call(this); if (dur) v.currentTime = t0; };
+    r1.oninput = function () { trimUi.call(this); if (dur) v.currentTime = Math.max(t0, t1 - 0.5); };
+    root.querySelector("[data-a=discard]").onclick = () => { if (!busy) close(); };
+    root.querySelector("[data-a=orig]").onclick = () => { if (busy) return; saveBlob(blob, name); flash("Clip saved to your downloads"); close(); };
+    root.querySelector("[data-a=save]").onclick = async () => {
+      if (busy || !dur) return;
+      busy = true; root.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      const prog = $q(".prog"), bar = $q(".prog div"); prog.style.display = "block"; msg.textContent = "Saving… keep this tab open";
+      try {
+        const sx = Math.round(crop.x * vw()), sy = Math.round(crop.y * vh());
+        let W = Math.round(crop.w * vw()) & ~1, H = Math.round(crop.h * vh()) & ~1;
+        const cap = Math.min(1, 1920 / Math.max(W, H)); const OW = Math.max(2, Math.round(W * cap) & ~1), OH = Math.max(2, Math.round(H * cap) & ~1);
+        const cv = document.createElement("canvas"); cv.width = OW; cv.height = OH; const g = cv.getContext("2d");
+        const stream = cv.captureStream(fps || 30);
+        const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+        const mime = mimes.find((m) => MediaRecorder.isTypeSupported(m)) || "";
+        const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: Math.min(16e6, OW * OH * (fps || 30) * 0.12) } : undefined);
+        const chunks = []; rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
+        const done = new Promise((res) => (rec.onstop = res));
+        v.pause(); v.currentTime = t0; await new Promise((res) => v.addEventListener("seeked", res, { once: true }));
+        g.drawImage(v, sx, sy, W, H, 0, 0, OW, OH);
+        rec.start(500); await v.play();
+        await new Promise((res) => {
+          const step = () => {
+            if (!busy) return res();
+            g.drawImage(v, sx, sy, W, H, 0, 0, OW, OH);
+            bar.style.width = Math.min(100, ((v.currentTime - t0) / Math.max(0.01, t1 - t0)) * 100) + "%";
+            if (v.currentTime >= t1 || v.ended) return res();
+            if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(step); else requestAnimationFrame(step);
+          };
+          step();
+        });
+        v.pause(); rec.stop(); await done;
+        const out = new Blob(chunks, { type: mime || "video/webm" });
+        saveBlob(out, name.replace(/\.webm$/, "") + "-edited.webm");
+        flash("Edited clip saved to your downloads");
+        close();
+      } catch (e) {
+        busy = false; root.querySelectorAll("button").forEach((b) => (b.disabled = false)); prog.style.display = "none";
+        msg.textContent = "Couldn't save the edit here. Use Save original.";
+      }
+    };
+    return host;
+  }
+
+  window.__bdOpenClipEditor = openClipEditor;   // test hook (isolated world only)
   // popup asks for a snapshot; we reply with a data URL it can download/preview (blobs don't cross the messaging port)
   function blobToDataURL(blob) { return new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); }); }
 
@@ -1360,9 +1594,8 @@
         const blob = new Blob(chunks, { type: mime || "video/webm" });
         if (autoSave) {
           const q = parseTitle(), name = `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${Math.round((performance.now() - t0) / 1000)}s.webm`;
-          const url = URL.createObjectURL(blob), a = document.createElement("a");
-          a.href = url; a.download = name; document.documentElement.appendChild(a); a.click(); a.remove();
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
+          if (cfg.clipEdit !== false) { openClipEditor(blob, name, cfg.clipFps); return resolve({ ok: true, saved: true, editing: true, name, mediaMissed, bytes: blob.size, w: W, h: H }); }
+          saveBlob(blob, name);
           flash("Clip saved to your downloads");
           return resolve({ ok: true, saved: true, name, mediaMissed, bytes: blob.size, w: W, h: H });
         }
@@ -1425,9 +1658,9 @@
       stream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
       if (!chunks.length) return;
       const secs = Math.round((performance.now() - t0) / 1000), q = parseTitle();
-      const blob = new Blob(chunks, { type: mime || "video/webm" }), url = URL.createObjectURL(blob), a = document.createElement("a");
-      a.href = url; a.download = `priism-screen-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${secs}s.webm`;
-      document.documentElement.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+      const blob = new Blob(chunks, { type: mime || "video/webm" }), name = `priism-screen-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${secs}s.webm`;
+      if (cfg.clipEdit !== false) return void openClipEditor(blob, name, cfg.clipFps);
+      saveBlob(blob, name);
       flash("Screen clip saved to your downloads");
     };
     // "Stop sharing" in Chrome's own bar ends the capture early; we still save what was recorded

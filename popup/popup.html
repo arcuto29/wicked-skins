@@ -31,18 +31,29 @@
       <div><b id="siteTitle"></b><p class="hint" id="siteHint"></p></div>
       <button id="siteBtn" class="primary"></button>
     </div>
+    <div class="finder"><input type="search" id="finder" placeholder="Find a setting (e.g. crosshair, glow, toolbar)" autocomplete="off" /><div id="finderOut" hidden></div></div>
     <div class="top">
       <span id="status"></span>
       <label class="switch"><input type="checkbox" id="enabled" /><span></span></label>
     </div>
 
     <section id="tab-skins">
-      <h4 style="margin-top:0">One-click looks</h4>
-      <div class="quick" id="quickLooks"></div>
-      <h4>Skins</h4>
-      <div class="chartpick" hidden></div>
-      <div class="chips" id="chips"></div>
-      <div class="cards" id="skinCards"></div>
+      <div class="skinbar">
+        <div class="seg" id="skinView"></div>
+        <input type="search" id="skinSearch" placeholder="Search looks & wallpapers" autocomplete="off" />
+      </div>
+      <div id="viewLooks">
+        <p class="hint" style="margin:2px 0 6px">One tap sets the wallpaper, candles, glow and price scale together. Undo is one tap too.</p>
+        <label class="keepbg"><input type="checkbox" id="keepBg" /> Keep my wallpaper (only change candles &amp; styling)</label>
+        <div class="chips" id="lookChips"></div>
+        <div class="quick" id="quickLooks"></div>
+      </div>
+      <div id="viewWalls" hidden>
+        <div class="chartpick" hidden></div>
+        <div class="chips" id="chips"></div>
+        <div class="cards" id="skinCards"></div>
+      </div>
+      <p class="hint" id="skinEmpty" hidden>Nothing matches. Try another word.</p>
     </section>
 
     <section id="tab-candles" hidden>
@@ -106,6 +117,12 @@
         <div class="row" id="bracketLineWRow"><span>Line width</span><div class="seg" id="bracketLineW"></div></div>
         <div class="row"><span>Not working?</span><button id="bracketDiag" class="link">Diagnose on my chart</button></div>
         <p class="hint" id="bracketDiagOut" style="display:none"></p>
+      </details>
+
+      <details class="grp" data-grp="chart">
+        <summary>Chart styling</summary>
+        <p class="hint">Every line on the chart: keep TradingView's own, or style it. Skin colour follows your wallpaper; Candle uses your up-candle colour.</p>
+        <div id="chartStyle"></div>
       </details>
 
       <details class="grp" data-grp="scale">
@@ -193,6 +210,7 @@
         </div>
         <div class="row"><span>Capture</span><div class="seg" id="clipMode"></div></div>
         <div class="row"><span>Smoothness</span><div class="seg" id="clipFps"></div></div>
+        <div class="row"><span>After recording</span><div class="seg" id="clipEdit"></div></div>
         <div class="row"><span>Length</span><div class="seg" id="clipLen"></div></div>
         <div class="row"><span>Custom</span><input class="field" id="clipCustom" type="number" min="2" max="120" step="1" placeholder="2–120 seconds" style="min-width:120px;max-width:150px" /><small class="hint" style="margin:0">overrides the length above</small></div>
         <p class="hint" id="clipHint"></p>
@@ -265,6 +283,8 @@
       <details class="grp" data-grp="ui">
         <summary>Interface</summary>
         <p class="hint">Restyle TradingView's own panels — the watchlist, toolbars, order area and the timeframe bar.</p>
+        <div class="row"><span>Panels</span><div class="seg" id="panelMode"></div><input type="color" id="panelColor" title="Panel colour" hidden /></div>
+        <p class="hint">Recolours TradingView itself: the watchlist, toolbars, menus and dialogs. Skin tints them with your wallpaper's colour. Text stays readable.</p>
         <div class="row"><span>Font</span><div class="seg" id="uiFont"></div></div>
         <div class="row"><span>Text size</span><div class="seg" id="uiSize"></div></div>
         <div class="row"><span>Accent</span><div class="seg" id="uiAccentMode"></div><input type="color" id="uiAccent" title="Accent colour" hidden /></div>

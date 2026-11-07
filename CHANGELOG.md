@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.25 (2026-11-04)
+- **Chart styling** (Style → Chart styling): grid, crosshair and price line, each Own or Styled. Pick the colour (Skin colour follows your wallpaper; Candle, or any colour), width and style (solid, dotted, dashed, or no grid). Grid strength, plus a soft glow where the crosshair meets your pointer.
+- **TradingView's panels in your colours** (Style → Interface → Panels): the watchlist, toolbars, menus and dialogs, in a tint of your wallpaper or any colour. Text stays readable.
+- **Crop & trim your recordings**: when a clip ends, an editor opens on the page. Drag a crop box (Free, 16:9, 9:16, 1:1, 4:5), trim the start and end, then save. "Save original" and a "Download right away" setting are there if you prefer.
+- **8 new "Wow" wallpapers**, each with its own one-click look: Event Horizon, Fractal Bloom, Ink Flow, Kaleidoscope, Oil Slick, Tesseract, Double Helix and Synapse. 50 wallpapers in total.
+  - Order Ladder, Ghost Charts, Candle Rain and Equalizer are retired as too distracting. If you were using one, you now get Fog Bank.
+- **Easier to find everything**:
+  - "Find a setting" search at the top of the panel jumps straight to any option.
+  - The Skins tab has a Looks / Wallpapers switch, search, and look groups (Wow, Calm, Glow, Classic).
+  - "Keep my wallpaper" applies a look's candles and styling to your own background.
+  - Candle look previews now show on your current wallpaper.
+- **Lighter on your computer**:
+  - The panel only animates the previews you can see.
+  - Nothing re-applies or redraws unless something really changed.
+  - Tested at a steady 60 fps with every new option on.
+
 ## 0.1.24 (2026-11-04)
 - **16 candle looks** (was 4), each shown as a card with a live preview in your own candle colours: Solid, Neon, Glass, Chrome, Ice, Lava, Fade, Outline, 3D, Holo, Ghost, Rounded, Pixel, Heat, Rainbow and Cycle.
   - Fade is brightest where each candle closed. Heat warms up the higher price is on the chart. Ghost shows barely-there bodies with solid open and close caps.

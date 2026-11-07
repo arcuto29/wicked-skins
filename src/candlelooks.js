@@ -155,9 +155,10 @@
   // ---------- previews (the panel's look cards) ----------
   // A small fixed run of candles, so every card shows the same chart and only the look differs.
   const SAMPLE = [[18, 52, 8, 60], [52, 36, 28, 58], [36, 70, 32, 78], [70, 54, 46, 76], [54, 88, 50, 96], [88, 70, 64, 92]];   // open, close, low, high (0..100)
-  function preview(canvas, look, up, down, glow) {
+  function preview(canvas, look, up, down, glow, bg) {
     const g = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+    if (bg) { try { g.drawImage(bg, 0, 0, W, H); g.fillStyle = "rgba(0,0,0,0.38)"; g.fillRect(0, 0, W, H); } catch {} }   // your wallpaper, dimmed like the chart
     const dpr = W / (canvas.clientWidth || W) || 1;
     const n = SAMPLE.length, slot = W / (n + 0.6), bw = Math.max(3, slot * 0.62);
     const Y = (v) => H - 6 * dpr - (v / 100) * (H - 12 * dpr);

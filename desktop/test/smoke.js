@@ -44,6 +44,8 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
     settings.on("pageerror", (e) => { errors.push("settings: " + e.message); console.log("settings PAGEERROR:", e.message, (e.stack || "").split("\n").slice(0, 3).join(" | ")); });
     settings.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") console.log("settings console:", m.text().slice(0, 300)); });
     await settings.reload();                         // re-run the panel with listeners attached
+    // wallpapers live behind the Looks / Wallpapers switch on the Skins tab
+    await settings.click("#skinView button:has-text('Wallpapers')", { timeout: 20000 }).catch(() => {});
     const cards = await settings.waitForSelector("#skinCards .card", { timeout: 20000 }).catch(() => null);
     await settings.screenshot({ path: path.join(OUT, "settings-start.png") });
     ok("settings panel renders skins", !!cards);
