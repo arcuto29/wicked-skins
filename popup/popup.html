@@ -214,6 +214,7 @@
         </div>
         <div class="row"><span>Capture</span><div class="seg" id="clipMode"></div></div>
         <div class="row"><span>Smoothness</span><div class="seg" id="clipFps"></div></div>
+        <div class="row"><span>Quality</span><div class="seg" id="clipQuality"></div></div>
         <div class="row"><span>After recording</span><div class="seg" id="clipEdit"></div></div>
         <div class="row"><span>Length</span><div class="seg" id="clipLen"></div></div>
         <div class="row"><span>Custom</span><input class="field" id="clipCustom" type="number" min="2" max="120" step="1" placeholder="2–120 seconds" style="min-width:120px;max-width:150px" /><small class="hint" style="margin:0">overrides the length above</small></div>
@@ -289,6 +290,9 @@
         <p class="hint">Restyle TradingView's own panels — the watchlist, toolbars, order area and the timeframe bar.</p>
         <div class="row"><span>Panels</span><div class="seg" id="panelMode"></div><input type="color" id="panelColor" title="Panel colour" hidden /></div>
         <p class="hint">Recolours TradingView itself: the watchlist, toolbars, menus and dialogs. Skin tints them with your wallpaper's colour. Text stays readable.</p>
+        <div class="row"><span>Windows &amp; menus</span><div class="seg" id="dlgMode"></div><input type="color" id="dlgColor" title="Window colour" hidden /></div>
+        <div class="row" id="dlgAlphaRow"><span>Strength</span><input type="range" id="dlgAlpha" min="0.4" max="1" step="0.02" /><output id="dlgAlphaOut"></output></div>
+        <p class="hint">TradingView's Settings window, other dialogs and dropdown menus. Glass is frosted so your wallpaper glows through; Colour uses your own.</p>
         <div class="row"><span>Font</span><div class="seg" id="uiFont"></div></div>
         <div class="row"><span>Text size</span><div class="seg" id="uiSize"></div></div>
         <div class="row"><span>Accent</span><div class="seg" id="uiAccentMode"></div><input type="color" id="uiAccent" title="Accent colour" hidden /></div>

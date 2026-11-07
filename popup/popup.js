@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -17,7 +17,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
@@ -916,6 +916,7 @@ const CLIP_HINTS = {
   screen: "Records exactly what you see, so every effect and any uploaded wallpaper is in it. After you click Record, a card appears on your chart: click \u201cChoose what to record\u201d and pick Entire Screen (or a window / this tab) in Chrome's box. It records for the length below, then downloads by itself. Stop early with Chrome's \u201cStop sharing\u201d button.",
 };
 const syncClipMode = () => {
+  if ($("clipQuality")) seg("clipQuality", [["high", "High"], ["balanced", "Balanced"], ["small", "Small file"]], () => cfg.clipQuality || "balanced", (v) => set({ clipQuality: v }));
   if ($("clipEdit")) seg("clipEdit", [[true, "Crop & trim first"], [false, "Download right away"]], () => cfg.clipEdit !== false, (v) => set({ clipEdit: v }));
   seg("clipFps", [[30, "30 fps"], [60, "60 fps"]], () => (+cfg.clipFps === 60 ? 60 : 30), (v) => { set({ clipFps: v }); syncClipMode(); });
   seg("clipMode", [["chart", "Chart only"], ["screen", "Whole screen"]], () => cfg.clipMode || "chart", (v) => { set({ clipMode: v }); syncClipMode(); });
@@ -1071,9 +1072,17 @@ function renderChartStyle() {
 }
 function syncPanels() {
   if (!$("panelMode")) return;
+  if ($("dlgMode")) {
+    seg("dlgMode", [["off", "TradingView"], ["glass", "Glass"], ["color", "Colour"]], () => cfg.dlgMode || "off", (v) => { set({ dlgMode: v }); syncPanels(); });
+    $("dlgColor").hidden = cfg.dlgMode !== "color"; $("dlgColor").value = cfg.dlgColor || "#12151f";
+    $("dlgAlphaRow").hidden = !cfg.dlgMode || cfg.dlgMode === "off";
+    $("dlgAlpha").value = cfg.dlgAlpha; $("dlgAlphaOut").textContent = Math.round(cfg.dlgAlpha * 100) + "%";
+  }
   seg("panelMode", [["off", "TradingView"], ["skin", "Skin"], ["color", "Colour"]], () => cfg.panelMode || "off", (v) => { set({ panelMode: v }); syncPanels(); });
   $("panelColor").hidden = cfg.panelMode !== "color"; $("panelColor").value = cfg.panelColor || "#10131c";
 }
+if ($("dlgColor")) $("dlgColor").oninput = (e) => set({ dlgColor: e.target.value, dlgMode: "color" });
+if ($("dlgAlpha")) $("dlgAlpha").oninput = (e) => { set({ dlgAlpha: +e.target.value }); $("dlgAlphaOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 if ($("panelColor")) $("panelColor").oninput = (e) => set({ panelColor: e.target.value, panelMode: "color" });
 
 function syncTune() {
@@ -1653,8 +1662,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Smoother: fixed the brief freezes, and changes are instant (no blinking)",
-  "Trade brackets now work with TradingView's newer rounded labels",
+const WHATS_NEW = ["TradingView's Settings window and menus can be frosted glass or your colour (Interface)",
+  "Clip quality options, and instant saving when you don't crop or trim",
+  "Smoother: fixed the brief freezes; trade brackets work with the newer rounded labels",
   "Community looks: share your whole setup, browse Top / New / Mine (Workshop)",
   "Crosshair labels in your crosshair colour, plus session breaks and scale borders in Chart styling",
   "A cleaner, modern panel where every option reads in full"];

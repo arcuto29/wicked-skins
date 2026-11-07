@@ -24,7 +24,11 @@
     // TradingView's own panels (watchlist, toolbars, menus): off = TradingView's colours | skin = a dark tint of the
     // wallpaper's colour | color = your colour. Text switches light/dark to stay readable.
     panelMode: "off", panelColor: "#10131c",
-    clipEdit: true,           // after a recording: open the crop / trim editor (false = download right away)
+    // TradingView's own windows (Settings, other dialogs) and dropdown menus: off | glass (frosted, your wallpaper
+    // glows through) | color (your colour). dlgAlpha = how solid (0.4 see-through .. 1 solid).
+    dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78,
+    clipEdit: true,
+    clipQuality: "balanced",  // high | balanced | small (small keeps a clip under ~20 MB, e.g. for Discord)           // after a recording: open the crop / trim editor (false = download right away)
     // Chart styling — each part off = TradingView's own. Colour "" = skin colour, "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chLabels: false,
@@ -611,6 +615,37 @@
     decl.push(`--bd-panel:${col}`, `--bd-panel-text:${text}`);
     st.textContent = `html.bd-panels{${decl.join(";")}}`;
   }
+  // ---------- TradingView's windows & menus (Settings dialog, other dialogs, dropdown menus) ----------
+  // One stylesheet: a tinted (optionally frosted) background on each window, and TradingView's own colour variables
+  // re-pointed INSIDE those windows only, so every field, tab and label inside follows, and text stays readable.
+  let dlgApplied = null;
+  function applyDialogs() {
+    const mode = cfg.enabled && ["glass", "color"].includes(cfg.dlgMode) ? cfg.dlgMode : "off";
+    const base = mode === "color" && /^#[0-9a-f]{6}$/i.test(cfg.dlgColor || "") ? cfg.dlgColor
+      : panelColour() || (() => { const a = skinAccent() || "#3a4256", r = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+        return "#" + r.map((v, i) => Math.round([12, 14, 20][i] + (v - [12, 14, 20][i]) * 0.12).toString(16).padStart(2, "0")).join(""); })();
+    const al = Math.max(0.4, Math.min(1, +cfg.dlgAlpha || 0.78));
+    const sig = mode + base + al;
+    if (sig === dlgApplied) return; dlgApplied = sig;
+    let st = document.getElementById("bd-dialogs-css");
+    if (mode === "off") { if (st) st.textContent = ""; return; }
+    if (!st) { st = document.createElement("style"); st.id = "bd-dialogs-css"; (document.head || document.documentElement).appendChild(st); }
+    const rgb = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16)), lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255, dark = lum < 0.5;
+    const tint = (f, a) => `rgba(${rgb.map((v) => Math.max(0, Math.min(255, Math.round(dark ? v + (255 - v) * f : v * (1 - f))))).join(",")},${a})`;
+    const text = dark ? "#e8ebf2" : "#14161c";
+    const vars = [];
+    [...PANEL_VARS, "--color-background-dialog-fullscreen"].forEach((n) => vars.push(`${n}:transparent!important`));   // the window's own backdrop does the colour
+    ["--color-input-bg", "--color-popup-background"].forEach((n) => vars.push(`${n}:${tint(0.06, 0.55)}!important`));
+    PANEL_VARS2.forEach((n) => vars.push(`${n}:${tint(0.05, 0.5)}!important`));
+    PANEL_HOVER.forEach((n) => vars.push(`${n}:${tint(0.14, 0.7)}!important`));
+    PANEL_TEXT.forEach((n) => vars.push(`${n}:${text}!important`));
+    for (const [n, L] of panelTextCandidates()) { if (dark ? L > 0.55 : L < 0.45) continue; const soft = dark ? L > 0.2 : L < 0.8;
+      vars.push(`${n}:${dark ? (soft ? "#a9b0bf" : "#e8ebf2") : (soft ? "#4a4f5c" : "#14161c")}!important`); }
+    const S = '#overlap-manager-root [class^="dialog-"], #overlap-manager-root [class^="menuWrap-"], [data-dialog-name][class^="dialog-"]';
+    const frost = mode === "glass" ? "-webkit-backdrop-filter:blur(22px) saturate(1.35)!important;backdrop-filter:blur(22px) saturate(1.35)!important;" : "";
+    st.textContent = `${S}{${vars.join(";")};background:${tint(0, mode === "glass" ? al : Math.max(al, 0.9))}!important;${frost}` +
+      `border:1px solid ${dark ? "rgba(255,255,255,.12)" : "rgba(0,0,0,.1)"}!important;box-shadow:0 24px 60px -18px rgba(0,0,0,.75)!important;color:${text}}`;
+  }
   // [name, lightness] of TradingView's neutral text colour variables, read once per theme (reading 1900 computed
   // properties is the expensive part, so it never happens while you're picking colours).
   let ptCache = null, ptTheme = "";
@@ -678,7 +713,7 @@
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
     document.documentElement.classList.toggle("bd-on", cfg.enabled);
-    applySides(); applyUiStyle(); applyPanels();
+    applySides(); applyUiStyle(); applyPanels(); applyDialogs();
     if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
@@ -1040,7 +1075,7 @@
     // the skin colour is taken ONCE per wallpaper (animated wallpapers shift colour all the time; following that
     // re-coloured lines and panels again and again)
     const srcSig = String(cfg.skin) + "|" + String(cfg.mediaId || "");
-    if (srcSig !== accentFor && rawAccent()) { accentFor = srcSig; lastAccent = rawAccent(); pushFx(); applyPanels(); }
+    if (srcSig !== accentFor && rawAccent()) { accentFor = srcSig; lastAccent = rawAccent(); pushFx(); applyPanels(); applyDialogs(); }
     const lit = views.filter((v) => v.lum);
     if (!lit.length) return;
     applyAutoMatch();
@@ -1200,6 +1235,7 @@
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
     if (keys.some((k) => k === "panelMode" || k === "panelColor" || k === "candleUp")) applyPanels();
+    if (keys.some((k) => k.startsWith("dlg") || k === "panelMode" || k === "panelColor")) applyDialogs();
     if (keys.includes("sides") || keys.includes("leftBar") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
@@ -1207,7 +1243,7 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -1405,6 +1441,14 @@
   // ---------- clip editor: crop + trim a finished recording before saving ----------
   // Opens on the chart page when a recording ends (unless "After recording" is set to download right away).
   // Everything happens on this computer: the clip is re-recorded from a hidden canvas, nothing is uploaded.
+  // bitrate for a clip: High = crisp, Balanced = good + reasonable size, Small = kept under ~20 MB (Discord-friendly)
+  function clipBps(W, H, fps, dur, q) {
+    const px = Math.max(1, W * H * (fps || 30));
+    const high = Math.min(16e6, Math.max(4e6, px * 0.12)), bal = Math.min(8e6, Math.max(2.5e6, px * 0.06));
+    if (q === "high") return Math.round(high);
+    if (q === "small") return Math.round(Math.max(600e3, Math.min(bal * 0.5, (20 * 8e6 * 0.92) / Math.max(2, dur))));
+    return Math.round(bal);
+  }
   function saveBlob(blob, name) {
     const url = URL.createObjectURL(blob), a = document.createElement("a");
     a.href = url; a.download = name; document.documentElement.appendChild(a); a.click(); a.remove();
@@ -1427,6 +1471,7 @@
       .crop i[data-h=tl]{left:-8px;top:-8px;cursor:nwse-resize}.crop i[data-h=br]{right:-8px;bottom:-8px;cursor:nwse-resize}
       .crop i[data-h=tr]{right:-8px;top:-8px;cursor:nesw-resize}.crop i[data-h=bl]{left:-8px;bottom:-8px;cursor:nesw-resize}
       .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#aab0bf}
+      .est{margin-left:auto;color:#7fe9d0;font-weight:600}
       .row>span{min-width:62px;color:#8b8fa0}
       button{background:#181b24;border:1px solid #2a2e3a;color:#dfe2ea;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
       button.on{background:#2a2f3d;border-color:#e9ebf2;color:#fff}
@@ -1447,13 +1492,24 @@
         <div class="crop"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i></div></div>
       <div class="row"><span>Crop</span><button data-r="free" class="on">Free</button><button data-r="full">Whole video</button><button data-r="16:9">16:9 (YouTube)</button><button data-r="9:16">9:16 (TikTok / Reels)</button><button data-r="1:1">1:1 (square)</button><button data-r="4:5">4:5</button></div>
       <div class="row"><span>Trim</span><div class="trim"><div class="bar"></div><div class="sel"></div><input type="range" class="t0" min="0" max="1000" value="0"><input type="range" class="t1" min="0" max="1000" value="1000"></div><b class="tl">0.0s – 0.0s</b></div>
+      <div class="row"><span>Size</span><button data-s="0" class="on">Original</button><button data-s="1080">1080p</button><button data-s="720">720p</button><button data-s="480">480p</button></div>
+      <div class="row"><span>Quality</span><button data-q="high">High</button><button data-q="balanced" class="on">Balanced</button><button data-q="small">Small file (Discord)</button><b class="est"></b></div>
       <div class="prog"><div></div></div>
-      <div class="acts"><span class="msg"></span><button data-a="orig">Save original</button><button data-a="save" class="go">Save edited clip</button></div>
+      <div class="acts"><span class="msg">Cropping or trimming re-saves the clip as it plays, so it takes about as long as the clip.</span><button data-a="orig">Save as is (instant)</button><button data-a="save" class="go">Save edited clip</button></div>
     </div></div>`;
     document.documentElement.appendChild(host);
     const $q = (s) => root.querySelector(s), v = $q("video"), stage = $q(".stage"), box = $q(".crop"), msg = $q(".msg");
     const url = URL.createObjectURL(blob); v.src = url; v.loop = false;
     let dur = 0, t0 = 0, t1 = 0, ratio = "free", crop = { x: 0, y: 0, w: 1, h: 1 }, busy = false;   // crop in 0..1 of the video
+    let outSize = 0, quality = (cfg.clipQuality === "high" || cfg.clipQuality === "small") ? cfg.clipQuality : "balanced";
+    const pick = (attr, val) => root.querySelectorAll(`[data-${attr}]`).forEach((b) => b.classList.toggle("on", b.dataset[attr] === String(val)));
+    const outDims = () => { let W = Math.max(2, Math.round(crop.w * (v.videoWidth || 2))), H = Math.max(2, Math.round(crop.h * (v.videoHeight || 2)));
+      // Size = the short side (1080p, 720p...), never upscaled; the long side is capped at 1920
+      const k = Math.min(1, outSize ? outSize / Math.min(W, H) : 1, 1920 / Math.max(W, H));
+      return [Math.max(2, Math.round(W * k) & ~1), Math.max(2, Math.round(H * k) & ~1)]; };
+    const estimate = () => { const [W, H] = outDims(), d = Math.max(0.5, t1 - t0), bps = clipBps(W, H, fps || 30, d, quality);
+      root.querySelector(".est").textContent = `≈ ${Math.max(0.1, (bps * d) / 8e6).toFixed(1)} MB · ${W}×${H}`; };
+    const untouched = () => crop.x === 0 && crop.y === 0 && crop.w === 1 && crop.h === 1 && t0 <= 0.05 && t1 >= dur - 0.05 && !outSize && quality === ((cfg.clipQuality === "high" || cfg.clipQuality === "small") ? cfg.clipQuality : "balanced");
     const close = () => { busy = false; try { v.pause(); } catch {} URL.revokeObjectURL(url); host.remove(); removeEventListener("keydown", onKey, true); };
     const onKey = (e) => { if (e.key === "Escape" && !busy) { e.stopPropagation(); close(); } };
     addEventListener("keydown", onKey, true);
@@ -1465,7 +1521,10 @@
         v.currentTime = 1e7;
       }, { once: true });
     });
-    ready.then(() => { dur = v.duration; t1 = dur; layout(); trimUi(); v.currentTime = 0; v.play().catch(() => {}); });
+    ready.then(() => { dur = v.duration; t1 = dur; layout(); trimUi(); estimate(); v.currentTime = 0; v.play().catch(() => {}); });
+    root.querySelectorAll("[data-s]").forEach((b) => b.onclick = () => { if (busy) return; outSize = +b.dataset.s; pick("s", b.dataset.s); estimate(); });
+    root.querySelectorAll("[data-q]").forEach((b) => b.onclick = () => { if (busy) return; quality = b.dataset.q; pick("q", quality); estimate(); });
+    pick("q", quality);
     // preview loops inside the trimmed range
     v.addEventListener("timeupdate", () => { if (!busy && dur && (v.currentTime >= t1 - 0.03 || v.currentTime < t0 - 0.2)) { v.currentTime = t0; v.play().catch(() => {}); } });
     const vw = () => v.videoWidth || 1, vh = () => v.videoHeight || 1;
@@ -1484,7 +1543,7 @@
     addEventListener("resize", layout);
     root.querySelectorAll("[data-r]").forEach((b) => b.onclick = () => {
       ratio = b.dataset.r === "full" ? "free" : b.dataset.r; crop = b.dataset.r === "free" ? crop : fitRatio(b.dataset.r);
-      root.querySelectorAll("[data-r]").forEach((x) => x.classList.toggle("on", x.dataset.r === (b.dataset.r === "full" ? "free" : b.dataset.r))); layout();
+      root.querySelectorAll("[data-r]").forEach((x) => x.classList.toggle("on", x.dataset.r === (b.dataset.r === "full" ? "free" : b.dataset.r))); layout(); estimate();
     });
     // drag to move / resize (keeps the chosen ratio when one is picked)
     let drag = null;
@@ -1506,7 +1565,7 @@
           if (y < 0 || y + h > 1) { h = Math.min(h, drag.h.includes("t") ? o.y + o.h : 1 - y); w = h * want; if (drag.h.includes("l")) x = o.x + o.w - w; y = drag.h.includes("t") ? o.y + o.h - h : y; }
         }
       }
-      crop = { x, y, w, h }; layout();
+      crop = { x, y, w, h }; layout(); estimate();
     });
     box.addEventListener("pointerup", () => { drag = null; });
     const r0 = $q(".t0"), r1 = $q(".t1");
@@ -1515,7 +1574,7 @@
       if (b - a < 0.02) { if (this === r0) r0.value = +r1.value - 20; else r1.value = +r0.value + 20; }
       t0 = (+r0.value / 1000) * dur; t1 = (+r1.value / 1000) * dur;
       Object.assign($q(".sel").style, { left: (+r0.value / 10) + "%", width: ((+r1.value - +r0.value) / 10) + "%" });
-      $q(".tl").textContent = `${t0.toFixed(1)}s – ${t1.toFixed(1)}s  (${(t1 - t0).toFixed(1)}s)`;
+      $q(".tl").textContent = `${t0.toFixed(1)}s – ${t1.toFixed(1)}s  (${(t1 - t0).toFixed(1)}s)`; if (dur) estimate();
     }
     r0.oninput = function () { trimUi.call(this); if (dur) v.currentTime = t0; };
     r1.oninput = function () { trimUi.call(this); if (dur) v.currentTime = Math.max(t0, t1 - 0.5); };
@@ -1523,17 +1582,18 @@
     root.querySelector("[data-a=orig]").onclick = () => { if (busy) return; saveBlob(blob, name); flash("Clip saved to your downloads"); close(); };
     root.querySelector("[data-a=save]").onclick = async () => {
       if (busy || !dur) return;
+      if (untouched()) { saveBlob(blob, name); flash("Clip saved to your downloads"); close(); return; }   // nothing changed: instant
       busy = true; root.querySelectorAll("button").forEach((b) => (b.disabled = true));
       const prog = $q(".prog"), bar = $q(".prog div"); prog.style.display = "block"; msg.textContent = "Saving… keep this tab open";
       try {
         const sx = Math.round(crop.x * vw()), sy = Math.round(crop.y * vh());
         let W = Math.round(crop.w * vw()) & ~1, H = Math.round(crop.h * vh()) & ~1;
-        const cap = Math.min(1, 1920 / Math.max(W, H)); const OW = Math.max(2, Math.round(W * cap) & ~1), OH = Math.max(2, Math.round(H * cap) & ~1);
+        const [OW, OH] = outDims();
         const cv = document.createElement("canvas"); cv.width = OW; cv.height = OH; const g = cv.getContext("2d");
         const stream = cv.captureStream(fps || 30);
         const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
         const mime = mimes.find((m) => MediaRecorder.isTypeSupported(m)) || "";
-        const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: Math.min(16e6, OW * OH * (fps || 30) * 0.12) } : undefined);
+        const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: clipBps(OW, OH, fps || 30, Math.max(0.5, t1 - t0), quality) } : undefined);
         const chunks = []; rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
         const done = new Promise((res) => (rec.onstop = res));
         v.pause(); v.currentTime = t0; await new Promise((res) => v.addEventListener("seeked", res, { once: true }));
@@ -1544,6 +1604,7 @@
             if (!busy) return res();
             g.drawImage(v, sx, sy, W, H, 0, 0, OW, OH);
             bar.style.width = Math.min(100, ((v.currentTime - t0) / Math.max(0.01, t1 - t0)) * 100) + "%";
+            msg.textContent = `Saving… ${Math.max(0, Math.ceil(t1 - v.currentTime))}s left (keep this tab open)`;
             if (v.currentTime >= t1 || v.ended) return res();
             if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(step); else requestAnimationFrame(step);
           };
@@ -1593,10 +1654,9 @@
     const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
     const mime = mimes.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
     let rec;
-    // Any length from 2s to 2 minutes. Longer clips use a lower bitrate so the file stays shareable
-    // (about 4.5 MB for 10s, 10 MB for 60s, 15 MB for 2 min).
+    // Any length from 2s to 2 minutes, at the quality you picked (based on the clip's real size + frame rate).
     const dur = Math.max(2, Math.min(MAX_CLIP_SECONDS, +seconds || 5));
-    const bps = Math.round((dur <= 10 ? 6_000_000 : dur <= 30 ? 3_500_000 : dur <= 60 ? 2_000_000 : 1_000_000) * (capFps > 40 ? 1.5 : 1));
+    const bps = clipBps(cap.width, cap.height, capFps, dur, cfg.clipQuality);
     try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: bps } : undefined); }
     catch { return { ok: false, reason: "Your browser can't record clips." }; }
     const chunks = [];
@@ -1679,7 +1739,8 @@
     screenBusy = true;
     const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
     const mime = mimes.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
-    const bps = dur <= 10 ? 8_000_000 : dur <= 30 ? 5_000_000 : dur <= 60 ? 3_500_000 : 2_000_000;
+    const vs = (stream.getVideoTracks()[0] && stream.getVideoTracks()[0].getSettings()) || {};
+    const bps = clipBps(vs.width || 1920, vs.height || 1080, vs.frameRate || 30, dur, cfg.clipQuality);
     let rec; try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: bps } : undefined); }
     catch { stream.getTracks().forEach((t) => t.stop()); screenBusy = false; return; }
     const chunks = [], t0 = performance.now(); let timer = 0, finished = false;
