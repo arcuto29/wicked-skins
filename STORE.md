@@ -22,13 +22,13 @@ Live wallpapers
 Choose from dozens of animated scenes, from quiet night skies and ocean depths to glowing city grids. You can also use your own pictures or videos; if the browser can't play a video, it is converted on your computer. The Workshop lets you try wallpapers shared by other traders in one tap.
 
 Candles and glow
-Recolour your candles with ready-made colour sets or your own colours, add a soft glow, and give indicators and drawings the same treatment. It works with your existing TradingView colours and chart styles.
+Recolour your candles with ready-made colour sets or your own colours and pick from sixteen candle looks, from glass and chrome to soft outlines. Style the grid, crosshair and price line, and recolour TradingView's own panels to match. It works with your existing TradingView colours and chart styles.
 
 Readable and calm
 The price scale adjusts its text so it stays readable on any wallpaper. You can darken or blur the wallpaper, and Calm mode quietly dims it while you're working on the chart. Eco mode keeps it light on your computer.
 
 For traders
-Make your take-profit, stop and P&L labels bigger and easier to read in one tap. Set a daily goal and loss limit, keep an automatic trade journal based on the P&L your chart already shows, save a snapshot or a short clip of your chart, and add a watermark for recordings. Everything stays on your computer.
+Make your take-profit, stop and P&L labels bigger and easier to read in one tap. Set a daily goal and loss limit, keep an automatic trade journal based on the P&L your chart already shows, save a snapshot or a short clip of your chart (and crop or trim it before saving), and add a watermark for recordings. Everything stays on your computer.
 
 Looks
 Apply a complete look in one click, undo it just as fast, save your own and share them as a short code.

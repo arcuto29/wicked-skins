@@ -8,7 +8,8 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const LOOK_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
+const CHART_KEYS = ["gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -16,10 +17,13 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, sides: "off", leftBar: "off", uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
+  gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
+  chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false,
+  plOn: false, plColor: "", plW: 0, plStyle: "dotted",
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
   multi: "span", chartSkins: {}, pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
@@ -44,7 +48,7 @@ document.querySelectorAll("#nav button").forEach((b) => {
 // ---------- skins (live previews share one loop) ----------
 let previews = [], quickPreviews = [], activeCat = "All";
 function renderSkins() {
-  const cats = ["All", ...new Set(Object.values(WickedSkins).map((s) => s.cat))];
+  const cats = ["All", "Wow", ...new Set(Object.values(WickedSkins).map((s) => s.cat))];
   $("chips").innerHTML = "";
   cats.forEach((c) => {
     const b = document.createElement("button");
@@ -55,26 +59,39 @@ function renderSkins() {
   });
   $("skinCards").innerHTML = "";
   previews = [];
+  let shown = 0;
   for (const [id, s] of Object.entries(WickedSkins)) {
-    if (activeCat !== "All" && s.cat !== activeCat) continue;
+    if (activeCat === "Wow" ? !s.wow : activeCat !== "All" && s.cat !== activeCat) continue;
+    if (!matchQ(s.name, s.cat, s.wow ? "wow" : "")) continue;
+    shown++;
     const card = document.createElement("button");
     card.className = "card" + (currentSrc() === id ? " on" : "");
     const cv = document.createElement("canvas");
     cv.width = 160; cv.height = 76;
     const skin = s.create(cv.getContext("2d")); skin.resize(160, 76);
-    previews.push({ skin, t: 0 });
+    previews.push(watchPreview({ skin, t: 0 }, cv));
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span><div class="label">${esc(s.name)}</div>`);
     card.onclick = () => pickSource(id);
     $("skinCards").appendChild(card);
   }
+  updateEmpty(shown);
+}
+// Only animate previews that are actually on screen (dozens of live canvases would load the computer for nothing).
+// Each preview draws one still frame straight away, so off-screen cards still show a picture.
+const previewIO = typeof IntersectionObserver !== "undefined" ? new IntersectionObserver((es) => { for (const e of es) if (e.target.__bdP) e.target.__bdP.vis = e.isIntersecting; }) : null;
+function watchPreview(p, cv) {
+  p.vis = !previewIO; try { p.skin.frame(2, 0.016); } catch {}
+  if (previewIO) { cv.__bdP = p; previewIO.observe(cv); }
+  return p;
 }
 let last = 0;
 (function loop(now) {
   requestAnimationFrame(loop);
   if (now - last < 66) return; // ~15fps previews
   const dt = (now - last) / 1000; last = now;
-  for (const p of [...previews, ...quickPreviews, ...lookPreviews]) p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1));
+  if (document.hidden) return;
+  for (const p of [...previews, ...quickPreviews, ...lookPreviews]) if (p.vis !== false) p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1));
 })(0);
 
 // ---------- candles ----------
@@ -121,7 +138,10 @@ const LOOK_HINT = {
 function renderLookGrid() {
   const box = $("candleLook"), CL = window.__bdCandleLooks; if (!box || !CL) return;
   const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
-  const sig = up + down + (+cfg.candleGlow || 0);
+  const sig = up + down + (+cfg.candleGlow || 0) + "|" + (cfg.skin || "");
+  // one still frame of YOUR current wallpaper, used behind every look preview
+  let bgc = null;
+  try { const sk = WickedSkins[cfg.skin]; if (sk) { bgc = document.createElement("canvas"); bgc.width = 200; bgc.height = 104; const s0 = sk.create(bgc.getContext("2d")); s0.resize(200, 104); s0.frame(3, 0.016); } } catch { bgc = null; }
   if (box.dataset.sig !== sig || box.children.length !== CL.LOOKS.length) {
     box.dataset.sig = sig; box.textContent = "";
     for (const [id, name] of CL.LOOKS) {
@@ -130,7 +150,7 @@ function renderLookGrid() {
       const lab = document.createElement("span"); lab.textContent = name;
       b.append(cv, lab); box.appendChild(b);
       b.onclick = () => { set({ candleLook: id, candleOn: true }); $("candleOn").checked = true; renderCandles(); };
-      requestAnimationFrame(() => { try { CL.preview(cv, id, up, down, +cfg.candleGlow || 0); } catch {} });
+      requestAnimationFrame(() => { try { CL.preview(cv, id, up, down, +cfg.candleGlow || 0, bgc); } catch {} });
     }
   }
   for (const b of box.children) b.classList.toggle("on", b.dataset.look === (cfg.candleLook || "solid"));
@@ -210,10 +230,35 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode(); }
+function refreshAll() { renderChartStyle(); syncPanels(); syncSkinView(); renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
+// Look groups (shown as chips). New looks: add the id here or they land in "Classic".
+const LOOK_GROUP = {
+  "ocean-calm": "Calm", nightfall: "Calm", daybreak: "Calm", sterling: "Calm", harbor: "Calm", dune: "Calm", "clean-focus": "Calm", blossom: "Calm",
+  glowstick: "Glow", blacklight: "Glow", vaporwave: "Glow", molten: "Glow", warp: "Glow", spectrum: "Glow", "neon-night": "Glow", firefly: "Glow",
+  horizon: "Wow", bloom: "Wow", ink: "Wow", kaleido: "Wow", slick: "Wow", hypercube: "Wow", helix: "Wow", synapse: "Wow",
+};
+const LOOK_GROUPS = ["All", "Wow", "Calm", "Glow", "Classic"];
+const groupOf = (q) => LOOK_GROUP[q.id] || "Classic";
 const QUICK_LOOKS = [
+  // ----- Wow: the showpiece wallpapers, each with one of the new candle looks (no wallpaper reused) -----
+  { id: "horizon", name: "Event Horizon", sub: "Black hole · Glass candles", skin: "blackhole",
+    set: { candleOn: true, candleUp: "#ffd27a", candleDown: "#8c6bff", candleLook: "glass", candleGlow: 0.3, candlePreset: "custom", lineGlow: 0.25, scaleText: "#ffe1a8", scaleGlow: 0.2, scaleBg: "auto", dim: 0.3 } },
+  { id: "bloom", name: "Bloom", sub: "Fractal Bloom · Holo", skin: "julia",
+    set: { candleOn: true, candleUp: "#ff9ecf", candleDown: "#6f63ff", candleLook: "holo", candleGlow: 0.2, candlePreset: "custom", lineGlow: 0.2, scaleText: "#ffc7e4", scaleGlow: 0.15, scaleBg: "auto", dim: 0.25 } },
+  { id: "ink", name: "Ink", sub: "Ink Flow · Outline", skin: "inkflow",
+    set: { candleOn: true, candleUp: "#e8e3d6", candleDown: "#7d8db0", candleLook: "outline", candleGlow: 0, candlePreset: "custom", lineGlow: 0, scaleText: "#e8e3d6", scaleGlow: 0, scaleBg: "auto", dim: 0.35 } },
+  { id: "kaleido", name: "Mirror", sub: "Kaleidoscope · Fade", skin: "kaleido",
+    set: { candleOn: true, candleUp: "#7df9ff", candleDown: "#ff5ec8", candleLook: "fade", candleGlow: 0.25, candlePreset: "custom", lineGlow: 0.25, scaleText: "#b8fbff", scaleGlow: 0.2, scaleBg: "auto", dim: 0.35 } },
+  { id: "slick", name: "Liquid Chrome", sub: "Oil Slick · Chrome", skin: "oilslick",
+    set: { candleOn: true, candleUp: "#b9f7ff", candleDown: "#c08bff", candleLook: "chrome", candleGlow: 0.1, candlePreset: "custom", lineGlow: 0.15, scaleText: "#d9faff", scaleGlow: 0.1, scaleBg: "glass", dim: 0.3 } },
+  { id: "hypercube", name: "Hypercube", sub: "Tesseract · Neon", skin: "tesseract",
+    set: { candleOn: true, candleUp: "#00e5ff", candleDown: "#ff3d7f", candleLook: "neon", candleGlow: 0.5, candlePreset: "custom", lineGlow: 0.4, scaleText: "#8ff4ff", scaleGlow: 0.35, scaleBg: "auto", dim: 0.35 } },
+  { id: "helix", name: "Genome", sub: "Double Helix · 3D", skin: "helix",
+    set: { candleOn: true, candleUp: "#39ff88", candleDown: "#ff4d6d", candleLook: "bevel", candleGlow: 0.15, candlePreset: "custom", lineGlow: 0.2, scaleText: "#a8ffc9", scaleGlow: 0.15, scaleBg: "auto", dim: 0.35 } },
+  { id: "synapse", name: "Neural", sub: "Synapse · Ice", skin: "synapse",
+    set: { candleOn: true, candleUp: "#c8f3ff", candleDown: "#7a8cff", candleLook: "ice", candleGlow: 0.2, candlePreset: "custom", lineGlow: 0.2, scaleText: "#d6f5ff", scaleGlow: 0.15, scaleBg: "auto", dim: 0.35 } },
   { id: "neon-night", name: "Neon Night", sub: "Cyber Grid · Tube", skin: "cybergrid",
     set: { candleOn: true, candleUp: "#fcee0a", candleDown: "#00f0ff", candleLook: "neon", candleGlow: 0.5, candlePreset: "cyberpunk", lineGlow: 0.5, scaleText: "#7df9ff", scaleGlow: 0.45, scaleBg: "auto", dim: 0.25 } },
   { id: "clean-focus", name: "Clean Focus", sub: "Slate · Mono", skin: "graphite",
@@ -284,21 +329,46 @@ const QUICK_LOOKS = [
   { id: "spectrum", name: "Spectrum", sub: "Ticker Tape · Rainbow", skin: "tickertape",
     set: { candleOn: true, candleUp: "#00e5ff", candleDown: "#ff00a8", candleLook: "prism", candleGlow: 0.5, candlePreset: "custom", lineGlow: 0.4, scaleText: "", scaleGlow: 0.35, scaleBg: "glass", dim: 0.45 } },
 ];
+let lookGroup = localStorage.getItem("lookGroup") || "All";
+const skinQuery = () => ($("skinSearch") ? $("skinSearch").value.trim().toLowerCase() : "");
+const matchQ = (...parts) => { const q = skinQuery(); return !q || parts.join(" ").toLowerCase().includes(q); };
 function renderQuick() {
   const box = $("quickLooks"); if (!box) return;
+  if ($("lookChips")) { $("lookChips").innerHTML = "";
+    for (const g of LOOK_GROUPS) { const b = document.createElement("button"); b.className = "chip" + (g === lookGroup ? " on" : ""); b.textContent = g;
+      b.onclick = () => { lookGroup = g; localStorage.setItem("lookGroup", g); renderQuick(); }; $("lookChips").appendChild(b); } }
   box.innerHTML = ""; quickPreviews = [];
+  let shown = 0;
   for (const q of QUICK_LOOKS) {
+    const grp = groupOf(q);
+    if (lookGroup !== "All" && grp !== lookGroup) continue;
+    const sk0 = WickedSkins[q.skin]; if (!sk0) continue;
+    if (!matchQ(q.name, q.sub, grp, sk0.name)) continue;
+    shown++;
     const on = cfg.skin === q.skin && cfg.candleOn && cfg.candleUp === q.set.candleUp && cfg.candleLook === q.set.candleLook;
     const card = document.createElement("button");
     card.className = "card" + (on ? " on" : "");
     const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
-    const sk = WickedSkins[q.skin].create(cv.getContext("2d")); sk.resize(160, 64); quickPreviews.push({ skin: sk, t: 0 });
+    const sk = WickedSkins[q.skin].create(cv.getContext("2d")); sk.resize(160, 64); quickPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(q.set.candleUp, q.set.candleDown)}</div><div class="label"><span>${esc(q.name)}<small>${esc(q.sub)}</small></span></div>`);
-    card.onclick = () => applyWithUndo({ enabled: true, skin: q.skin, ...q.set }, `Applied ${q.name}.`);
+    card.onclick = () => applyWithUndo($("keepBg") && $("keepBg").checked ? { enabled: true, ...q.set } : { enabled: true, skin: q.skin, ...q.set },
+      $("keepBg") && $("keepBg").checked ? `Applied ${q.name} (kept your wallpaper).` : `Applied ${q.name}.`);
     box.appendChild(card);
   }
+  updateEmpty(shown);
 }
+function updateEmpty(n) { if ($("skinEmpty")) $("skinEmpty").hidden = n > 0 || !skinQuery(); }
+// Looks / Wallpapers switch + search (remembered)
+let skinView = localStorage.getItem("skinView") || "looks";
+function syncSkinView() {
+  if (!$("skinView")) return;
+  seg("skinView", [["looks", "Looks"], ["walls", "Wallpapers"]], () => skinView, (v) => { skinView = v; localStorage.setItem("skinView", v); syncSkinView(); });
+  $("viewLooks").hidden = skinView !== "looks"; $("viewWalls").hidden = skinView !== "walls";
+  if (skinView === "looks") renderQuick(); else renderSkins();
+}
+if ($("skinSearch")) $("skinSearch").oninput = () => (skinView === "looks" ? renderQuick() : renderSkins());
+if ($("keepBg")) { $("keepBg").checked = localStorage.getItem("keepBg") === "1"; $("keepBg").onchange = (e) => localStorage.setItem("keepBg", e.target.checked ? "1" : "0"); }
 
 // ---------- remember which sections are open ----------
 document.querySelectorAll("details.grp").forEach((d) => {
@@ -784,6 +854,7 @@ const CLIP_HINTS = {
   screen: "Records exactly what you see, so every effect and any uploaded wallpaper is in it. After you click Record, a card appears on your chart: click \u201cChoose what to record\u201d and pick Entire Screen (or a window / this tab) in Chrome's box. It records for the length below, then downloads by itself. Stop early with Chrome's \u201cStop sharing\u201d button.",
 };
 const syncClipMode = () => {
+  if ($("clipEdit")) seg("clipEdit", [[true, "Crop & trim first"], [false, "Download right away"]], () => cfg.clipEdit !== false, (v) => set({ clipEdit: v }));
   seg("clipFps", [[30, "30 fps"], [60, "60 fps"]], () => (+cfg.clipFps === 60 ? 60 : 30), (v) => { set({ clipFps: v }); syncClipMode(); });
   seg("clipMode", [["chart", "Chart only"], ["screen", "Whole screen"]], () => cfg.clipMode || "chart", (v) => { set({ clipMode: v }); syncClipMode(); });
   if ($("clipHint")) $("clipHint").textContent = CLIP_HINTS[cfg.clipMode === "screen" ? "screen" : "chart"];
@@ -900,6 +971,46 @@ function seg(id, options, get, onPick) {
     box.appendChild(b);
   });
 }
+// ---------- chart styling: grid, crosshair, price line ----------
+const CHART_PARTS = [
+  { k: "grid", title: "Grid", desc: "The lines behind the candles.", styles: [["solid", "Solid"], ["dotted", "Dotted"], ["dashed", "Dashed"], ["none", "None"]] },
+  { k: "ch", title: "Crosshair", desc: "The lines that follow your pointer.", styles: [["solid", "Solid"], ["dotted", "Dotted"], ["dashed", "Dashed"]], glow: true },
+  { k: "pl", title: "Price line", desc: "The dotted line at the last price.", styles: [["solid", "Solid"], ["dotted", "Dotted"], ["dashed", "Dashed"]] },
+];
+function renderChartStyle() {
+  const box = $("chartStyle"); if (!box) return;
+  box.innerHTML = "";
+  for (const p of CHART_PARTS) {
+    const on = !!cfg[p.k + "On"], card = document.createElement("div"); card.className = "cpart";
+    card.innerHTML = `<div class="cpart-h"><div><b>${p.title}</b><small>${p.desc}</small></div><div class="seg cpart-mode" id="cs-${p.k}-on"></div></div>`;
+    box.appendChild(card);
+    seg(`cs-${p.k}-on`, [[false, "Own"], [true, "Styled"]], () => !!cfg[p.k + "On"], (v) => { set({ [p.k + "On"]: v }); renderChartStyle(); });
+    if (!on) continue;
+    const body = document.createElement("div"); body.className = "cpart-b";
+    const colKey = p.k + "Color", cur = cfg[colKey] || "";
+    body.innerHTML = `<div class="row"><span>Colour</span><div class="seg" id="cs-${p.k}-cm"></div><input type="color" id="cs-${p.k}-col" ${/^#/.test(cur) ? "" : "hidden"} /></div>
+      <div class="row"><span>Width</span><div class="seg" id="cs-${p.k}-w"></div></div>
+      <div class="row"><span>Style</span><div class="seg" id="cs-${p.k}-st"></div></div>` +
+      (p.k === "grid" ? `<div class="row"><span>Strength</span><input type="range" id="cs-grid-a" min="0.05" max="1" step="0.05" /><output id="cs-grid-ao"></output></div>` : "") +
+      (p.glow ? `<div class="row"><span>Glow at the pointer</span><div class="seg" id="cs-ch-glow"></div></div>` : "");
+    card.appendChild(body);
+    seg(`cs-${p.k}-cm`, [["", "Skin colour"], ["candle", "Candle"], ["custom", "Custom"]], () => (/^#/.test(cfg[colKey] || "") ? "custom" : cfg[colKey] || ""),
+      (v) => { set({ [colKey]: v === "custom" ? ($(`cs-${p.k}-col`).value || "#7df9ff") : v }); renderChartStyle(); });
+    const ci = $(`cs-${p.k}-col`); ci.value = /^#/.test(cur) ? cur : "#7df9ff"; ci.oninput = (e) => set({ [colKey]: e.target.value });
+    seg(`cs-${p.k}-w`, [[0, "1"], [1, "2"], [2, "3"]], () => +cfg[p.k + "W"] || 0, (v) => set({ [p.k + "W"]: v }));
+    seg(`cs-${p.k}-st`, p.styles, () => cfg[p.k + "Style"], (v) => set({ [p.k + "Style"]: v }));
+    if (p.k === "grid") { const r = $("cs-grid-a"); r.value = cfg.gridAlpha; $("cs-grid-ao").textContent = Math.round(cfg.gridAlpha * 100) + "%";
+      r.oninput = (e) => { set({ gridAlpha: +e.target.value }); $("cs-grid-ao").textContent = Math.round(+e.target.value * 100) + "%"; }; }
+    if (p.glow) seg("cs-ch-glow", [[false, "Off"], [true, "On"]], () => !!cfg.chGlow, (v) => set({ chGlow: v }));
+  }
+}
+function syncPanels() {
+  if (!$("panelMode")) return;
+  seg("panelMode", [["off", "TradingView"], ["skin", "Skin"], ["color", "Colour"]], () => cfg.panelMode || "off", (v) => { set({ panelMode: v }); syncPanels(); });
+  $("panelColor").hidden = cfg.panelMode !== "color"; $("panelColor").value = cfg.panelColor || "#10131c";
+}
+if ($("panelColor")) $("panelColor").oninput = (e) => set({ panelColor: e.target.value, panelMode: "color" });
+
 function syncTune() {
   $("sliders").innerHTML = "";
   SLIDERS.forEach(([key, label, min, max, step, fmt]) => {
@@ -1294,7 +1405,7 @@ $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cf
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
 const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","vignette","calm"];
-const STYLE_KEYS = ["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
+const STYLE_KEYS = [...CHART_KEYS, "candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
 
@@ -1404,6 +1515,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
+  renderChartStyle(); syncPanels(); syncSkinView();
   renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode();
   siteBar();
   deskCard();
@@ -1417,3 +1529,43 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
     convertPending();
   }
 });
+
+// ---------- Find a setting: search every section of every tab, jump straight to it ----------
+(function finder() {
+  const inp = $("finder"), out = $("finderOut"); if (!inp) return;
+  const TAB_NAME = {}; document.querySelectorAll("#nav [data-tab]").forEach((b) => (TAB_NAME[b.dataset.tab] = b.textContent.trim()));
+  function index() {
+    const items = [];
+    document.querySelectorAll("main section").forEach((sec) => {
+      const tab = sec.id.replace("tab-", "");
+      sec.querySelectorAll("details.grp").forEach((d) => {
+        const title = (d.querySelector("summary") || {}).textContent || "";
+        const words = [title, ...[...d.querySelectorAll(".row > span:first-child, .hint, .cpart-h b, .looklabel, label")].map((e) => e.textContent)].join(" ");
+        items.push({ tab, el: d, title: title.trim(), words: words.toLowerCase() });
+        d.querySelectorAll(".row > span:first-child, .cpart-h b").forEach((r) => items.push({ tab, el: d, row: r, title: title.trim() + " \u203a " + r.textContent.trim(), words: (r.textContent + " " + title).toLowerCase() }));
+      });
+    });
+    return items;
+  }
+  const go = (it) => {
+    const b = document.querySelector(`#nav [data-tab="${it.tab}"]`); if (b) b.click();
+    it.el.open = true;
+    const target = it.row ? it.row.closest(".row, .cpart") || it.el : it.el;
+    setTimeout(() => { target.scrollIntoView({ block: "center", behavior: "smooth" }); target.classList.add("found"); setTimeout(() => target.classList.remove("found"), 1600); }, 60);
+    inp.value = ""; out.hidden = true;
+  };
+  inp.oninput = () => {
+    const q = inp.value.trim().toLowerCase(); out.innerHTML = "";
+    if (q.length < 2) { out.hidden = true; return; }
+    // best first: a setting whose own name starts with / contains the words, then section names, then descriptions
+    const score = (it) => { const own = (it.row ? it.row.textContent : it.title).trim().toLowerCase();
+      return own.startsWith(q) ? 4 : own.includes(q) ? 3 : it.title.toLowerCase().includes(q) ? 2 : 1; };
+    const seen = new Set(), hits = index().filter((it) => it.words.includes(q)).map((it) => ({ it, s: score(it) })).sort((a, b) => b.s - a.s)
+      .map((x) => x.it).filter((it) => !seen.has(it.title) && seen.add(it.title)).slice(0, 8);
+    if (!hits.length) { out.innerHTML = '<div class="fx none">No setting called that. Try another word.</div>'; out.hidden = false; return; }
+    for (const it of hits) { const b = document.createElement("button"); b.className = "fx"; b.innerHTML = `<b></b><small></small>`;
+      b.querySelector("b").textContent = it.title; b.querySelector("small").textContent = TAB_NAME[it.tab] || it.tab; b.onclick = () => go(it); out.appendChild(b); }
+    out.hidden = false;
+  };
+  inp.onkeydown = (e) => { if (e.key === "Enter") { const f = out.querySelector("button.fx"); if (f) f.click(); } if (e.key === "Escape") { inp.value = ""; out.hidden = true; } };
+})();

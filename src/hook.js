@@ -73,8 +73,14 @@
     bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
     bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
     bracketDebug: false,
+    // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
+    gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
+    chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false,
+    plOn: false, plColor: "", plW: 0, plStyle: "dotted",
+    accent: "",
     bg: null, busy: false, prof: [], profs: [] };
   let fx = { ...FX0 };
+  const colOpt = (v) => (v === "candle" || /^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
   function readFx() {
     try {
       const raw = htmlEl().getAttribute("data-ws-fx"), f = raw ? JSON.parse(raw) : {};
@@ -100,6 +106,13 @@
         bracketLineColor: /^#[0-9a-f]{6}$/i.test(f.bracketLineColor || "") ? f.bracketLineColor : "",
         bracketLineW: Math.max(0, Math.min(3, +f.bracketLineW || 0)),
         bracketDebug: !!f.bracketDebug,
+        gridOn: !!f.gridOn, gridColor: colOpt(f.gridColor), gridAlpha: Math.max(0.03, Math.min(1, f.gridAlpha === undefined ? 0.35 : +f.gridAlpha || 0)),
+        gridW: Math.max(0, Math.min(2, +f.gridW || 0)), gridStyle: ["solid", "dotted", "dashed", "none"].includes(f.gridStyle) ? f.gridStyle : "dotted",
+        chOn: !!f.chOn, chColor: colOpt(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)),
+        chStyle: ["solid", "dotted", "dashed"].includes(f.chStyle) ? f.chStyle : "dashed", chGlow: !!f.chGlow,
+        plOn: !!f.plOn, plColor: colOpt(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)),
+        plStyle: ["solid", "dotted", "dashed"].includes(f.plStyle) ? f.plStyle : "dotted",
+        accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
         prof: Array.isArray(f.prof) ? f.prof.slice(0, 18).map(Number) : [],  // brightness behind the price scale, top->bottom
@@ -111,7 +124,8 @@
     remapCache.clear();
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
-      fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW]);
+      fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW,
+      fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -290,13 +304,76 @@
   //  - any colourful, visible line can glow; grid (faint) and crosshair (grey) never do
   const segs = new WeakMap();
   const origBegin = proto.beginPath, origMove = proto.moveTo, origLine = proto.lineTo, origStroke = proto.stroke;
-  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && fx.bracketOn) lastSeg.set(this, null); return origBegin.call(this); };
+  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && (fx.bracketOn || styling())) lastSeg.set(this, null); return origBegin.call(this); };
   proto.moveTo = function (x, y) { const k = segs.get(this); if (k) k[0]++;
-    if (on && fx.bracketOn) { const t = this.getTransform(); lastSeg.set(this, { x0: x * (t.a || 1) + t.e, y0: y * (t.d || 1) + t.f, x1: null, y1: null }); }
+    if (on && (fx.bracketOn || styling())) { const t = this.getTransform(); lastSeg.set(this, { x0: x * (t.a || 1) + t.e, y0: y * (t.d || 1) + t.f, x1: null, y1: null }); }
     return origMove.call(this, x, y); };
   proto.lineTo = function (x, y) { const k = segs.get(this); if (k) k[1]++;
-    if (on && fx.bracketOn) { const s = lastSeg.get(this), t = this.getTransform(); if (s) { s.x1 = x * (t.a || 1) + t.e; s.y1 = y * (t.d || 1) + t.f; } }
+    if (on && (fx.bracketOn || styling())) { const s = lastSeg.get(this), t = this.getTransform(); if (s) { s.x1 = x * (t.a || 1) + t.e; s.y1 = y * (t.d || 1) + t.f; } }
     return origLine.call(this, x, y); };
+
+  // ---------- chart styling: grid, crosshair, price line ----------
+  // TradingView draws each of these as ONE straight segment across the whole pane:
+  //   grid lines      — faint grey, on the pane's main canvas
+  //   crosshair       — grey, on the pane's TOP canvas (the overlay it redraws as you move the pointer)
+  //   last-price line — dotted, in the candle colour, horizontal, on the main canvas
+  // so we tell them apart by shape + canvas + colour and restyle them at draw time.
+  const styling = () => fx.gridOn || fx.chOn || fx.plOn;
+  const topCache = new WeakMap();
+  function isTop(c) { let v = topCache.get(c); if (v === undefined) { const all = c.parentElement ? [...c.parentElement.querySelectorAll("canvas")] : []; v = all.length > 1 && all.indexOf(c) > 0; topCache.set(c, v); } return v; }
+  const greyCache = new Map();
+  function greyish(col) {
+    let v = greyCache.get(col); if (v !== undefined) return v;
+    const r = rgbKey(col); v = false;
+    if (r) { const [R, G, B] = r.key.split(",").map((n) => n / 255), mx = Math.max(R, G, B), mn = Math.min(R, G, B), l = (mx + mn) / 2;
+      const sat = mx === mn ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1)); v = sat < 0.2 || (r.a !== null && +r.a <= 0.3); }
+    if (greyCache.size < 200) greyCache.set(col, v); return v;
+  }
+  function candleCol(col) { const r = rgbKey(col); if (!r) return false; if (sides.has(r.key)) return true;
+    return !!candles && (r.key === candles.up.join(",") || r.key === candles.down.join(",")); }
+  const DASH = { solid: [], dotted: [1, 3], dashed: [5, 5] };
+  function pick(opt, cur) { return opt === "candle" ? (candles ? candles.upHex : cur) : opt || fx.accent || (candles ? candles.upHex : cur); }
+  const xhair = new WeakMap();      // top canvas -> { x, y, t } of the crosshair lines drawn this frame
+  function styleLine(ctx, c, args) {
+    const k = segs.get(ctx); if (!k || k[0] !== 1 || k[1] !== 1) return false;
+    const s = lastSeg.get(ctx); if (!s || s.x1 === null) return false;
+    const horiz = Math.abs(s.y0 - s.y1) <= 1 && Math.abs(s.x1 - s.x0) >= c.width * 0.6;
+    const vert = Math.abs(s.x0 - s.x1) <= 1 && Math.abs(s.y1 - s.y0) >= c.height * 0.6;
+    if (!horiz && !vert) return false;
+    const cur = strokeDesc.get.call(ctx), top = isTop(c);
+    let part = null;
+    if (top) { if (fx.chOn && greyish(cur)) part = "ch"; }
+    else if (horiz && fx.plOn && candleCol(cur) && ctx.getLineDash().length) part = "pl";
+    else if (fx.gridOn && greyish(cur)) part = "grid";
+    if (!part) return false;
+    if (part === "grid" && fx.gridStyle === "none") return true;              // no grid at all
+    const sx = ctx.getTransform().a || 1;
+    const opt = part === "grid" ? [fx.gridColor, fx.gridW, fx.gridStyle] : part === "ch" ? [fx.chColor, fx.chW, fx.chStyle] : [fx.plColor, fx.plW, fx.plStyle];
+    const col = pick(opt[0], cur), pS = cur, pLW = ctx.lineWidth, pD = ctx.getLineDash(), pA = ctx.globalAlpha;
+    strokeDesc.set.call(ctx, col);
+    ctx.lineWidth = (1 + opt[1]) / sx;
+    ctx.setLineDash(DASH[opt[2]].map((d) => d * (1 + opt[1] * 0.5) / sx));
+    if (part === "grid") ctx.globalAlpha = pA * fx.gridAlpha;
+    origStroke.apply(ctx, args);
+    strokeDesc.set.call(ctx, pS); ctx.lineWidth = pLW; ctx.setLineDash(pD); ctx.globalAlpha = pA;
+    // glow at the pointer: once both crosshair lines of this frame are known, a soft light where they cross
+    if (part === "ch" && fx.chGlow) {
+      const now = performance.now(), m = xhair.get(ctx) || {};
+      if (now - (m.t || 0) > 40) { m.x = null; m.y = null; }
+      m.t = now; if (vert) m.x = s.x0; else m.y = s.y0; xhair.set(ctx, m);
+      if (m.x !== null && m.y !== null) {
+        const t = ctx.getTransform(), R = 34 * ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+        const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, R), rgb = rgbKey(col);
+        const k3 = rgb ? rgb.key : "255,255,255";
+        g.addColorStop(0, `rgba(${k3},0.45)`); g.addColorStop(0.35, `rgba(${k3},0.14)`); g.addColorStop(1, `rgba(${k3},0)`);
+        origFillDesc.set.call(ctx, g); origFillRaw.call(ctx, m.x - R, m.y - R, R * 2, R * 2);
+        ctx.restore(); m.x = m.y = null; void t;
+      }
+    }
+    return true;
+  }
+  const origFillRaw = proto.fillRect;
 
   const glowCache = new Map();
   function glowable(col) {
@@ -315,6 +392,7 @@
 
   proto.stroke = function (path) {
     const c = this.canvas;
+    if (on && path === undefined && c && styling() && isPane(c) && styleLine(this, c, arguments)) return;
     // Bracket level line: a wide, horizontal stroke sitting at a pill's height. Recolour / thicken it so the whole
     // bracket level is easy to see. Done before the candle/glow path because it can be on when those are off.
     if (on && fx.bracketOn && (fx.bracketLineColor || fx.bracketLineW > 0) && c && path === undefined && isPane(c)) {
