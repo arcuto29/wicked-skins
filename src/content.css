@@ -227,3 +227,15 @@ html.bd-ui-accent [class*="layout__area--top"] [class*="isActive"] {
 #bd-goal.bd-g-warn { --gc: #ffb13b; } #bd-goal.bd-g-goal { --gc: #00e08a; }
 #bd-goal.bd-g-limit { --gc: #ff3355; animation: bd-g-pulse 1.5s ease-in-out infinite; }
 @keyframes bd-g-pulse { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, #ff3355 35%, transparent), 0 8px 30px -8px rgba(0,0,0,.7); } }
+
+/* Focus mode: the wallpaper fades away (and pauses) so only the chart is left */
+#bd-layer { transition: opacity .35s ease; }
+html.bd-focus #bd-layer { opacity: 0 !important; }
+/* Session timer */
+#bd-timer { position: fixed; z-index: 2147483001; pointer-events: none; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 14px 0 12px;
+  border-radius: 999px; background: rgba(8,11,18,.78); border: 1px solid color-mix(in srgb, var(--tc, #2ef2b0) 55%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 8px 24px -10px rgba(0,0,0,.7); white-space: nowrap; }
+#bd-timer i { width: 7px; height: 7px; border-radius: 50%; background: #8a93a6; }
+#bd-timer.bd-t-open i { background: var(--tc, #2ef2b0); box-shadow: 0 0 8px var(--tc, #2ef2b0); }
+#bd-timer b { font: 800 11px ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; color: rgba(223,229,241,.65); }
+#bd-timer span { font: 700 12px ui-monospace, Menlo, Consolas, monospace; color: #eef1f7; font-variant-numeric: tabular-nums; }

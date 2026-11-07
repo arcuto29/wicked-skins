@@ -17,7 +17,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipLen: 10, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
@@ -231,7 +231,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderChartStyle(); syncPanels(); syncSkinView(); renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode(); }
+function refreshAll() { renderChartStyle(); syncPanels(); syncShortcuts(); syncTimer(); syncSkinView(); renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 // Look groups (shown as chips). New looks: add the id here or they land in "Classic".
@@ -660,7 +660,12 @@ async function wsLoadLooks(reset) {
     wsLooks = reset ? rows : [...wsLooks, ...rows];
     $("wsMore").hidden = wsSort === "mine" || rows.length < 24;
     if (!wsLooks.length && wsSort !== "mine") $("wsMsg").textContent = "No community looks yet. Be the first: tap \u201cShare my current look\u201d.";
-  } catch (e) { $("wsMsg").textContent = "Couldn't load community looks: " + e.message; }
+  } catch (e) {
+    // the backend hasn't been set up for looks yet (WORKSHOP.md: re-run supabase/schema.sql): say so plainly
+    const notReady = /looks|relation|schema cache|404|not find/i.test(String(e && e.message));
+    $("wsMsg").textContent = notReady ? "Community looks are coming soon. Wallpapers already work: switch to Wallpapers above." : "Couldn't load community looks right now. Check your connection and try again.";
+    if (notReady) $("wsShareLook").hidden = true;
+  }
   wsRenderLooks();
 }
 function wsRenderLooks() {
@@ -785,8 +790,10 @@ function makeLookCode(name) {
   const payload = { v: 1, n: (name || "").slice(0, 40), s: skin, l: look };
   return LOOK_CODE_PREFIX + b64urlEncode(JSON.stringify(payload));
 }
+const lookLink = (code) => WS_SITE() + "look.html#" + code;
 function parseLookCode(code) {
-  const raw = String(code || "").trim();
+  const m = String(code || "").match(/PRIISM1-[A-Za-z0-9_-]+/);    // a share link or a bare code
+  const raw = m ? m[0] : "";
   if (!raw.startsWith(LOOK_CODE_PREFIX)) return null;
   try {
     const p = JSON.parse(b64urlDecode(raw.slice(LOOK_CODE_PREFIX.length)));
@@ -872,15 +879,15 @@ $("loImport").onchange = async (e) => {
 // ---------- look codes (copy / paste a short code of the whole look) ----------
 const codeMsg = (t, ok) => { const el = $("codeMsg"); if (!el) return; el.style.display = ""; el.textContent = t; el.style.color = ok === false ? "#ff8a8a" : ""; };
 if ($("codeCopy")) $("codeCopy").onclick = async () => {
-  const code = makeLookCode(($("loName") && $("loName").value.trim()) || "");
-  const done = await copyText(code);
-  if ($("codeInput")) $("codeInput").value = code;
-  codeMsg(done ? "Copied! Paste it anywhere to share your look." : "Couldn't copy — select the code above and copy it manually.", done);
+  const link = lookLink(makeLookCode(($("loName") && $("loName").value.trim()) || ""));
+  const done = await copyText(link);
+  if ($("codeInput")) $("codeInput").value = link;
+  codeMsg(done ? "Link copied! Paste it anywhere to share your look." : "Couldn't copy: select the link above and copy it.", done);
 };
 if ($("codeApply")) {
   const apply = () => {
     const parsed = parseLookCode($("codeInput").value);
-    if (!parsed) return codeMsg("That isn't a valid look code (it should start with PRIISM1-).", false);
+    if (!parsed) return codeMsg("That isn't a Priism share link or look code.", false);
     applyWithUndo({ ...parsed.look, enabled: true, skin: parsed.skin },
       parsed.name ? `Applied look code “${parsed.name}”.` : "Applied look code.");
     codeMsg("Applied! (Use the Undo in the toast to revert.)", true);
@@ -908,7 +915,7 @@ if ($("snapBtn")) $("snapBtn").onclick = async () => {
 };
 
 // ---------- live clip (short animated WebM of the chart + moving wallpaper) ----------
-let clipSecs = 5;
+let clipSecs = 10;
 // Chart only = we redraw the chart + effects ourselves (fast, no prompts). Whole screen = Chrome's screen share,
 // which records exactly what you see (every effect, uploaded wallpapers, the lot) after you pick what to share.
 const CLIP_HINTS = {
@@ -924,7 +931,8 @@ const syncClipMode = () => {
   if ($("clipBtn")) $("clipBtn").textContent = cfg.clipMode === "screen" ? "Record screen" : "Record";
 };
 if ($("clipMode")) syncClipMode();
-if ($("clipLen")) seg("clipLen", [[5, "5s"], [10, "10s"], [30, "30s"], [60, "1 min"], [120, "2 min"]], () => clipSecs, (v) => { clipSecs = v; if ($("clipCustom")) $("clipCustom").value = ""; });
+if ($("clipLen")) seg("clipLen", [[5, "5s"], [10, "10s"], [30, "30s"], [60, "1 min"], [120, "2 min"]], () => clipSecs, (v) => { clipSecs = v; set({ clipLen: v }); if ($("clipCustom")) $("clipCustom").value = ""; });
+if ($("clipCustom")) $("clipCustom").addEventListener("input", () => { const c = Math.round(+$("clipCustom").value); if (c >= 2) set({ clipLen: Math.min(120, c) }); });
 // a custom length (2-120 s) overrides the preset
 const clipLength = () => { const c = Math.round(+($("clipCustom") && $("clipCustom").value)); return c >= 2 ? Math.min(120, c) : clipSecs; };
 if ($("clipBtn")) $("clipBtn").onclick = async () => {
@@ -1071,6 +1079,58 @@ function renderChartStyle() {
       seg("cs-ch-lab", [[false, "Own"], [true, "Match crosshair"]], () => !!cfg.chLabels, (v) => set({ chLabels: v })); }
   }
 }
+// ---------- shortcuts ----------
+const KEY_NAMES = { focusKey: "Focus mode", recordKey: "Record a clip", snapKey: "Snapshot", toggleKey: "Turn everything on/off" };
+const keyLabel = (spec) => spec ? String(spec).split("+").map((k) => k.replace(/^Key/, "").replace(/^Digit/, "").replace(/^Arrow/, "")).join("+") : "Off";
+const TV_ALT = ["KeyT", "KeyH", "KeyJ", "KeyV", "KeyC", "KeyF", "KeyI", "KeyL", "KeyR", "KeyS", "KeyA", "KeyG", "KeyP", "KeyW", "KeyX", "KeyZ", "KeyK", "KeyN", "KeyO", "KeyD", "KeyB"];
+let keyListen = null;
+function syncShortcuts() {
+  document.querySelectorAll(".keybtn").forEach((b) => { b.textContent = keyListen === b.dataset.key ? "Press keys\u2026" : keyLabel(cfg[b.dataset.key]); b.classList.toggle("listening", keyListen === b.dataset.key);
+    b.onclick = () => { keyListen = keyListen === b.dataset.key ? null : b.dataset.key; if ($("keyMsg")) $("keyMsg").textContent = keyListen ? "Press the new shortcut. Esc cancels, Backspace turns it off." : ""; syncShortcuts(); }; });
+  if ($("focusHides")) seg("focusHides", [["wallpaper", "Wallpaper"], ["all", "Everything"]], () => cfg.focusHides || "wallpaper", (v) => set({ focusHides: v }));
+  if ($("tipToggle")) $("tipToggle").textContent = keyLabel(cfg.toggleKey); if ($("tipFocus")) $("tipFocus").textContent = keyLabel(cfg.focusKey);
+  const fb = $("focusBar");
+  if (fb) { fb.hidden = !cfg.focus; if (cfg.focus) { fb.innerHTML = `<b>Focus is on</b><p class="hint" style="color:#cfd5e2;margin:2px 0 8px">Your wallpaper is hidden. Press <b>${esc(keyLabel(cfg.focusKey))}</b> on the chart to bring it back.</p><button class="primary" id="focusExit">Exit focus</button>`; $("focusExit").onclick = () => { set({ focus: false }); syncShortcuts(); }; } }
+}
+addEventListener("keydown", (e) => {
+  if (!keyListen) return;
+  e.preventDefault(); e.stopPropagation();
+  const msg = (t) => { if ($("keyMsg")) $("keyMsg").textContent = t; };
+  if (e.key === "Escape") { keyListen = null; msg(""); return syncShortcuts(); }
+  if (e.key === "Backspace" || e.key === "Delete") { set({ [keyListen]: "" }); msg(`${KEY_NAMES[keyListen]} shortcut turned off.`); keyListen = null; return syncShortcuts(); }
+  if (["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;               // wait for the real key
+  const fkey = /^F([1-9]|1[0-2])$/.test(e.code);
+  if (!e.altKey && !e.ctrlKey && !e.metaKey && !fkey) return msg("Add Alt, Ctrl or \u2318 (or use an F-key) so it never fires while you type.");
+  const spec = [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Meta", e.code].filter(Boolean).join("+");
+  const used = Object.keys(KEY_NAMES).find((k) => k !== keyListen && cfg[k] === spec);
+  if (used) return msg(`${keyLabel(spec)} is already used for ${KEY_NAMES[used]}.`);
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && ["KeyC", "KeyV", "KeyX", "KeyZ", "KeyY", "KeyS", "KeyF", "KeyP", "KeyA", "KeyR", "KeyW", "KeyT", "KeyN"].includes(e.code))
+    return msg(`${keyLabel(spec)} is a browser shortcut. Pick another one.`);
+  const tvClash = e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey && TV_ALT.includes(e.code);
+  set({ [keyListen]: spec });
+  msg(`${KEY_NAMES[keyListen]}: ${keyLabel(spec)}.` + (tvClash ? ` TradingView also uses ${keyLabel(spec)}; on the chart Priism takes it. Add Shift to keep both.` : ""));
+  keyListen = null; syncShortcuts();
+}, true);
+
+// ---------- session timer ----------
+function syncTimer() {
+  if (!$("timerOn")) return;
+  $("timerOn").checked = !!cfg.timerOn; $("timerMarket").value = cfg.timerMarket || "auto";
+  seg("timerPos", [["bl", "Bottom left"], ["bc", "Bottom centre"], ["br", "Bottom right"]], () => (["bl", "bc", "br"].includes(cfg.timerPos) ? cfg.timerPos : "bc"), (v) => set({ timerPos: v, timerOn: true }));
+}
+if ($("timerOn")) { $("timerOn").onchange = (e) => set({ timerOn: e.target.checked }); $("timerMarket").onchange = (e) => set({ timerMarket: e.target.value, timerOn: true }); }
+
+// ---------- share link offer: open the panel on a Priism share link and add the look in one tap ----------
+(async function lookOffer() {
+  const el = $("lookOffer"); if (!el || !(chrome.tabs && chrome.tabs.query)) return;
+  let tab; try { [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); } catch { return; }
+  const parsed = tab && tab.url && /look\.html#PRIISM1-/.test(tab.url) ? parseLookCode(tab.url) : null;
+  if (!parsed) return;
+  el.innerHTML = `<b>Add this look?</b><p class="hint" style="color:#cfd5e2;margin:2px 0 8px">\u201c${esc(parsed.name || "Shared look")}\u201d \u00B7 ${esc((WickedSkins[parsed.skin] || {}).name || parsed.skin)}. It goes on your chart right away, with Undo.</p><button class="primary" id="lookOfferGo">Add look</button>`;
+  el.hidden = false;
+  $("lookOfferGo").onclick = () => { applyWithUndo({ ...parsed.look, enabled: true, skin: parsed.skin }, `Added \u201c${parsed.name || "Shared look"}\u201d.`); el.hidden = true; };
+})();
+
 function syncPanels() {
   if (!$("panelMode")) return;
   if ($("dlgMode")) {
@@ -1607,7 +1667,8 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderChartStyle(); syncPanels(); syncSkinView();
+  renderChartStyle(); syncPanels(); syncSkinView(); syncShortcuts(); syncTimer();
+  if (+cfg.clipLen) clipSecs = [5, 10, 30, 60, 120].includes(+cfg.clipLen) ? +cfg.clipLen : clipSecs;
   renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode();
   siteBar();
   deskCard();
@@ -1663,8 +1724,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Reorganised: new TradingView, Trading and Capture tabs, and no duplicate settings",
-  "TradingView's Settings window and menus can be frosted glass or your colour (TradingView tab)",
+const WHATS_NEW = ["Focus mode + shortcuts you can change: focus, record, snapshot (Adjust › Shortcuts)",
+  "Session timer: countdown to the next open / close (Trading)",
+  "Share links with a live preview page (Saved › More ways to share)",
   "Clip quality options, and instant saving when you don't crop or trim",
   "Smoother: fixed the brief freezes; trade brackets work with the newer rounded labels",
   "Community looks: share your whole setup, browse Top / New / Mine (Workshop)",

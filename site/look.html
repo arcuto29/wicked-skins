@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A shared look · Priism Skins</title>
+  <meta name="description" content="A chart look shared with Priism Skins: live wallpaper, candles and styling for TradingView.">
+  <link rel="icon" href="img/icon-32.png"><link rel="stylesheet" href="style.css">
+  <style>
+    .lk { max-width: 980px; margin: 0 auto; padding: 36px 20px 60px; }
+    .lk-stage { position: relative; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,.12); background: #05060a; box-shadow: 0 30px 80px -30px rgba(0,0,0,.9); }
+    .lk-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .lk-dim { position: absolute; inset: 0; background: #000; pointer-events: none; }
+    .lk-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 0 0 16px; }
+    .lk-head h1 { margin: 0; font-size: 30px; }
+    .lk-head p { margin: 4px 0 0; color: var(--muted); }
+    .lk-tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 0; }
+    .lk-tags span { padding: 5px 11px; border-radius: 99px; border: 1px solid rgba(255,255,255,.14); font-size: 13px; color: #d7dbe6; }
+    .lk-add { margin-top: 22px; padding: 18px; border-radius: 14px; border: 1px solid rgba(46,242,176,.35); background: rgba(46,242,176,.06); }
+    .lk-add ol { margin: 8px 0 0; padding-left: 20px; color: #d7dbe6; line-height: 1.7; }
+    .lk-bad { text-align: center; padding: 80px 20px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="lk">
+    <div id="look" hidden>
+      <div class="lk-head">
+        <div><h1 id="lkName">Shared look</h1><p id="lkSub"></p></div>
+        <div class="cta" style="margin:0"><button class="btn" id="lkCopy" type="button">Copy link</button><a class="btn primary" data-chrome href="#">Get Priism Skins</a></div>
+      </div>
+      <div class="lk-stage"><canvas id="bg"></canvas><div class="lk-dim" id="dim"></div><canvas id="fg"></canvas></div>
+      <div class="lk-tags" id="lkTags"></div>
+      <div class="lk-add">
+        <b>Add it to your chart</b>
+        <ol>
+          <li>Install Priism Skins (free) if you haven't yet.</li>
+          <li>On this page, click the <b>Priism Skins</b> icon in your browser's toolbar.</li>
+          <li>Tap <b>Add look</b>. It goes straight onto your charts, and Undo is one tap.</li>
+        </ol>
+        <p class="hint" style="margin:10px 0 0">Or copy this page's link and paste it in Priism Skins under <b>Saved › More ways to share</b>.</p>
+      </div>
+    </div>
+    <div id="bad" class="lk-bad" hidden><h2>This link doesn't contain a look</h2><p>Ask for the link again, or <a href="workshop.html">browse community looks</a>.</p></div>
+  </main>
+  <script src="site-config.js"></script><script src="common.js"></script>
+  <!-- the same wallpaper + candle drawing code the extension uses (copied in when the site is published) -->
+  <script src="lib/skins.js"></script><script src="lib/candlelooks.js"></script>
+  <script>
+  (function () {
+    const $ = (id) => document.getElementById(id);
+    addEventListener("hashchange", () => location.reload());   // a different link pasted into the same tab
+    const m = location.hash.match(/PRIISM1-[A-Za-z0-9_-]+/);
+    let p = null;
+    try {
+      let b = m[0].slice(8).replace(/-/g, "+").replace(/_/g, "/"); while (b.length % 4) b += "=";
+      const bin = atob(b), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      p = JSON.parse(new TextDecoder().decode(bytes));
+      if (!p || p.v !== 1 || !/^[a-z0-9_-]{1,40}$/.test(p.s || "") || typeof p.l !== "object") p = null;
+    } catch { p = null; }
+    if (!p) { $("bad").hidden = false; return; }
+    const L = p.l || {}, S = window.WickedSkins || {}, CL = window.__bdCandleLooks;
+    const skin = S[p.s], name = (p.n || "").trim() || (skin ? skin.name : "Shared look");
+    document.title = name + " · Priism Skins";
+    $("look").hidden = false; $("lkName").textContent = name;
+    $("lkSub").textContent = "A Priism Skins look for TradingView" + (skin ? " · wallpaper: " + skin.name : "");
+    const tags = [];
+    if (skin) tags.push(skin.name + " wallpaper");
+    if (L.candleOn) tags.push(((CL && CL.META[L.candleLook]) ? CL.META[L.candleLook].name : "Solid") + " candles");
+    if (L.candleGlow > 0 || L.lineGlow > 0) tags.push("Glow");
+    if (L.gridOn || L.chOn || L.plOn || L.sbOn || L.axOn) tags.push("Chart lines styled");
+    if (L.panelMode && L.panelMode !== "off") tags.push("TradingView panels");
+    if (L.dlgMode && L.dlgMode !== "off") tags.push("Windows & menus");
+    $("lkTags").innerHTML = tags.map((t) => `<span>${t.replace(/[&<>]/g, "")}</span>`).join("");
+    $("lkCopy").onclick = async () => { try { await navigator.clipboard.writeText(location.href); $("lkCopy").textContent = "Copied!"; } catch { $("lkCopy").textContent = "Copy failed"; } };
+    // live preview: the real animated wallpaper, dimmed like the chart, with candles in the look
+    const bg = $("bg"), fg = $("fg"), dpr = Math.min(2, devicePixelRatio || 1);
+    $("dim").style.opacity = Math.max(0, Math.min(0.9, +L.dim || 0.3));
+    let sk = null;
+    const size = () => { const r = bg.getBoundingClientRect(), W = Math.round(r.width * 0.75), H = Math.round(r.height * 0.75);
+      bg.width = W; bg.height = H; if (sk) sk.resize(W, H); fg.width = Math.round(r.width * dpr); fg.height = Math.round(r.height * dpr); drawCandles(); };
+    function drawCandles() {
+      if (!CL) return;
+      const up = /^#[0-9a-f]{6}$/i.test(L.candleUp || "") ? L.candleUp : "#26a69a", dn = /^#[0-9a-f]{6}$/i.test(L.candleDown || "") ? L.candleDown : "#ef5350";
+      CL.preview(fg, L.candleOn ? (L.candleLook || "solid") : "solid", up, dn, +L.candleGlow || 0);
+    }
+    if (skin) { sk = skin.create(bg.getContext("2d")); }
+    size(); addEventListener("resize", size);
+    let t = 0, last = performance.now();
+    (function loop(now) { requestAnimationFrame(loop); if (!sk || document.hidden) return; const dt = Math.min(0.05, (now - last) / 1000); last = now; sk.frame((t += dt), dt); })(last);
+  })();
+  </script>
+</body>
+</html>

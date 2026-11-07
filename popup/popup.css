@@ -275,3 +275,8 @@ nav button svg { width: 19px; height: 19px; }
 .brand { padding: 0 0 6px; margin-bottom: 2px; gap: 2px; }
 .brand img { width: 30px; height: 30px; }
 .brand span { font-size: 9px; }
+
+.keybtn { min-width: 128px; margin-left: auto; font: 700 12px ui-monospace, Menlo, Consolas, monospace; letter-spacing: .02em; color: #e9ebf2; }
+.keybtn.listening { border-color: var(--acc); box-shadow: 0 0 0 3px rgba(46,242,176,.18); color: var(--acc); }
+select.field { padding: 7px 8px; width: 100%; }
+.focusbar { border-color: rgba(198,255,61,.35); }

@@ -28,6 +28,12 @@
     // glows through) | color (your colour). dlgAlpha = how solid (0.4 see-through .. 1 solid).
     dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78,
     clipEdit: true,
+    // Shortcuts (changeable in Adjust > Shortcuts). Stored as "Alt+Shift+KeyF" (modifiers + the key's code).
+    toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS",
+    clipLen: 10,              // seconds a shortcut recording lasts (the Clip section's length)
+    focus: false, focusHides: "wallpaper",   // Focus mode: hide just the wallpaper, or the wallpaper AND all styling
+    // Session timer: a slim countdown to the next market open / close, styled to match your look.
+    timerOn: false, timerMarket: "auto", timerPos: "bc",
     clipQuality: "balanced",  // high | balanced | small (small keeps a clip under ~20 MB, e.g. for Discord)           // after a recording: open the crop / trim editor (false = download right away)
     // Chart styling — each part off = TradingView's own. Colour "" = skin colour, "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
@@ -591,7 +597,7 @@
     const h = document.documentElement, col = cfg.enabled ? panelColour() : "";
     if (col === panelApplied) return;            // nothing changed: never restyle the page for nothing (keeps it smooth)
     panelApplied = col;
-    h.classList.toggle("bd-panels", !!col);
+    h.classList.toggle("bd-panels", !!col && !focusAll());
     // ONE stylesheet holds every override, written in a single update (setting hundreds of properties one by one made
     // the browser restyle TradingView's whole page each time: a multi-second freeze while picking a colour).
     let st = document.getElementById("bd-panels-css");
@@ -712,7 +718,7 @@
       const bg = getComputedStyle(document.body).backgroundColor;
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
-    document.documentElement.classList.toggle("bd-on", cfg.enabled);
+    document.documentElement.classList.toggle("bd-on", cfg.enabled && !focusAll());
     applySides(); applyUiStyle(); applyPanels(); applyDialogs();
     if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
@@ -770,6 +776,7 @@
     placeWatermark();
     placePnl();
     placeGoal();
+    placeTimer();
   }
   function trackLayout() {
     if (!layer || standDown || document.querySelector(".chart-container[data-bd-repaint]")) return;   // mid-redraw: charts hidden for 2 frames
@@ -847,7 +854,7 @@
     const step = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(step);
-      if (document.hidden || cfg.paused) { last = now; hLast = 0; return; }
+      if (document.hidden || cfg.paused || (cfg.focus && cfg.enabled)) { last = now; hLast = 0; return; }
       const watch = cfg.autoQuality && !cfg.powerSaver && (cfg.fps === "auto" || cfg.fps === "max");
       if (watch) trackHealth(now);
       // Target fps: user setting, power saver, or the current auto-quality cap (whichever is lowest).
@@ -1231,6 +1238,8 @@
 
   function apply(keys) {
     if (standDown || (EXT && !owner)) return;
+    if (keys.some((k) => k === "focus" || k === "focusHides" || k === "enabled")) applyFocus();
+    if (keys.some((k) => k.startsWith("timer") || k === "enabled" || k === "candleUp")) renderTimer();
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
@@ -1243,7 +1252,7 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -1414,7 +1423,7 @@
       for (const c of (charts.length ? charts : [{ r: box }])) g.rect((c.r.left - box.left) * dpr, (c.r.top - box.top) * dpr, c.r.width * dpr, c.r.height * dpr);
       g.clip(); mediaMissed = drawWallpaper(g, box, dpr); drawMoodGlow(g, 0, 0, W, H, dpr); g.restore();
     }
-    drawMoodPill(g, box, dpr); drawPnlOverlay(g, box, dpr); drawGoalOverlay(g, box, dpr); drawWatermark(g, box, dpr, wmImg);
+    drawMoodPill(g, box, dpr); drawPnlOverlay(g, box, dpr); drawGoalOverlay(g, box, dpr); drawTimerOverlay(g, box, dpr); drawWatermark(g, box, dpr, wmImg);
     return { mediaMissed };
   }
   // preload the right watermark image for compositing (corner logo, or the tiled pattern), or null if wm is off
@@ -1646,7 +1655,7 @@
   // MediaRecorder. Captures the MOTION of a built-in animated skin. Uploaded media (iframe player) still can't be
   // read, so for those the clip shows the chart + watermark moving but not the uploaded wallpaper. A clip is bigger
   // than a PNG, so we cap it (default ~5s) and downscale to keep it shareable.
-  let clipRec = null;
+  let clipRec = null, stopClip = null;
   const MAX_CLIP_SECONDS = 120;
   async function captureClip(seconds, fpsWanted) {
     if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
@@ -1690,7 +1699,7 @@
     return await new Promise((resolve) => {
       let rafId = 0, done = false, stopTimer = 0;
       const stop = () => { clearTimeout(stopTimer); try { rec.state !== "inactive" && rec.stop(); } catch {} };
-      badge.onclick = stop;
+      badge.onclick = stop; stopClip = stop;
       const cleanup = () => { done = true; cancelAnimationFrame(rafId); clearTimeout(stopTimer); clearInterval(badgeTimer); badge.remove(); clipRec = null; };
       const draw = () => { if (done) return; try { compositeFrame(g, box, dpr, wmImg); } catch {} rafId = requestAnimationFrame(draw); };
       rec.onstop = async () => {
@@ -1780,16 +1789,163 @@
     const t = document.createElement("div"); t.className = "bd-flash"; t.textContent = msg;
     document.documentElement.appendChild(t); setTimeout(() => t.remove(), 1400);
   }
+  // ---------- shortcuts (changeable) ----------
+  function keyMatch(e, spec) {
+    if (!spec) return false;
+    const p = String(spec).split("+"), code = p.pop();
+    return e.code === code && e.altKey === p.includes("Alt") && e.shiftKey === p.includes("Shift") && e.ctrlKey === p.includes("Ctrl") && e.metaKey === p.includes("Meta");
+  }
+  const keyLabel = (spec) => String(spec || "").split("+").map((k) => k.replace(/^Key/, "").replace(/^Digit/, "")).join("+");
+  const save = (o) => { if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) chrome.storage.local.set(o); else if (window.__bdUpdate) window.__bdUpdate(o); };
   addEventListener("keydown", (e) => {
-    if (!(e.altKey && e.shiftKey && e.code === "KeyW") || e.repeat) return;
+    if (e.repeat) return;
+    const isToggle = keyMatch(e, cfg.toggleKey || "Alt+Shift+KeyW"), isFocus = cfg.enabled && keyMatch(e, cfg.focusKey);
+    const isRec = cfg.enabled && keyMatch(e, cfg.recordKey), isSnap = cfg.enabled && keyMatch(e, cfg.snapKey);
+    if (!isToggle && !isFocus && !isRec && !isSnap) return;
     const tag = (e.target && e.target.tagName) || "";
     if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
     e.preventDefault(); e.stopPropagation();
-    const next = !cfg.enabled;
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) chrome.storage.local.set({ enabled: next });
-    else if (window.__bdUpdate) window.__bdUpdate({ enabled: next });
-    flash(next ? "Priism Skins on" : "Priism Skins off");
+    if (isToggle) { const next = !cfg.enabled; save({ enabled: next }); flash(next ? "Priism Skins on" : "Priism Skins off"); return; }
+    if (EXT && !owner) return;                      // only the frame that owns the chart records / snaps
+    if (isRec) {
+      if (clipRec && stopClip) { stopClip(); return; }               // pressed again: stop and save now
+      const secs = Math.max(2, Math.min(120, +cfg.clipLen || 10));
+      if (cfg.clipMode === "screen") { const r = startScreenFlow(secs, +cfg.clipFps === 60 ? 60 : 30); if (r && r.ok === false) flash(r.reason); }
+      else captureClip(secs, +cfg.clipFps === 60 ? 60 : 30).then((r) => { if (r && r.ok === false) flash(r.reason); }).catch(() => {});
+      return;
+    }
+    if (isSnap) {
+      captureSnapshot().then((r) => {
+        if (!r.ok) return flash(r.reason || "Couldn't take a snapshot");
+        const q = parseTitle(); saveBlob(r.blob, `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}.png`); flash("Snapshot saved to your downloads");
+      }).catch(() => flash("Couldn't take a snapshot"));
+      return;
+    }
+    const next = !cfg.focus; save({ focus: next });
+    flash(next ? `Focus on \u00B7 ${keyLabel(cfg.focusKey)} to bring it back` : "Focus off");
   }, true);
+
+  // ---------- Focus mode ----------
+  // Fades the wallpaper away (and pauses it) so only your chart is left; "everything" also drops all styling.
+  // Trading info (P&L, goal bar, session timer, brackets) stays, since that's what you're focusing on.
+  const focusAll = () => !!(cfg.enabled && cfg.focus && cfg.focusHides === "all");
+  function applyFocus() {
+    const h = document.documentElement, f = !!(cfg.enabled && cfg.focus);
+    h.classList.toggle("bd-focus", f);
+    const wantOn = cfg.enabled && !focusAll();
+    if (h.classList.contains("bd-on") !== wantOn && cfg.enabled) { h.classList.toggle("bd-on", wantOn); h.classList.toggle("bd-panels", wantOn && !!panelApplied); repaint(); }
+  }
+
+  // ---------- session timer ----------
+  // Countdown to the next open / close of the market you trade, computed in each exchange's own time zone (so
+  // daylight-saving changes are handled). No data is fetched; these are the regular trading hours.
+  const MARKETS = {
+    cme: { name: "CME futures", main: ["NY"], sessions: [
+      { id: "NY", label: "NY session", tz: "America/New_York", days: [1, 2, 3, 4, 5], open: 570, close: 960 },
+      { id: "GX", label: "Globex", tz: "America/New_York", days: [0, 1, 2, 3, 4], open: 1080, close: 1020, overnight: true }] },
+    nyse: { name: "US stocks", main: ["NY"], sessions: [
+      { id: "NY", label: "NY", tz: "America/New_York", days: [1, 2, 3, 4, 5], open: 570, close: 960 }] },
+    london: { name: "London", main: ["LDN"], sessions: [
+      { id: "LDN", label: "London", tz: "Europe/London", days: [1, 2, 3, 4, 5], open: 480, close: 990 }] },
+    tokyo: { name: "Tokyo", main: ["TKY"], sessions: [
+      { id: "TKY", label: "Tokyo", tz: "Asia/Tokyo", days: [1, 2, 3, 4, 5], open: 540, close: 900 }] },
+    forex: { name: "Forex", main: ["TKY", "LDN", "NY"], sessions: [
+      { id: "TKY", label: "Tokyo", tz: "Asia/Tokyo", days: [1, 2, 3, 4, 5], open: 540, close: 1080 },
+      { id: "LDN", label: "London", tz: "Europe/London", days: [1, 2, 3, 4, 5], open: 480, close: 1020 },
+      { id: "NY", label: "New York", tz: "America/New_York", days: [1, 2, 3, 4, 5], open: 480, close: 1020 }] },
+    crypto: { name: "Crypto", daily: true },
+  };
+  const tzFmt = {};
+  function wall(ts, tz) {           // the wall-clock time in a zone: { y, m, d, dow, mins }
+    const f = tzFmt[tz] || (tzFmt[tz] = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", weekday: "short", hour: "numeric", minute: "numeric" }));
+    const o = {}; for (const p of f.formatToParts(new Date(ts))) o[p.type] = p.value;
+    return { y: +o.year, m: +o.month, d: +o.day, dow: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(o.weekday), mins: +o.hour * 60 + +o.minute };
+  }
+  function zoned(y, m, d, mins, tz) {   // a zone's wall time -> real timestamp
+    let ts = Date.UTC(y, m - 1, d, Math.floor(mins / 60), mins % 60);
+    for (let i = 0; i < 2; i++) { const w = wall(ts, tz); ts -= (Date.UTC(w.y, w.m - 1, w.d, Math.floor(w.mins / 60), w.mins % 60) - Date.UTC(y, m - 1, d, Math.floor(mins / 60), mins % 60)); }
+    return ts;
+  }
+  function sessionTimes(s, now) {        // this week's [open, close] timestamps of a session around now
+    const out = [];
+    for (let k = -2; k <= 8; k++) {
+      const w = wall(now + k * 864e5, s.tz); if (!s.days.includes(w.dow)) continue;
+      const o = zoned(w.y, w.m, w.d, s.open, s.tz);
+      const c = s.overnight ? (() => { const n = wall(o + 864e5, s.tz); return zoned(n.y, n.m, n.d, s.close, s.tz); })() : zoned(w.y, w.m, w.d, s.close, s.tz);
+      out.push([o, c]);
+    }
+    return out;
+  }
+  function autoMarket() {
+    const q = parseTitle(), sym = String((q && q.sym) || "").toUpperCase();
+    if (/USDT|USDC|BTC|ETH|SOL|XRP|DOGE|PERP/.test(sym)) return "crypto";
+    if (/\d!$|1!|2!/.test(sym) || /^(NQ|ES|YM|RTY|MNQ|MES|GC|SI|CL|NG|ZB|ZN|6E|MGC|MCL)/.test(sym)) return "cme";
+    if (/^(EUR|GBP|AUD|NZD|USD|CHF|CAD|JPY)[A-Z]{3}$/.test(sym)) return "forex";
+    return "nyse";
+  }
+  const dur = (ms) => { const s = Math.max(0, Math.round(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+    return h >= 1 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m ${String(x).padStart(2, "0")}s`; };
+  function timerText(now = Date.now()) {
+    const key = cfg.timerMarket === "auto" ? autoMarket() : cfg.timerMarket, M = MARKETS[key] || MARKETS.nyse;
+    if (M.daily) { const n = new Date(now), next = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 1); return { open: true, name: M.name, text: `Daily close in ${dur(next - now)}` }; }
+    const open = [], events = [];
+    for (const s of M.sessions) for (const [o, c] of sessionTimes(s, now)) {
+      if (now >= o && now < c && !open.includes(s.label)) open.push(s.label);
+      if (M.main.includes(s.id)) { if (o > now) events.push([o, s.label + " opens"]); if (c > now) events.push([c, s.label + " closes"]); }
+    }
+    // fully closed (weekend, CME daily break): the soonest reopening of ANY session matters most
+    if (!open.length) for (const s of M.sessions) for (const [o] of sessionTimes(s, now)) if (o > now) events.push([o, s.label + " opens"]);
+    events.sort((a, b) => a[0] - b[0]);
+    const nx = events[0], head = open.length ? open.join(" + ") + " open" : "Closed";
+    if (!nx) return { open: !!open.length, name: M.name, text: head };
+    const far = nx[0] - now > 864e5, sess = M.sessions.find((s) => nx[1].startsWith(s.label));
+    const when = far ? new Intl.DateTimeFormat("en-US", { timeZone: sess.tz, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(nx[0])) : `in ${dur(nx[0] - now)}`;
+    return { open: !!open.length, name: M.name, text: `${head} \u00B7 ${nx[1]} ${when}` };
+  }
+  let timerEl = null, timerIv = 0;
+  function renderTimer() {
+    if (!(cfg.enabled && cfg.timerOn)) { if (timerEl) { timerEl.remove(); timerEl = null; } clearInterval(timerIv); timerIv = 0; return; }
+    if (!timerEl) {
+      timerEl = document.createElement("div"); timerEl.id = "bd-timer"; timerEl.dataset.bdOwner = ME.token;
+      timerEl.innerHTML = '<i></i><b></b><span></span>';
+      document.documentElement.appendChild(timerEl);
+    }
+    timerEl.style.setProperty("--tc", upColor());
+    tickTimer(); placeTimer();
+    if (!timerIv) timerIv = setInterval(() => { if (!document.hidden) tickTimer(); }, 1000);
+  }
+  function tickTimer() {
+    if (!timerEl) return;
+    let t; try { t = timerText(); } catch { t = { open: false, name: "", text: "" }; }
+    timerEl.classList.toggle("bd-t-open", t.open);
+    const b = timerEl.querySelector("b"), sp = timerEl.querySelector("span");
+    if (b.textContent !== t.name) b.textContent = t.name;
+    if (sp.textContent !== t.text) sp.textContent = t.text;
+  }
+  function placeTimer() {
+    if (!timerEl) return;
+    // Along the bottom, just above the time axis: the top of the chart belongs to TradingView's legend (symbol,
+    // prices, indicators), which grows as you add things, so anything up there ends up covering it.
+    const r = chartsBox(), st = timerEl.style, pos = ["bl", "bc", "br"].includes(cfg.timerPos) ? cfg.timerPos : "bc";
+    const bottom = innerHeight - r.bottom + 30 + 12 + (cfg.goalOn && (cfg.goalPos || "bl") === "bl" && pos === "bl" ? 86 : 0);
+    st.left = st.right = st.top = st.transform = ""; st.bottom = bottom + "px";
+    if (pos === "bl") st.left = r.left + 16 + "px";
+    else if (pos === "br") st.right = innerWidth - r.right + 80 + "px";
+    else { st.left = r.left + r.width / 2 + "px"; st.transform = "translateX(-50%)"; }
+  }
+  function drawTimerOverlay(g, box, dpr) {
+    if (!timerEl || !timerEl.isConnected) return;
+    const r = timerEl.getBoundingClientRect(); if (r.width < 2) return;
+    const x = (r.left - box.left) * dpr, y = (r.top - box.top) * dpr, w = r.width * dpr, h = r.height * dpr, col = upColor();
+    g.save(); rr(g, x, y, w, h, h / 2); g.fillStyle = "rgba(8,11,18,.78)"; g.fill(); g.lineWidth = dpr; g.strokeStyle = col + "8c"; g.stroke();
+    g.beginPath(); g.arc(x + 14 * dpr, y + h / 2, 3.5 * dpr, 0, Math.PI * 2); g.fillStyle = timerEl.classList.contains("bd-t-open") ? col : "#8a93a6"; g.fill();
+    g.textBaseline = "middle"; g.textAlign = "left";
+    g.font = `800 ${11 * dpr}px ui-sans-serif, system-ui, sans-serif`; g.fillStyle = "rgba(223,229,241,.65)";
+    const name = timerEl.querySelector("b").textContent; g.fillText(name, x + 24 * dpr, y + h / 2);
+    const nw = g.measureText(name).width;
+    g.font = `700 ${12 * dpr}px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = "#eef1f7"; g.fillText(timerEl.querySelector("span").textContent, x + 24 * dpr + nw + 10 * dpr, y + h / 2);
+    g.restore();
+  }
 
   // ---------- one instance per page ----------
   // Two copies of the extension installed, or a stale script left in an open tab after an update, would each draw
@@ -1847,7 +2003,7 @@
   }
 
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored, react: "off" /* Live mood retired: too distracting */ }; build(); pushCandles(); pushFx(); renderWatermark(); }));
+    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored, react: "off" /* Live mood retired: too distracting */ }; build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); }));
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       // today's total is shared between tabs (and reset from the panel); the journal is just stored data
@@ -1863,7 +2019,7 @@
     build();
     pushCandles();
     pushFx();
-    renderWatermark();
+    renderWatermark(); applyFocus(); renderTimer();
     window.__bdUpdate = (next) => {
       const keys = Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(cfg[k]));
       cfg = { ...cfg, ...next, react: "off" };

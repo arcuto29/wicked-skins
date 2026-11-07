@@ -34,6 +34,8 @@
       <div><b id="siteTitle"></b><p class="hint" id="siteHint"></p></div>
       <button id="siteBtn" class="primary"></button>
     </div>
+    <div id="lookOffer" class="news" hidden></div>
+    <div id="focusBar" class="news focusbar" hidden></div>
     <div id="news" class="news" hidden></div>
     <div class="finder"><input type="search" id="finder" placeholder="Find any setting…" autocomplete="off" /><div id="finderOut" hidden></div></div>
     <div class="top">
@@ -168,6 +170,14 @@
         <div class="row"><span>Position</span><div class="seg" id="goalPos"></div></div>
         <div class="row"><span>Today</span><b id="goalToday" style="font-weight:600">—</b><button id="goalReset" style="margin-left:auto">Reset today</button></div>
       </details>
+      <details class="grp" data-grp="timer">
+        <summary>Session timer <label class="switch" title="Countdown to the next market open / close"><input type="checkbox" id="timerOn" /><span></span></label></summary>
+        <p class="hint">A slim countdown on your chart to the next open or close, in your look's colour. Uses each exchange's regular hours in its own time zone (daylight saving included); holidays aren't included.</p>
+        <div class="row"><span>Market</span><select class="field" id="timerMarket">
+          <option value="auto">Auto (from your symbol)</option><option value="cme">CME futures (NQ, ES, GC…)</option><option value="nyse">US stocks</option>
+          <option value="forex">Forex (Tokyo, London, New York)</option><option value="london">London</option><option value="tokyo">Tokyo</option><option value="crypto">Crypto (daily close, UTC)</option></select></div>
+        <div class="row"><span>Position</span><div class="seg" id="timerPos"></div></div>
+      </details>
       <details class="grp" data-grp="journal">
         <summary>Trade journal <label class="switch" title="Save a picture of your chart when a trade closes"><input type="checkbox" id="journalOn" /><span></span></label></summary>
         
@@ -264,15 +274,15 @@
       
       <details class="grp" data-grp="share">
         <summary>More ways to share</summary>
-        <p class="hint">Copy a short look code to paste in a chat, or save all your looks as a file (handy for a new computer).</p>
+        <p class="hint">Copy a share link for your look, or save all your looks as a file (handy for a new computer).</p>
         <div class="box" style="margin-top:8px">
         <div class="inline">
-          <strong style="font-size:13px">Look code</strong>
-          <button class="primary" id="codeCopy" style="margin-left:auto">Copy my look code</button>
+          <strong style="font-size:13px">Share link</strong>
+          <button class="primary" id="codeCopy" style="margin-left:auto">Copy share link</button>
         </div>
-        <p class="hint">A short code for your whole look — share it anywhere and anyone can paste it below to get your exact setup in one tap. (Your uploaded wallpapers can't travel in a code; a built-in skin is used instead — everything else carries.)</p>
+        <p class="hint">One link for your whole look. Anyone who opens it sees a live preview, and with Priism Skins installed they add it in one tap. (Your own uploaded wallpaper can't travel in a link; a built-in one is used instead.)</p>
         <div class="inline">
-          <input class="field" id="codeInput" placeholder="Paste a PRIISM1-… look code" spellcheck="false" />
+          <input class="field" id="codeInput" placeholder="Paste a share link (or an older look code)" spellcheck="false" />
           <button id="codeApply">Apply</button>
         </div>
         <p class="hint" id="codeMsg" style="display:none"></p>
@@ -306,6 +316,17 @@
         <div class="row"><span>Calm</span><div class="seg" id="calm"></div></div>
         <p class="hint">Calm: when your cursor is on the chart, the wallpaper dims and slows down so you can focus.</p>
         <div class="row"><span>Animation</span><div class="seg" id="motion"></div></div>
+      </details>
+      <details class="grp" data-grp="keys">
+        <summary>Shortcuts</summary>
+        <p class="hint">Press these on your chart. Click a key to change it; Backspace turns a shortcut off.</p>
+        <div class="row"><span>Focus mode</span><button class="keybtn" data-key="focusKey"></button></div>
+        <div class="row"><span>Focus hides</span><div class="seg" id="focusHides"></div></div>
+        <div class="row"><span>Record a clip</span><button class="keybtn" data-key="recordKey"></button></div>
+        <div class="row"><span>Snapshot</span><button class="keybtn" data-key="snapKey"></button></div>
+        <div class="row"><span>Turn everything on/off</span><button class="keybtn" data-key="toggleKey"></button></div>
+        <p class="hint" id="keyMsg"></p>
+        <p class="hint">Focus fades the wallpaper away (and pauses it) so only your chart is left; press again to bring it back. "Everything" also drops the chart styling. Your P&amp;L, goal bar, timer and brackets stay. The clip shortcut records for the Clip length set in Capture; press it again to stop early.</p>
       </details>
       <h4>Advanced</h4>
       <details class="grp" data-grp="layer">
@@ -343,7 +364,7 @@
     </section>
 
     <div id="toast" hidden><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
-    <p class="legal">Tip: <b>Alt+Shift+W</b> on the chart turns everything on/off. Cosmetic only. Not affiliated with TradingView, Inc.</p>
+    <p class="legal">Tip: <b id="tipToggle">Alt+Shift+W</b> on the chart turns everything on/off, <b id="tipFocus">Alt+Shift+F</b> is Focus mode. Cosmetic only. Not affiliated with TradingView, Inc.</p>
   </main>
 
   <script src="../vendor/supabase/supabase.js"></script>
