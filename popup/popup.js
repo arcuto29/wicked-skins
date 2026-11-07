@@ -1653,7 +1653,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Changes are instant now: drag through colours and the chart keeps up, no blinking",
+const WHATS_NEW = ["Smoother: fixed the brief freezes, and changes are instant (no blinking)",
+  "Trade brackets now work with TradingView's newer rounded labels",
   "Community looks: share your whole setup, browse Top / New / Mine (Workshop)",
   "Crosshair labels in your crosshair colour, plus session breaks and scale borders in Chart styling",
   "A cleaner, modern panel where every option reads in full"];

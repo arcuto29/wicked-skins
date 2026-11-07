@@ -133,7 +133,11 @@
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
-  let fxSig = "";
+  let fxSig = "", lastToneSig = "";
+  function toneSig() {
+    const t = (p) => (p || []).map((v) => (v > 0.46 ? "L" : "d")).join("");
+    return (fx.bg || "") + (fx.busy ? "b" : "") + "|" + t(fx.prof) + "|" + (fx.profs || []).map((q) => t(q.p)).join(",");
+  }
   readFx();
 
   const settingsObserver = new MutationObserver((muts) => {
@@ -142,7 +146,13 @@
       if (m.attributeName === "class") { const was = on; on = htmlEl().classList.contains("bd-on"); if (was !== on) rebuild = true; }
       if (m.attributeName === "data-ws-candles") { const before = candles ? candles.upHex + candles.downHex : ""; readCandles(); redraw = true;
         if ((candles ? candles.upHex + candles.downHex : "") !== before) rebuild = true; }   // new colours: volume bars are cached by TradingView
-      if (m.attributeName === "data-ws-fx") { readFx(); redraw = true; }
+      if (m.attributeName === "data-ws-fx") {
+        // your settings changed -> redraw; the wallpaper's brightness drifted -> redraw ONLY if the scale text has to
+        // flip between light and dark somewhere (an idle chart used to redraw every ~2s for nothing: a periodic hitch)
+        const user = readFx(), ts = toneSig();
+        if (user || ts !== lastToneSig) redraw = true;
+        lastToneSig = ts;
+      }
     }
     if (rebuild) forceRepaint(false); else if (redraw) forceRepaint(true);
   });
@@ -308,11 +318,13 @@
   //  - any colourful, visible line can glow; grid (faint) and crosshair (grey) never do
   const segs = new WeakMap();
   const origBegin = proto.beginPath, origMove = proto.moveTo, origLine = proto.lineTo, origStroke = proto.stroke;
-  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && (fx.bracketOn || styling())) lastSeg.set(this, null); return origBegin.call(this); };
+  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && (fx.bracketOn || styling())) lastSeg.set(this, null); if (on && fx.bracketOn) pathBox.delete(this); return origBegin.call(this); };
   proto.moveTo = function (x, y) { const k = segs.get(this); if (k) k[0]++;
+    if (on && fx.bracketOn) growBox(this, x, y);
     if (on && (fx.bracketOn || styling())) { const t = this.getTransform(); lastSeg.set(this, { x0: x * (t.a || 1) + t.e, y0: y * (t.d || 1) + t.f, x1: null, y1: null }); }
     return origMove.call(this, x, y); };
   proto.lineTo = function (x, y) { const k = segs.get(this); if (k) k[1]++;
+    if (on && fx.bracketOn) growBox(this, x, y);
     if (on && (fx.bracketOn || styling())) { const s = lastSeg.get(this), t = this.getTransform(); if (s) { s.x1 = x * (t.a || 1) + t.e; s.y1 = y * (t.d || 1) + t.f; } }
     return origLine.call(this, x, y); };
 
@@ -472,7 +484,9 @@
   // blink). The heavier rebuild (hide the chart for two frames) is only needed for things TradingView caches, like
   // volume-bar colours, so it runs ONCE, after you stop changing things, instead of on every step of a colour drag.
   let softRaf = 0, hardT = 0;
+  const stats = (window.__bdStats = window.__bdStats || { soft: 0, hard: 0 });
   function hardRebuild() {
+    stats.hard++;
     document.querySelectorAll(".chart-container").forEach((el) => {
       if (el.dataset.bdRepaint) return;
       el.dataset.bdRepaint = "1";
@@ -482,7 +496,7 @@
   }
   function forceRepaint(softOnly) {
     if (!softRaf) softRaf = requestAnimationFrame(() => {
-      softRaf = 0;
+      softRaf = 0; stats.soft++;
       if (!apiRepaint()) { clearTimeout(hardT); hardT = setTimeout(hardRebuild, 160); }   // no API here (some platforms): rebuild instead
     });
     if (!softOnly) { clearTimeout(hardT); hardT = setTimeout(hardRebuild, 700); }
@@ -590,6 +604,40 @@
   // we keep its size test loose and DPR-correct so wide multi-part pills and HiDPI screens still match.
   const BRACKET_FONT = /\bVerdana\b/i;
   const lastPill = new WeakMap();
+  // A pill box was just drawn (rect or rounded path), in device px. Remember it (so the number drawn next is known to
+  // be a pill) and its colour (green / red boxes tell profit from loss when the number has no + / - sign).
+  // Returns the fill to draw instead (your colour, or a strengthened dark box), or null to keep TradingView's.
+  function notePillBox(ctx, box) {
+    const own = String(ctx.fillStyle);
+    lastPill.set(ctx, { used: false, t: performance.now(), box, sign: boxSign(own) });
+    if (fx.bracketFill) { pillFill.set(ctx, fx.bracketFill); return fx.bracketFill; }
+    if (fx.bracketBack !== "keep") {
+      const r = rgbKey(own), base = [16, 19, 28], rgb = r ? r.key.split(",").map(Number) : base;
+      const k = tintK(rgb), al = fx.bracketBack === "solid" ? 1 : 0.88;
+      const fill = `rgba(${rgb.map((v, i) => Math.round(base[i] + (v - base[i]) * k)).join(",")},${al})`;
+      pillFill.set(ctx, fill); return fill;
+    }
+    pillFill.delete(ctx); return null;     // box unchanged: TradingView's own text already reads on it
+  }
+  function boxSign(col) {
+    const r = rgbKey(col); if (!r) return 0; const [R, G, B] = r.key.split(",").map(Number);
+    if (G > R + 40 && G >= B - 20) return 1;           // green-ish box: in profit
+    if (R > G + 50 && R > B + 20) return -1;           // red-ish box: in loss
+    return 0;
+  }
+  // bounding box (device px) of the path being built, so rounded pill boxes (roundRect / arcs) are recognised too
+  const pathBox = new WeakMap();
+  function growBox(ctx, x, y) {
+    const t = ctx.getTransform(), X = x * (t.a || 1) + t.e, Y = y * (t.d || 1) + t.f;
+    const b = pathBox.get(ctx); if (!b) pathBox.set(ctx, { x0: X, y0: Y, x1: X, y1: Y });
+    else { if (X < b.x0) b.x0 = X; if (X > b.x1) b.x1 = X; if (Y < b.y0) b.y0 = Y; if (Y > b.y1) b.y1 = Y; }
+  }
+  for (const name of ["rect", "roundRect"]) {
+    const o = proto[name]; if (typeof o !== "function") continue;
+    proto[name] = function (x, y, w, h) { if (on && fx.bracketOn) { growBox(this, x, y); growBox(this, x + w, y + h); } return o.apply(this, arguments); };
+  }
+  { const o = proto.arcTo; proto.arcTo = function (x1, y1, x2, y2) { if (on && fx.bracketOn) { growBox(this, x1, y1); growBox(this, x2, y2); } return o.apply(this, arguments); }; }
+  { const o = proto.quadraticCurveTo; proto.quadraticCurveTo = function (cx, cy, x, y) { if (on && fx.bracketOn) { growBox(this, cx, cy); growBox(this, x, y); } return o.apply(this, arguments); }; }
   // Font-independent pill test: this text sits inside the pill box drawn a moment ago (so a font change on
   // TradingView's side can't leave a restyled box with unstyled, invisible text on it).
   function textInPill(ctx, x, y) {
@@ -760,7 +808,7 @@
       {
         const pill = lastPill.get(this);
         if (pill) pill.used = true;
-        const sign = pillSign(a[0]);
+        const sign = pillSign(a[0]) || (pill && pill.sign) || 0;   // "40.75" on a green box = profit
         // remember this pill's row so stroke() can find the level line. Prefer the box centre; else the text's y.
         const rowY = pill && pill.box ? pill.box.y + pill.box.h / 2 : (() => { const t = this.getTransform(); return (a[2] || 0) * (t.d || 1) + t.f; })();
         if (fx.bracketDebug) noteBracketDebug(a[0], this.font, this.textAlign, String(this.fillStyle), pill && pill.box);
@@ -874,6 +922,17 @@
   const lastTag = new WeakMap();   // colour of the last price box drawn on each scale canvas
   proto.fill = function (...a) {
     const c = this.canvas;
+    // rounded pill box (TradingView's newer trading labels draw their box as a path, not a rect)
+    if (on && fx.bracketOn && c && a.length === 0 && bracketCanvas(c)) {
+      const b = pathBox.get(this);
+      if (b) {
+        const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1, w = (b.x1 - b.x0) / dpr, h = (b.y1 - b.y0) / dpr;
+        if (h >= 8 && h <= 40 && w >= 10 && w <= 460 && w >= h * 0.7 && w < c.width / dpr * 0.6) {
+          const fill = notePillBox(this, { x: b.x0, y: b.y0, w: b.x1 - b.x0, h: b.y1 - b.y0 });
+          if (fill) { const pF = this.fillStyle; origFillDesc.set.call(this, fill); const r = origFillPath.apply(this, a); origFillDesc.set.call(this, pF); return r; }
+        }
+      }
+    }
     // crosshair price / time labels (the boxes that follow your pointer on the scales): your crosshair colour
     if (on && fx.chOn && fx.chLabels && c && isAxis(c) && isTop(c)) {
       const col = pick(fx.chColor, String(this.fillStyle)), pF = this.fillStyle;
@@ -904,7 +963,7 @@
     stroke(v) { strokeDesc.set.call(lookK.g, v); },
     strokeRect(x, y, w, h) { origStrokeRectRaw.call(lookK.g, x, y, w, h); },
     fillPath() { origFillPathRaw.call(lookK.g); } };
-  const origStrokeRectRaw = proto.strokeRect, origFillPathRaw = proto.fill;
+  const origStrokeRectRaw = proto.strokeRect, origFillPathRaw = origFillPath;   // the untouched fill: candle looks never pass through the pill / label logic
   proto.fillRect = function (x, y, w, h) {
     const c = this.canvas;
     // scale border: a 1px rect along the edge of the price / time scale
@@ -923,30 +982,8 @@
     if (c && !c.isConnected && c.height <= 120 && h >= 6) noteSrcBox(c, this.fillStyle, w, h);
     if (on && fx.bracketOn && c && bracketCanvas(c) && pillBox(this, x, y, w, h)) {
       const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1;
-      lastPill.set(this, { used: false, t: performance.now(), box: { x: x * sx + t.e, y: y * sy + t.f, w: Math.abs(w * sx), h: Math.abs(h * sy) } });
-      // Custom box colour wins; otherwise glass/solid just strengthens TradingView's own box so it pops on a skin.
-      if (fx.bracketFill) {
-        const pF = this.fillStyle;
-        this.fillStyle = fx.bracketFill; pillFill.set(this, fx.bracketFill);
-        origFill.call(this, x, y, w, h);
-        this.fillStyle = pF;
-        return;
-      }
-      if (fx.bracketBack !== "keep") {
-        // Strengthen as a DARK box tinted with the pill's own colour. (Making TradingView's colour opaque turned the
-        // box the same colour as its number -> "fully white", nothing readable.) Text is then forced to contrast.
-        const r = rgbKey(this.fillStyle), base = [16, 19, 28];
-        const rgb = r ? r.key.split(",").map(Number) : base;
-        const k = tintK(rgb), al = fx.bracketBack === "solid" ? 1 : 0.88;
-        const mix = rgb.map((v, i) => Math.round(base[i] + (v - base[i]) * k));
-        const pF = this.fillStyle, fill = `rgba(${mix.join(",")},${al})`;
-        this.fillStyle = fill; pillFill.set(this, fill);
-        origFill.call(this, x, y, w, h);
-        this.fillStyle = pF;
-        return;
-      }
-      // box unchanged: TradingView's own text already reads on it, so don't override the colour
-      pillFill.delete(this);
+      const fill = notePillBox(this, { x: x * sx + t.e, y: y * sy + t.f, w: Math.abs(w * sx), h: Math.abs(h * sy) });
+      if (fill) { const pF = this.fillStyle; origFillDesc.set.call(this, fill); origFill.call(this, x, y, w, h); origFillDesc.set.call(this, pF); return; }
     }
     if (on && c && c.width > 20 && c.height > 20) {
       const s = this.getTransform().a || 1;

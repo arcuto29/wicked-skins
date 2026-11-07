@@ -1035,10 +1035,12 @@
   function hueOfHex(x) { const [r, g, b] = [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16) / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
     if (mx === mn) return 0; const d = mx - mn; let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return h * 60; }
   function skinAccent() { return lastAccent; }
+  let accentFor = "";
   function updateBackdrop() {
-    const acc = rawAccent();
-    const moved = !acc !== !lastAccent || (acc && lastAccent && Math.min(Math.abs(hueOfHex(acc) - hueOfHex(lastAccent)), 360 - Math.abs(hueOfHex(acc) - hueOfHex(lastAccent))) > 25);
-    if (moved) { lastAccent = acc; pushFx(); applyPanels(); }
+    // the skin colour is taken ONCE per wallpaper (animated wallpapers shift colour all the time; following that
+    // re-coloured lines and panels again and again)
+    const srcSig = String(cfg.skin) + "|" + String(cfg.mediaId || "");
+    if (srcSig !== accentFor && rawAccent()) { accentFor = srcSig; lastAccent = rawAccent(); pushFx(); applyPanels(); }
     const lit = views.filter((v) => v.lum);
     if (!lit.length) return;
     applyAutoMatch();
@@ -1064,12 +1066,26 @@
       q.p.length !== old[i].p.length || q.p.some((v, j) => Math.abs(v - old[i].p[j]) > 0.08));
     if (bg !== backdrop.bg || busy !== backdrop.busy || profMoved) { backdrop = { bg, busy, profs, prof: profs[0] ? profs[0].p : [] }; pushFx(); }
   }
-  function measureBackdrop() {
-    if (!layer || !views.length || !cfg.enabled) return;
-    for (const v of views) if (v.content.tagName !== "IFRAME") { const g = gridOf(v.content); if (g) v.lum = g; }  // players post { __wicked: "lum" }
-    updateBackdrop();
+  // Reading pixels straight off a GPU canvas stalls the page until the graphics card catches up (a hitch you can
+  // feel on some PCs). createImageBitmap shrinks the frame to 32x18 off the main thread first, then we read that.
+  let measuring = false;
+  async function measureBackdrop() {
+    if (!layer || !views.length || !cfg.enabled || document.hidden || measuring) return;
+    measuring = true;
+    try {
+      for (const v of views) {
+        if (v.content.tagName === "IFRAME") continue;                        // players post { __wicked: "lum" }
+        let src = v.content;
+        if (typeof createImageBitmap === "function" && v.content.width > GW) {
+          try { src = await createImageBitmap(v.content, { resizeWidth: GW, resizeHeight: GH, resizeQuality: "low" }); } catch { src = v.content; }
+        }
+        const g = gridOf(src); if (g) v.lum = g;
+        if (src !== v.content && src.close) src.close();
+      }
+      updateBackdrop();
+    } finally { measuring = false; }
   }
-  setInterval(measureBackdrop, 1500);
+  setInterval(measureBackdrop, 3000);
   addEventListener("message", (e) => {
     if (!e.data || e.data.__wicked !== "lum") return;
     const v = views.find((x) => x.content.tagName === "IFRAME" && e.source === x.content.contentWindow);

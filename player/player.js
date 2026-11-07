@@ -34,9 +34,15 @@
     // brightness report for the page's auto-contrast (we're same-origin with our own blob, so we can read pixels)
     const c = document.createElement("canvas"); c.width = 32; c.height = 18;
     const g = c.getContext("2d", { willReadFrequently: true });
-    setInterval(() => {
+    // the video frame lives on the graphics card; shrink it off the main thread (createImageBitmap) before reading,
+    // so measuring never stalls the page
+    let busy = false;
+    setInterval(async () => {
+      if (busy || document.hidden) return; busy = true;
       try {
-        g.clearRect(0, 0, 32, 18); g.drawImage(el, 0, 0, 32, 18);
+        let src = el, bmp = null;
+        if (typeof createImageBitmap === "function") { try { bmp = await createImageBitmap(el, { resizeWidth: 32, resizeHeight: 18, resizeQuality: "low" }); src = bmp; } catch { src = el; } }
+        g.clearRect(0, 0, 32, 18); g.drawImage(src, 0, 0, 32, 18); if (bmp && bmp.close) bmp.close();
         const d = g.getImageData(0, 0, 32, 18).data; let sum = 0, sq = 0, n = 0; const prof = new Array(18).fill(0), grid = [];
         for (let i = 0; i < d.length; i += 4) {
           const l = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; sum += l; sq += l * l; n++;
@@ -46,8 +52,8 @@
         const mean = sum / n;
         // grid = 32x18 brightness map; rgb = same pixels (r,g,b,a bytes) so the page can derive an Auto-match palette.
         parent.postMessage({ __wicked: "lum", mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), prof, grid, rgb: Array.from(d) }, "*");
-      } catch {}
-    }, 1500);
+      } catch {} finally { busy = false; }
+    }, 3000);
   } catch (err) {
     parent.postMessage({ __wicked: "player-error", id, msg: String(err) }, "*");
   }

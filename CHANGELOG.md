@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.30 (2026-11-04)
+- **Fixed brief freezes of the wallpaper and chart.** Three periodic jobs could each cause a short hitch on some PCs; all three are fixed:
+  - An idle chart was fully redrawn about every 2 seconds as the wallpaper's brightness drifted. It now redraws only when the price-scale text really needs to switch between light and dark (in tests: 22 redraws in 40 s → 0).
+  - Measuring the wallpaper (and video wallpapers) read pixels straight off the graphics card, which can stall the page. Frames are now shrunk in the background first, half as often, and never while the tab is hidden.
+  - The "Skin colour" is now taken once per wallpaper. Animated wallpapers no longer keep re-colouring the lines and TradingView's panels.
+- **Trade brackets: support for TradingView's newer label style**, where the box is rounded and the number is plain (like "40.75", 14px TradingView font). The labels are now restyled, and profit / loss colours come from the box's own green / red when the number has no + or − sign.
+
 ## 0.1.29 (2026-11-04)
 - **Changes now show instantly.** Dragging through colours or clicking through options keeps up with you instead of stepping slowly through every colour.
   - Every change gets TradingView's own light redraw on the very next frame, with no blink. In tests the chart showed the final colour 12–18 ms after the last step, down from 130–200 ms.
