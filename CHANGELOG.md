@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.31 (2026-11-04)
+- **TradingView's windows & menus in your style** (Style → Interface → Windows & menus): the Settings window, other dialogs and dropdown menus can be **Glass** (frosted, your wallpaper glows through) or **Colour** (your own), with a Strength slider. Everything inside follows and text stays readable.
+- **Clip quality** (Clip → Quality): High, Balanced or Small file. Small keeps long clips under ~20 MB, handy for Discord. Long clips no longer get a lower bitrate automatically.
+- **Faster clip saving**:
+  - If you don't crop or trim, "Save" is instant (it saves the original).
+  - The editor has Size (Original, 1080p, 720p, 480p) and Quality options, with an estimate of the file size.
+  - Saving an edited clip shows how many seconds are left. It still takes about as long as the clip, because the browser re-records it as it plays.
+
 ## 0.1.30 (2026-11-04)
 - **Fixed brief freezes of the wallpaper and chart.** Three periodic jobs could each cause a short hitch on some PCs; all three are fixed:
   - An idle chart was fully redrawn about every 2 seconds as the wallpaper's brightness drifted. It now redraws only when the price-scale text really needs to switch between light and dark (in tests: 22 redraws in 40 s → 0).
