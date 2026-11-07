@@ -50,7 +50,7 @@ class MainActivity : Activity() {
         chart.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
                 // hook.js must run before TradingView paints (it wraps the canvas API).
-                view.evaluateJavascript(asset("shared/src/hook.js"), null)
+                view.evaluateJavascript(asset("shared/src/candlelooks.js") + "\n" + asset("shared/src/hook.js"), null)
             }
             override fun onPageFinished(view: WebView, url: String?) {
                 injectSkins(view)
