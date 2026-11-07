@@ -12,38 +12,29 @@ Chrome Web Store Developer Dashboard → **New item** → upload `priism-skins-<
 **Summary (132 chars max):**
 Live wallpapers, your own videos, candle colours, glow and a readable price scale behind your TradingView charts.
 
-**Description** (paste into the big "Description" box — this field allows up to 16,000 chars; it is NOT the 132-char manifest description):
+**Description** (paste into the big "Description" box; it allows up to 16,000 chars and is NOT the 132-char manifest description).
+Keep it plain sentences: the first version was rejected (Yellow Argon, "excessive keywords") for listing video file formats.
+Don't add lists of file formats, platforms, chart types or skin names.
 ```
-Your charts, in full spectrum. Priism Skins puts live wallpapers behind your TradingView candles and lets you restyle the chart, without touching your data.
+Your charts, in full spectrum. Priism Skins puts calm, animated wallpapers behind your TradingView candles and lets you restyle the chart to match. It is purely cosmetic: your data, orders and account are never touched.
 
-LIVE WALLPAPERS
-• 46 animated skins: Totality, Spiral Galaxy, Moonlit Ridge, Cyber Grid, Midnight Towers, Jellyfish, Candle Rain, Order Ladder and more
-• Your own images, GIFs and videos: any video format (MP4, MOV, MKV, AVI, WMV, HEVC). Ones the browser can't play are converted on your computer
-• Workshop: browse community wallpapers, use them in one tap, share your own
+Live wallpapers
+Choose from dozens of animated scenes, from quiet night skies and ocean depths to glowing city grids. You can also use your own pictures or videos; if the browser can't play a video, it is converted on your computer. The Workshop lets you try wallpapers shared by other traders in one tap.
 
-CANDLES & GLOW
-• Colour presets in Clean, Neon, Warm, Cool and Rich
-• Styles: Solid, Tube (glowing outlines), Rainbow, Cycle
-• Glow for candles, indicators, drawings, price and position lines
-• Works with your own TradingView colours, and with candles, hollow candles, Heikin Ashi and bars
+Candles and glow
+Recolour your candles with ready-made colour sets or your own colours, add a soft glow, and give indicators and drawings the same treatment. It works with your existing TradingView colours and chart styles.
 
-READABLE & CALM
-• Price scale text turns light or dark per label to stay readable on any wallpaper
-• Price scale size, font, glow, backing and price-tag colours
-• Darken, blur, vignette, Calm mode (dims while your cursor is on the chart), Eco mode
+Readable and calm
+The price scale adjusts its text so it stays readable on any wallpaper. You can darken or blur the wallpaper, and Calm mode quietly dims it while you're working on the chart. Eco mode keeps it light on your computer.
 
-MORE
-• One-click looks with Undo, plus saved looks and shareable look codes
-• Trade brackets: recolour your broker's on-chart TP / Stop / entry pills
-• Snapshot and Live Clip: save a shareable image or a clip of up to 2 minutes, with your effects in it, or record your whole screen
-• Live mood: the chart glows with the day's move or with the open P&L on your position lines
-• Daily goal & limit bar and an automatic trade journal (estimated from the P&L your chart already shows; nothing leaves your computer)
-• Watermark for recordings
-• Works on TopstepX and other platforms that embed TradingView charts ("Turn on here")
-• Alt+Shift+W toggles everything
+For traders
+Make your take-profit, stop and P&L labels bigger and easier to read in one tap. Set a daily goal and loss limit, keep an automatic trade journal based on the P&L your chart already shows, save a snapshot or a short clip of your chart, and add a watermark for recordings. Everything stays on your computer.
 
-PRIVACY
-Purely cosmetic. Priism Skins never reads your orders, positions or account and sends nothing from the chart anywhere. Your settings and your own wallpapers stay on your computer. Browsing and using Workshop wallpapers needs no account; sharing your own is done on the website.
+Looks
+Apply a complete look in one click, undo it just as fast, save your own and share them as a short code.
+
+Privacy
+Priism Skins never reads your orders, positions or account and sends nothing from the chart anywhere. Your settings and wallpapers stay on your computer. No account is needed.
 
 Not affiliated with, endorsed or sponsored by TradingView, Inc. Not financial advice.
 ```

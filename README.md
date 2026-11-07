@@ -49,8 +49,8 @@ See **[RELEASING.md](RELEASING.md)**: one command + a tag push publishes everywh
 - **Alt+Shift+W** on the chart: everything on/off.
 - **Candles**: recolour up/down candles and volume (18 presets or custom colours; works with your own TradingView colours and candle/hollow/Heikin Ashi/bar styles) with optional glow. Changes apply live.
 - **Skins**: 46 live wallpapers in 8 categories (Nature, Space, Warm, Neon, City, Calm, Weather, Trading).
-- **Uploads**: your own images/GIFs/videos, **any video format**. MP4/MOV/MKV/WebM play directly; AVI, WMV, FLV,
-  HEVC/H.265 and others are converted to WebM on your computer (ffmpeg.wasm, see `vendor/ffmpeg/NOTICE.md`).
+- **Uploads**: your own images/GIFs/videos, **almost any video**. Ones the browser
+  can't play are converted to WebM on your computer (ffmpeg.wasm, see `vendor/ffmpeg/NOTICE.md`).
   Files are stored in the extension's own database (up to 2 GB each) and played by `player/player.html`.
   Adding files opens a full-tab manager so long conversions aren't interrupted. Drag & drop supported.
 - **Live mood** (Adjust → Motion & mood):
