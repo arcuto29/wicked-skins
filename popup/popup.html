@@ -11,6 +11,9 @@
     <div class="brand" title="Priism Skins"><img src="../icons/icon-48.png" alt="" /><span>Priism<br>Skins</span></div>
     <button data-tab="skins" class="on"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="16" cy="8.5" r="1.6"/></svg><span>Skins</span></button>
     <button data-tab="candles"><svg viewBox="0 0 24 24"><path d="M7 3v4M7 15v6M17 3v3M17 14v7"/><rect x="4.5" y="7" width="5" height="8" rx="1.2"/><rect x="14.5" y="6" width="5" height="8" rx="1.2"/></svg><span>Style</span></button>
+    <button data-tab="interface"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 8.5h18M8 8.5V20"/></svg><span>TradingView</span></button>
+    <button data-tab="trading"><svg viewBox="0 0 24 24"><path d="M4 17l5-5 4 3 7-8"/><path d="M15 7h5v5"/></svg><span>Trading</span></button>
+    <button data-tab="capture"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3"/></svg><span>Capture</span></button>
     <button data-tab="media"><svg viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>Uploads</span></button>
     <button data-tab="workshop"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.3A4.5 4.5 0 0 1 21 19"/></svg><span>Workshop</span></button>
     <button data-tab="loadouts"><svg viewBox="0 0 24 24"><path d="M7 3h10a1 1 0 0 1 1 1v17l-6-4-6 4V4a1 1 0 0 1 1-1z"/></svg><span>Saved</span></button>
@@ -58,6 +61,7 @@
     </section>
 
     <section id="tab-candles" hidden>
+
       <details class="grp" data-grp="candles" open>
         <summary>Candles <label class="switch" title="Candle colours on/off"><input type="checkbox" id="candleOn" /><span></span></label></summary>
         <p class="hint">Purely visual: prices and chart data are untouched. Works with your own TradingView candle colours and chart types.</p>
@@ -72,38 +76,59 @@
         <p class="hint" id="autoMatchHint">Pulls candle colours, glow and the price scale from your own uploaded wallpaper's colours, and updates if the wallpaper changes. Use an image or video from Uploads.</p>
         <div class="chips" id="candleChips"></div>
         <div class="cards" id="candleCards"></div>
+        <div class="row"><span>Glow</span><input type="range" id="candleGlow" min="0" max="1" step="0.05" /><output id="candleGlowOut"></output></div>
       </details>
 
-      <details class="grp" data-grp="glow" open>
-        <summary>Glow</summary>
-        <div class="row"><span>Candles</span><input type="range" id="candleGlow" min="0" max="1" step="0.05" /><output id="candleGlowOut"></output></div>
-        <div class="row"><span>Lines &amp; P&amp;L</span><input type="range" id="lineGlow" min="0" max="1" step="0.05" /><output id="lineGlowOut"></output></div>
-        <p class="hint">Lines = indicators, drawings, the price line, position lines and your P&amp;L pill. Grid and crosshair never glow.</p>
+
+      <details class="grp" data-grp="chart">
+        <summary>Chart lines</summary>
+        <p class="hint">Every line on the chart: keep TradingView's own, or style it. Skin colour follows your wallpaper; Candle uses your up-candle colour.</p>
+        <div id="chartStyle"></div>
+        <div class="row"><span>Line glow</span><input type="range" id="lineGlow" min="0" max="1" step="0.05" /><output id="lineGlowOut"></output></div>
+        <p class="hint">Line glow: indicators, drawings, the price line, position lines and the P&amp;L readout. Grid and crosshair never glow.</p>
       </details>
 
-      <details class="grp" data-grp="pnl">
-        <summary>P&amp;L readout <label class="switch" title="Big P&amp;L readout on/off"><input type="checkbox" id="pnlShow" /><span></span></label></summary>
-        <p class="hint">A big, bold open-P&amp;L number we draw ourselves, so it's readable on any wallpaper. It reads the P&amp;L already on your position line — nothing is sent anywhere.</p>
-        <div class="row"><span>Colour</span><div class="seg" id="pnlStyle"></div></div>
-        <div class="row" id="pnlColsRow"><span>Up · Down</span>
-          <input type="color" id="pnlUp" title="Up / profit" /> <input type="color" id="pnlDown" title="Down / loss" />
-          <small class="hint" style="margin:0">blank = candle colours</small></div>
-        <div class="row"><span>Backing</span><div class="seg" id="pnlBack"></div></div>
-        <p class="hint">A panel behind the number keeps it readable on busy or dark wallpapers.</p>
-        <div class="row"><span>Size</span><div class="seg" id="pnlSize"></div></div>
-        <div class="row"><span>Position</span><div class="seg" id="pnlPos"></div></div>
-      </details>
 
-      <details class="grp" data-grp="goal">
-        <summary>Daily goal &amp; limit <label class="switch" title="Track today's P&amp;L against a goal and a max loss"><input type="checkbox" id="goalOn" /><span></span></label></summary>
-        <p class="hint">A slim bar on your chart showing today's P&amp;L against your profit goal and your max loss. It adds up the P&amp;L drawn on your position line each time a trade closes, so it's an <b>estimate from what your chart shows, not your broker's statement</b>. Don't rely on it for a prop firm's official limits. Nothing is sent anywhere.</p>
-        <div class="row"><span>Profit goal</span><input class="field" id="goalTarget" type="number" min="0" step="10" style="max-width:110px" /></div>
-        <div class="row"><span>Max loss</span><input class="field" id="goalLimit" type="number" min="0" step="10" style="max-width:110px" /></div>
-        <div class="row"><span>Position</span><div class="seg" id="goalPos"></div></div>
-        <div class="row"><span>Today</span><b id="goalToday" style="font-weight:600">—</b><button id="goalReset" style="margin-left:auto">Reset today</button></div>
+      <details class="grp" data-grp="scale">
+        <summary>Price scale</summary>
+        <div class="row"><span>Text</span><div class="seg" id="scaleTextMode"></div><input type="color" id="scaleText" title="Text colour" /></div>
+        <div class="row"><span>Size</span><div class="seg" id="scaleSize"></div></div>
+        <div class="row"><span>Font</span><div class="seg" id="scaleFont"></div></div>
+        <div class="row"><span>Weight</span><div class="seg" id="scaleBold"></div></div>
+        <div class="row"><span>Glow</span><input type="range" id="scaleGlow" min="0" max="1" step="0.05" /><output id="scaleGlowOut"></output></div>
+        <div class="row"><span>Backing</span><div class="seg" id="scaleBg"></div><input type="color" id="scaleBgColor" title="Backing colour" /></div>
+        <div class="row"><span>Price tags</span><div class="seg" id="scaleLabels"></div></div>
+        <p class="hint">Applies to the price scale, the live price tag and the time scale. Auto text turns light or dark per label to stay readable. Backing is frosted glass: Auto adds it only behind busy wallpapers.</p>
+        <div id="scaleParts"></div>
       </details>
+      <button id="resetStyle" class="link">Reset style</button>
+    </section>
 
-      <details class="grp" data-grp="brackets">
+    <section id="tab-interface" hidden>
+      <details class="grp" data-grp="tvui" open>
+        <summary>TradingView interface</summary>
+        <p class="hint">Style TradingView itself around your chart. Everything here stays TradingView's own until you pick something.</p>
+        <div class="row" id="sidesRow"><span>Top &amp; bottom bars</span><div class="seg" id="sides"></div></div>
+        <div class="row" id="leftBarRow"><span>Left toolbar</span><div class="seg" id="leftBar"></div></div>
+        <p class="hint">Glass: the wallpaper flows across the bars with a frosted tint so text stays readable. Clear: fully see-through.</p>
+        <div class="row"><span>Panels</span><div class="seg" id="panelMode"></div><input type="color" id="panelColor" title="Panel colour" hidden /></div>
+        <p class="hint">Watchlist, toolbars and side panels. Skin tints them with your wallpaper's colour; text stays readable.</p>
+        <div class="row"><span>Windows &amp; menus</span><div class="seg" id="dlgMode"></div><input type="color" id="dlgColor" title="Window colour" hidden /></div>
+        <div class="row" id="dlgAlphaRow"><span>Strength</span><input type="range" id="dlgAlpha" min="0.4" max="1" step="0.02" /><output id="dlgAlphaOut"></output></div>
+        <p class="hint">TradingView's Settings window, other dialogs and dropdown menus. Glass is frosted so your wallpaper glows through.</p>
+      </details>
+      <details class="grp" data-grp="ui">
+        <summary>Text &amp; accent</summary>
+        <div class="row"><span>Font</span><div class="seg" id="uiFont"></div></div>
+        <div class="row"><span>Text size</span><div class="seg" id="uiSize"></div></div>
+        <div class="row"><span>Accent</span><div class="seg" id="uiAccentMode"></div><input type="color" id="uiAccent" title="Accent colour" hidden /></div>
+        <p class="hint">Accent tints the watchlist symbols, timeframe buttons and toolbar labels. Leave on Default for TradingView's own colours.</p>
+      </details>
+    </section>
+    <section id="tab-trading" hidden>
+
+
+      <details class="grp" data-grp="brackets" open>
         <summary>Trade brackets <label class="switch" title="Recolour the broker's TP / Stop / entry pills"><input type="checkbox" id="bracketOn" /><span></span></label></summary>
         <p class="hint">Fully recolour your broker's on-chart Take profit, Stop and entry pills — box, number, outline and the level line — in any colour, and make the number bigger so it's easy to read on a busy wallpaper. We only restyle the pills TradingView already draws; nothing is sent anywhere.</p>
         <button id="bracketEasy" class="primary" style="width:100%;margin:4px 0 8px">Make TP / Stop / P&amp;L easy to see</button>
@@ -120,26 +145,76 @@
         <p class="hint" id="bracketDiagOut" style="display:none"></p>
       </details>
 
-      <details class="grp" data-grp="chart">
-        <summary>Chart styling</summary>
-        <p class="hint">Every line on the chart: keep TradingView's own, or style it. Skin colour follows your wallpaper; Candle uses your up-candle colour.</p>
-        <div id="chartStyle"></div>
+
+      <details class="grp" data-grp="pnl">
+        <summary>P&amp;L readout <label class="switch" title="Big P&amp;L readout on/off"><input type="checkbox" id="pnlShow" /><span></span></label></summary>
+        <p class="hint">A big, bold open-P&amp;L number we draw ourselves, so it's readable on any wallpaper. It reads the P&amp;L already on your position line — nothing is sent anywhere.</p>
+        <div class="row"><span>Colour</span><div class="seg" id="pnlStyle"></div></div>
+        <div class="row" id="pnlColsRow"><span>Up · Down</span>
+          <input type="color" id="pnlUp" title="Up / profit" /> <input type="color" id="pnlDown" title="Down / loss" />
+          <small class="hint" style="margin:0">blank = candle colours</small></div>
+        <div class="row"><span>Backing</span><div class="seg" id="pnlBack"></div></div>
+        <p class="hint">A panel behind the number keeps it readable on busy or dark wallpapers.</p>
+        <div class="row"><span>Size</span><div class="seg" id="pnlSize"></div></div>
+        <div class="row"><span>Position</span><div class="seg" id="pnlPos"></div></div>
       </details>
 
-      <details class="grp" data-grp="scale">
-        <summary>Price scale</summary>
-        <div class="row"><span>Text</span><div class="seg" id="scaleTextMode"></div><input type="color" id="scaleText" title="Text colour" /></div>
-        <div class="row"><span>Size</span><div class="seg" id="scaleSize"></div></div>
-        <div class="row"><span>Font</span><div class="seg" id="scaleFont"></div></div>
-        <div class="row"><span>Weight</span><div class="seg" id="scaleBold"></div></div>
-        <div class="row"><span>Glow</span><input type="range" id="scaleGlow" min="0" max="1" step="0.05" /><output id="scaleGlowOut"></output></div>
-        <div class="row"><span>Backing</span><div class="seg" id="scaleBg"></div><input type="color" id="scaleBgColor" title="Backing colour" /></div>
-        <div class="row"><span>Price tags</span><div class="seg" id="scaleLabels"></div></div>
-        <p class="hint">Applies to the price scale, the live price tag and the time scale. Auto text turns light or dark per label to stay readable. Backing is frosted glass: Auto adds it only behind busy wallpapers.</p>
+
+      <details class="grp" data-grp="goal">
+        <summary>Daily goal &amp; limit <label class="switch" title="Track today's P&amp;L against a goal and a max loss"><input type="checkbox" id="goalOn" /><span></span></label></summary>
+        <p class="hint">A slim bar on your chart showing today's P&amp;L against your profit goal and your max loss. It adds up the P&amp;L drawn on your position line each time a trade closes, so it's an <b>estimate from what your chart shows, not your broker's statement</b>. Don't rely on it for a prop firm's official limits. Nothing is sent anywhere.</p>
+        <div class="row"><span>Profit goal</span><input class="field" id="goalTarget" type="number" min="0" step="10" style="max-width:110px" /></div>
+        <div class="row"><span>Max loss</span><input class="field" id="goalLimit" type="number" min="0" step="10" style="max-width:110px" /></div>
+        <div class="row"><span>Position</span><div class="seg" id="goalPos"></div></div>
+        <div class="row"><span>Today</span><b id="goalToday" style="font-weight:600">—</b><button id="goalReset" style="margin-left:auto">Reset today</button></div>
       </details>
-      <button id="resetStyle" class="link">Reset style</button>
+      <details class="grp" data-grp="journal">
+        <summary>Trade journal <label class="switch" title="Save a picture of your chart when a trade closes"><input type="checkbox" id="journalOn" /><span></span></label></summary>
+        
+        
+        <p class="hint">When a trade closes, saves a picture of your chart as it looked while the trade was open (your entry, stop and target), stamped with the symbol, P&amp;L and time. Stored only on this computer; the latest 60 are kept.</p>
+        <p class="hint" id="journalEmpty">No trades saved yet. Turn it on, then take a trade.</p>
+        <div id="journalList"></div>
+        <div class="inline" style="margin-top:8px"><button id="journalClear" hidden>Clear journal</button></div>
+      
+      </details>
     </section>
+    <section id="tab-capture" hidden>
+      <details class="grp" data-grp="snap" open>
+        <summary>Snapshot</summary>
+        <div style="margin:2px 0 6px"><button class="primary" style="width:100%" id="snapBtn">Capture my chart</button></div>
+        
+        <p class="hint">Takes a clean PNG of your chart with the skin and your watermark baked in — great for sharing. Open it on a TradingView chart tab. (Animated wallpaper is captured as a single still frame.)</p>
+        <p class="hint" id="snapMsg" style="display:none"></p>
+        <a id="snapPreview" href="#" download="priism-chart.png" style="display:none"><img id="snapImg" alt="snapshot preview" style="width:100%;border-radius:8px;border:1px solid var(--line,#2a3142)" /></a>
+      
+      </details>
+      <details class="grp" data-grp="clip" open>
+        <summary>Clip</summary>
+        <div style="margin:2px 0 6px"><button class="primary" style="width:100%" id="clipBtn">Record</button></div>
+        
+        <div class="row"><span>Capture</span><div class="seg" id="clipMode"></div></div>
+        <div class="row"><span>Smoothness</span><div class="seg" id="clipFps"></div></div>
+        <div class="row"><span>Quality</span><div class="seg" id="clipQuality"></div></div>
+        <div class="row"><span>After recording</span><div class="seg" id="clipEdit"></div></div>
+        <div class="row"><span>Length</span><div class="seg" id="clipLen"></div></div>
+        <div class="row"><span>Custom</span><input class="field" id="clipCustom" type="number" min="2" max="120" step="1" placeholder="2–120 seconds" style="min-width:120px;max-width:150px" /><small class="hint" style="margin:0">overrides the length above</small></div>
+        <p class="hint" id="clipHint"></p>
+        <p class="hint" id="clipMsg" style="display:none"></p>
+        <a id="clipPreview" href="#" download="priism-chart.webm" style="display:none"><video id="clipVid" autoplay loop muted playsinline style="width:100%;border-radius:8px;border:1px solid var(--line,#2a3142)"></video></a>
+      
+      </details>
 
+      <details class="grp" data-grp="watermark">
+        <summary>Watermark <label class="switch" title="Watermark on/off"><input type="checkbox" id="wmOn" /><span></span></label></summary>
+        <div class="row"><span>Your handle</span><input type="text" id="wmText" class="field" maxlength="40" placeholder="@yourname (blank = Priism Skins)" /></div>
+        <div class="row"><span>Style</span><div class="seg" id="wmStyle"></div></div>
+        <div class="row" id="wmPosRow"><span>Position</span><div class="seg" id="wmPos"></div></div>
+        <div class="row" id="wmDriftRow"><span>Movement</span><div class="seg" id="wmDrift"></div></div>
+        <div class="row"><span>Strength</span><input type="range" id="wmOpacity" min="0.1" max="1" step="0.05" /><output id="wmOpacityOut"></output></div>
+        <p class="hint">Puts your logo + handle on the chart for recordings. <b>Corner</b> is a clean mark (try <b>Drift</b> so it's harder to crop out); <b>Tiled</b> repeats it faintly across the chart so a reposter can't remove it without wrecking the clip.</p>
+      </details>
+    </section>
     <section id="tab-media" hidden>
       <div class="chartpick" hidden></div>
       <div class="cards" id="mediaCards"></div>
@@ -179,12 +254,18 @@
       </div>
       <p class="hint" id="loEmpty">No saved looks yet. Set things up the way you like, then save it here.</p>
       <div class="cards one" id="loCards"></div>
-      <div class="inline" style="margin-top:10px">
-        <button id="loExport">Export all</button>
-        <label class="btn">Import<input type="file" id="loImport" accept="application/json,.json" hidden /></label>
-      </div>
 
-      <div class="box" style="margin-top:14px">
+
+      
+
+      
+
+      
+      
+      <details class="grp" data-grp="share">
+        <summary>More ways to share</summary>
+        <p class="hint">Copy a short look code to paste in a chat, or save all your looks as a file (handy for a new computer).</p>
+        <div class="box" style="margin-top:8px">
         <div class="inline">
           <strong style="font-size:13px">Look code</strong>
           <button class="primary" id="codeCopy" style="margin-left:auto">Copy my look code</button>
@@ -196,45 +277,15 @@
         </div>
         <p class="hint" id="codeMsg" style="display:none"></p>
       </div>
-
-      <div class="box" style="margin-top:14px">
-        <div class="inline">
-          <strong style="font-size:13px">Snapshot</strong>
-          <button class="primary" id="snapBtn" style="margin-left:auto">Capture my chart</button>
-        </div>
-        <p class="hint">Takes a clean PNG of your chart with the skin and your watermark baked in — great for sharing. Open it on a TradingView chart tab. (Animated wallpaper is captured as a single still frame.)</p>
-        <p class="hint" id="snapMsg" style="display:none"></p>
-        <a id="snapPreview" href="#" download="priism-chart.png" style="display:none"><img id="snapImg" alt="snapshot preview" style="width:100%;border-radius:8px;border:1px solid var(--line,#2a3142)" /></a>
+      <div class="inline" style="margin-top:10px">
+        <button id="loExport">Export all</button>
+        <label class="btn">Import<input type="file" id="loImport" accept="application/json,.json" hidden /></label>
       </div>
-
-      <div class="box" style="margin-top:14px">
-        <div class="inline">
-          <strong style="font-size:13px">Live clip</strong>
-          <button class="primary" id="clipBtn" style="margin-left:auto">Record</button>
-        </div>
-        <div class="row"><span>Capture</span><div class="seg" id="clipMode"></div></div>
-        <div class="row"><span>Smoothness</span><div class="seg" id="clipFps"></div></div>
-        <div class="row"><span>Quality</span><div class="seg" id="clipQuality"></div></div>
-        <div class="row"><span>After recording</span><div class="seg" id="clipEdit"></div></div>
-        <div class="row"><span>Length</span><div class="seg" id="clipLen"></div></div>
-        <div class="row"><span>Custom</span><input class="field" id="clipCustom" type="number" min="2" max="120" step="1" placeholder="2–120 seconds" style="min-width:120px;max-width:150px" /><small class="hint" style="margin:0">overrides the length above</small></div>
-        <p class="hint" id="clipHint"></p>
-        <p class="hint" id="clipMsg" style="display:none"></p>
-        <a id="clipPreview" href="#" download="priism-chart.webm" style="display:none"><video id="clipVid" autoplay loop muted playsinline style="width:100%;border-radius:8px;border:1px solid var(--line,#2a3142)"></video></a>
-      </div>
-      <div class="box" style="margin-top:14px">
-        <div class="inline">
-          <strong style="font-size:13px">Trade journal</strong>
-          <label class="switch" style="margin-left:auto" title="Save a picture of your chart when a trade closes"><input type="checkbox" id="journalOn" /><span></span></label>
-        </div>
-        <p class="hint">When a trade closes, saves a picture of your chart as it looked while the trade was open (your entry, stop and target), stamped with the symbol, P&amp;L and time. Stored only on this computer; the latest 60 are kept.</p>
-        <p class="hint" id="journalEmpty">No trades saved yet. Turn it on, then take a trade.</p>
-        <div id="journalList"></div>
-        <div class="inline" style="margin-top:8px"><button id="journalClear" hidden>Clear journal</button></div>
-      </div>
+      </details>
     </section>
 
     <section id="tab-tune" hidden>
+
       <details class="grp" data-grp="picture" open>
         <summary>Picture</summary>
         <div id="sliders"></div>
@@ -244,9 +295,10 @@
         <div class="row" id="autoQRow"><span>Quality</span><div class="seg" id="autoQuality"></div></div>
         <p class="hint" id="autoQHint">Auto: lowers the wallpaper's detail by itself if your computer starts lagging, then raises it again. Max: always full quality.</p>
       </details>
+
       <details class="grp" data-grp="motion">
-        <summary>Motion &amp; mood</summary>
-        <div class="row"><span>Live mood</span><div class="seg" id="react"></div></div>
+        <summary>Motion</summary>
+        <div hidden><div class="seg" id="react"></div></div>
         <div id="reactOpts" hidden>
           <div class="row"><span>Strength</span><input type="range" id="reactStrength" min="0.1" max="1" step="0.05" /><output id="reactStrengthOut"></output></div>
           <p class="hint" id="reactHint"></p>
@@ -255,6 +307,13 @@
         <p class="hint">Calm: when your cursor is on the chart, the wallpaper dims and slows down so you can focus.</p>
         <div class="row"><span>Animation</span><div class="seg" id="motion"></div></div>
       </details>
+      <h4>Advanced</h4>
+      <details class="grp" data-grp="layer">
+        <summary>Wallpaper layer</summary>
+        <div class="row"><span>Layer</span><div class="seg" id="layer"></div></div>
+        <p class="hint">Behind (normal): the wallpaper sits behind your candles. On top: a see-through layer over the whole chart.</p>
+      </details>
+
       <details class="grp" data-grp="charts">
         <summary>Multiple charts</summary>
         <p class="hint">For layouts with 2 or more charts on screen. <span id="chartsFound"></span></p>
@@ -263,11 +322,13 @@
         <div id="chartRows"></div>
         <button id="showNums" class="link">Show chart numbers on the page</button>
       </details>
+
       <details class="grp" data-grp="sessions">
         <summary>Sessions <label class="switch" title="Session skins on/off"><input type="checkbox" id="sessionOn" /><span></span></label></summary>
         <p class="hint">A different wallpaper for each market session, switching by itself (New York time).</p>
         <div id="sessionRows"></div>
       </details>
+
       <details class="grp" data-grp="symbols">
         <summary>Per symbol <label class="switch" title="Symbol skins on/off"><input type="checkbox" id="symbolOn" /><span></span></label></summary>
         <p class="hint">A wallpaper per ticker — it switches by itself when you change symbol. Takes priority over Sessions.</p>
@@ -277,35 +338,6 @@
           <button id="symbolAdd" class="primary">Add</button>
         </div>
         <button id="symbolCurrent" class="link">Add the chart's current symbol</button>
-      </details>
-      <details class="grp" data-grp="placement">
-        <summary>Placement</summary>
-        <div class="row"><span>Layer</span><div class="seg" id="layer"></div></div>
-        <div class="row" id="sidesRow"><span>Sides</span><div class="seg" id="sides"></div></div>
-        <div class="row" id="leftBarRow"><span>Left toolbar</span><div class="seg" id="leftBar"></div></div>
-        <p class="hint" id="sidesHint">Flow the wallpaper across the chart's own bars — the top toolbar and the bottom time bar. Left toolbar does the same for the drawing tools on the left (off by default). Glass keeps text readable; Clear is fully see-through.</p>
-      </details>
-      <details class="grp" data-grp="ui">
-        <summary>Interface</summary>
-        <p class="hint">Restyle TradingView's own panels — the watchlist, toolbars, order area and the timeframe bar.</p>
-        <div class="row"><span>Panels</span><div class="seg" id="panelMode"></div><input type="color" id="panelColor" title="Panel colour" hidden /></div>
-        <p class="hint">Recolours TradingView itself: the watchlist, toolbars, menus and dialogs. Skin tints them with your wallpaper's colour. Text stays readable.</p>
-        <div class="row"><span>Windows &amp; menus</span><div class="seg" id="dlgMode"></div><input type="color" id="dlgColor" title="Window colour" hidden /></div>
-        <div class="row" id="dlgAlphaRow"><span>Strength</span><input type="range" id="dlgAlpha" min="0.4" max="1" step="0.02" /><output id="dlgAlphaOut"></output></div>
-        <p class="hint">TradingView's Settings window, other dialogs and dropdown menus. Glass is frosted so your wallpaper glows through; Colour uses your own.</p>
-        <div class="row"><span>Font</span><div class="seg" id="uiFont"></div></div>
-        <div class="row"><span>Text size</span><div class="seg" id="uiSize"></div></div>
-        <div class="row"><span>Accent</span><div class="seg" id="uiAccentMode"></div><input type="color" id="uiAccent" title="Accent colour" hidden /></div>
-        <p class="hint">Accent tints the watchlist symbols, timeframe buttons and toolbar labels. Leave on Default for TradingView's own colours.</p>
-      </details>
-      <details class="grp" data-grp="watermark">
-        <summary>Watermark <label class="switch" title="Watermark on/off"><input type="checkbox" id="wmOn" /><span></span></label></summary>
-        <div class="row"><span>Your handle</span><input type="text" id="wmText" class="field" maxlength="40" placeholder="@yourname (blank = Priism Skins)" /></div>
-        <div class="row"><span>Style</span><div class="seg" id="wmStyle"></div></div>
-        <div class="row" id="wmPosRow"><span>Position</span><div class="seg" id="wmPos"></div></div>
-        <div class="row" id="wmDriftRow"><span>Movement</span><div class="seg" id="wmDrift"></div></div>
-        <div class="row"><span>Strength</span><input type="range" id="wmOpacity" min="0.1" max="1" step="0.05" /><output id="wmOpacityOut"></output></div>
-        <p class="hint">Puts your logo + handle on the chart for recordings. <b>Corner</b> is a clean mark (try <b>Drift</b> so it's harder to crop out); <b>Tiled</b> repeats it faintly across the chart so a reposter can't remove it without wrecking the clip.</p>
       </details>
       <button id="reset" class="link">Reset adjustments</button>
     </section>

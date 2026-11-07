@@ -1847,25 +1847,26 @@
   }
 
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); pushFx(); renderWatermark(); }));
+    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored, react: "off" /* Live mood retired: too distracting */ }; build(); pushCandles(); pushFx(); renderWatermark(); }));
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       // today's total is shared between tabs (and reset from the panel); the journal is just stored data
       if (changes.dayPnl) { const nv = changes.dayPnl.newValue; day = nv && nv.date ? { ...freshDay(), ...nv } : freshDay(); renderGoal(); }
       const keys = Object.keys(changes).filter((k) => k !== "dayPnl" && k !== "journal");
       for (const k of keys) cfg[k] = changes[k].newValue;
+      cfg.react = "off";
       if (keys.length) apply(keys);
     });
   } else {
     // Desktop app: host injects window.__BD_CFG and calls window.__bdUpdate on change.
-    cfg = { ...DEFAULTS, ...(window.__BD_CFG || {}) };
+    cfg = { ...DEFAULTS, ...(window.__BD_CFG || {}), react: "off" };
     build();
     pushCandles();
     pushFx();
     renderWatermark();
     window.__bdUpdate = (next) => {
       const keys = Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(cfg[k]));
-      cfg = { ...cfg, ...next };
+      cfg = { ...cfg, ...next, react: "off" };
       if (keys.length) apply(keys);
     };
   }
