@@ -644,52 +644,82 @@
     if (!v.skin) return;
     // Auto quality steps the resolution down when the computer struggles (res 1 = full, 0 = lowest).
     const base = cfg.powerSaver ? 0.5 : 0.75;
-    const scale = Math.max(0.35, base * QLEVELS[qLevel].res);
+    const scale = Math.max(0.35, base * qlv().res);
     const w = Math.max(2, (v.w * scale) | 0), h = Math.max(2, (v.h * scale) | 0);
-    if (v.content.width !== w || v.content.height !== h) { v.content.width = w; v.content.height = h; v.skin.resize(w, h); }
+    if (v.content.width !== w || v.content.height !== h) {
+      v.content.width = w; v.content.height = h; v.skin.resize(w, h);
+      // Resizing wipes the canvas. Draw straight away so there is never a blank flash, and a paused wallpaper doesn't stay empty.
+      try { v.skin.frame(v.clock || 0, 0); } catch {}
+    }
   }
 
-  // ---------- auto quality ----------
-  // If the machine can't keep up, step down (fewer fps, then lower resolution); when it's smooth again, step back up.
-  // Levels from best to lightest; res multiplies sizeCanvas's scale, fps caps the loop.
-  const QLEVELS = [{ res: 1, fps: 60 }, { res: 1, fps: 40 }, { res: 0.8, fps: 30 }, { res: 0.6, fps: 20 }];
-  let qLevel = 0, fpsAccum = 0, fpsCount = 0, fpsWindowStart = 0, smoothFor = 0;
-  function resetQuality() { qLevel = 0; fpsAccum = fpsCount = fpsWindowStart = smoothFor = 0; }
+  // ---------- frame rate + auto quality ----------
+  // Smooth = 60 fps. Max = your screen's own refresh rate (120 / 144 / 240 Hz...), measured from the browser's frame
+  // timing. Auto quality watches how often the browser really manages to draw a frame; if that drops (the computer is
+  // struggling) it steps down (lower fps, then lower resolution), and once it has been healthy for a while it tries
+  // stepping back up. Quick repeat failures make it wait longer before trying again, so it never flaps.
+  let refreshHz = 60;
+  const HZ = [30, 48, 50, 60, 72, 75, 85, 90, 100, 120, 144, 165, 180, 240, 360];
+  function measureRefresh() {
+    const gaps = []; let last = 0;
+    const step = (now) => {
+      if (document.hidden) { last = 0; return requestAnimationFrame(step); }   // wait until the tab is visible
+      if (last) gaps.push(now - last); last = now;
+      if (gaps.length < 70) return requestAnimationFrame(step);
+      gaps.sort((x, y) => x - y);
+      const fast = gaps[Math.floor(gaps.length * 0.25)] || 16.7, hz = 1000 / Math.max(2.5, fast);   // fast frames = what the display can do
+      refreshHz = HZ.reduce((best, c) => (Math.abs(c - hz) < Math.abs(best - hz) ? c : best), 60);
+      document.documentElement.setAttribute("data-bd-hz", String(refreshHz));
+    };
+    requestAnimationFrame(step);
+  }
+  const QL_SMOOTH = [{ res: 1, fps: 60 }, { res: 1, fps: 40 }, { res: 0.8, fps: 30 }, { res: 0.6, fps: 20 }];
+  function qlevels() {
+    if (cfg.fps !== "max") return QL_SMOOTH;
+    const all = [{ res: 1, fps: refreshHz }, { res: 1, fps: 60 }, { res: 0.85, fps: 40 }, { res: 0.7, fps: 30 }, { res: 0.6, fps: 20 }];
+    return all.filter((l, i) => i === 0 || l.fps < all[i - 1].fps);
+  }
+  const qlv = () => { const L = qlevels(); return L[Math.min(qLevel, L.length - 1)]; };
+  let qLevel = 0, hAcc = 0, hCount = 0, hStart = 0, hLast = 0, smoothFor = 0, needSmooth = 4, lastUp = 0;
+  function resetQuality() { qLevel = 0; hAcc = hCount = hStart = hLast = smoothFor = 0; needSmooth = 4; lastUp = 0; }
+  const publishQ = () => document.documentElement.setAttribute("data-bd-q", `${qLevel + 1}/${qlevels().length}@${refreshHz}`);
 
   // One animation loop drives every animated wallpaper on the page.
   function startLoop() {
     running = true;
     let last = performance.now();
+    measureRefresh();
     const step = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(step);
-      if (document.hidden || cfg.paused) { last = now; return; }
+      if (document.hidden || cfg.paused) { last = now; hLast = 0; return; }
+      const watch = cfg.autoQuality && !cfg.powerSaver && (cfg.fps === "auto" || cfg.fps === "max");
+      if (watch) trackHealth(now);
       // Target fps: user setting, power saver, or the current auto-quality cap (whichever is lowest).
-      let target = cfg.powerSaver ? 15 : cfg.fps === "auto" ? 60 : +cfg.fps;
-      if (cfg.autoQuality && !cfg.powerSaver) target = Math.min(target, QLEVELS[qLevel].fps);
+      let target = cfg.powerSaver ? 15 : cfg.fps === "auto" ? 60 : cfg.fps === "max" ? refreshHz : +cfg.fps;
+      if (watch) target = Math.min(target, qlv().fps);
       const gap = now - last;
       if (gap < 1000 / target - 2) return;
-      // Measure how well we're actually keeping up (only while animating), over ~2s windows.
-      if (cfg.autoQuality && !cfg.powerSaver && cfg.fps === "auto") measureQuality(now, gap, target);
       const dt = Math.min(0.1, gap / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
       last = now;
       for (const v of views) if (v.skin) { v.clock += dt; v.skin.frame(v.clock, dt); }
     };
     raf = requestAnimationFrame(step);
   }
-  function measureQuality(now, gap, target) {
-    if (!fpsWindowStart) { fpsWindowStart = now; fpsAccum = fpsCount = 0; return; }
-    fpsAccum += 1000 / gap; fpsCount++;
-    if (now - fpsWindowStart < 2000) return;
-    const avg = fpsAccum / Math.max(1, fpsCount);
-    fpsWindowStart = now; fpsAccum = fpsCount = 0;
-    // Struggling: hitting under ~75% of the level's target -> step down.
-    if (avg < QLEVELS[qLevel].fps * 0.75 && qLevel < QLEVELS.length - 1) {
-      qLevel++; smoothFor = 0; views.forEach(sizeCanvas);
-    } else if (avg > QLEVELS[Math.max(0, qLevel - 1)].fps * 0.92 && qLevel > 0) {
-      // Comfortably smooth for ~8s at a reduced level -> try stepping back up.
-      if (++smoothFor >= 4) { qLevel--; smoothFor = 0; views.forEach(sizeCanvas); }
-    } else smoothFor = 0;
+  // Health = how often the browser actually delivers a frame (measured on every frame, whatever our own cap is).
+  function trackHealth(now) {
+    if (hLast) { const g = now - hLast; if (g < 250) { hAcc += g; hCount++; } }
+    hLast = now;
+    if (!hStart) { hStart = now; return; }
+    if (now - hStart < 2000 || hCount < 10) return;
+    const health = 1000 / (hAcc / hCount), L = qlevels();
+    hStart = now; hAcc = hCount = 0;
+    if (health < refreshHz * 0.8 && qLevel < L.length - 1) {
+      qLevel++; smoothFor = 0; if (now - lastUp < 25000) needSmooth = Math.min(32, needSmooth * 2);   // failed soon after climbing: wait longer next time
+      views.forEach(sizeCanvas); publishQ();
+    } else if (health > refreshHz * 0.92 && qLevel > 0) {
+      if (++smoothFor >= needSmooth) { qLevel--; smoothFor = 0; lastUp = now; views.forEach(sizeCanvas); publishQ(); }
+    } else if (health <= refreshHz * 0.92) smoothFor = 0;
   }
 
   function teardown() {
@@ -734,8 +764,8 @@
       }
       if (msg.ws === "clip") {
         if (!owner || standDown) return;
-        if (msg.mode === "screen") { reply(startScreenFlow(+msg.seconds || 5)); return; }   // the user finishes this on the page
-        captureClip(+msg.seconds || 5).then((r) => reply(r)).catch((e) => reply({ ok: false, reason: String(e && e.message || e) }));
+        if (msg.mode === "screen") { reply(startScreenFlow(+msg.seconds || 5, +msg.fps || 30)); return; }   // the user finishes this on the page
+        captureClip(+msg.seconds || 5, +msg.fps || 30).then((r) => reply(r)).catch((e) => reply({ ok: false, reason: String(e && e.message || e) }));
         return true;   // async reply (takes a few seconds while recording)
       }
     });
@@ -1023,6 +1053,7 @@
     if (keys.includes("sides") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
+    if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
@@ -1231,7 +1262,7 @@
   // than a PNG, so we cap it (default ~5s) and downscale to keep it shareable.
   let clipRec = null;
   const MAX_CLIP_SECONDS = 120;
-  async function captureClip(seconds) {
+  async function captureClip(seconds, fpsWanted) {
     if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
     if (clipRec) return { ok: false, reason: "Already recording a clip." };
     if (typeof MediaRecorder === "undefined") return { ok: false, reason: "Your browser can't record clips." };
@@ -1246,14 +1277,15 @@
     // first frame to check we can actually read the pixels (a tainted/cross-origin chart will throw on record)
     const { mediaMissed } = compositeFrame(g, box, dpr, wmImg);
     let stream;
-    try { stream = cap.captureStream(30); } catch { return { ok: false, reason: "Your browser can't record this chart." }; }
+    const capFps = Math.max(10, Math.min(60, +fpsWanted || 30));
+    try { stream = cap.captureStream(capFps); } catch { return { ok: false, reason: "Your browser can't record this chart." }; }
     const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
     const mime = mimes.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
     let rec;
     // Any length from 2s to 2 minutes. Longer clips use a lower bitrate so the file stays shareable
     // (about 4.5 MB for 10s, 10 MB for 60s, 15 MB for 2 min).
     const dur = Math.max(2, Math.min(MAX_CLIP_SECONDS, +seconds || 5));
-    const bps = dur <= 10 ? 6_000_000 : dur <= 30 ? 3_500_000 : dur <= 60 ? 2_000_000 : 1_000_000;
+    const bps = Math.round((dur <= 10 ? 6_000_000 : dur <= 30 ? 3_500_000 : dur <= 60 ? 2_000_000 : 1_000_000) * (capFps > 40 ? 1.5 : 1));
     try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: bps } : undefined); }
     catch { return { ok: false, reason: "Your browser can't record clips." }; }
     const chunks = [];
@@ -1304,7 +1336,7 @@
   // tab). It saves by itself when it ends, like the chart-only clip. The card is removed before recording starts.
   let screenAsk = null, screenBusy = false;
   function cancelScreenAsk() { if (screenAsk) { screenAsk.remove(); screenAsk = null; } }
-  function startScreenFlow(seconds) {
+  function startScreenFlow(seconds, fps) {
     if (screenBusy || clipRec) return { ok: false, reason: "Already recording." };
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return { ok: false, reason: "Your browser can't record the screen on this page." };
     cancelScreenAsk();
@@ -1321,7 +1353,7 @@
     go.onclick = async () => {
       let stream;
       try {
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30, displaySurface: "monitor" }, audio: false,
+        stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: Math.max(10, Math.min(60, +fps || 30)) }, displaySurface: "monitor" }, audio: false,
           selfBrowserSurface: "include", surfaceSwitching: "include", monitorTypeSurfaces: "include" });
       } catch (e) {
         txt.textContent = e && e.name === "NotAllowedError" ? "Not started: sharing was cancelled or isn't allowed on this page." : "Couldn't start the screen recording.";

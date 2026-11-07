@@ -190,6 +190,7 @@
           <button class="primary" id="clipBtn" style="margin-left:auto">Record</button>
         </div>
         <div class="row"><span>Capture</span><div class="seg" id="clipMode"></div></div>
+        <div class="row"><span>Smoothness</span><div class="seg" id="clipFps"></div></div>
         <div class="row"><span>Length</span><div class="seg" id="clipLen"></div></div>
         <div class="row"><span>Custom</span><input class="field" id="clipCustom" type="number" min="2" max="120" step="1" placeholder="2–120 seconds" style="min-width:120px;max-width:150px" /><small class="hint" style="margin:0">overrides the length above</small></div>
         <p class="hint" id="clipHint"></p>
@@ -214,6 +215,7 @@
         <div id="sliders"></div>
         <div class="row" data-only="media"><span>Fit</span><div class="seg" id="fit"></div></div>
         <div class="row"><span>Smoothness</span><div class="seg" id="smooth"></div></div>
+        <p class="hint" id="smoothHint"></p>
         <div class="row" id="autoQRow"><span>Quality</span><div class="seg" id="autoQuality"></div></div>
         <p class="hint" id="autoQHint">Auto: lowers the wallpaper's detail by itself if your computer starts lagging, then raises it again. Max: always full quality.</p>
       </details>

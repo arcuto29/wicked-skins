@@ -17,7 +17,7 @@ Live wallpapers, your own videos, candle colours, glow and a readable price scal
 Your charts, in full spectrum. Priism Skins puts live wallpapers behind your TradingView candles and lets you restyle the chart, without touching your data.
 
 LIVE WALLPAPERS
-• 24 animated skins: Spiral Galaxy, Cyber Grid, Skyline, Thunderstorm, Tide, Cinders and more
+• 46 animated skins: Totality, Spiral Galaxy, Moonlit Ridge, Cyber Grid, Midnight Towers, Jellyfish, Candle Rain, Order Ladder and more
 • Your own images, GIFs and videos: any video format (MP4, MOV, MKV, AVI, WMV, HEVC). Ones the browser can't play are converted on your computer
 • Workshop: browse community wallpapers, use them in one tap, share your own
 
