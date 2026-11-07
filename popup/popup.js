@@ -26,7 +26,7 @@ const DEFAULTS = {
   bracketOn: false, bracketSize: 1, bracketBack: "keep",
   bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
   bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
-  goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false, clipMode: "chart",
+  goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false, clipMode: "chart", clipFps: 30,
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -764,6 +764,7 @@ const CLIP_HINTS = {
   screen: "Records exactly what you see, so every effect and any uploaded wallpaper is in it. After you click Record, a card appears on your chart: click \u201cChoose what to record\u201d and pick Entire Screen (or a window / this tab) in Chrome's box. It records for the length below, then downloads by itself. Stop early with Chrome's \u201cStop sharing\u201d button.",
 };
 const syncClipMode = () => {
+  seg("clipFps", [[30, "30 fps"], [60, "60 fps"]], () => (+cfg.clipFps === 60 ? 60 : 30), (v) => { set({ clipFps: v }); syncClipMode(); });
   seg("clipMode", [["chart", "Chart only"], ["screen", "Whole screen"]], () => cfg.clipMode || "chart", (v) => { set({ clipMode: v }); syncClipMode(); });
   if ($("clipHint")) $("clipHint").textContent = CLIP_HINTS[cfg.clipMode === "screen" ? "screen" : "chart"];
   if ($("clipBtn")) $("clipBtn").textContent = cfg.clipMode === "screen" ? "Record screen" : "Record";
@@ -778,7 +779,7 @@ if ($("clipBtn")) $("clipBtn").onclick = async () => {
   if (!EXT_MODE || IS_TAB) return show("Open this on a TradingView chart tab to record.", false);
   const secs = clipLength();
   if (cfg.clipMode === "screen") {
-    const r0 = await tabMsgAnyFrame({ ws: "clip", seconds: secs, mode: "screen" });
+    const r0 = await tabMsgAnyFrame({ ws: "clip", seconds: secs, mode: "screen", fps: +cfg.clipFps === 60 ? 60 : 30 });
     if (!r0) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
     if (!r0.ok) return show(r0.reason || "Couldn't start the screen recording.", false);
     return show(`Now click \u201cChoose what to record\u201d on your chart and pick what to share. It records ${secs}s, then downloads by itself.`, true);
@@ -786,7 +787,7 @@ if ($("clipBtn")) $("clipBtn").onclick = async () => {
   prev.style.display = "none"; btn.disabled = true;
   let left = secs; show(`Recording ${secs}s. You can close this panel; the clip downloads by itself when it ends.`);
   const tick = setInterval(() => { left--; }, 1000);
-  const r = await tabMsgAnyFrame({ ws: "clip", seconds: secs });
+  const r = await tabMsgAnyFrame({ ws: "clip", seconds: secs, fps: +cfg.clipFps === 60 ? 60 : 30 });
   clearInterval(tick); btn.disabled = false;
   if (!r) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
   if (!r.ok) return show(r.reason || "Couldn't record the clip.", false);
@@ -895,11 +896,14 @@ function syncTune() {
     $("sliders").appendChild(row);
   });
   document.querySelectorAll("[data-only=media]").forEach((el) => (el.hidden = cfg.skin !== "media"));
-  seg("smooth", [["eco", "Eco"], ["balanced", "Balanced"], ["smooth", "Smooth"]],
-    () => (cfg.powerSaver ? "eco" : String(cfg.fps) === "60" || cfg.fps === "auto" ? "smooth" : "balanced"),
-    (v) => set(v === "eco" ? { powerSaver: true, fps: 30 } : v === "balanced" ? { powerSaver: false, fps: 30 } : { powerSaver: false, fps: "auto" }));
-  // Auto quality: only meaningful on Smooth (auto fps). Eco/Balanced already cap things.
-  $("autoQRow").hidden = cfg.powerSaver || cfg.fps !== "auto";
+  seg("smooth", [["eco", "Eco"], ["balanced", "Balanced"], ["smooth", "Smooth"], ["max", "Max"]],
+    () => (cfg.powerSaver ? "eco" : cfg.fps === "max" ? "max" : cfg.fps === "auto" || String(cfg.fps) === "60" ? "smooth" : "balanced"),
+    (v) => set(v === "eco" ? { powerSaver: true, fps: 30 } : v === "balanced" ? { powerSaver: false, fps: 30 } : v === "max" ? { powerSaver: false, fps: "max" } : { powerSaver: false, fps: "auto" }));
+  // Max runs at your screen's refresh rate (120/144/240Hz). Show it when known.
+  const hz = +document.documentElement.getAttribute("data-bd-hz") || 0;   // only set on a chart page, not the popup
+  if ($("smoothHint")) $("smoothHint").textContent = cfg.powerSaver ? "Eco: 15 fps, lightest on your computer." : cfg.fps === "max" ? "Max: runs at your screen's refresh rate (e.g. 120/144/240Hz) for the smoothest motion. Uses more GPU." : cfg.fps === "auto" ? "Smooth: 60 fps." : "Balanced: 30 fps.";
+  // Auto quality: meaningful on Smooth or Max (it eases off if your computer struggles). Eco/Balanced already cap things.
+  $("autoQRow").hidden = cfg.powerSaver || (cfg.fps !== "auto" && cfg.fps !== "max");
   seg("autoQuality", [[true, "Auto"], [false, "Max"]], () => (cfg.autoQuality !== false), (v) => set({ autoQuality: v }));
   seg("fit", [["cover", "Cover"], ["fit", "Contain"], ["stretch", "Stretch"]], () => cfg.fit, (v) => set({ fit: v }));
   seg("calm", [[false, "Off"], [true, "On"]], () => cfg.calm, (v) => set({ calm: v }));

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.20 (2026-11-07)
+- 22 new live wallpapers, taking the collection from 24 to 46: Totality, Meteor Shower, Wormhole, Pulsar, Wildfire, Caldera, Hive, Old Terminal, Laser Show, Equalizer, Night Drive, Midnight Towers, Zen Waves, Fog Bank, Reef Light, Silk, Autumn Drift, Moonlit Ridge, Jellyfish, plus three trading-themed ones: Candle Rain, Order Ladder and Ghost Charts. Every one is light on your computer.
+- New "Max" smoothness (Adjust → Smoothness): the wallpaper runs at your screen's own refresh rate, so on a 120/144/240 Hz monitor it is as smooth as the screen allows. Before, the top setting was capped at 60 fps. Max uses more GPU; auto quality still eases off if your computer struggles.
+- Fixed auto quality: it used to lower the wallpaper's quality when your computer struggled but never raised it again. It now recovers once things are smooth, and waits longer before retrying if it keeps failing.
+- Fixed a brief blank flash of the wallpaper whenever it changed resolution or you resized the window, and a wallpaper that could stay blank if it was paused at that moment.
+- Live clip can record at 60 fps (Saved → Live clip → Smoothness). Whole-screen recordings follow the same setting.
+
 ## 0.1.19 (2026-11-06)
 - Snapshots and chart-only clips now include your effects: wallpaper blur, saturation, hue and black & white, opacity and "On top" mode, vignette, the mood glow, the big P&L readout, the daily goal bar and the watermark (even while it drifts). Before, they only had the wallpaper, the chart and the watermark.
 - Live clip can now record your whole screen. Pick "Whole screen" under Saved → Live clip, press Record, click the card that appears on your chart, and choose what to share in Chrome's box. It records exactly what you see, so everything is in it, including uploaded wallpapers that chart-only clips can't read. It downloads by itself when it ends; Chrome's "Stop sharing" button ends it early.
