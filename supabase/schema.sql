@@ -223,6 +223,116 @@ drop policy if exists "workshop: delete own or admin" on storage.objects;
 create policy "workshop: delete own or admin" on storage.objects for delete to authenticated
   using (bucket_id = 'workshop' and ((storage.foldername(name))[1] = (select auth.uid())::text or public.is_admin((select auth.uid()))));
 
+-- ---------- community looks ----------
+-- A "look" is a whole setup (built-in wallpaper + candles, glow, chart styling, panels...) stored as settings,
+-- never a file, so it's tiny. Same rules as wallpapers: anyone browses approved looks, signed-in users share,
+-- shares wait for review (admins' are live at once), 3 reports hide one again, uses are counted without an account.
+create table if not exists public.looks (
+  id uuid primary key default gen_random_uuid(),
+  owner uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  author text check (char_length(author) <= 40),
+  title text not null check (char_length(title) between 1 and 40),
+  skin text not null check (skin ~ '^[a-z0-9_-]{1,40}$'),
+  data jsonb not null check (jsonb_typeof(data) = 'object' and pg_column_size(data) <= 8000),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  reject_reason text,
+  uses integer not null default 0,
+  reports integer not null default 0,
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+create index if not exists looks_status_created on public.looks (status, created_at desc);
+create index if not exists looks_status_uses on public.looks (status, uses desc);
+create index if not exists looks_owner on public.looks (owner);
+alter table public.looks enable row level security;
+
+create or replace function public.looks_before_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  new.owner := auth.uid();
+  new.author := coalesce((select p.display_name from public.profiles p where p.id = auth.uid()), 'trader');
+  new.uses := 0; new.reports := 0; new.reject_reason := null;
+  if public.is_admin(auth.uid()) then new.status := 'approved'; new.reviewed_at := now();
+  else new.status := 'pending'; new.reviewed_at := null; end if;
+  return new;
+end;
+$$;
+drop trigger if exists looks_before_insert on public.looks;
+create trigger looks_before_insert before insert on public.looks
+  for each row execute function public.looks_before_insert();
+
+drop policy if exists "looks: read approved, own, or all for admins" on public.looks;
+create policy "looks: read approved, own, or all for admins" on public.looks for select to anon, authenticated
+  using (status = 'approved' or owner = (select auth.uid()) or public.is_admin((select auth.uid())));
+drop policy if exists "looks: signed-in users share" on public.looks;
+create policy "looks: signed-in users share" on public.looks for insert to authenticated
+  with check ((select auth.uid()) is not null);
+drop policy if exists "looks: delete own or admin" on public.looks;
+create policy "looks: delete own or admin" on public.looks for delete to authenticated
+  using (owner = (select auth.uid()) or public.is_admin((select auth.uid())));
+
+create or replace function public.moderate_look(look uuid, new_status text, reason text default null)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin(auth.uid()) then raise exception 'admins only'; end if;
+  if new_status not in ('approved', 'rejected', 'pending') then raise exception 'bad status'; end if;
+  update public.looks
+     set status = new_status, reject_reason = case when new_status = 'rejected' then reason end,
+         reviewed_at = now(), reports = case when new_status = 'approved' then 0 else reports end
+   where id = look;
+end;
+$$;
+
+create or replace function public.count_look_use(look uuid)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.looks set uses = uses + 1 where id = look and status = 'approved';
+$$;
+
+create table if not exists public.look_reports (
+  id uuid primary key default gen_random_uuid(),
+  look_id uuid not null references public.looks (id) on delete cascade,
+  reporter uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  reason text check (char_length(reason) <= 200),
+  created_at timestamptz not null default now(),
+  unique (look_id, reporter)
+);
+alter table public.look_reports enable row level security;
+drop policy if exists "look_reports: signed-in users report" on public.look_reports;
+create policy "look_reports: signed-in users report" on public.look_reports for insert to authenticated
+  with check (reporter = (select auth.uid()));
+drop policy if exists "look_reports: admins read" on public.look_reports;
+create policy "look_reports: admins read" on public.look_reports for select to authenticated
+  using (public.is_admin((select auth.uid())));
+create or replace function public.look_reports_count()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.looks
+     set reports = reports + 1,
+         status = case when reports + 1 >= 3 and status = 'approved' then 'pending' else status end
+   where id = new.look_id;
+  return null;
+end;
+$$;
+drop trigger if exists look_reports_count on public.look_reports;
+create trigger look_reports_count after insert on public.look_reports
+  for each row execute function public.look_reports_count();
+
 -- ---------- make yourself admin ----------
 -- After you've signed in once from the extension, run this with YOUR email:
 --   update public.profiles set is_admin = true

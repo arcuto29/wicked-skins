@@ -22,6 +22,14 @@
       const rows = err(await q.range(page * PAGE, page * PAGE + PAGE - 1));
       return rows.map((r) => ({ ...r, fileUrl: publicUrl(r.file_path), thumbUrl: publicUrl(r.thumb_path) || publicUrl(r.file_path) }));
     },
+    // community looks (whole setups, stored as settings): sort "top" | "new"
+    async listLooks(sort = "top", page = 0) {
+      need();
+      let q = sb.from("looks").select("id, title, author, skin, data, uses, created_at").eq("status", "approved");
+      q = sort === "new" ? q.order("created_at", { ascending: false }) : q.order("uses", { ascending: false }).order("created_at", { ascending: false });
+      return err(await q.range(page * PAGE, page * PAGE + PAGE - 1));
+    },
+    countLookUse(id) { if (sb) sb.rpc("count_look_use", { look: id }).then(() => {}, () => {}); },
     // download the file so it can be added to your Uploads (and count the use)
     async fetchFile(item) {
       need();

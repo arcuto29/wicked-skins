@@ -31,6 +31,11 @@ update public.profiles set is_admin = true where id = (select id from auth.users
 ```
 Now your uploads go live immediately, and **Workshop → Review** shows everyone else's for you to approve or reject.
 
+## Community looks (added in 0.1.27)
+Re-run `supabase/schema.sql` once (SQL Editor -> paste -> Run). It's safe to re-run and adds the `looks` table and
+its rules. Looks are settings only (no files), shared from the extension via **Workshop -> Share my current look**
+(the website signs you in and posts it). Approve them on the website under **Review** (admins only).
+
 ## How it works
 - **Extension:** browse approved wallpapers and tap **Use** — no account, ever. "Use" downloads the file into Uploads
   and puts it on the chart. A **Submit on the website** link opens the site for sharing.

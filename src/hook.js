@@ -77,6 +77,8 @@
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false,
     plOn: false, plColor: "", plW: 0, plStyle: "dotted",
+    sbOn: false, sbColor: "", sbW: 0, sbStyle: "dashed",          // session breaks (vertical lines between sessions)
+    axOn: false, axColor: "", axW: 0, axStyle: "solid",           // the border lines of the price / time scales
     accent: "",
     bg: null, busy: false, prof: [], profs: [] };
   let fx = { ...FX0 };
@@ -112,6 +114,8 @@
         chStyle: ["solid", "dotted", "dashed"].includes(f.chStyle) ? f.chStyle : "dashed", chGlow: !!f.chGlow,
         plOn: !!f.plOn, plColor: colOpt(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)),
         plStyle: ["solid", "dotted", "dashed"].includes(f.plStyle) ? f.plStyle : "dotted",
+        sbOn: !!f.sbOn, sbColor: colOpt(f.sbColor), sbW: Math.max(0, Math.min(2, +f.sbW || 0)), sbStyle: ["solid", "dotted", "dashed", "none"].includes(f.sbStyle) ? f.sbStyle : "dashed",
+        axOn: !!f.axOn, axColor: colOpt(f.axColor), axW: Math.max(0, Math.min(2, +f.axW || 0)), axStyle: ["solid", "none"].includes(f.axStyle) ? f.axStyle : "solid",
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
@@ -125,7 +129,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW,
-      fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.accent]);
+      fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -318,7 +322,7 @@
   //   crosshair       — grey, on the pane's TOP canvas (the overlay it redraws as you move the pointer)
   //   last-price line — dotted, in the candle colour, horizontal, on the main canvas
   // so we tell them apart by shape + canvas + colour and restyle them at draw time.
-  const styling = () => fx.gridOn || fx.chOn || fx.plOn;
+  const styling = () => fx.gridOn || fx.chOn || fx.plOn || fx.sbOn || fx.axOn;
   const topCache = new WeakMap();
   function isTop(c) { let v = topCache.get(c); if (v === undefined) { const all = c.parentElement ? [...c.parentElement.querySelectorAll("canvas")] : []; v = all.length > 1 && all.indexOf(c) > 0; topCache.set(c, v); } return v; }
   const greyCache = new Map();
@@ -342,13 +346,19 @@
     if (!horiz && !vert) return false;
     const cur = strokeDesc.get.call(ctx), top = isTop(c);
     let part = null;
-    if (top) { if (fx.chOn && greyish(cur)) part = "ch"; }
+    if (isAxis(c)) {                                     // scale border: the edge line of a price / time scale
+      const edge = vert ? Math.min(s.x0, c.width - s.x0) <= 3 : Math.min(s.y0, c.height - s.y0) <= 3;
+      if (!edge || !fx.axOn) return false; part = "ax";
+    }
+    else if (top) { if (fx.chOn && greyish(cur)) part = "ch"; }
+    else if (vert && fx.sbOn && !greyish(cur) && !candleCol(cur) && ctx.getLineDash().length) part = "sb";
     else if (horiz && fx.plOn && candleCol(cur) && ctx.getLineDash().length) part = "pl";
     else if (fx.gridOn && greyish(cur)) part = "grid";
     if (!part) return false;
-    if (part === "grid" && fx.gridStyle === "none") return true;              // no grid at all
+    if ((part === "grid" && fx.gridStyle === "none") || (part === "sb" && fx.sbStyle === "none") || (part === "ax" && fx.axStyle === "none")) return true;   // hidden
     const sx = ctx.getTransform().a || 1;
-    const opt = part === "grid" ? [fx.gridColor, fx.gridW, fx.gridStyle] : part === "ch" ? [fx.chColor, fx.chW, fx.chStyle] : [fx.plColor, fx.plW, fx.plStyle];
+    const opt = part === "grid" ? [fx.gridColor, fx.gridW, fx.gridStyle] : part === "ch" ? [fx.chColor, fx.chW, fx.chStyle]
+      : part === "sb" ? [fx.sbColor, fx.sbW, fx.sbStyle] : part === "ax" ? [fx.axColor, fx.axW, "solid"] : [fx.plColor, fx.plW, fx.plStyle];
     const col = pick(opt[0], cur), pS = cur, pLW = ctx.lineWidth, pD = ctx.getLineDash(), pA = ctx.globalAlpha;
     strokeDesc.set.call(ctx, col);
     ctx.lineWidth = (1 + opt[1]) / sx;
@@ -392,7 +402,7 @@
 
   proto.stroke = function (path) {
     const c = this.canvas;
-    if (on && path === undefined && c && styling() && isPane(c) && styleLine(this, c, arguments)) return;
+    if (on && path === undefined && c && styling() && (isPane(c) || (fx.axOn && isAxis(c))) && styleLine(this, c, arguments)) return;
     // Bracket level line: a wide, horizontal stroke sitting at a pill's height. Recolour / thicken it so the whole
     // bracket level is easy to see. Done before the candle/glow path because it can be on when those are off.
     if (on && fx.bracketOn && (fx.bracketLineColor || fx.bracketLineW > 0) && c && path === undefined && isPane(c)) {
@@ -864,6 +874,16 @@
   const origStrokeRectRaw = proto.strokeRect, origFillPathRaw = proto.fill;
   proto.fillRect = function (x, y, w, h) {
     const c = this.canvas;
+    // scale border: a 1px rect along the edge of the price / time scale
+    if (on && fx.axOn && c && isAxis(c)) {
+      const t = this.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
+      if ((W <= 3 && H >= c.height * 0.5) || (H <= 3 && W >= c.width * 0.5)) {
+        if (fx.axStyle === "none") return;
+        const col = pick(fx.axColor, String(this.fillStyle)), pF = this.fillStyle, th = (1 + fx.axW) / (t.a || 1);
+        origFillDesc.set.call(this, col); origFill.call(this, x, y, W <= 3 ? th : w, H <= 3 ? th : h); origFillDesc.set.call(this, pF);
+        return;
+      }
+    }
     if (on && c && w * (this.getTransform().a || 1) <= 40 && isPane(c)) noteFill(this.__bdFill);
     // Bracket pills: record the box so the text drawn next knows it belongs to a pill. Optionally strengthen the
     // box backing so the TP/Stop/P&L number stays readable on busy wallpapers.

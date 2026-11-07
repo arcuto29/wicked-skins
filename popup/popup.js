@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -24,6 +24,7 @@ const DEFAULTS = {
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
+  sbOn: false, sbColor: "", sbW: 0, sbStyle: "dashed", axOn: false, axColor: "", axW: 0, axStyle: "solid",
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
   scaleSize: 0, scaleFont: "default",
   multi: "span", chartSkins: {}, pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
@@ -609,15 +610,17 @@ mediaTab.addEventListener("dragleave", () => mediaTab.classList.remove("drop"));
 mediaTab.addEventListener("drop", (e) => { e.preventDefault(); mediaTab.classList.remove("drop"); addFiles([...e.dataTransfer.files]); });
 
 // ---------- workshop: community wallpapers ----------
-let wsSort = "popular", wsPage = 0, wsItems = [];
+let wsSort = "popular", wsPage = 0, wsItems = [], wsKind = localStorage.getItem("wsKind") || "looks";
 const W = () => window.Workshop;
 
 // The extension Workshop is browse + use only — no account. Sharing/liking/reporting and admin review all live
 // on the website (login there), which avoids a sign-in wall and the free-tier email limits inside the popup.
 const WS_SITE = () => (window.WORKSHOP_CONFIG && window.WORKSHOP_CONFIG.siteUrl) || "https://arcuto29.github.io/wicked-skins/";
 function wsTabs() {
+  seg("wsKind", [["looks", "Community looks"], ["walls", "Wallpapers"]], () => wsKind, (v) => { wsKind = v; localStorage.setItem("wsKind", v); wsSort = "popular"; wsLoad(true); });
+  $("wsSubmit").hidden = wsKind !== "walls"; $("wsShareLook").hidden = wsKind !== "looks";
   const box = $("wsTabs"); box.innerHTML = "";
-  for (const [k, label] of [["popular", "Popular"], ["new", "New"]]) {
+  for (const [k, label] of [["popular", wsKind === "looks" ? "Top" : "Popular"], ["new", "New"], ...(wsKind === "looks" ? [["mine", "Mine"]] : [])]) {
     const b = document.createElement("button"); b.className = "chip" + (k === wsSort ? " on" : ""); b.textContent = label;
     b.onclick = () => { wsSort = k; wsLoad(true); };
     box.appendChild(b);
@@ -628,6 +631,7 @@ async function wsLoad(reset) {
   if (reset) { wsPage = 0; wsItems = []; }
   wsTabs();
   $("wsMsg").textContent = "Loading…";
+  if (wsKind === "looks") return wsLoadLooks(reset);
   try {
     const rows = await W().list(wsSort, wsPage);
     wsItems = reset ? rows : [...wsItems, ...rows];
@@ -636,7 +640,64 @@ async function wsLoad(reset) {
   } catch (e) { $("wsMsg").textContent = "Couldn't load the Workshop: " + e.message; }
   wsRender();
 }
+// ---------- community looks ----------
+// A look is settings only (built-in wallpaper + styling), so the card preview is drawn live from the data itself.
+const LOOK_SAFE = new Set(LOOK_KEYS);
+const cleanLook = (data) => Object.fromEntries(Object.entries(data || {}).filter(([k, v]) => LOOK_SAFE.has(k) && (v === null || ["string", "number", "boolean"].includes(typeof v) || (typeof v === "object" && JSON.stringify(v).length < 2000))));
+const myShared = () => { try { return JSON.parse(localStorage.getItem("myLooks") || "[]"); } catch { return []; } };
+let wsLooks = [];
+async function wsLoadLooks(reset) {
+  try {
+    let rows;
+    if (wsSort === "mine") {
+      const mine = myShared();
+      rows = mine.length ? (await W().listLooks("new", 0)).filter((r) => mine.some((m) => m.t === r.title && m.s === r.skin)) : [];
+      $("wsMsg").textContent = rows.length ? "" : "Looks you share appear here once they're approved. Tap \u201cShare my current look\u201d to share one.";
+    } else {
+      rows = await W().listLooks(wsSort === "new" ? "new" : "top", wsPage);
+      $("wsMsg").textContent = "";
+    }
+    wsLooks = reset ? rows : [...wsLooks, ...rows];
+    $("wsMore").hidden = wsSort === "mine" || rows.length < 24;
+    if (!wsLooks.length && wsSort !== "mine") $("wsMsg").textContent = "No community looks yet. Be the first: tap \u201cShare my current look\u201d.";
+  } catch (e) { $("wsMsg").textContent = "Couldn't load community looks: " + e.message; }
+  wsRenderLooks();
+}
+function wsRenderLooks() {
+  const box = $("wsCards"); box.innerHTML = ""; lookPreviews.length = 0;
+  for (const it of wsLooks) {
+    if (!WickedSkins[it.skin]) continue;
+    const d = cleanLook(it.data), card = document.createElement("button"); card.className = "card wslook";
+    const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
+    const sk = WickedSkins[it.skin].create(cv.getContext("2d")); sk.resize(160, 64); lookPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
+    card.append(cv);
+    const up = d.candleUp || "#26a69a", down = d.candleDown || "#ef5350";
+    card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(up, down)}</div><span class="oncount">${it.uses} ON</span>
+      <div class="label"><span>${esc(it.title)}<small>by ${esc(it.author || "trader")} · ${esc(WickedSkins[it.skin].name)}</small></span></div>`);
+    card.onclick = () => {
+      applyWithUndo({ ...d, enabled: true, skin: it.skin }, `Applied \u201c${it.title}\u201d by ${it.author || "trader"}.`);
+      const used = new Set(JSON.parse(localStorage.getItem("usedLooks") || "[]"));
+      if (!used.has(it.id)) { used.add(it.id); localStorage.setItem("usedLooks", JSON.stringify([...used].slice(-500))); W().countLookUse(it.id); }   // count each person once
+    };
+    box.appendChild(card);
+  }
+}
+// Share: the website (signed in there) receives your look as a code and posts it for review.
+function shareLook() {
+  const name = (($("loName") && $("loName").value.trim()) || (WickedSkins[cfg.skin] ? WickedSkins[cfg.skin].name : "My look")).slice(0, 40);
+  const code = makeLookCode(name);
+  const skin = cfg.skin === "media" ? "aurora" : cfg.skin, a = myShared();
+  if (!a.some((m) => m.t === name && m.s === skin)) localStorage.setItem("myLooks", JSON.stringify([...a, { t: name, s: skin }].slice(-100)));
+  const u = WS_SITE() + "workshop.html#look=" + encodeURIComponent(code);
+  if (window.PriismNative && window.PriismNative.openUrl) window.PriismNative.openUrl(u);          // Android app
+  else if (chrome.tabs && chrome.tabs.create) chrome.tabs.create({ url: u });                       // extension
+  else window.open(u, "_blank");                                                                      // desktop app -> your browser
+  if (cfg.skin === "media") toast("Your own upload can't be shared in a look, so it uses a built-in wallpaper instead.");
+}
+if ($("wsShareLook")) $("wsShareLook").onclick = shareLook;
+if ($("loShare")) $("loShare").onclick = shareLook;
 function wsRender() {
+  if (wsKind === "looks") return wsRenderLooks();
   const box = $("wsCards"); box.innerHTML = "";
   for (const it of wsItems) {
     const card = document.createElement("div"); card.className = "card ws";
@@ -661,6 +722,7 @@ async function wsUse(it) {
   } catch (e) { toast("Couldn't use it: " + e.message); }
 }
 $("wsMore").onclick = () => { wsPage++; wsLoad(false); };
+
 function initWorkshop() {
   const on = !!(window.Workshop && Workshop.configured);
   $("wsOff").hidden = on; $("wsOn").hidden = !on;
@@ -976,6 +1038,8 @@ const CHART_PARTS = [
   { k: "grid", title: "Grid", desc: "The lines behind the candles.", styles: [["solid", "Solid"], ["dotted", "Dotted"], ["dashed", "Dashed"], ["none", "None"]] },
   { k: "ch", title: "Crosshair", desc: "The lines that follow your pointer.", styles: [["solid", "Solid"], ["dotted", "Dotted"], ["dashed", "Dashed"]], glow: true },
   { k: "pl", title: "Price line", desc: "The dotted line at the last price.", styles: [["solid", "Solid"], ["dotted", "Dotted"], ["dashed", "Dashed"]] },
+  { k: "sb", title: "Session breaks", desc: "The lines between trading sessions (turn them on in TradingView first).", styles: [["solid", "Solid"], ["dotted", "Dotted"], ["dashed", "Dashed"], ["none", "Hide"]] },
+  { k: "ax", title: "Scale borders", desc: "The edge lines of the price and time scales.", styles: [["solid", "Show"], ["none", "Hide"]] },
 ];
 function renderChartStyle() {
   const box = $("chartStyle"); if (!box) return;
@@ -1585,4 +1649,36 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
     out.hidden = false;
   };
   inp.onkeydown = (e) => { if (e.key === "Enter") { const f = out.querySelector("button.fx"); if (f) f.click(); } if (e.key === "Escape") { inp.value = ""; out.hidden = true; } };
+})();
+
+// ---------- welcome tour (first install) + "what's new" (once after each update) ----------
+const WHATS_NEW = ["Community looks: share your whole setup, browse Top / New / Mine (Workshop)",
+  "Session breaks and scale borders join grid, crosshair and price line in Chart styling",
+  "A cleaner, modern panel, plus \u201cFind any setting\u201d at the top"];
+(function onboarding() {
+  let ver = ""; try { ver = chrome.runtime.getManifest().version; } catch {}
+  const seen = localStorage.getItem("seenVer");
+  if (!seen) {
+    localStorage.setItem("seenVer", ver || "1");
+    const steps = [
+      ["Pick a look", "Skins \u203a Looks puts a matching wallpaper, candles and glow on your chart in one tap. Undo is one tap too."],
+      ["Make it yours", "Style has 16 candle looks, chart styling (grid, crosshair, price line) and TradingView's own panel colours."],
+      ["Find anything", "Type in \u201cFind any setting\u201d at the top and jump straight to it. Have fun!"],
+    ];
+    // a friendly card at the top (never a blocking overlay)
+    let i = 0; const el = $("news"); if (!el) return;
+    const draw = () => { el.innerHTML = `<b>Welcome! ${steps[i][0]}</b><p class="hint" style="color:#cfd5e2;margin:2px 0 10px">${steps[i][1]}</p>
+      <div class="tour-bar"><div class="dots">${steps.map((_, j) => `<i class="${j === i ? "on" : ""}"></i>`).join("")}</div>
+      <div><button class="link" data-a="skip" style="margin:0 8px 0 0">Skip</button><button class="primary" data-a="next">${i < steps.length - 1 ? "Next" : "Let's go"}</button></div></div>`;
+      el.hidden = false;
+      el.querySelector("[data-a=skip]").onclick = () => { el.hidden = true; };
+      el.querySelector("[data-a=next]").onclick = () => { if (++i >= steps.length) el.hidden = true; else draw(); }; };
+    draw();
+    return;
+  }
+  if (ver && seen !== ver && $("news")) {
+    $("news").innerHTML = `<button class="x" title="Dismiss">\u2715</button><b>New in ${esc(ver)}</b><ul>${WHATS_NEW.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>`;
+    $("news").hidden = false;
+    $("news").querySelector(".x").onclick = () => { $("news").hidden = true; localStorage.setItem("seenVer", ver); };
+  }
 })();
