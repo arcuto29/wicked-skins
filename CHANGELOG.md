@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.33 (2026-11-04)
+- **Reorganised panel: everything in one place, no duplicates.**
+  - **Style**: Candles (colours, look and glow together), Chart lines (grid, crosshair, price line, session breaks, plus line glow), Price scale (now including scale borders).
+  - **TradingView** (new): one section for TradingView's own interface (top and bottom bars, left toolbar, panels, windows & menus), plus Text & accent.
+  - **Trading** (new): Trade brackets, P&L readout, Daily goal and Trade journal.
+  - **Capture** (new): Snapshot, Clip and Watermark.
+  - **Saved**: your saved looks. Look codes and file export are under "More ways to share".
+  - **Adjust**: Picture and Motion, with Advanced (wallpaper layer, multiple charts, sessions, per symbol) below.
+- The separate Glow section is gone. Candle glow sits with Candles, and line glow with Chart lines.
+- Retired **Live mood** (the chart glowing with your P&L or the day's move). It was too distracting next to calm wallpapers, and it's switched off for everyone.
+
 ## 0.1.32 (2026-11-04)
 - Fixed saving an edited clip getting stuck at the end. When the end point was at the very end of the clip, the browser could stop delivering frames a moment before it, so the save never finished.
   - Saving now finishes when the end point is reached (within one frame), when the video ends or pauses, or at a hard deadline.

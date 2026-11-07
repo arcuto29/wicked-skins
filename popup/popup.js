@@ -1044,11 +1044,12 @@ const CHART_PARTS = [
 ];
 function renderChartStyle() {
   const box = $("chartStyle"); if (!box) return;
-  box.innerHTML = "";
+  box.innerHTML = ""; if ($("scaleParts")) $("scaleParts").innerHTML = "";
   for (const p of CHART_PARTS) {
     const on = !!cfg[p.k + "On"], card = document.createElement("div"); card.className = "cpart";
+    const host = p.k === "ax" && $("scaleParts") ? $("scaleParts") : box;     // scale borders live with the price scale
     card.innerHTML = `<div class="cpart-h"><div><b>${p.title}</b><small>${p.desc}</small></div><div class="seg cpart-mode" id="cs-${p.k}-on"></div></div>`;
-    box.appendChild(card);
+    host.appendChild(card);
     seg(`cs-${p.k}-on`, [[false, "Own"], [true, "Styled"]], () => !!cfg[p.k + "On"], (v) => { set({ [p.k + "On"]: v }); renderChartStyle(); });
     if (!on) continue;
     const body = document.createElement("div"); body.className = "cpart-b";
@@ -1116,8 +1117,8 @@ function syncTune() {
   seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => { set({ layer: v }); syncTune(); });
   // Sides only makes sense under the chart (On top already floats over everything).
   $("sidesRow").hidden = cfg.layer === "over"; if ($("leftBarRow")) $("leftBarRow").hidden = cfg.layer === "over";
-  $("sidesHint").hidden = cfg.layer === "over";
-  seg("sides", [["off", "Chart only"], ["glass", "Glass"], ["clear", "Clear"]], () => cfg.sides || "off", (v) => set({ sides: v }));
+  if ($("sidesHint")) $("sidesHint").hidden = cfg.layer === "over";
+  seg("sides", [["off", "Default"], ["glass", "Glass"], ["clear", "Clear"]], () => cfg.sides || "off", (v) => set({ sides: v }));
   if ($("leftBar")) seg("leftBar", [["off", "Default"], ["glass", "Glass"], ["clear", "Clear"]], () => cfg.leftBar || "off", (v) => set({ leftBar: v }));
   // Interface (fonts / size / accent for TradingView's own panels)
   seg("uiFont", [["default", "Default"], ["mono", "Mono"], ["rounded", "Rounded"]], () => cfg.uiFont || "default", (v) => set({ uiFont: v }));
@@ -1662,7 +1663,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["TradingView's Settings window and menus can be frosted glass or your colour (Interface)",
+const WHATS_NEW = ["Reorganised: new TradingView, Trading and Capture tabs, and no duplicate settings",
+  "TradingView's Settings window and menus can be frosted glass or your colour (TradingView tab)",
   "Clip quality options, and instant saving when you don't crop or trim",
   "Smoother: fixed the brief freezes; trade brackets work with the newer rounded labels",
   "Community looks: share your whole setup, browse Top / New / Mine (Workshop)",
