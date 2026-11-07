@@ -60,6 +60,8 @@ function openSettings() {
     width: 460, height: 720, minWidth: 380, title: "Priism Skins", icon: ICON, autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: false },
   });
+  // web links from the panel (Share my look, Workshop website) open in your normal browser
+  settingsWin.webContents.setWindowOpenHandler(({ url }) => { if (/^https:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
   settingsWin.loadFile(POPUP);
   settingsWin.webContents.on("did-finish-load", notifyTV);
   settingsWin.on("closed", () => { settingsWin = null; });

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.27 (2026-11-04)
+- **Community looks** (Workshop → Community looks): browse whole setups other traders shared (wallpaper, candles, chart styling, panels) by Top, New or Mine, each with a live preview and an "ON" count. One tap puts a look on, and Undo is one tap too.
+  - **Share my current look** sends your setup to the website, where you sign in and post it. Shares are reviewed before they appear.
+  - The website has a new admin **Review** queue for wallpapers and looks.
+- **More chart styling**: session breaks (colour, width, style, or hide) and scale borders (colour or hide).
+- **A cleaner, modern panel**: icon navigation, refined cards and controls, glowing selection, better focus states and a slimmer scrollbar.
+- **Welcome tour** on first install and a **What's new** card after each update. Both are cards at the top, never a blocking popup.
+- Apps: in the desktop and Android apps, web links from the panel (Share my look, the Workshop website) now open in your browser.
+
 ## 0.1.26 (2026-11-04)
 - Trade brackets: added support for charts where TradingView draws TP / Stop / P&L labels once into a hidden canvas and pastes that picture onto the chart. Bracket styling never saw these labels, so it had no effect there.
   - Pasted labels are now redrawn as a styled pill: dark box, bigger number, profit green / loss red.

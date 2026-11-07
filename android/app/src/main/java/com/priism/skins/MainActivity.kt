@@ -100,6 +100,11 @@ class MainActivity : Activity() {
             override fun onPageFinished(view: WebView, url: String?) {
                 view.evaluateJavascript(asset("shared/popup/priism-android.js"), null)
             }
+            // web links (Workshop website, Share my look) open in the phone's browser
+            override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
+                val s = req.url.scheme ?: return false
+                return if (s == "http" || s == "https") { openUrl(req.url.toString()); true } else false
+            }
         }
         wv.settings.allowFileAccess = true
         wv.loadUrl("file:///android_asset/shared/popup/popup.html")
@@ -133,6 +138,11 @@ class MainActivity : Activity() {
         fab.setOnClickListener { if (settings == null) openSettings() else closeSettings() }
     }
 
+    private fun openUrl(url: String) {
+        if (!url.startsWith("https://") && !url.startsWith("http://")) return
+        try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))) } catch (_: Exception) {}
+    }
+
     private fun asset(path: String): String =
         assets.open(path).bufferedReader().use { it.readText() }
 
@@ -144,5 +154,6 @@ class MainActivity : Activity() {
             runOnUiThread { pushToChart(obj) }
         }
         @JavascriptInterface fun closeSettings() = runOnUiThread { this@MainActivity.closeSettings() }
+        @JavascriptInterface fun openUrl(url: String) = runOnUiThread { this@MainActivity.openUrl(url) }
     }
 }

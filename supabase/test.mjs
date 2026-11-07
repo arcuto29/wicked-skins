@@ -71,5 +71,23 @@ ok("upload file into own folder", (await tryAs(U1, `insert into storage.objects 
 ok("can't upload into someone else's folder", (await tryAs(U1, `insert into storage.objects (bucket_id, name) values ('workshop', '${U2}/a.webm')`)).startsWith("denied"));
 ok("title length enforced", (await tryAs(U1, `insert into public.wallpapers (title, kind, file_path, size_bytes) values ('', 'image', 'x', 10)`)).startsWith("denied"));
 ok("size limit enforced (50 MB)", (await tryAs(U1, `insert into public.wallpapers (title, kind, file_path, size_bytes) values ('big', 'video', 'x', 60000000)`)).startsWith("denied"));
+// ---------- community looks ----------
+const share = (uid, title, data = { candleOn: true, candleUp: "#00ffa3" }) => as(uid, `insert into public.looks (title, skin, data, status, uses, author) values ($1, 'aurora', $2, 'approved', 500, 'fake') returning id, status, uses, owner, author`, [title, JSON.stringify(data)]);
+const l1 = (await share(U1, "Night look")).rows[0];
+ok("look share -> pending, can't fake uses / author / status", l1.status === "pending" && l1.uses === 0 && l1.owner === U1 && l1.author === "a", JSON.stringify(l1));
+const la = (await share(ADMIN, "Admin look")).rows[0];
+ok("admin look -> approved immediately", la.status === "approved");
+ok("anyone sees only approved looks", (await as(null, "select count(*)::int n from public.looks")).rows[0].n === 1);
+ok("can't share a look anonymously", (await tryAs(null, "insert into public.looks (title, skin, data) values ('x', 'aurora', '{}')")).startsWith("denied"));
+ok("look skin id validated", (await tryAs(U1, "insert into public.looks (title, skin, data) values ('x', '<script>', '{}')")).startsWith("denied"));
+ok("look data must be a small object", (await tryAs(U1, "insert into public.looks (title, skin, data) values ('x', 'aurora', '[1,2]')")).startsWith("denied"));
+ok("non-admin can't approve looks", (await tryAs(U1, "select public.moderate_look($1, 'approved')", [l1.id])).startsWith("denied"));
+ok("nobody edits looks directly", (await tryAs(U1, "update public.looks set status = 'approved' where id = $1", [l1.id])).startsWith("denied"));
+await as(ADMIN, "select public.moderate_look($1, 'approved')", [l1.id]);
+await as(null, "select public.count_look_use($1)", [l1.id]); await as(null, "select public.count_look_use($1)", [l1.id]);
+ok("look uses counted without an account", (await as(null, "select uses from public.looks where id = $1", [l1.id])).rows[0].uses === 2);
+for (const u of [U2, U3, U4]) await as(u, "insert into public.look_reports (look_id, reason) values ($1, 'spam')", [l1.id]);
+ok("3 reports hide a look until re-review", (await as(null, "select count(*)::int n from public.looks where id = $1", [l1.id])).rows[0].n === 0);
+ok("owner can delete own look", (await as(U1, "delete from public.looks where id = $1 returning id", [l1.id])).rows.length === 1);
 const passed = Object.values(R).filter(Boolean).length, total = Object.keys(R).length;
 console.log("SUMMARY:", passed + "/" + total); if (passed !== total) process.exit(1);

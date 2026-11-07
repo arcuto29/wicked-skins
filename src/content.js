@@ -28,7 +28,8 @@
     // Chart styling — each part off = TradingView's own. Colour "" = skin colour, "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false,
-    plOn: false, plColor: "", plW: 0, plStyle: "dotted",           // the left drawing-tool rail: off (TradingView's own) | glass | clear
+    plOn: false, plColor: "", plW: 0, plStyle: "dotted",
+    sbOn: false, sbColor: "", sbW: 0, sbStyle: "dashed", axOn: false, axColor: "", axW: 0, axStyle: "solid",           // the left drawing-tool rail: off (TradingView's own) | glass | clear
     // UI style: font + accent for TradingView's own panels (watchlist, toolbars, order area, timeframe bar).
     uiFont: "default", uiSize: 0, uiAccent: "",     // font: default|mono|rounded ; size: 0|1 ; accent: "" or #hex
     // Watermark: the Priism Skins logo + your name/handle, for recordings and streams.
@@ -892,7 +893,7 @@
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug",
-    "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "plOn", "plColor", "plW", "plStyle"];
+    "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper

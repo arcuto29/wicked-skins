@@ -141,3 +141,11 @@ footer { background: linear-gradient(180deg, transparent, rgba(46,242,176,.04));
 .qfix details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px; margin-bottom: 10px; }
 .qfix summary { cursor: pointer; font-weight: 700; } .qfix p { color: var(--muted); margin: 10px 0 0; }
 .qfix details[open] { border-color: #2c3647; }
+
+/* community looks + review */
+.lookshare { border: 1px solid var(--line, #262a36); border-radius: 12px; padding: 12px; margin: 0 0 14px; background: rgba(46,242,176,.06); }
+.lookmedia { display: flex; align-items: flex-end; justify-content: center; gap: 10px; height: 120px; background: radial-gradient(circle at 30% 20%, #1b2140, #07090f); }
+.lookmedia .c { width: 18px; border-radius: 3px; height: 50px; margin-bottom: 26px; } .lookmedia .c:nth-child(2) { height: 32px; margin-bottom: 40px; } .lookmedia .c:nth-child(3) { height: 64px; }
+.rev { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line, #262a36); border-radius: 10px; margin: 8px 0; }
+.rev img { width: 96px; height: 54px; object-fit: cover; border-radius: 6px; } .rev .lk { width: 96px; height: 54px; display: grid; place-items: center; border-radius: 6px; background: #1b2140; font-weight: 800; font-size: 12px; }
+.rev > div { flex: 1; } .rev small { display: block; color: var(--muted); }

@@ -33,6 +33,15 @@
         <p class="hint" id="authMsg"></p>
       </div>
 
+      <!-- a look sent from the extension ("Share my current look") -->
+      <div id="lookShare" class="lookshare" hidden>
+        <b>Share this look</b>
+        <p class="hint" id="lookSum"></p>
+        <input id="lookTitle" class="field" maxlength="40" placeholder="Name your look">
+        <button id="lookGo" class="btn primary" type="button">Share look</button>
+        <p class="hint" id="lookMsg"></p>
+      </div>
+
       <!-- signed in: upload -->
       <div id="uploader" hidden>
         <label id="drop" class="drop">
@@ -49,7 +58,18 @@
       </div>
     </section>
 
-    <h2 style="font-size:22px;margin:34px 0 12px">Browse</h2>
+    <section id="review" hidden>
+      <h2 style="font-size:22px;margin:34px 0 12px">Review <span class="adm">ADMIN</span></h2>
+      <p class="hint">Shares waiting for you. Approve to make them public, or reject with a reason the sharer sees.</p>
+      <div id="reviewList"></div>
+    </section>
+
+    <h2 style="font-size:22px;margin:34px 0 12px">Community looks</h2>
+    <p style="color:var(--muted);margin:-4px 0 12px">Whole setups other traders built: wallpaper, candles, glow, chart styling. In the extension: <b>Workshop › Community looks</b>, one tap to put one on.</p>
+    <div class="ws-grid" id="lookGrid"></div>
+    <p class="empty" id="lookEmpty" hidden>No community looks yet. Share yours from the extension: <b>Workshop › Share my current look</b>.</p>
+
+    <h2 style="font-size:22px;margin:34px 0 12px">Wallpapers</h2>
     <div class="ws-bar"><button class="chip on" data-sort="popular">Popular</button><button class="chip" data-sort="new">New</button></div>
     <div class="ws-grid" id="grid"></div>
     <p class="empty" id="empty" hidden></p>
@@ -97,6 +117,74 @@
     more.onclick = () => { page++; load(false); };
     load(true);
 
+    // ---------- community looks: browse ----------
+    async function loadLooks() {
+      const { data, error } = await sb.from("looks").select("id,title,author,skin,data,uses").eq("status", "approved").order("uses", { ascending: false }).range(0, 23);
+      const g = $("lookGrid"); g.innerHTML = "";
+      if (error || !data || !data.length) { $("lookEmpty").hidden = false; return; }
+      $("lookEmpty").hidden = true;
+      for (const l of data) {
+        const d = l.data || {}, up = /^#[0-9a-f]{6}$/i.test(d.candleUp || "") ? d.candleUp : "#26a69a", dn = /^#[0-9a-f]{6}$/i.test(d.candleDown || "") ? d.candleDown : "#ef5350";
+        const el = document.createElement("div"); el.className = "ws-card";
+        el.innerHTML = `<div class="media lookmedia"><span class="c" style="background:${up}"></span><span class="c" style="background:${dn}"></span><span class="c" style="background:${up}"></span><span class="tag">${l.uses} ON</span></div>
+          <div class="info"><b>${esc(l.title)}</b><small>by ${esc(l.author || "trader")} · ${esc(l.skin)}</small></div>`;
+        g.appendChild(el);
+      }
+    }
+    loadLooks();
+
+    // ---------- community looks: share (a code sent from the extension) ----------
+    let pendingLook = null;
+    (function readLook() {
+      const m = location.hash.match(/look=([^&]+)/); if (!m) return;
+      try {
+        const code = decodeURIComponent(m[1]); if (!code.startsWith("PRIISM1-")) return;
+        let b = code.slice(8).replace(/-/g, "+").replace(/_/g, "/"); while (b.length % 4) b += "=";
+        const bin = atob(b), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const p = JSON.parse(new TextDecoder().decode(bytes));
+        if (!p || p.v !== 1 || !/^[a-z0-9_-]{1,40}$/.test(p.s || "") || typeof p.l !== "object") return;
+        pendingLook = { title: String(p.n || "").slice(0, 40), skin: p.s, data: p.l };
+        $("lookShare").hidden = false; $("lookTitle").value = pendingLook.title;
+        const d = p.l, parts = [`wallpaper: ${p.s}`, d.candleLook ? `candles: ${d.candleLook}` : "", d.gridOn || d.chOn || d.plOn ? "chart styling" : "", d.panelMode && d.panelMode !== "off" ? "panel colours" : ""].filter(Boolean);
+        say("lookSum", parts.join(" · ") + ". Sign in below to share it. Looks are reviewed before they appear.");
+        document.getElementById("submit").scrollIntoView();
+      } catch {}
+    })();
+    $("lookGo").onclick = async () => {
+      if (!pendingLook) return;
+      if (!user) return say("lookMsg", "Sign in first (just below), then tap Share look.");
+      const title = $("lookTitle").value.trim(); if (!title) return say("lookMsg", "Give your look a name.");
+      $("lookGo").disabled = true; say("lookMsg", "Sharing…");
+      const ins = await sb.from("looks").insert({ title, skin: pendingLook.skin, data: pendingLook.data }).select("status").single();
+      if (ins.error) { $("lookGo").disabled = false; return say("lookMsg", "Couldn't share: " + ins.error.message); }
+      say("lookMsg", ins.data.status === "approved" ? "Shared, it's live now." : "Thanks! It appears in the Workshop once a moderator approves it.");
+      pendingLook = null; history.replaceState(null, "", location.pathname); loadLooks();
+    };
+
+    // ---------- admin review (wallpapers + looks) ----------
+    async function renderReview() {
+      const box = $("review"); if (!profile || !profile.is_admin) { box.hidden = true; return; }
+      box.hidden = false; const list = $("reviewList"); list.innerHTML = "Loading…";
+      const [w, l] = await Promise.all([
+        sb.from("wallpapers").select("id,title,kind,file_path,thumb_path,reports").eq("status", "pending").order("created_at").range(0, 49),
+        sb.from("looks").select("id,title,author,skin,data,reports").eq("status", "pending").order("created_at").range(0, 49)]);
+      const items = [...(w.data || []).map((x) => ({ ...x, t: "wallpaper" })), ...(l.data || []).map((x) => ({ ...x, t: "look" }))];
+      list.innerHTML = items.length ? "" : "<p class='hint'>Nothing waiting. Nice.</p>";
+      for (const it of items) {
+        const row = document.createElement("div"); row.className = "rev";
+        const media = it.t === "wallpaper" ? `<img src="${esc(url(it.thumb_path) || url(it.file_path))}" alt="">` : `<span class="lk">LOOK</span>`;
+        row.innerHTML = `${media}<div><b>${esc(it.title)}</b><small>${it.t === "look" ? "look by " + esc(it.author || "?") + " · " + esc(it.skin) : it.kind}${it.reports ? " · " + it.reports + " report(s)" : ""}</small></div>
+          <button class="btn primary" data-a="approved">Approve</button><button class="btn" data-a="rejected">Reject</button>`;
+        row.querySelectorAll("button").forEach((b) => (b.onclick = async () => {
+          const reason = b.dataset.a === "rejected" ? (prompt("Reason (the sharer sees this):", "Doesn't meet the rules") || "") : null;
+          const fn = it.t === "look" ? "moderate_look" : "moderate_wallpaper", arg = it.t === "look" ? { look: it.id } : { wallpaper: it.id };
+          const r = await sb.rpc(fn, { ...arg, new_status: b.dataset.a, reason }); if (r.error) return alert(r.error.message);
+          row.remove(); load(true); loadLooks();
+        }));
+        list.appendChild(row);
+      }
+    }
+
     // ---------- account ----------
     let user = null, profile = null;
     async function refresh() {
@@ -110,6 +198,7 @@
       $("auth").hidden = !!user; $("uploader").hidden = !user;
       $("whoami").innerHTML = user ? `${esc(user.email || "")}${profile && profile.is_admin ? ' <span class="adm">ADMIN</span>' : ""} · <a id="signout" href="#">Sign out</a>` : "";
       if (user) { $("signout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); await refresh(); say("shareMsg", ""); }; renderMine(); }
+      renderReview();
     }
     sb.auth.onAuthStateChange(() => refresh());
     refresh();
