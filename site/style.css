@@ -149,3 +149,11 @@ footer { background: linear-gradient(180deg, transparent, rgba(46,242,176,.04));
 .rev { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--line, #262a36); border-radius: 10px; margin: 8px 0; }
 .rev img { width: 96px; height: 54px; object-fit: cover; border-radius: 6px; } .rev .lk { width: 96px; height: 54px; display: grid; place-items: center; border-radius: 6px; background: #1b2140; font-weight: 800; font-size: 12px; }
 .rev > div { flex: 1; } .rev small { display: block; color: var(--muted); }
+
+/* small screens: the header menu fits (scrolls sideways if it must) */
+@media (max-width: 640px) {
+  header.top .wrap { gap: 10px; }
+  .brand span { display: none; }
+  nav.links { gap: 14px; font-size: 13px; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+  nav.links::-webkit-scrollbar { display: none; }
+}
