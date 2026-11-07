@@ -1653,7 +1653,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Community looks: share your whole setup, browse Top / New / Mine (Workshop)",
+const WHATS_NEW = ["Changes are instant now: drag through colours and the chart keeps up, no blinking",
+  "Community looks: share your whole setup, browse Top / New / Mine (Workshop)",
   "Crosshair labels in your crosshair colour, plus session breaks and scale borders in Chart styling",
   "A cleaner, modern panel where every option reads in full"];
 (function onboarding() {
