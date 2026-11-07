@@ -3,7 +3,7 @@ name: Website
 on:
   push:
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", "src/skins.js", "src/candlelooks.js", ".github/workflows/pages.yml"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,6 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # share-link previews (look.html) draw with the extension's own wallpaper + candle code
+      - run: mkdir -p site/lib && cp src/skins.js src/candlelooks.js site/lib/
       - uses: actions/upload-pages-artifact@v3
         with: { path: site }
       - id: deploy

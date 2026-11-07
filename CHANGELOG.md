@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.34 (2026-11-04)
+- **Focus mode** (default Alt+Shift+F on the chart): fades the wallpaper away and pauses it, so only your chart is left. Press again to bring it back.
+  - "Everything" also drops the chart styling. Your P&L, goal bar, session timer and brackets stay.
+  - If Focus is on, the panel shows a banner with an Exit button.
+- **Shortcuts you can change** (Adjust → Shortcuts): Focus mode, Record a clip (press again to stop early), Snapshot (saves straight to downloads) and Turn everything on/off.
+  - Click a key and press the new one; Backspace turns a shortcut off.
+  - Plain letters, keys you already use and browser shortcuts are refused. You get a warning if TradingView also uses that key.
+- **Session timer** (Trading → Session timer): a slim countdown to the next market open or close in your look's colour.
+  - Covers CME futures (Globex + the NY session), US stocks, Forex (Tokyo, London, New York), London, Tokyo and Crypto (daily close), or picks automatically from your symbol.
+  - Uses each exchange's own time zone, so daylight saving is handled; holidays aren't included.
+  - Sits just above the time axis so it never covers TradingView's legend, and shows in snapshots and clips.
+- **Share links** replace look codes (Saved → More ways to share). One link opens a page with a live preview of the look. With Priism installed, click its icon on that page and tap **Add look**. Older look codes still paste.
+- Community looks now say "coming soon" instead of showing an error until the database is set up.
+
 ## 0.1.33 (2026-11-04)
 - **Reorganised panel: everything in one place, no duplicates.**
   - **Style**: Candles (colours, look and glow together), Chart lines (grid, crosshair, price line, session breaks, plus line glow), Price scale (now including scale borders).
