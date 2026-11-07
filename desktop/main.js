@@ -19,7 +19,7 @@ const read = (f) => fs.readFileSync(path.join(SRC, f), "utf8");
 
 // hook.js must run before TradingView's own scripts (it wraps the canvas API), so the TV window's
 // preload asks for it synchronously and runs it in the page world at document start.
-ipcMain.on("hook-code", (e) => { e.returnValue = read("hook.js"); });
+ipcMain.on("hook-code", (e) => { e.returnValue = read("candlelooks.js") + "\n" + read("hook.js"); });
 
 async function inject() {
   if (!tvWin || tvWin.isDestroyed()) return;

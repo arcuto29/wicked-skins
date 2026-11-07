@@ -116,6 +116,25 @@ const LOOK_HINT = {
   prism: "Rainbow: colours fan out across the chart, left to right.",
   shift: "Cycle: colours keep flowing over time. Indicator lines on the chart cycle too.",
 };
+// Candle look cards: every look, each with a small preview drawn in YOUR current candle colours (same drawing code
+// the chart uses, so the preview is what you get). Redrawn when colours or glow change.
+function renderLookGrid() {
+  const box = $("candleLook"), CL = window.__bdCandleLooks; if (!box || !CL) return;
+  const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
+  const sig = up + down + (+cfg.candleGlow || 0);
+  if (box.dataset.sig !== sig || box.children.length !== CL.LOOKS.length) {
+    box.dataset.sig = sig; box.textContent = "";
+    for (const [id, name] of CL.LOOKS) {
+      const b = document.createElement("button"); b.className = "lookcard"; b.dataset.look = id; b.title = CL.META[id].hint;
+      const cv = document.createElement("canvas"); cv.width = 200; cv.height = 104;
+      const lab = document.createElement("span"); lab.textContent = name;
+      b.append(cv, lab); box.appendChild(b);
+      b.onclick = () => { set({ candleLook: id, candleOn: true }); $("candleOn").checked = true; renderCandles(); };
+      requestAnimationFrame(() => { try { CL.preview(cv, id, up, down, +cfg.candleGlow || 0); } catch {} });
+    }
+  }
+  for (const b of box.children) b.classList.toggle("on", b.dataset.look === (cfg.candleLook || "solid"));
+}
 function renderCandles() {
   $("candleOn").checked = cfg.candleOn;
   seg("autoMatch", [[false, "Off"], [true, "On"]], () => !!cfg.autoMatch, (v) => { set({ autoMatch: v, ...(v ? { candleOn: true } : {}) }); if (v) $("candleOn").checked = true; });
@@ -123,11 +142,11 @@ function renderCandles() {
   const onMedia = cfg.skin === "media";
   $("autoMatchRow").hidden = !onMedia;
   $("autoMatchHint").hidden = !onMedia;
-  seg("candleLook", [["solid", "Solid"], ["neon", "Tube"], ["prism", "Rainbow"], ["shift", "Cycle"]], () => cfg.candleLook,
-    (v) => { set({ candleLook: v, candleOn: true }); $("candleOn").checked = true; renderCandles(); });
+  renderLookGrid();
   $("shiftRow").hidden = cfg.candleLook !== "shift";
   $("shiftSpeed").value = cfg.shiftSpeed; $("shiftSpeedOut").textContent = cfg.shiftSpeed + "s";
-  $("lookHint").textContent = LOOK_HINT[cfg.candleLook] || "";
+  { const CL = window.__bdCandleLooks, m = CL && CL.META[cfg.candleLook];
+    $("lookHint").textContent = m ? m.name + ": " + m.hint : (LOOK_HINT[cfg.candleLook] || ""); }
   $("lineGlow").value = cfg.lineGlow; $("lineGlowOut").textContent = Math.round(cfg.lineGlow * 100) + "%";
   seg("scaleTextMode", [["auto", "Auto"], ["custom", "Custom"]], () => (cfg.scaleText ? "custom" : "auto"),
     (v) => { set({ scaleText: v === "custom" ? $("scaleText").value : "" }); renderCandles(); });
@@ -172,9 +191,9 @@ $("scaleGlow").oninput = (e) => { set({ scaleGlow: +e.target.value }); $("scaleG
 $("scaleText").oninput = (e) => set({ scaleText: e.target.value });
 $("scaleBgColor").oninput = (e) => set({ scaleBgColor: e.target.value });
 $("uiAccent").oninput = (e) => set({ uiAccent: e.target.value });
-$("candleGlow").oninput = (e) => { set({ candleGlow: +e.target.value }); $("candleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
-$("candleUp").oninput = (e) => { set({ candleUp: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
-$("candleDown").oninput = (e) => { set({ candleDown: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; };
+$("candleGlow").oninput = (e) => { set({ candleGlow: +e.target.value }); renderLookGrid(); $("candleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+$("candleUp").oninput = (e) => { set({ candleUp: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; renderLookGrid(); };
+$("candleDown").oninput = (e) => { set({ candleDown: e.target.value, candleOn: true, candlePreset: "custom" }); $("candleOn").checked = true; renderLookGrid(); };
 
 // ---------- undo ----------
 // Any one-click change can be undone from the toast at the bottom.
@@ -592,7 +611,8 @@ const sameLook = (lo) => lo.skin === cfg.skin && (lo.skin !== "media" || lo.medi
 function describe(lo) {
   const sk = lo.skin === "media" ? (cfg.media.find((m) => m.id === lo.mediaId)?.name || "Upload") : (WickedSkins[lo.skin]?.name || lo.skin);
   const preset = lo.look.candleOn ? (CANDLE_PRESETS.find(([, , u, d]) => u === lo.look.candleUp && d === lo.look.candleDown)?.[1] || "Custom colours") : "Chart colours";
-  const style = { solid: "", neon: " · Tube", prism: " · Rainbow", shift: " · Cycle" }[lo.look.candleLook] || "";
+  const lm = window.__bdCandleLooks && window.__bdCandleLooks.META[lo.look.candleLook];
+  const style = lo.look.candleLook && lo.look.candleLook !== "solid" && lm ? " · " + lm.name : "";
   return `${sk} · ${preset}${style}`;
 }
 function applyLook(lo) {

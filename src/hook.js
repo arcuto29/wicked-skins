@@ -42,6 +42,8 @@
 
   const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 
+  // every candle look lives in candlelooks.js (shared with lw.js and the panel previews)
+  const lookIds = () => (window.__bdCandleLooks && window.__bdCandleLooks.IDS) || ["solid", "neon", "prism", "shift"];
   function readCandles() {
     remapCache.clear();
     try {
@@ -49,7 +51,7 @@
       const c = raw ? JSON.parse(raw) : null;
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
         candles = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
-          glow: Math.max(0, Math.min(1, +c.glow || 0)), look: ["solid", "neon", "prism", "shift"].includes(c.look) ? c.look : "solid" };
+          glow: Math.max(0, Math.min(1, +c.glow || 0)), look: lookIds().includes(c.look) ? c.look : "solid" };
       } else candles = null;
     } catch { candles = null; }
   }
@@ -699,6 +701,15 @@
 
   // ---------- fillRect: transparent pane background + candle looks / glow ----------
   const origFill = proto.fillRect;
+  const lastBody = new WeakMap();
+  // drawing kit handed to candlelooks.js: the REAL canvas calls, so our own hooks don't re-process the look's shapes
+  const lookK = { g: null, px: 1, yfrac: 0,
+    fill(x, y, w, h) { origFill.call(lookK.g, x, y, w, h); },
+    style(v) { origFillDesc.set.call(lookK.g, v); },
+    stroke(v) { strokeDesc.set.call(lookK.g, v); },
+    strokeRect(x, y, w, h) { origStrokeRectRaw.call(lookK.g, x, y, w, h); },
+    fillPath() { origFillPathRaw.call(lookK.g); } };
+  const origStrokeRectRaw = proto.strokeRect, origFillPathRaw = proto.fill;
   proto.fillRect = function (x, y, w, h) {
     const c = this.canvas;
     if (on && c && w * (this.getTransform().a || 1) <= 40 && isPane(c)) noteFill(this.__bdFill);
@@ -739,24 +750,30 @@
         return this.clearRect(x, y, w, h);
       }
     }
-    if (candles && c && (candles.glow > 0 || candles.look === "neon" || candles.look === "prism") && h < c.height * 0.8 && isPane(c)) {
+    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift")) && h < c.height * 0.8 && isPane(c)) {
       const fs = this.fillStyle; // already remapped, normalised to "#rrggbb" for opaque colours
       if (fs === candles.upHex || fs === candles.downHex) {
-        const sx = this.getTransform().a || 1, body = w * sx >= 3;
-        let col = fs;
-        if (candles.look === "prism") col = prismColour(fs === candles.upHex, (x * sx) / c.width);
-        const glow = candles.look === "neon" ? Math.max(0.55, candles.glow) : candles.glow;
-        this.save();
-        if (glow > 0) { this.shadowColor = col; this.shadowBlur = 4 + glow * 22; }
-        if (candles.look === "neon" && body && h * (this.getTransform().d || 1) >= 3) {
-          // neon tube: faint fill + bright outline
-          this.globalAlpha *= 0.22; this.fillStyle = col; origFill.call(this, x, y, w, h); this.globalAlpha /= 0.22;
-          strokeDesc.set.call(this, col); this.lineWidth = Math.max(1, 1.4 / sx);
-          proto.strokeRect.call(this, x + 0.5 / sx, y + 0.5 / sx, w - 1 / sx, h - 1 / sx);
-        } else {
-          if (col !== fs) this.fillStyle = col;
-          origFill.call(this, x, y, w, h);
+        const L = window.__bdCandleLooks, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, body = w * sx >= 3;
+        const isUp = fs === candles.upHex, look = L ? candles.look : (candles.look === "neon" ? "neon" : "solid");
+        // TradingView draws a bordered candle as an outer rect then the body inside it, both in our colour: draw the
+        // look once (on the outer rect) so outlines / glass don't double up.
+        if (body && look !== "solid") {
+          const lb = lastBody.get(this), X = x * sx + t.e, Y = y * sy + t.f, W = w * sx, H = h * sy;
+          // either order: body-then-border or border-then-body (within ~2 device px on every side)
+          const inside = (a, o) => a.x >= o.x - 0.5 && a.y >= o.y - 0.5 && a.x + a.w <= o.x + o.w + 0.5 && a.y + a.h <= o.y + o.h + 0.5;
+          const near = (a, o) => Math.abs(a.x - o.x) <= 2.5 && Math.abs(a.y - o.y) <= 2.5 && Math.abs(a.x + a.w - o.x - o.w) <= 2.5 && Math.abs(a.y + a.h - o.y - o.h) <= 2.5;
+          const cur = { x: X, y: Y, w: W, h: H };
+          if (lb && lb.col === fs && near(cur, lb) && (inside(cur, lb) || inside(lb, cur))) { lastBody.delete(this); return; }
+          lastBody.set(this, { x: X, y: Y, w: W, h: H, col: fs });
         }
+        let col = fs;
+        if (look === "prism") col = prismColour(isUp, (x * sx) / c.width);
+        const meta = L && L.META[look], glow = Math.max(candles.glow, meta ? meta.minGlow : 0);
+        lookK.g = this; lookK.px = 1 / sx; lookK.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
+        this.save();
+        if (glow > 0) { this.shadowColor = L ? L.tone(look, col, lookK) : col; this.shadowBlur = 4 + glow * 22; }
+        if (L && body && h * sy >= 3) L.draw(this, look, x, y, w, h, col, isUp, lookK);
+        else { const wc = L ? L.wick(look, col, lookK) : col; origFillDesc.set.call(this, wc); origFill.call(this, x, y, w, h); }
         this.restore();
         return;
       }

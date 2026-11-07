@@ -139,3 +139,13 @@ details.grp > summary .switch { margin-left: auto; }
 .jrow img { width: 96px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #2b2e3a; display: block; }
 .jrow .jmeta { flex: 1; min-width: 0; font-size: 12px; } .jrow .jmeta small { display: block; color: #6f7280; margin-top: 2px; }
 .jrow .jup { color: #00e08a; font-weight: 700; } .jrow .jdn { color: #ff5470; font-weight: 700; }
+
+/* candle look cards (previews drawn by src/candlelooks.js) */
+.looklabel { font: 700 11px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #8b8fa0; margin: 8px 0 6px; }
+.looklabel small { text-transform: none; letter-spacing: 0; font-weight: 500; color: #6c7080; margin-left: 6px; }
+.lookgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px; }
+.lookcard { display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 4px; background: #0a0b0f; border: 1px solid #23252f; border-radius: 9px; color: #c9ccd6; font: 600 11px system-ui, sans-serif; cursor: pointer; }
+.lookcard canvas { width: 100%; height: 52px; border-radius: 6px; background: #05060a; }
+.lookcard span { text-align: left; padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lookcard:hover { border-color: #3a3e4c; }
+.lookcard.on { border-color: #e9ebf2; box-shadow: 0 0 0 1px #e9ebf2 inset; color: #fff; }

@@ -49,7 +49,8 @@
       <details class="grp" data-grp="candles" open>
         <summary>Candles <label class="switch" title="Candle colours on/off"><input type="checkbox" id="candleOn" /><span></span></label></summary>
         <p class="hint">Purely visual: prices and chart data are untouched. Works with your own TradingView candle colours and chart types.</p>
-        <div class="row"><span>Style</span><div class="seg" id="candleLook"></div></div>
+        <div class="looklabel">Look <small>how the candles are drawn, in any colours</small></div>
+        <div class="lookgrid" id="candleLook"></div>
         <div class="row" id="shiftRow" hidden><span>Cycle</span><input type="range" id="shiftSpeed" min="2" max="40" step="1" /><output id="shiftSpeedOut"></output></div>
         <p class="hint" id="lookHint"></p>
         <div class="row"><span>Colours</span>
@@ -292,6 +293,7 @@
   <script src="../src/migrate.js"></script>
   <script src="../src/mediadb.js"></script>
   <script src="../src/skins.js"></script>
+  <script src="../src/candlelooks.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

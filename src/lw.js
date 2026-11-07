@@ -65,7 +65,7 @@
       const c = raw ? JSON.parse(raw) : null;
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
         candles = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
-          glow: Math.max(0, Math.min(1, +c.glow || 0)), look: ["solid", "neon", "prism", "shift"].includes(c.look) ? c.look : "solid" };
+          glow: Math.max(0, Math.min(1, +c.glow || 0)), look: String(c.look || "solid") };
       } else candles = null;
     } catch { candles = null; }
   }
@@ -221,7 +221,12 @@
     Object.defineProperty(proto, "strokeStyle", { configurable: true, enumerable: sd.enumerable, get: sd.get,
       set(v) { if (on && candles && isChart(this.canvas)) sd.set.call(this, remap(v)); else sd.set.call(this, v); } });
 
-    const origFillRect = proto.fillRect;
+    const origFillRect = proto.fillRect, origStrokeRectL = proto.strokeRect, origFillPathL = proto.fill;
+    const lk = { g: null, px: 1, yfrac: 0,
+      fill(x, y, w, h) { origFillRect.call(lk.g, x, y, w, h); }, style(v) { fillDesc.set.call(lk.g, v); },
+      stroke(v) { strokeDesc.set.call(lk.g, v); }, strokeRect(x, y, w, h) { origStrokeRectL.call(lk.g, x, y, w, h); },
+      fillPath() { origFillPathL.call(lk.g); } };
+    const toHexCol = (v) => { const r = rgbKey(v); return r ? "#" + r.key.split(",").map((n) => (+n).toString(16).padStart(2, "0")).join("") : v; };
     proto.fillRect = function (x, y, w, h) {
       const c = this.canvas;
       if (on && c && typeof this.__bdLwOrig === "string" && Math.abs(w) < c.width * 0.5 && Math.abs(h) < c.height * 0.5 && (inLwTable(c) || isChart(c))) noteFill(this.__bdLwOrig);
@@ -237,10 +242,16 @@
         }
       }
       drawCalls.fillRect++;
-      if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.fillStyle)) {
-        const pB = this.shadowBlur, pC = this.shadowColor;
-        this.shadowColor = this.fillStyle; this.shadowBlur = 3 + candles.glow * 16;
-        origFillRect.call(this, x, y, w, h); this.shadowBlur = pB; this.shadowColor = pC; return;
+      const L = window.__bdCandleLooks, look = candles && L && L.META[candles.look] ? candles.look : "solid";
+      const meta = L && L.META[look], glow = candles ? Math.max(candles.glow, meta ? meta.minGlow : 0) : 0;
+      if (on && candles && (glow > 0 || (look !== "solid" && look !== "shift")) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(this.fillStyle)) {
+        const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, col = toHexCol(this.fillStyle), isUp = col === candles.upHex;
+        lk.g = this; lk.px = 1 / sx; lk.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
+        this.save();
+        if (glow > 0) { this.shadowColor = L ? L.tone(look, col, lk) : col; this.shadowBlur = 3 + glow * 16; }
+        if (L && look !== "solid" && Math.abs(w * sx) >= 3 && Math.abs(h * sy) >= 3) L.draw(this, look, x, y, w, h, col, isUp, lk);
+        else { if (L) fillDesc.set.call(this, L.wick(look, col, lk)); origFillRect.call(this, x, y, w, h); }
+        this.restore(); return;
       }
       return origFillRect.call(this, x, y, w, h);
     };

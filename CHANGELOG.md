@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.24 (2026-11-04)
+- **16 candle looks** (was 4), each shown as a card with a live preview in your own candle colours: Solid, Neon, Glass, Chrome, Ice, Lava, Fade, Outline, 3D, Holo, Ghost, Rounded, Pixel, Heat, Rainbow and Cycle.
+  - Fade is brightest where each candle closed. Heat warms up the higher price is on the chart. Ghost shows barely-there bodies with solid open and close caps.
+  - They work with any colours, on TradingView and on Lightweight Charts apps like nq.vision, and on desktop and Android too.
+  - Bordered candles are drawn once, so outlines and glass don't double up. No measurable slowdown (60 fps in tests).
+
 ## 0.1.23 (2026-11-04)
 - Custom trading apps built on TradingView Lightweight Charts (like nq.vision): candle colours and glow now work, not just the wallpaper and watermark.
   - Candle colours are learned even when the app uses slightly see-through colours, or draws candles as shapes instead of plain boxes.
