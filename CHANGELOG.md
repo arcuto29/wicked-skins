@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.21 (2026-11-07)
+- Fixed custom trading apps built on TradingView Lightweight Charts (like nq.vision): the wallpaper and candle colours now show up. Before, only the watermark did.
+  - The wallpaper was hidden behind the app's own solid backgrounds. On these apps it now sits inside the chart's own box, directly under the chart, so nothing the app paints around the chart can cover it.
+  - Candle colours now work with the app's own colours, not just the library defaults (the extension works out which colours are the candles). The chart is told to redraw when you change a setting, so changes show straight away.
+  - The price and time scales become see-through panels instead of solid strips.
+- Diagnose (Style → Trade brackets) now explains what it sees on these pages: whether the wallpaper is mounted, which candle colours were found, and what sits over the chart, so any remaining problem can be pinned down from one pasted message.
+- Note: broker pills (trade brackets) don't exist on these charts, and the Interface and Sides options only apply to TradingView itself.
+
 ## 0.1.20 (2026-11-07)
 - 22 new live wallpapers, taking the collection from 24 to 46: Totality, Meteor Shower, Wormhole, Pulsar, Wildfire, Caldera, Hive, Old Terminal, Laser Show, Equalizer, Night Drive, Midnight Towers, Zen Waves, Fog Bank, Reef Light, Silk, Autumn Drift, Moonlit Ridge, Jellyfish, plus three trading-themed ones: Candle Rain, Order Ladder and Ghost Charts. Every one is light on your computer.
 - New "Max" smoothness (Adjust → Smoothness): the wallpaper runs at your screen's own refresh rate, so on a 120/144/240 Hz monitor it is as smooth as the screen allows. Before, the top setting was capped at 60 fps. Max uses more GPU; auto quality still eases off if your computer struggles.

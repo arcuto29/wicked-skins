@@ -1201,20 +1201,40 @@ if ($("bracketDiag")) $("bracketDiag").onclick = async () => {
           else if (lw) engine = "lightweight";
         } catch {}
         const canvases = (() => { try { return [...document.querySelectorAll("canvas")].filter((c) => { const r = c.getBoundingClientRect(); return r.width > 150 && r.height > 120; }).length; } catch { return 0; } })();
-        return { hooked: !!window.__bdHooked, ver: window.__bdHookVer || null, caught: d ? d.samples : null, onChart: window.__bdDiagSeen || [], engine, canvases };
+        // facts about a Lightweight-Charts style page (read-only): is our adapter running, is the wallpaper mounted, and what
+        // sits between the wallpaper and the screen (an opaque box there is what hides it)
+        let lw = null, layer = null, stack = [];
+        try { lw = window.__bdLwInfo ? window.__bdLwInfo() : null; } catch {}
+        try {
+          const l = document.getElementById("bd-layer");
+          if (l) { const r = l.getBoundingClientRect(); layer = { inside: l.parentElement ? l.parentElement.tagName.toLowerCase() + (l.parentElement.id ? "#" + l.parentElement.id : "") : "", w: Math.round(r.width), h: Math.round(r.height), embedded: l.classList.contains("bd-embedded") }; }
+          const cv = [...document.querySelectorAll("canvas")].filter((c) => { const r = c.getBoundingClientRect(); return r.width > 250 && r.height > 150; }).sort((a, b) => b.width * b.height - a.width * a.height)[0];
+          if (cv) { const r = cv.getBoundingClientRect(); let e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2), n = 0;
+            while (e && n++ < 7) { const bg = getComputedStyle(e).backgroundColor; stack.push(e.tagName.toLowerCase() + (e.id ? "#" + e.id : "") + (typeof e.className === "string" && e.className ? "." + e.className.split(" ")[0].slice(0, 24) : "") + (bg && !/rgba?\(0, 0, 0, 0\)|transparent/.test(bg) ? " [" + bg + "]" : "")); e = e.parentElement; } }
+        } catch {}
+        return { hooked: !!window.__bdHooked, ver: window.__bdHookVer || null, caught: d ? d.samples : null, onChart: window.__bdDiagSeen || [], engine, canvases, lw, layer, stack, frame: location.hostname };
       },
     });
     const score = (x) => x && x.result ? ((x.result.caught ? x.result.caught.length * 100 : 0) + (x.result.onChart ? x.result.onChart.length : 0) + (x.result.engine && x.result.engine !== "unknown" ? 5 : 0) + (x.result.hooked ? 1 : 0)) : -1;
     const best = (results || []).sort((a, b) => score(b) - score(a))[0];
     const r = best && best.result;
     if (!r) { out.textContent = "Couldn't read the chart. Make sure Priism Skins is on for this tab."; return; }
-    // Engine check first — if it's Lightweight Charts, no amount of "turning on" will skin it with today's build.
-    if (r.engine === "lightweight") {
-      out.textContent = "This chart is TradingView Lightweight Charts — a different engine Priism Skins doesn't support yet (candles/brackets won't apply). Send me this message and I'll look at an adapter.";
+    // Lightweight Charts (custom apps like nq.vision): wallpaper + candle colours are supported; there are no broker pills.
+    if (r.engine === "lightweight" || (r.lw && r.lw.active)) {
+      const L = r.lw;
+      const facts = [
+        `adapter ${L && L.active ? "ON" : "NOT running"}`,
+        `wallpaper ${r.layer ? (r.layer.embedded ? "mounted inside the chart box" : "mounted behind the page") + ` (${r.layer.w}\u00D7${r.layer.h})` : "NOT mounted"}`,
+        L && L.candles ? `candle colours set (${L.candles.up}/${L.candles.down})` : "candle colours: not enabled (Style \u2192 Candles)",
+        L && L.sides ? `${L.sides.length} candle colours known, learned: ${L.learned.map((x) => x[0] + " " + x[1]).join(", ") || "none yet"}` : "",
+        `${r.canvases} chart canvas(es)`,
+        r.stack && r.stack.length ? `over the chart: ${r.stack.join(" < ")}` : "",
+      ].filter(Boolean).join(" \u00B7 ");
+      out.textContent = `Lightweight Charts detected. Wallpaper and candle colours are supported here (broker pills are not, that chart has none). ${facts}. If something isn't showing, copy this whole message and send it to me.`;
       return;
     }
     if (!r.hooked && r.engine !== "advanced") {
-      out.textContent = `No TradingView (Advanced Charts) chart detected here${r.canvases ? ` (${r.canvases} canvas chart(s) on the page, but not a supported engine)` : ""}. Priism Skins only skins TradingView's Advanced Charts. Paste me this line.`;
+      out.textContent = `No TradingView chart detected on this page${r.canvases ? ` (${r.canvases} canvas chart(s), but not one I recognise)` : ""}. ${r.stack && r.stack.length ? `Over the chart: ${r.stack.join(" < ")}. ` : ""}Copy this and send it to me.`;
       return;
     }
     if (!r.hooked) { out.textContent = "The skin engine isn't active on this tab yet. Turn Priism Skins on here, let the chart load, then click again."; return; }

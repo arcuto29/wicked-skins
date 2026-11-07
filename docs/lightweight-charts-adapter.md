@@ -1,6 +1,6 @@
 # Priism Skins on TradingView **Lightweight Charts** (e.g. nq.vision)
 
-**Status: shipped (v0.1.11).** `src/lw.js` is a Lightweight Charts adapter that recolours candles (up/down,
+**Status: shipped (v0.1.11), reworked for real apps in v0.1.21.** `src/lw.js` is a Lightweight Charts adapter that recolours candles (up/down,
 auto-learned from the chart) and clears the chart background so a wallpaper shows through. It activates only when
 Lightweight Charts is present and Advanced Charts is not, so it never conflicts with the main engine on
 tradingview.com. Verified against a live Lightweight Charts chart (8/8).
@@ -8,6 +8,13 @@ tradingview.com. Verified against a live Lightweight Charts chart (8/8).
 **What works:** wallpaper behind the chart, candle recolour. **What does NOT exist on this engine:** the broker
 **trade brackets** (TP/Stop/entry/P&L pills) — Lightweight Charts has no such element, so there is nothing to
 restyle. Price-scale text styling and glow are Advanced-Charts-only for now.
+
+**v0.1.21 (custom apps like nq.vision).** A page-wide layer behind the app is hidden by the app's own solid backgrounds, so on these
+pages the wallpaper is mounted *inside the chart's container*, just under the chart (single chart, "behind" mode). Candle colours are
+learned from the rectangles the chart actually draws (counted per rectangle, original colour, remembered), the chart is nudged to redraw
+after a change (window resize event + a 1px width nudge for two frames), and the price/time scales get a translucent panel. Tested against
+a stand-in app with solid backgrounds on Lightweight Charts 3.8.0, 4.2.0 and 5.x, with default and custom colours. Not tested on nq.vision
+itself (login-gated); use Diagnose on the page and send the result if something doesn't show.
 
 The rest of this note is the original feasibility analysis.
 

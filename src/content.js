@@ -564,6 +564,28 @@
     h.classList.toggle("bd-ui-accent", !!(on && accent));
   }
 
+  // Pages built on Lightweight Charts (not TradingView's own charts), like nq.vision: the app around the chart has solid
+  // backgrounds we can't know about, so a layer behind the whole page would be hidden. Instead the wallpaper goes INSIDE the
+  // chart's own container, directly under the chart (whose background lw.js clears). Single chart + "behind" mode only.
+  let embeddedHost = null, lastRebuild = 0;
+  function lwHost() {
+    if (document.querySelector(".chart-container, .chart-markup-table")) return null;
+    if (charts.length !== 1) return null;
+    const el = charts[0].el;
+    const host = el.classList.contains("tv-lightweight-charts") ? el.parentElement : el;
+    return host && host !== document.body && host !== document.documentElement ? host : null;
+  }
+  function claimStack(host) {      // the chart wrapper must be positioned so it paints ABOVE the wallpaper (a positioned sibling)
+    const mark = (el) => { if (el && getComputedStyle(el).position === "static") { el.style.position = "relative"; el.dataset.bdPos = "1"; } };
+    mark(host); host.querySelectorAll(".tv-lightweight-charts").forEach(mark);
+  }
+  function releaseStack() {
+    if (!embeddedHost) return;
+    const undo = (el) => { if (el && el.dataset && el.dataset.bdPos) { el.style.position = ""; delete el.dataset.bdPos; } };
+    undo(embeddedHost); embeddedHost.querySelectorAll("[data-bd-pos]").forEach(undo);
+    embeddedHost = null;
+  }
+
   function build() {
     teardown();
     const was = document.documentElement.classList.contains("bd-on");
@@ -601,7 +623,10 @@
     pillEl.className = "bd-pill"; pillEl.hidden = true;
     pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     layer.appendChild(pillEl);
-    document.documentElement.appendChild(layer);
+    embeddedHost = cfg.layer !== "over" && !tiled() ? lwHost() : null;
+    layer.classList.toggle("bd-embedded", !!embeddedHost);
+    if (embeddedHost) { claimStack(embeddedHost); embeddedHost.insertBefore(layer, embeddedHost.firstChild); }
+    else document.documentElement.appendChild(layer);
     placeViews();
     resetQuality(); lastMatch = "";
     if (views.some((v) => v.skin)) startLoop();
@@ -615,9 +640,12 @@
   function placeViews() {
     if (!layer) return;
     views.forEach((v, i) => {
-      const r = tiled() && charts[i] ? charts[i].r : { left: 0, top: 0, width: innerWidth, height: innerHeight };
-      Object.assign(v, { x: r.left, y: r.top, w: r.width, h: r.height });
-      Object.assign(v.tile.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" });
+      const hr = embeddedHost && embeddedHost.isConnected ? embeddedHost.getBoundingClientRect() : null;
+      const r = hr ? { left: hr.left + embeddedHost.clientLeft, top: hr.top + embeddedHost.clientTop, width: embeddedHost.clientWidth, height: embeddedHost.clientHeight }
+        : tiled() && charts[i] ? charts[i].r : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+      Object.assign(v, { x: r.left, y: r.top, w: r.width, h: r.height });          // v.x/y stay in viewport coordinates (used for measuring + capture)
+      Object.assign(v.tile.style, hr ? { left: "0px", top: "0px", width: r.width + "px", height: r.height + "px" }
+        : { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" });
       sizeCanvas(v);
     });
     clipToChart();
@@ -627,6 +655,10 @@
   }
   function trackLayout() {
     if (!layer || standDown || document.querySelector(".chart-container[data-bd-repaint]")) return;   // mid-redraw: charts hidden for 2 frames
+    if (!layer.isConnected || (embeddedHost && !embeddedHost.isConnected)) {          // the app re-drew its page and took our layer with it
+      if (Date.now() - lastRebuild > 3000) { lastRebuild = Date.now(); charts = chartEls(); build(); }
+      return;
+    }
     const next = chartEls(), sig = sigOf(next);
     if (sig === layoutSig) return;
     const before = charts.length, wasTiled = tiled();
@@ -723,6 +755,7 @@
   }
 
   function teardown() {
+    releaseStack();
     running = false;
     cancelAnimationFrame(raf);
     if (layer) {
