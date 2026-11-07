@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.22 (2026-11-04)
+- Fixed TP / Stop / P&L numbers that could turn invisible ("fully white") with trade-bracket styling on.
+  - A strengthened box used to become TradingView's own pill colour at full strength, often the same colour as its number. It is now a dark box tinted with that colour.
+  - The number is checked against its box. If they're too close in colour, it switches to black or white so it always reads.
+  - With Box set to Keep, we no longer override TradingView's own number colour.
+  - Pill text is now recognised by where it sits (inside a pill box), not only by font, so pills drawn in a different font get styled too.
+- New one-tap button in Style → Trade brackets: **Make TP / Stop / P&L easy to see** (bigger number, dark box, profit green / loss red, thicker line and outline).
+
 ## 0.1.21 (2026-11-07)
 - Fixed custom trading apps built on TradingView Lightweight Charts (like nq.vision): the wallpaper and candle colours now show up. Before, only the watermark did.
   - The wallpaper was hidden behind the app's own solid backgrounds. On these apps it now sits inside the chart's own box, directly under the chart, so nothing the app paints around the chart can cover it.

@@ -1141,6 +1141,12 @@ function syncBracket() {
   seg("bracketLineW", [[0, "Thin"], [1, "Medium"], [2, "Thick"], [3, "Thicker"]], () => (+cfg.bracketLineW || 0), (v) => { set({ bracketLineW: v }); bkOn(); });
 }
 $("bracketOn").onchange = (e) => set({ bracketOn: e.target.checked });
+// One tap: big number on a dark box, profit green / loss red, thicker level line — readable on any wallpaper.
+$("bracketEasy").onclick = () => {
+  set({ bracketOn: true, bracketSize: 2, bracketBack: "solid", bracketFill: "", bracketText: "",
+    bracketProfit: "#19e68c", bracketLoss: "#ff4d5e", bracketBorderColor: "", bracketBorderW: 1, bracketLineColor: "", bracketLineW: 1 });
+  syncBracket(); toast && toast("TP / Stop / P&L: big, dark box, green/red numbers");
+};
 $("bracketFill").oninput = (e) => { set({ bracketFill: e.target.value }); bkOn(); };
 $("bracketText").oninput = (e) => { set({ bracketText: e.target.value, bracketProfit: "", bracketLoss: "" }); bkOn(); };
 $("bracketProfit").oninput = (e) => { set({ bracketProfit: e.target.value, bracketText: "", bracketOn: true }); };
