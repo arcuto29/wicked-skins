@@ -8,7 +8,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 1;
+  const LW_VERSION = 2;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -19,11 +19,31 @@
 
   // ---------- is this a Lightweight Charts page (and NOT Advanced Charts)? ----------
   function hasAdvanced() {
-    try { return !!(window.TradingViewApi || window.tradingViewApi || document.querySelector(".chart-markup-table, .chart-container")); }
+    // NOTE: not ".chart-container" — that's a generic class name lots of apps (incl. Lightweight Charts ones) use too.
+    try { return !!(window.TradingViewApi || window.tradingViewApi || document.querySelector(".chart-markup-table")); }
     catch { return false; }
+  }
+  // Modified builds of Lightweight Charts may rename the ".tv-lightweight-charts" wrapper, so also recognise the
+  // chart by its structure: LW always lays a chart out as a <table> of cells holding 2+ stacked canvases.
+  const ROOT_SEL = "[data-bd-lwroot], .tv-lightweight-charts";
+  function markRoots() {
+    let n = 0, fresh = false;
+    try {
+      for (const el of document.querySelectorAll(".tv-lightweight-charts")) { if (!el.hasAttribute("data-bd-lwroot")) { el.setAttribute("data-bd-lwroot", ""); fresh = true; } n++; }
+      for (const t of document.querySelectorAll("table")) {
+        if (t.closest(ROOT_SEL)) { n++; continue; }
+        const cv = t.querySelectorAll("canvas"); if (cv.length < 2) continue;
+        const r = t.getBoundingClientRect(); if (r.width < 200 || r.height < 120) continue;
+        const root = t.parentElement && t.parentElement !== document.body ? t.parentElement : t;
+        root.setAttribute("data-bd-lwroot", ""); fresh = true; n++;
+      }
+    } catch {}
+    if (fresh) { try { paneCache = new WeakMap(); lwTableCache = new WeakMap(); } catch {} }   // a chart appeared: re-check canvases
+    return n;
   }
   function hasLightweight() {
     try {
+      if (markRoots()) return true;
       if (window.LightweightCharts) return true;
       if (document.querySelector(".tv-lightweight-charts, [class*='lightweight']")) return true;
       // fallback: a canvas whose wrapper looks like a LW table, or the LW "attribution" link is present
@@ -59,7 +79,7 @@
     repaintT = setTimeout(() => {
       if (!active) return;
       try { window.dispatchEvent(new Event("resize")); } catch {}
-      const hosts = [...document.querySelectorAll(".tv-lightweight-charts")].map((e) => e.parentElement).filter(Boolean);
+      const hosts = [...document.querySelectorAll(ROOT_SEL)].map((e) => e.parentElement).filter(Boolean);
       for (const h of hosts) {
         const r = h.getBoundingClientRect(); if (r.width < 50) continue;
         const was = h.style.width, wasMax = h.style.maxWidth;
@@ -131,7 +151,7 @@
   function colourful(key) { const [R, G, B] = key.split(",").map(Number); const mx = Math.max(R, G, B), mn = Math.min(R, G, B); return mx - mn > 28 && mx > 40; }
   function learnFromDrawing() {
     lastTally = [...tally].sort((a, b) => b[1] - a[1]).slice(0, 6);
-    const cands = [...tally].filter(([c, n]) => n >= 6).map(([c, n]) => [rgbKey(c), n]).filter(([r]) => r && r.a === null && colourful(r.key))
+    const cands = [...tally].filter(([c, n]) => n >= 6).map(([c, n]) => [rgbKey(c), n]).filter(([r]) => r && (r.a === null || +r.a >= 0.6) && colourful(r.key))
       .sort((a, b) => b[1] - a[1]).slice(0, 2);
     tally.clear();
     if (cands.length < 2) return [];
@@ -157,6 +177,8 @@
     if (sig !== sidesSig) { sides = next; sidesSig = sig; cache.clear(); remapCache.clear(); repaint(); }   // new colours learned: the chart has to redraw to show them
   }
 
+  // is this (already remapped) colour one of the chosen candle colours?
+  function isCandleCol(v) { if (!candles || typeof v !== "string") return false; const r = rgbKey(v); return !!r && (r.key === candles.up.join(",") || r.key === candles.down.join(",")); }
   // ---------- remap ----------
   function remap(v) {
     if (!candles || typeof v !== "string") return v;
@@ -171,20 +193,20 @@
   }
 
   // ---------- only touch the chart's own canvases ----------
-  const paneCache = new WeakMap();
+  let paneCache = new WeakMap();
   function isChart(c) {
     if (!c) return false;
     let v = paneCache.get(c);
     if (v === undefined) {
-      try { v = !!(c.closest && (c.closest(".tv-lightweight-charts") || (c.parentElement && /lightweight|tv-lw/i.test(c.parentElement.className || "")) || (c.width >= 200 && c.height >= 120))); }
+      try { v = !!(c.closest && (c.closest(ROOT_SEL) || (c.parentElement && /lightweight|tv-lw/i.test(c.parentElement.className || "")) || (c.width >= 200 && c.height >= 120))); }
       catch { v = false; }
       paneCache.set(c, v);
     }
     return v;
   }
 
-  const lwTableCache = new WeakMap();
-  function inLwTable(c) { let v = lwTableCache.get(c); if (v === undefined) { try { v = !!(c.closest && c.closest(".tv-lightweight-charts")); } catch { v = false; } lwTableCache.set(c, v); } return v; }
+  let lwTableCache = new WeakMap();
+  function inLwTable(c) { let v = lwTableCache.get(c); if (v === undefined) { try { v = !!(c.closest && c.closest(ROOT_SEL)); } catch { v = false; } lwTableCache.set(c, v); } return v; }
 
   // ---------- install the canvas hooks (once, when this is a LW page) ----------
   let active = false;
@@ -214,8 +236,39 @@
           const prev = this.fillStyle; fillDesc.set.call(this, "rgba(6,9,16,0.5)"); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, prev); return;
         }
       }
+      drawCalls.fillRect++;
+      if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.fillStyle)) {
+        const pB = this.shadowBlur, pC = this.shadowColor;
+        this.shadowColor = this.fillStyle; this.shadowBlur = 3 + candles.glow * 16;
+        origFillRect.call(this, x, y, w, h); this.shadowBlur = pB; this.shadowColor = pC; return;
+      }
       return origFillRect.call(this, x, y, w, h);
     };
+    // Some (modified) builds draw candle bodies as paths (rounded bodies, custom series) instead of fillRect:
+    // learn their colours from fill() too, and glow them the same way.
+    const origFillP = proto.fill;
+    proto.fill = function (...a) {
+      const c = this.canvas;
+      if (on && c && typeof this.__bdLwOrig === "string" && isChart(c)) { noteFill(this.__bdLwOrig); drawCalls.fill++; }
+      if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.fillStyle)) {
+        const pB = this.shadowBlur, pC = this.shadowColor;
+        this.shadowColor = this.fillStyle; this.shadowBlur = 3 + candles.glow * 16;
+        const r = origFillP.apply(this, a); this.shadowBlur = pB; this.shadowColor = pC; return r;
+      }
+      return origFillP.apply(this, a);
+    };
+    const origStrokeP = proto.stroke;
+    proto.stroke = function (...a) {
+      const c = this.canvas;
+      if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.strokeStyle)) {
+        drawCalls.stroke++;
+        const pB = this.shadowBlur, pC = this.shadowColor;
+        this.shadowColor = this.strokeStyle; this.shadowBlur = 2 + candles.glow * 12;
+        const r = origStrokeP.apply(this, a); this.shadowBlur = pB; this.shadowColor = pC; return r;
+      }
+      return origStrokeP.apply(this, a);
+    };
+    setInterval(markRoots, 2000);
 
     setInterval(learnSides, 1500);
     learnSides(); setTimeout(learnSides, 400); setTimeout(learnSides, 900);
@@ -225,7 +278,9 @@
 
   // Diagnostics (read by the panel's Diagnose button): what the adapter currently believes about this page.
   window.__bdLwInfo = () => ({ active, on, candles: candles ? { up: candles.upHex, down: candles.downHex } : null,
-    sides: [...sides].slice(0, 12), learned: [...learnedDrawn], lastTally: lastTally, canvases: document.querySelectorAll(".tv-lightweight-charts canvas").length });
+    sides: [...sides].slice(0, 12), learned: [...learnedDrawn], lastTally: lastTally, canvases: document.querySelectorAll("[data-bd-lwroot] canvas, .tv-lightweight-charts canvas").length, roots: document.querySelectorAll(ROOT_SEL).length,
+    drawCalls: { ...drawCalls } });
+  const drawCalls = { fillRect: 0, fill: 0, stroke: 0 };
   let lastTally = [];
 
   // Wait until the page actually has a Lightweight Charts chart (and isn't an Advanced Charts page).
@@ -233,6 +288,7 @@
   (function waitForChart() {
     if (hasAdvanced()) return;                 // hook.js owns this page
     if (hasLightweight()) { install(); return; }
-    if (tries++ < 120) setTimeout(waitForChart, 250);   // up to ~30s for a late-loading chart
+    // keep looking: on login-gated / single-page apps the chart can appear minutes after the page loads
+    setTimeout(waitForChart, tries++ < 120 ? 250 : 1000);
   })();
 })();
