@@ -17,7 +17,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipLen: 10, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
@@ -231,7 +231,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderChartStyle(); syncPanels(); syncShortcuts(); syncTimer(); syncSkinView(); renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode(); }
+function refreshAll() { renderChartStyle(); syncPanels(); syncShortcuts(); syncTimer(); syncExtras(); syncSkinView(); renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 // Look groups (shown as chips). New looks: add the id here or they land in "Classic".
@@ -364,8 +364,10 @@ function updateEmpty(n) { if ($("skinEmpty")) $("skinEmpty").hidden = n > 0 || !
 let skinView = localStorage.getItem("skinView") || "looks";
 function syncSkinView() {
   if (!$("skinView")) return;
-  seg("skinView", [["looks", "Looks"], ["walls", "Wallpapers"]], () => skinView, (v) => { skinView = v; localStorage.setItem("skinView", v); syncSkinView(); });
-  $("viewLooks").hidden = skinView !== "looks"; $("viewWalls").hidden = skinView !== "walls";
+  seg("skinView", [["looks", "Looks"], ["walls", "Wallpapers"], ["mine", "My uploads"]], () => skinView, (v) => { skinView = v; localStorage.setItem("skinView", v); syncSkinView(); });
+  $("viewLooks").hidden = skinView !== "looks"; $("viewWalls").hidden = skinView !== "walls"; $("tab-media").hidden = skinView !== "mine";
+  if ($("skinSearch")) $("skinSearch").hidden = skinView === "mine";
+  if (skinView === "mine") return renderMedia();
   if (skinView === "looks") renderQuick(); else renderSkins();
 }
 if ($("skinSearch")) $("skinSearch").oninput = () => (skinView === "looks" ? renderQuick() : renderSkins());
@@ -723,7 +725,7 @@ async function wsUse(it) {
     const blob = await W().fetchFile(it);
     const ext = (blob.type.split("/")[1] || "").replace("jpeg", "jpg");
     await addFiles([new File([blob], `${it.title}.${ext || (it.kind === "video" ? "webm" : "png")}`, { type: blob.type })]);
-    toast(`“${it.title}” is on your chart and in your Uploads.`);
+    toast(`“${it.title}” is on your chart and in My uploads (Skins tab).`);
   } catch (e) { toast("Couldn't use it: " + e.message); }
 }
 $("wsMore").onclick = () => { wsPage++; wsLoad(false); };
@@ -1005,13 +1007,21 @@ function renderJournal() {
         a.append(im); row.append(a);
       }
       const meta = document.createElement("div"); meta.className = "jmeta";
-      meta.innerHTML = `<b>${esc(e.sym || "Trade")}</b> <span class="${e.v >= 0 ? "jup" : "jdn"}">${esc(fmtMoneyP(e.v, e.unit))}</span><small>${esc(when)} \u00B7 held ${fmtDurP(e.secs || 0)}</small>`;
+      meta.innerHTML = `<b>${esc(e.sym || "Trade")}</b> <span class="${e.v >= 0 ? "jup" : "jdn"}">${esc(cfg.privacy ? "\u2022\u2022\u2022\u2022\u2022" : fmtMoneyP(e.v, e.unit))}</span><small>${esc(when)} \u00B7 held ${fmtDurP(e.secs || 0)}</small>`;
       const del = document.createElement("button"); del.className = "x"; del.title = "Delete"; del.innerHTML = ICON_X;
       del.onclick = async () => { const cur = (await storeGet({ journal: [] })).journal || []; chrome.storage.local.set({ journal: cur.filter((x) => x.id !== e.id) }, renderJournal); };
       row.append(meta, del); box.append(row);
     }
   });
 }
+// streamer mode + auto trade clips
+function syncExtras() {
+  if ($("privacyOn")) { $("privacyOn").checked = !!cfg.privacy; seg("privacyPeek", [[false, "Stay blurred"], [true, "Clear while pointing"]], () => !!cfg.privacyPeek, (v) => set({ privacyPeek: v })); }
+  if ($("tradeClipOn")) { $("tradeClipOn").checked = !!cfg.tradeClipOn; $("tradeClipLenRow").hidden = !cfg.tradeClipOn;
+    seg("tradeClipLen", [[15, "Last 15s"], [30, "Last 30s"], [60, "Last 1 min"]], () => +cfg.tradeClipLen || 30, (v) => set({ tradeClipLen: v })); }
+}
+if ($("privacyOn")) $("privacyOn").onchange = (e) => { set({ privacy: e.target.checked }); renderJournal(); };
+if ($("tradeClipOn")) $("tradeClipOn").onchange = (e) => { set({ tradeClipOn: e.target.checked }); syncExtras(); };
 if ($("journalOn")) {
   $("journalOn").onchange = (e) => set({ journalOn: e.target.checked });
   $("journalClear").onclick = () => { try { chrome.storage.local.set({ journal: [] }, renderJournal); } catch {} };
@@ -1080,7 +1090,7 @@ function renderChartStyle() {
   }
 }
 // ---------- shortcuts ----------
-const KEY_NAMES = { focusKey: "Focus mode", recordKey: "Record a clip", snapKey: "Snapshot", toggleKey: "Turn everything on/off" };
+const KEY_NAMES = { focusKey: "Focus mode", privacyKey: "Streamer mode", recordKey: "Record a clip", snapKey: "Snapshot", toggleKey: "Turn everything on/off" };
 const keyLabel = (spec) => spec ? String(spec).split("+").map((k) => k.replace(/^Key/, "").replace(/^Digit/, "").replace(/^Arrow/, "")).join("+") : "Off";
 const TV_ALT = ["KeyT", "KeyH", "KeyJ", "KeyV", "KeyC", "KeyF", "KeyI", "KeyL", "KeyR", "KeyS", "KeyA", "KeyG", "KeyP", "KeyW", "KeyX", "KeyZ", "KeyK", "KeyN", "KeyO", "KeyD", "KeyB"];
 let keyListen = null;
@@ -1667,7 +1677,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderChartStyle(); syncPanels(); syncSkinView(); syncShortcuts(); syncTimer();
+  renderChartStyle(); syncPanels(); syncSkinView(); syncShortcuts(); syncTimer(); syncExtras();
   if (+cfg.clipLen) clipSecs = [5, 10, 30, 60, 120].includes(+cfg.clipLen) ? +cfg.clipLen : clipSecs;
   renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode();
   siteBar();
@@ -1677,7 +1687,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
   const q = new URLSearchParams(location.search);
   if (q.get("page")) {
     document.body.classList.add("page");
-    const b = document.querySelector(`#nav button[data-tab="${q.get("page")}"]`); b && b.click();
+    const pg = q.get("page") === "media" ? "skins" : q.get("page");          // Uploads now lives in Skins > My uploads
+    if (q.get("page") === "media") { skinView = "mine"; localStorage.setItem("skinView", "mine"); }
+    const b = document.querySelector(`#nav button[data-tab="${pg}"]`); b && b.click(); if (q.get("page") === "media") syncSkinView();
     if (q.has("pick")) hint("Click “Add video / image” or drop files here.");
     convertPending();
   }
@@ -1724,9 +1736,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Focus mode + shortcuts you can change: focus, record, snapshot (Adjust › Shortcuts)",
-  "Session timer: countdown to the next open / close (Trading)",
-  "Share links with a live preview page (Saved › More ways to share)",
+const WHATS_NEW = ["Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)",
+  "Auto trade clips: a clip of each trade saved when it closes (Trading › After each trade)",
+  "Tidier panel: switched-off sections fold down, and Uploads lives in Skins",
   "Clip quality options, and instant saving when you don't crop or trim",
   "Smoother: fixed the brief freezes; trade brackets work with the newer rounded labels",
   "Community looks: share your whole setup, browse Top / New / Mine (Workshop)",
@@ -1759,3 +1771,15 @@ const WHATS_NEW = ["Focus mode + shortcuts you can change: focus, record, snapsh
     $("news").querySelector(".x").onclick = () => { $("news").hidden = true; localStorage.setItem("seenVer", ver); };
   }
 })();
+
+// ---------- keep it uncluttered: a switched-off section shows just its title and one line ----------
+// (switch it on and its options appear). Candles stay open: picking a candle look is how most people start.
+function syncOffGroups() {
+  document.querySelectorAll("details.grp").forEach((d) => {
+    const sw = d.querySelector(":scope > summary .switch input");
+    d.classList.toggle("is-off", !!sw && !sw.checked && d.dataset.grp !== "candles");
+  });
+}
+document.addEventListener("change", () => setTimeout(syncOffGroups, 0), true);
+document.addEventListener("click", (e) => { if (e.target.closest && e.target.closest("button")) setTimeout(syncOffGroups, 30); }, true);
+syncOffGroups(); setTimeout(syncOffGroups, 300);

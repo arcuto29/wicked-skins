@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.35 (2026-11-04)
+- **Streamer mode** (Capture → Streamer mode, or Alt+Shift+P on the chart): hides your money while you stream or record.
+  - The numbers in your TP / Stop / P&L labels become dots, right where TradingView draws them, so they're hidden on screen and in any recording.
+  - Priism's P&L readout and goal bar (including how full it is) and the journal amounts are hidden too.
+  - TradingView's account and order panels are blurred. Optionally they clear while your mouse is over them.
+- **Auto trade clips** (Trading → After each trade → Save a clip): while you're in a trade, Priism keeps the last 15 s, 30 s or 1 min ready and saves a clip automatically when the trade closes, ending just after the close. Nothing records while you're flat.
+- **Less crowded panel**:
+  - A section that's switched off now shows only its title and a short line; switch it on and its options appear.
+  - Uploads moved into Skins (Looks · Wallpapers · My uploads), so there's one tab fewer.
+  - The journal and auto clips sit together under "After each trade".
+
 ## 0.1.34 (2026-11-04)
 - **Focus mode** (default Alt+Shift+F on the chart): fades the wallpaper away and pauses it, so only your chart is left. Press again to bring it back.
   - "Everything" also drops the chart styling. Your P&L, goal bar, session timer and brackets stay.

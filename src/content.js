@@ -34,6 +34,11 @@
     focus: false, focusHides: "wallpaper",   // Focus mode: hide just the wallpaper, or the wallpaper AND all styling
     // Session timer: a slim countdown to the next market open / close, styled to match your look.
     timerOn: false, timerMarket: "auto", timerPos: "bc",
+    // Streamer mode: hides your money on screen and in every recording (labels on the chart, Priism's readouts,
+    // TradingView's account / order panels). privacyPeek = un-blur a panel while your mouse is over it.
+    privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP",
+    // Auto trade clips: while a trade is open, keep the last tradeClipLen seconds ready; save a clip when it closes.
+    tradeClipOn: false, tradeClipLen: 30,
     clipQuality: "balanced",  // high | balanced | small (small keeps a clip under ~20 MB, e.g. for Discord)           // after a recording: open the crop / trim editor (false = download right away)
     // Chart styling — each part off = TradingView's own. Colour "" = skin colour, "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
@@ -221,7 +226,8 @@
 
   // Position: the open P&L TradingView already shows on your chart's position line(s), read by hook.js.
   // Strength is relative to the biggest swing seen this session, so there's nothing to set up.
-  const fmtPnl = (v, u) => { const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
+  const DOTS = "\u2022\u2022\u2022\u2022\u2022";
+  const fmtPnl = (v, u) => { if (cfg.privacy) return DOTS; const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
     return `${v >= 0 ? "+" : "\u2212"}${unit}${Math.abs(v).toFixed(2)}${code}`; };
   let pnlMaxAbs = 0;
   function readPnl() {
@@ -338,7 +344,7 @@
   let day = freshDay(), openTrade = null, lastNudge = 0, goalEl = null, jShot = null, jShotT = 0;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fmtDur = (s) => (s < 90 ? s + "s" : s < 5400 ? Math.round(s / 60) + "m" : (s / 3600).toFixed(1) + "h");
-  const fmtAbs = (n, u) => { const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
+  const fmtAbs = (n, u) => { if (cfg.privacy) return DOTS; const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
     return `${unit}${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}${code}`; };
   const readPnlRaw = () => { try { const p = JSON.parse(document.documentElement.getAttribute("data-ws-pnl") || "null"); return p && typeof p.v === "number" ? p : null; } catch { return null; } };
   const curSym = () => { const q = parseTitle(); return q ? q.sym : ""; };
@@ -349,14 +355,14 @@
 
   function tickTrades() {
     if (standDown || (EXT && !owner)) return;
-    if (!(cfg.enabled && (cfg.goalOn || cfg.journalOn))) { openTrade = null; jShot = null; return renderGoal(); }
+    if (!(cfg.enabled && (cfg.goalOn || cfg.journalOn || cfg.tradeClipOn))) { openTrade = null; jShot = null; tcStop(); return renderGoal(); }
     // A hidden tab doesn't redraw its chart, so its P&L text goes stale. That must never look like a closed trade
     // (otherwise tabbing away mid-trade would record a fake close, then a fake new trade when you come back).
     if (document.hidden) return renderGoal();
     rollDay();
     const now = Date.now(), p = readPnlRaw(), age = p ? now - p.ts : Infinity;
     if (p && age < 3000) {
-      if (!openTrade) openTrade = { since: now, sym: curSym(), v: p.v, unit: p.unit || "", seen: p.ts };
+      if (!openTrade) { openTrade = { since: now, sym: curSym(), v: p.v, unit: p.unit || "", seen: p.ts }; if (cfg.tradeClipOn) tcStart(); }
       else { openTrade.v = p.v; openTrade.seen = p.ts; if (p.unit) openTrade.unit = p.unit; }
       if (cfg.journalOn && now - openTrade.since >= 2500) refreshJournalShot();   // let the entry / stop / target lines settle first
     } else if (openTrade) {
@@ -370,6 +376,65 @@
     renderGoal();
   }
   setInterval(tickTrades, 700);
+
+  // ---------- auto trade clips ----------
+  // Only records while you're in a trade (nothing runs when you're flat). Two overlapping recorders share one
+  // picture of the chart; a fresh one starts every N seconds and the oldest is dropped, so the older of the two always
+  // holds the last N..2N seconds. When the trade closes (Priism notices a few seconds later), that one is saved, so the
+  // clip ends just after the close.
+  let tc = null;
+  async function tcStart() {
+    if (tc || !(cfg.enabled && cfg.tradeClipOn) || typeof MediaRecorder === "undefined" || (EXT && !owner)) return;
+    tc = { starting: true };
+    const box = chartsBox(), scale = Math.min(1, 900 / Math.max(1, box.width)), dpr = Math.min(1.5, devicePixelRatio || 1) * scale;
+    const W = Math.max(2, Math.round(box.width * dpr)) & ~1, H = Math.max(2, Math.round(box.height * dpr)) & ~1;
+    const cap = document.createElement("canvas"); cap.width = W; cap.height = H; const g = cap.getContext("2d");
+    let wmImg = null; try { wmImg = await watermarkImage(); } catch {}
+    if (!tc || !tc.starting) return;                                  // stopped while we were getting ready
+    try { compositeFrame(g, box, dpr, wmImg); } catch { tc = null; return; }
+    const fps = 24; let stream; try { stream = cap.captureStream(fps); } catch { tc = null; return; }
+    const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+    const N = Math.max(10, Math.min(120, +cfg.tradeClipLen || 30));
+    tc = { cap, g, box, dpr, wmImg, stream, mime, N, recs: [], last: 0, rot: 0, raf: 0 };
+    const draw = (t) => { if (!tc || !tc.cap) return; tc.raf = requestAnimationFrame(draw); if (t - tc.last < 1000 / fps - 2) return; tc.last = t; try { compositeFrame(tc.g, tc.box, tc.dpr, tc.wmImg); } catch {} };
+    tc.raf = requestAnimationFrame(draw);
+    const fresh = () => {
+      if (!tc || !tc.cap) return;
+      let r; try { r = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: clipBps(W, H, fps, N * 2, cfg.clipQuality) } : undefined); } catch { return; }
+      r.chunks = []; r.t0 = Date.now(); r.ondataavailable = (e) => { if (e.data && e.data.size) r.chunks.push(e.data); };
+      r.start(1000); tc.recs.push(r);
+      while (tc.recs.length > 2) { const old = tc.recs.shift(); try { old.stop(); } catch {} }
+    };
+    fresh(); tc.rot = setInterval(fresh, N * 1000);
+  }
+  function tcStop() {
+    if (!tc) return; const t = tc; tc = null;
+    clearInterval(t.rot); cancelAnimationFrame(t.raf);
+    for (const r of t.recs || []) try { r.stop(); } catch {}
+    try { t.stream && t.stream.getTracks().forEach((x) => x.stop()); } catch {}
+  }
+  async function tcFinish(trade, v) {
+    if (!tc || !tc.recs || !tc.recs.length) return tcStop();
+    const r = tc.recs[0], t = tc; tc = null;
+    clearInterval(t.rot);
+    for (const x of t.recs) if (x !== r) try { x.stop(); } catch {}
+    await new Promise((res) => { r.onstop = res; try { r.requestData(); r.stop(); } catch { res(); } setTimeout(res, 3000); });
+    cancelAnimationFrame(t.raf); try { t.stream.getTracks().forEach((x) => x.stop()); } catch {}
+    if (!r.chunks.length) return;
+    const blob = new Blob(r.chunks, { type: t.mime || "video/webm" }), d = new Date();
+    const pnl = cfg.privacy ? "" : "-" + (v >= 0 ? "+" : "") + String(v).replace(/[^\d.+-]/g, "");
+    saveBlob(blob, `priism-trade-${String(trade.sym || "chart").replace(/[^\w-]+/g, "")}${pnl}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}.webm`);
+    flash("Trade clip saved to your downloads");
+  }
+  window.__bdTradeClip = () => (tc && tc.recs ? { recording: tc.recs.length, ages: tc.recs.map((r) => Math.round((Date.now() - r.t0) / 1000)) } : null);   // diagnostics
+
+  // ---------- Streamer mode ----------
+  function applyPrivacy() {
+    const h = document.documentElement, on = !!(cfg.enabled && cfg.privacy);
+    h.classList.toggle("bd-privacy", on); h.classList.toggle("bd-peek", on && !!cfg.privacyPeek);
+    if (pnlEl && pnlEl.textContent) { try { renderPnl(); } catch {} }
+    document.dispatchEvent(new CustomEvent("bd-softrepaint"));   // redraw the chart labels masked / unmasked
+  }
 
   // Add a finished trade to today's total. Two TradingView tabs showing the same trade must not count it twice, so
   // the shared storage copy is checked first and only the tab that records it first goes on to write the journal.
@@ -386,7 +451,8 @@
   }
   async function closeTrade(t) {
     const secs = Math.max(0, Math.round((t.seen - t.since) / 1000));
-    if (secs < 4) { jShot = null; return; }                       // a flicker, not a trade
+    if (secs >= 4 && tc) tcFinish(t, Math.round(t.v * 100) / 100);
+    if (secs < 4) { jShot = null; tcStop(); return; }             // a flicker, not a trade
     const v = Math.round(t.v * 100) / 100;
     await sleep(Math.random() * 400);
     const first = await recordClose(v, t.sym, t.unit);
@@ -949,7 +1015,7 @@
   // Line glow + price scale styling, also drawn by hook.js
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
-    "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug",
+    "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy",
     "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
@@ -1240,6 +1306,8 @@
     if (standDown || (EXT && !owner)) return;
     if (keys.some((k) => k === "focus" || k === "focusHides" || k === "enabled")) applyFocus();
     if (keys.some((k) => k.startsWith("timer") || k === "enabled" || k === "candleUp")) renderTimer();
+    if (keys.some((k) => k.startsWith("privacy") || k === "enabled")) { applyPrivacy(); try { renderGoal(); } catch {} }
+    if (keys.some((k) => k.startsWith("tradeClip") || k === "enabled") && !(cfg.enabled && cfg.tradeClipOn)) tcStop();
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
@@ -1252,7 +1320,7 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -1370,7 +1438,7 @@
     g.fillText(goalEl.querySelector(".bd-g-val").textContent, x + w - pad, y + 24 * dpr);
     const tx = x + pad, tw = w - 2 * pad, ty = y + 34 * dpr, th = 6 * dpr;
     rr(g, tx, ty, tw, th, th / 2); g.fillStyle = "rgba(255,255,255,.12)"; g.fill();
-    const fill = goalEl.querySelector(".bd-g-fill"), fl = parseFloat(fill.style.left) || 50, fw = parseFloat(fill.style.width) || 0;
+    const fill = goalEl.querySelector(".bd-g-fill"), fl = parseFloat(fill.style.left) || 50, fw = cfg.privacy ? 0 : parseFloat(fill.style.width) || 0;
     if (fw > 0) { rr(g, tx + tw * fl / 100, ty, Math.max(th, tw * fw / 100), th, th / 2); g.fillStyle = col; g.fill(); }
     g.fillStyle = "rgba(255,255,255,.55)"; g.fillRect(tx + tw / 2 - dpr, ty, 2 * dpr, th);
     g.font = `700 ${10 * dpr}px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = "rgba(223,229,241,.75)";
@@ -1800,12 +1868,13 @@
   addEventListener("keydown", (e) => {
     if (e.repeat) return;
     const isToggle = keyMatch(e, cfg.toggleKey || "Alt+Shift+KeyW"), isFocus = cfg.enabled && keyMatch(e, cfg.focusKey);
-    const isRec = cfg.enabled && keyMatch(e, cfg.recordKey), isSnap = cfg.enabled && keyMatch(e, cfg.snapKey);
-    if (!isToggle && !isFocus && !isRec && !isSnap) return;
+    const isRec = cfg.enabled && keyMatch(e, cfg.recordKey), isSnap = cfg.enabled && keyMatch(e, cfg.snapKey), isPriv = cfg.enabled && keyMatch(e, cfg.privacyKey);
+    if (!isToggle && !isFocus && !isRec && !isSnap && !isPriv) return;
     const tag = (e.target && e.target.tagName) || "";
     if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
     e.preventDefault(); e.stopPropagation();
     if (isToggle) { const next = !cfg.enabled; save({ enabled: next }); flash(next ? "Priism Skins on" : "Priism Skins off"); return; }
+    if (isPriv) { const next = !cfg.privacy; save({ privacy: next }); flash(next ? "Streamer mode on \u00B7 your numbers are hidden" : "Streamer mode off"); return; }
     if (EXT && !owner) return;                      // only the frame that owns the chart records / snaps
     if (isRec) {
       if (clipRec && stopClip) { stopClip(); return; }               // pressed again: stop and save now
@@ -2003,7 +2072,7 @@
   }
 
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored, react: "off" /* Live mood retired: too distracting */ }; build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); }));
+    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored, react: "off" /* Live mood retired: too distracting */ }; build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); }));
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       // today's total is shared between tabs (and reset from the panel); the journal is just stored data
@@ -2019,7 +2088,7 @@
     build();
     pushCandles();
     pushFx();
-    renderWatermark(); applyFocus(); renderTimer();
+    renderWatermark(); applyFocus(); renderTimer(); applyPrivacy();
     window.__bdUpdate = (next) => {
       const keys = Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(cfg[k]));
       cfg = { ...cfg, ...next, react: "off" };
