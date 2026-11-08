@@ -506,7 +506,7 @@ function renderDesk(open) {
   if (!DESK) return;
   $("deskCard").hidden = false;
   $("deskTitle").textContent = open ? "TradingView is open — skins are on" : "TradingView is closed";
-  $("deskHint").textContent = open ? `Your look is live on the chart. In the chart window, press ${/Mac/.test(navigator.platform) ? "\u2318," : "Ctrl+,"} to come back here.` : "Your real TradingView, with your look. Sign in once in that window and your layouts, alerts and broker come with you.";
+  $("deskHint").textContent = open ? `Your look is live on the chart. ${/Mac/.test(navigator.platform) ? "\u2318" : "Ctrl+"}T opens another chart tab, and ${/Mac/.test(navigator.platform) ? "\u2318," : "Ctrl+,"} brings you back here.` : "Your real TradingView, with your look. Sign in once in that window and your layouts, alerts and broker come with you.";
   const btn = $("deskBtn");
   btn.textContent = open ? "Show chart" : "Open TradingView";
   btn.onclick = () => (open ? DESK.open() : DESK.open());   // both focus/open; close is via the chart window

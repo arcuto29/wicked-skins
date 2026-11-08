@@ -27,6 +27,8 @@
       "main.js",
       "preload.js",
       "tv-preload.js",
+      "tabs.html",
+      "tabs-preload.js",
       "package.json"
     ],
     "extraResources": [
