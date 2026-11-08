@@ -167,6 +167,9 @@ html.bd-ui-font.bd-lwpage body,
 html.bd-ui-font.bd-lwpage body *:not(i):not([class*="icon"]):not([class*="Icon"]):not([class*="material"]):not([class*="fa-"]) {
   font-family: var(--bd-ui-font) !important;
 }
+/* …the platform's own text over the chart (legend: symbol, timeframe, indicators) stays readable on a wallpaper */
+html.bd-on.bd-lwpage:not(.bd-over-mode) [data-bd-halo] { text-shadow: 0 0 3px rgba(0,0,0,.9), 0 0 1px rgba(0,0,0,.9) !important; }
+html.bd-on.bd-lwpage:not(.bd-over-mode) [data-bd-lighten] { color: #e6e9f0 !important; }
 /* …and Accent: the platform's watchlist symbols and timeframe buttons (found by their text, see markTickers) */
 html.bd-lwpage.bd-ui-accent [data-bd-tk="list"],
 html.bd-lwpage.bd-ui-accent [data-bd-tk="tf"] { color: var(--bd-ui-accent) !important; }

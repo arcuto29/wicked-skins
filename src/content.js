@@ -767,18 +767,31 @@
   const TF_RE = /^(\d{1,3}\s?(s|m|min|h|hr|d|w|mo)|[DWM]|1Y)$/i, SYM_RE = /^[A-Z][A-Z0-9.\-]{0,9}!?$/;
   const COMBO_RE = /^[A-Z][A-Z0-9.\-]{0,9}!?\s*[\u00b7\u2022|,\-]\s*(\d{1,3}\s?(s|m|min|h|hr|d|w|mo)|[DWM])$/i;   // "NQ1! · 1m"
   const NOT_SYM = new Set(["BUY", "SELL", "USD", "OK", "ON", "OFF", "LIVE", "PNL", "LONG", "SHORT", "MARKET", "LIMIT", "STOP", "CLOSE", "OPEN", "HIGH", "LOW", "VOL", "AUTO", "LOG", "ALL", "TP", "SL", "QTY", "AM", "PM", "UTC", "ET", "EST", "NEW", "BETA", "PRO", "FAQ", "ID", "X"]);
+  // Text the platform draws OVER the chart (its legend: symbol, timeframe, indicator names and values) was made for its
+  // own dark-grey chart background; over a wallpaper, dark text there is unreadable. That text gets a soft dark halo,
+  // and text that's too dark is lightened (coloured indicator values keep their colour).
+  const SYM_START = /^([A-Z][A-Z0-9.\-]{0,9}!?)(?=$|[\s\u00b7\u2022|,:])/;
+  const lumOf = (css) => { const m = String(css).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/); return m ? (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255 : 1; };
   function markTickers() {
     const root = document.querySelector("[data-bd-lwroot], .tv-lightweight-charts"), cr = root ? root.getBoundingClientRect() : null;
     let main = null, best = Infinity, n = 0;
     for (const el of document.body ? document.body.querySelectorAll("span, div, button, a, b, strong, td, li, p, h1, h2, h3, h4, label") : []) {
       if (++n > 8000) break;
-      if (el.childElementCount || (root && root.contains(el)) || el.closest("#bd-layer, #bd-timer, #bd-goal, #bd-pnl, #bd-wm, #bd-tip")) continue;
-      const t = (el.textContent || "").trim(); if (!t || t.length > 22) { if (el.dataset.bdTk) delete el.dataset.bdTk; continue; }
-      let kind = TF_RE.test(t) ? "tf" : (t.length <= 12 && SYM_RE.test(t) && /[A-Z]/.test(t) && !NOT_SYM.has(t.replace(/!$/, "")) && t.length >= 2) || COMBO_RE.test(t) ? "list" : "";
+      if (el.childElementCount || el.closest("[data-bd-lwroot] table, .tv-lightweight-charts table, #bd-layer, #bd-timer, #bd-goal, #bd-pnl, #bd-wm, #bd-tip")) continue;
+      const t = (el.textContent || "").trim();
+      const r = (t && t.length <= 80 && cr) ? el.getBoundingClientRect() : null;
+      const over = !!r && r.width > 0 && r.left >= cr.left - 2 && r.right <= cr.right + 2 && r.top >= cr.top - 2 && r.bottom <= cr.bottom + 2;   // sits on the chart
+      if (over) { el.dataset.bdHalo = "1"; if (lumOf(getComputedStyle(el).color) < 0.45) el.dataset.bdLighten = "1"; else delete el.dataset.bdLighten; }
+      else if (el.dataset.bdHalo) { delete el.dataset.bdHalo; delete el.dataset.bdLighten; }
+      if (!t || t.length > 40) { if (el.dataset.bdTk) delete el.dataset.bdTk; continue; }
+      const symStart = SYM_START.exec(t), sym = symStart && !NOT_SYM.has(symStart[1].replace(/!$/, "")) && symStart[1].length >= 2;
+      // a symbol-like start in the legend ("NQ1! · 1 · CME", but also "EMA 20 …") can only be the ticker, never "list"
+      let kind = TF_RE.test(t) ? "tf" : (t.length <= 12 && SYM_RE.test(t) && /[A-Z]/.test(t) && !NOT_SYM.has(t.replace(/!$/, "")) && t.length >= 2) || COMBO_RE.test(t) ? "list" : over && sym ? "legend" : "";
+      if (over && kind === "list") kind = "legend";       // nothing on the chart itself is the watchlist ("VWAP", "EMA")
       if (!kind) { if (el.dataset.bdTk) delete el.dataset.bdTk; continue; }
-      if (kind === "list" && cr) {                  // the ticker: a symbol in the band just above (or at the top of) the chart
-        const r = el.getBoundingClientRect(), dy = cr.top - r.bottom;
-        if (r.width && dy > -60 && dy < 120 && r.left < cr.right && r.right > cr.left - 40) { const d = Math.abs(dy) + Math.abs(r.left - cr.left) * 0.2; if (d < best) { best = d; main = el; } }
+      if ((kind === "list" || kind === "legend") && cr && r) {             // the ticker: a symbol just above the chart, or in the legend at its top
+        const dy = cr.top - r.bottom;
+        if (r.width && dy > -cr.height * 0.25 && dy < 120 && r.left < cr.right && r.right > cr.left - 40) { const d = Math.abs(dy) + Math.abs(r.left - cr.left) * 0.2 + (over ? 0 : 5); if (d < best) { best = d; main = el; } }
       }
       el.dataset.bdTk = kind;
     }
@@ -786,13 +799,13 @@
   }
   // one observer for the platform's page: re-mark panels / tickers after it changes (at most every 2 s)
   let tkT = 0;
-  function appWanted() { return isLwPage() && cfg.enabled && (!!panelApplied || cfg.tkOn || !!cfg.uiAccent); }
+  function appWanted() { return isLwPage() && cfg.enabled; }   // legend readability is always on there
   function watchApp() {
     if (!appWanted()) { if (surfObs) { surfObs.disconnect(); surfObs = null; } return; }
     if (surfObs || !document.body) return;
     surfObs = new MutationObserver(() => {
       if (panelApplied && !surfT) surfT = setTimeout(markSurfaces, 2000);
-      if ((cfg.tkOn || cfg.uiAccent) && !tkT) tkT = setTimeout(() => { tkT = 0; markTickers(); }, 2000);
+      if (!tkT) tkT = setTimeout(() => { tkT = 0; markTickers(); }, 2000);
     });
     surfObs.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
@@ -912,7 +925,8 @@
     const P = 'html:root:root:root:root [class*="legend-"] [class*="legendMainSourceWrapper-"]', M = `${P} [class*="mainTitle-"] > [class*="title-"]`,
       side = `${P} [class*="intervalTitle-"] > [class*="title-"], ${P} [class*="exchangeTitle-"] > [class*="title-"]`;
     if (isLwPage()) { markTickers(); watchApp(); }
-    const LWM = 'html.bd-lwpage [data-bd-tk="main"]', LWT = 'html.bd-lwpage [data-bd-tk="tf"]';
+    // stronger than the legend readability rule in content.css (which would otherwise win)
+    const LWM = 'html.bd-on.bd-lwpage:not(.bd-x) [data-bd-tk="main"][data-bd-tk]', LWT = 'html.bd-on.bd-lwpage:not(.bd-x) [data-bd-tk="tf"][data-bd-tk]';
     st.textContent = `${M}, ${LWM}{color:${col}!important;font-size:${px}px!important;line-height:1.25!important;font-weight:700!important;${ff}${glow}}` +
       `${LWT}{color:${col}!important;${ff}${cfg.tkGlow ? `text-shadow:0 0 8px ${col}88!important;` : ""}}` +
       (cfg.tkOnly ? `${P} [class*="intervalTitle-"], ${P} [class*="exchangeTitle-"]{display:none!important}`
@@ -933,7 +947,7 @@
     if (isLwPage() && (accent || cfg.tkOn)) { markTickers(); watchApp(); }
   }
   // lw.js marks the page once it finds a Lightweight Charts chart (can be after we start): apply the app styling then
-  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelApplied) applyAppPanels(panelApplied); tkApplied = ""; applyTicker(); } })
+  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelApplied) applyAppPanels(panelApplied); tkApplied = ""; applyTicker(); markTickers(); watchApp(); } })
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-bd-lw"] });
 
   // Pages built on Lightweight Charts (not TradingView's own charts), like nq.vision: the app around the chart has solid

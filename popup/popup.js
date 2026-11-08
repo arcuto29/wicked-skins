@@ -1925,7 +1925,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Smoother charts: wallpapers are now drawn in the background, leaving TradingView's thread free",
+const WHATS_NEW = ["Desktop app: TradingView in tabs, opens with your last layouts and keeps you signed in",
+  "Smoother charts: wallpapers are now drawn in the background, leaving TradingView's thread free",
   "nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",
   "TradingView's light theme is readable over your wallpaper, and one tap switches to dark",
   "Candle looks now work on more Lightweight Charts platforms (like nq.vision)",

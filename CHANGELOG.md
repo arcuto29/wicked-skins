@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.47 (2026-11-04)
+- **Desktop app: TradingView in tabs, like TradingView Desktop.**
+  - The chart window has a tab bar. **+** (or Ctrl+T) opens another chart, Ctrl+W closes one, Ctrl+Tab and Ctrl+1–9 switch. Chart links open as a new tab. Every tab is skinned.
+  - **Opens where you left off:** your tabs come back with their layouts (TradingView keeps the layout in each tab's address), along with the window's size and position.
+  - **Stays signed in:** your TradingView sign-in is saved to disk regularly and when the app closes.
+  - A tab you're not looking at pauses its wallpaper, so extra tabs don't slow your computer.
+  - The **Skins** button on the tab bar opens Priism Skins' settings.
+- **nq.vision: the legend over the chart is readable.** Its symbol line and indicator names (EMA, VWAP…) are dark text made for its own dark-grey chart, so they disappeared on a wallpaper. They now get a soft dark halo, and text that's too dark is lightened. Coloured indicator values keep their colour. The ticker in that legend takes your Ticker styling, and indicator names are never mistaken for watchlist symbols.
+- **nq.vision: the price line no longer gets the crosshair's glow.** nq.vision draws its price line in its own grey/black candle colour, which Priism mistook for a crosshair line. The line was styled like the crosshair and glowed where the crosshair crossed it. It now takes your price-line style, and the glow only appears where the crosshair's own two lines cross.
+
 ## 0.1.46 (2026-11-04)
 - **nq.vision: your candle colours and looks now stay on.** They used to show for a couple of seconds after a refresh, then disappear. nq.vision first draws candles in default colours, then switches them to its own grey and black. Priism had also picked up blue and pink that nq.vision draws elsewhere, and took those for the candles, so it never noticed the switch.
   - Candles are now recognised by their shape: narrow bars spread across the chart that end at different heights. That works for coloured, grey, white or black candles. Volume bars and buttons are ignored, and only the candle bars are recoloured.

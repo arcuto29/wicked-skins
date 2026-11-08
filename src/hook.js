@@ -414,6 +414,7 @@
       if (vert) { m.x = s.x0; m.xt = now; } else { m.y = s.y0; m.yt = now; }
       xhair.set(ctx, m);
       if (m.x != null && m.y != null && Math.abs((m.xt || 0) - (m.yt || 0)) < 30) {
+        if (window.__bdGlowDebug) window.__bdGlowDebug.push([Math.round(m.x), Math.round(m.y), String(cur)]);   // tests
         const t = ctx.getTransform(), R = 34 * ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
         ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
         const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, R), rgb = rgbKey(col);
