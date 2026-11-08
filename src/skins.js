@@ -1223,6 +1223,72 @@
     };
   };
 
+  // Nebula: real gas clouds. The clouds are painted once into two small textures (seeded noise, so every preview
+  // matches) and then only drift, turn and breathe — each frame is a few image draws plus stars, so it stays light.
+  let nebTex = null;
+  const nebTextures = () => {
+    if (nebTex) return nebTex;
+    const W = 384, H = 216, P = new Uint8Array(512);
+    let seed = 1337; const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let i = 0; i < 256; i++) P[i] = i;
+    for (let i = 255; i > 0; i--) { const j = (r() * (i + 1)) | 0; const x = P[i]; P[i] = P[j]; P[j] = x; }
+    for (let i = 0; i < 256; i++) P[i + 256] = P[i];
+    const fade = (u) => u * u * (3 - 2 * u);
+    const vn = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, X = xi & 255, Y = yi & 255;
+      const a = P[P[X] + Y], b = P[P[X + 1] + Y], c = P[P[X] + Y + 1], d = P[P[X + 1] + Y + 1], u = fade(xf), v = fade(yf);
+      return ((a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v) / 255; };
+    const fbm = (x, y, o) => { let s = 0, a = 0.5, f = 1; for (let i = 0; i < o; i++) { s += a * vn(x * f, y * f); f *= 2.03; a *= 0.5; } return s / (1 - Math.pow(0.5, o)); };
+    const mk = (fn) => { const c = document.createElement("canvas"); c.width = W; c.height = H; const g = c.getContext("2d"), im = g.createImageData(W, H), d = im.data;
+      for (let y = 0, i = 0; y < H; y++) for (let x = 0; x < W; x++, i += 4) { const [R, G, B, A] = fn(x / H, y / H, x / W, y / H); d[i] = R; d[i + 1] = G; d[i + 2] = B; d[i + 3] = A; }
+      g.putImageData(im, 0, 0); return c; };
+    const cl = (v) => Math.max(0, Math.min(1, v));
+    // soft wide dust: deep blue into violet, with dark lanes
+    const dust = mk((x, y, u) => {
+      const q = fbm(x * 2.2 + 3.1, y * 2.2, 4), n = fbm(x * 1.6 + q * 1.8, y * 1.6 - q * 1.2, 5);
+      const lane = cl((fbm(x * 3.4 - 7, y * 3.4 + q, 4) - 0.42) * 3.2);
+      const m = cl((n - 0.36) * 2.1) * (1 - lane * 0.85), hue = cl(u * 0.8 + q * 0.5 - 0.2);
+      return [30 + 110 * hue, 40 + 30 * (1 - hue), 120 + 90 * (1 - hue * 0.4), 235 * m * m]; });
+    // bright filaments: magenta into a hot pink-orange heart, teal at the edges
+    const glow = mk((x, y, u, v) => {
+      const q = fbm(x * 2.8 - 5, y * 2.8 + 2, 4), n = fbm(x * 2.4 + q * 2.4, y * 2.4 + q * 1.6, 5);
+      const fil = Math.pow(1 - Math.abs(n * 2 - 1), 4), dx = u - 0.55, dy = v - 0.5, core = cl(1 - Math.sqrt(dx * dx * 2.2 + dy * dy * 3.2) * 1.5);
+      const m = cl(fil * (0.35 + core * 1.1)), hot = cl(core * 1.3 + fil * 0.2 - 0.25), edge = cl(q * 1.4 - 0.75);
+      return [cl(0.55 + hot * 0.45 - edge * 0.5) * 255, cl(0.12 + hot * 0.5 + edge * 0.55) * 255, cl(0.62 - hot * 0.35 + edge * 0.2) * 255, 255 * m]; });
+    return (nebTex = { dust, glow });
+  };
+  const nebulaCore = (ctx) => {
+    let w = 0, h = 0, k = 1, st = [], big = [];
+    const draw = (img, t, sp, rot, sc, ox, oy, a) => {
+      const S = Math.max(w / img.width, h / img.height) * sc;
+      ctx.save(); ctx.globalAlpha = a; ctx.translate(w / 2 + Math.sin(t * sp) * w * ox, h / 2 + Math.cos(t * sp * 0.8) * h * oy);
+      ctx.rotate(Math.sin(t * sp * 0.6) * rot); ctx.drawImage(img, -img.width * S / 2, -img.height * S / 2, img.width * S, img.height * S); ctx.restore();
+    };
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h); nebTextures();
+        st = starsOf(w, h, 220, k);
+        big = Array.from({ length: 7 }, () => ({ x: rnd(0.08, 0.92) * w, y: rnd(0.1, 0.9) * h, r: rnd(2.5, 5) * k, p: rnd(0, T2), c: Math.random() < 0.5 ? "190,220,255" : "255,215,235" }));
+      },
+      frame(t) {
+        sky(ctx, w, h, [[0, "#03020a"], [1, "#07041a"]]);
+        drawStars(ctx, st, t, 0.55);
+        const T = nebTextures(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+        ctx.globalCompositeOperation = "lighter";
+        draw(T.dust, t, 0.03, 0.05, 1.3, 0.03, 0.03, 0.85);
+        draw(T.glow, t + 40, 0.022, -0.06, 1.22 + Math.sin(t * 0.05) * 0.03, 0.025, 0.02, 0.62 + 0.12 * Math.sin(t * 0.21));
+        draw(T.glow, t + 90, 0.017, 0.08, 1.55, 0.04, 0.03, 0.22);   // a second, softer pass gives the gas depth
+        for (const b of big) {
+          const tw = 0.75 + 0.25 * Math.sin(t * 0.9 + b.p), L = b.r * 7 * tw;
+          glowDot(ctx, b.x, b.y, b.r * 5, b.c, 0.5 * tw);
+          ctx.strokeStyle = `rgba(${b.c},${0.35 * tw})`; ctx.lineWidth = Math.max(1, k * 0.8);
+          ctx.beginPath(); ctx.moveTo(b.x - L, b.y); ctx.lineTo(b.x + L, b.y); ctx.moveTo(b.x, b.y - L); ctx.lineTo(b.x, b.y + L); ctx.stroke();
+          ctx.fillStyle = "#fff"; ctx.fillRect(b.x - k, b.y - k, 2 * k, 2 * k);
+        }
+        ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
+
   window.WickedSkins = {
     aurora:    { name: "Polar Lights",    cat: "Wild", create: aurora },
     nebula:    { name: "Stardust",    cat: "Cosmos",  create: nebula },
@@ -1276,6 +1342,7 @@
     tesseract:   { name: "Tesseract",      cat: "Abstract", create: tesseract, wow: true },
     helix:       { name: "Double Helix",   cat: "Wild",     create: helix, wow: true },
     synapse:     { name: "Synapse",        cat: "Electric", create: synapse, wow: true },
+    nebulacore:  { name: "Nebula",         cat: "Cosmos",   create: nebulaCore, wow: true },
   };
   // Retired because they were too busy behind a chart. Not listed any more, but anyone who had one selected (or saved
   // in a look, session or symbol) gets the calm Fog Bank instead of a broken wallpaper. Non-enumerable = hidden from lists.

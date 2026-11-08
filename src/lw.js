@@ -5,10 +5,11 @@
      1. Candle recolour — remap the series' up/down colours to the chosen ones as they're drawn.
      2. Transparent background — clear the chart's full-canvas background fill so a wallpaper shows through.
    It activates ONLY when Lightweight Charts is present AND Advanced Charts is not, so it never fights hook.js.
+     3. Chart lines — grid, crosshair and price line take your Style tab settings (same options as on TradingView).
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 2;
+  const LW_VERSION = 3;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -89,14 +90,34 @@
     }, 150);
   }
   window.__bdLwRepaint = repaint;
+  // chart-line settings (Style tab), from the same attribute hook.js reads
+  let lfx = null;
+  const colOk = (v) => (v === "candle" || /^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
+  const styleOk = (v, d, extra = []) => (["solid", "dotted", "dashed", ...extra].includes(v) ? v : d);
+  function readFx() {
+    try {
+      const f = JSON.parse(htmlEl().getAttribute("data-ws-fx") || "null");
+      lfx = f && (f.gridOn || f.chOn || f.plOn) ? {
+        gridOn: !!f.gridOn, gridColor: colOk(f.gridColor), gridAlpha: Math.max(0.03, Math.min(1, f.gridAlpha === undefined ? 0.35 : +f.gridAlpha || 0)),
+        gridW: Math.max(0, Math.min(2, +f.gridW || 0)), gridStyle: styleOk(f.gridStyle, "dotted", ["none"]),
+        chOn: !!f.chOn, chColor: colOk(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)), chStyle: styleOk(f.chStyle, "dashed"),
+        plOn: !!f.plOn, plColor: colOk(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)), plStyle: styleOk(f.plStyle, "dotted"),
+        accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "" } : null;
+    } catch { lfx = null; }
+  }
+  let lfxSig = "null", candSig = null, onWas = null;
+  // data-ws-fx also carries the wallpaper brightness, refreshed every few seconds: only redraw when something we use changed
   const settingsObserver = new MutationObserver(() => {
-    on = htmlEl().classList.contains("bd-on"); readCandles(); remapCache.clear(); repaint();
+    on = htmlEl().classList.contains("bd-on");
+    const cs = htmlEl().getAttribute("data-ws-candles"); readFx(); const ls = JSON.stringify(lfx);
+    if (cs === candSig && ls === lfxSig && on === onWas) return;
+    candSig = cs; lfxSig = ls; onWas = on; readCandles(); remapCache.clear(); repaint();
   });
   (function watch() {
     const el = document.documentElement;
     if (!el) return setTimeout(watch, 10);
-    settingsObserver.observe(el, { attributes: true, attributeFilter: ["class", "data-ws-candles"] });
-    on = el.classList.contains("bd-on"); readCandles();
+    settingsObserver.observe(el, { attributes: true, attributeFilter: ["class", "data-ws-candles", "data-ws-fx"] });
+    on = el.classList.contains("bd-on"); readCandles(); readFx();
   })();
 
   // ---------- colour normalisation (no recursion with our own setters) ----------
@@ -209,7 +230,7 @@
   function inLwTable(c) { let v = lwTableCache.get(c); if (v === undefined) { try { v = !!(c.closest && c.closest(ROOT_SEL)); } catch { v = false; } lwTableCache.set(c, v); } return v; }
 
   // ---------- install the canvas hooks (once, when this is a LW page) ----------
-  let active = false;
+  let active = false, lineHook = null;
   function install() {
     if (active) return;
     active = true;
@@ -271,6 +292,7 @@
     const origStrokeP = proto.stroke;
     proto.stroke = function (...a) {
       const c = this.canvas;
+      if (on && lfx && lineHook && !a.length && lineHook(this)) return;
       if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.strokeStyle)) {
         drawCalls.stroke++;
         const pB = this.shadowBlur, pC = this.shadowColor;
@@ -279,6 +301,55 @@
       }
       return origStrokeP.apply(this, a);
     };
+    // ---------- chart lines: grid, crosshair, price line ----------
+    // Lightweight Charts strokes each kind as one path of straight lines across the pane: the grid = several long
+    // grey lines in one path; the crosshair = one dashed line (vertical + horizontal); the price line = one dashed
+    // horizontal line in the candle colour. We record the path's segments and restyle at stroke time.
+    const seg = new WeakMap();   // ctx -> { n, ok, x0, y0, last:[x,y] }
+    const oBegin = proto.beginPath, oMove = proto.moveTo, oLine = proto.lineTo;
+    const lineFx = () => on && lfx;
+    proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null }); return oBegin.call(this); };
+    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) k.p = [x, y]; return oMove.call(this, x, y); };
+    proto.lineTo = function (x, y) {
+      const k = lineFx() && seg.get(this);
+      if (k && k.ok) {
+        const c = this.canvas, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, p = k.p;
+        if (!p || !c) k.ok = false;
+        else {
+          const dx = Math.abs(x - p[0]) * sx, dy = Math.abs(y - p[1]) * sy;
+          if (dy <= 1 && dx >= c.width * 0.6) k.h++; else if (dx <= 1 && dy >= c.height * 0.6) k.v++; else k.ok = false;
+          k.n++; k.p = [x, y];
+        }
+      }
+      return oLine.call(this, x, y);
+    };
+    const DASH = { solid: [], dotted: [1, 3], dashed: [5, 5] };
+    // grid colours are muted: little colour in them (dark navy greys count), or mostly transparent
+    const greyish = (col) => { const r = rgbKey(col); if (!r) return false; const [R, G, B] = r.key.split(",").map(Number);
+      return Math.max(R, G, B) - Math.min(R, G, B) < 42 || (r.a !== null && +r.a <= 0.3); };
+    const pickCol = (opt, cur) => (opt === "candle" ? (candles ? candles.upHex : cur) : opt || lfx.accent || (candles ? candles.upHex : cur));
+    function styleLines(ctx) {
+      const k = seg.get(ctx), c = ctx.canvas;
+      if (!k || !k.ok || !k.n || !c || !isChart(c)) return false;
+      const cur = strokeDesc.get.call(ctx), dashed = ctx.getLineDash().length > 0;
+      let part = null;
+      if (k.n === 1 && dashed && k.h && isCandleCol(cur)) part = lfx.plOn ? "pl" : null;
+      else if (k.n === 1 && dashed) part = lfx.chOn ? "ch" : null;
+      else if (greyish(cur)) part = lfx.gridOn ? "grid" : null;
+      if (!part) return false;
+      if (part === "grid" && lfx.gridStyle === "none") return true;
+      const opt = part === "grid" ? [lfx.gridColor, lfx.gridW, lfx.gridStyle] : part === "ch" ? [lfx.chColor, lfx.chW, lfx.chStyle] : [lfx.plColor, lfx.plW, lfx.plStyle];
+      const sxx = ctx.getTransform().a || 1, pS = cur, pLW = ctx.lineWidth, pD = ctx.getLineDash(), pA = ctx.globalAlpha;
+      strokeDesc.set.call(ctx, pickCol(opt[0], cur)); ctx.lineWidth = (1 + opt[1]) / sxx;
+      ctx.setLineDash(DASH[opt[2]].map((d) => d * (1 + opt[1] * 0.5) / sxx));
+      if (part === "grid") ctx.globalAlpha = pA * lfx.gridAlpha;
+      drawCalls.lines++;
+      origStrokeP.call(ctx);
+      strokeDesc.set.call(ctx, pS); ctx.lineWidth = pLW; ctx.setLineDash(pD); ctx.globalAlpha = pA;
+      return true;
+    }
+    lineHook = styleLines;
+
     setInterval(markRoots, 2000);
 
     setInterval(learnSides, 1500);
@@ -290,8 +361,8 @@
   // Diagnostics (read by the panel's Diagnose button): what the adapter currently believes about this page.
   window.__bdLwInfo = () => ({ active, on, candles: candles ? { up: candles.upHex, down: candles.downHex } : null,
     sides: [...sides].slice(0, 12), learned: [...learnedDrawn], lastTally: lastTally, canvases: document.querySelectorAll("[data-bd-lwroot] canvas, .tv-lightweight-charts canvas").length, roots: document.querySelectorAll(ROOT_SEL).length,
-    drawCalls: { ...drawCalls } });
-  const drawCalls = { fillRect: 0, fill: 0, stroke: 0 };
+    drawCalls: { ...drawCalls }, lines: lfx });
+  const drawCalls = { fillRect: 0, fill: 0, stroke: 0, lines: 0 };
   let lastTally = [];
 
   // Wait until the page actually has a Lightweight Charts chart (and isn't an Advanced Charts page).

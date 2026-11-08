@@ -38,6 +38,9 @@
     // Streamer mode: hides your money on screen and in every recording (labels on the chart, Priism's readouts,
     // TradingView's account / order panels). privacyPeek = un-blur a panel while your mouse is over it.
     privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP",
+    privacyAcct: true, privacyOrder: false,   // which TradingView panels get blurred
+    privacyPnl: "hide",    // trade-label P&L in Streamer mode: hide | ticks (money hidden) | points | show
+    bracketQty: "",        // colour of the lot-size pill on your brackets
     // Auto trade clips: while a trade is open, keep the last tradeClipLen seconds ready; save a clip when it closes.
     tradeClipOn: false, tradeClipLen: 30,
     clipQuality: "balanced",  // high | balanced | small (small keeps a clip under ~20 MB, e.g. for Discord)           // after a recording: open the crop / trim editor (false = download right away)
@@ -228,7 +231,8 @@
   // Position: the open P&L TradingView already shows on your chart's position line(s), read by hook.js.
   // Strength is relative to the biggest swing seen this session, so there's nothing to set up.
   const DOTS = "\u2022\u2022\u2022\u2022\u2022";
-  const fmtPnl = (v, u) => { if (cfg.privacy) return DOTS; const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
+  const hideMoney = () => !!cfg.privacy && cfg.privacyPnl !== "show";
+  const fmtPnl = (v, u) => { if (hideMoney()) return DOTS; const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
     return `${v >= 0 ? "+" : "\u2212"}${unit}${Math.abs(v).toFixed(2)}${code}`; };
   let pnlMaxAbs = 0;
   function readPnl() {
@@ -345,7 +349,7 @@
   let day = freshDay(), openTrade = null, lastNudge = 0, goalEl = null, jShot = null, jShotT = 0;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const fmtDur = (s) => (s < 90 ? s + "s" : s < 5400 ? Math.round(s / 60) + "m" : (s / 3600).toFixed(1) + "h");
-  const fmtAbs = (n, u) => { if (cfg.privacy) return DOTS; const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
+  const fmtAbs = (n, u) => { if (hideMoney()) return DOTS; const unit = u && u.length === 1 ? u : "", code = u && u.length > 1 ? " " + u : "";
     return `${unit}${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}${code}`; };
   const readPnlRaw = () => { try { const p = JSON.parse(document.documentElement.getAttribute("data-ws-pnl") || "null"); return p && typeof p.v === "number" ? p : null; } catch { return null; } };
   const curSym = () => { const q = parseTitle(); return q ? q.sym : ""; };
@@ -423,7 +427,7 @@
     cancelAnimationFrame(t.raf); try { t.stream.getTracks().forEach((x) => x.stop()); } catch {}
     if (!r.chunks.length) return;
     const blob = new Blob(r.chunks, { type: t.mime || "video/webm" }), d = new Date();
-    const pnl = cfg.privacy ? "" : "-" + (v >= 0 ? "+" : "") + String(v).replace(/[^\d.+-]/g, "");
+    const pnl = hideMoney() ? "" : "-" + (v >= 0 ? "+" : "") + String(v).replace(/[^\d.+-]/g, "");
     saveBlob(blob, `priism-trade-${String(trade.sym || "chart").replace(/[^\w-]+/g, "")}${pnl}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}.webm`);
     flash("Trade clip saved to your downloads");
   }
@@ -433,6 +437,9 @@
   function applyPrivacy() {
     const h = document.documentElement, on = !!(cfg.enabled && cfg.privacy);
     h.classList.toggle("bd-privacy", on); h.classList.toggle("bd-peek", on && !!cfg.privacyPeek);
+    h.classList.toggle("bd-priv-money", on && cfg.privacyPnl !== "show");
+    h.classList.toggle("bd-priv-acct", on && cfg.privacyAcct !== false); h.classList.toggle("bd-priv-order", on && !!cfg.privacyOrder);
+    pushFx();
     if (pnlEl && pnlEl.textContent) { try { renderPnl(); } catch {} }
     document.dispatchEvent(new CustomEvent("bd-softrepaint"));   // redraw the chart labels masked / unmasked
   }
@@ -913,16 +920,36 @@
   function resetQuality() { qLevel = 0; hAcc = hCount = hStart = hLast = smoothFor = 0; needSmooth = 4; lastUp = 0; }
   const publishQ = () => document.documentElement.setAttribute("data-bd-q", `${qLevel + 1}/${qlevels().length}@${refreshHz}`);
 
+  // While one of TradingView's big windows is open (Trade / broker login, Settings, Indicators, Alerts…) the wallpaper
+  // holds still: TradingView blurs everything behind those windows, and re-blurring a moving wallpaper every frame
+  // is what made them feel slow to open. Only fires when TradingView adds/removes a window, so it costs nothing.
+  let dlgOpen = false, dlgObs = null, dlgT = 0;
+  function checkDialogs() {
+    dlgT = 0;
+    const root = document.getElementById("overlap-manager-root");
+    const open = !!root && [...root.querySelectorAll('[class^="dialog-"], [data-dialog-name]')].some((el) => {
+      const r = el.getBoundingClientRect(); return r.width >= 300 && r.height >= 200; });
+    if (open !== dlgOpen) { dlgOpen = open; document.documentElement.toggleAttribute("data-bd-dlg", open); }
+  }
+  function watchDialogs() {
+    const root = document.getElementById("overlap-manager-root");
+    if (!root || dlgObs) return;
+    dlgObs = new MutationObserver(() => { if (!dlgT) dlgT = setTimeout(checkDialogs, 120); });
+    dlgObs.observe(root, { childList: true, subtree: true });
+    checkDialogs();
+  }
+
   // One animation loop drives every animated wallpaper on the page.
   let fpsN = 0, fpsT = 0;
   function startLoop() {
     running = true;
+    watchDialogs(); if (!dlgObs) setTimeout(watchDialogs, 3000);
     let last = performance.now();
     measureRefresh();
     const step = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(step);
-      if (document.hidden || cfg.paused || (cfg.focus && cfg.enabled)) { last = now; hLast = 0; return; }
+      if (document.hidden || cfg.paused || (cfg.focus && cfg.enabled) || dlgOpen) { last = now; hLast = 0; return; }
       const watch = cfg.autoQuality && !cfg.powerSaver && (cfg.fps === "auto" || cfg.fps === "max");
       if (watch) trackHealth(now);
       // Target fps: user setting, power saver, or the current auto-quality cap (whichever is lowest).
@@ -1019,7 +1046,7 @@
   // Line glow + price scale styling, also drawn by hook.js
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
-    "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy",
+    "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
     "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
@@ -1208,9 +1235,22 @@
     updateBackdrop();
   });
 
+  // Tick size of the futures contract on the chart, so Streamer mode can show TradingView's "+8 ticks" as "+2 pts".
+  // Read from the symbol in the tab title (NQ1!, MNQZ2025, CME_MINI:ES1!…); 0 = unknown (ticks are kept as ticks).
+  const TICKS = { NQ: 0.25, MNQ: 0.25, ES: 0.25, MES: 0.25, YM: 1, MYM: 1, RTY: 0.1, M2K: 0.1, EMD: 0.1, NKD: 5,
+    CL: 0.01, MCL: 0.01, QM: 0.025, NG: 0.001, QG: 0.005, RB: 0.0001, HO: 0.0001, GC: 0.1, MGC: 0.1, SI: 0.005, SIL: 0.005, HG: 0.0005, MHG: 0.0005, PL: 0.1, PA: 0.5,
+    ZB: 0.03125, UB: 0.03125, ZN: 0.015625, ZF: 0.0078125, ZT: 0.00390625, ZC: 0.25, ZS: 0.25, ZW: 0.25, ZL: 0.01, ZM: 0.1, LE: 0.025, HE: 0.025,
+    "6E": 0.00005, M6E: 0.0001, "6B": 0.0001, "6J": 0.0000005, "6A": 0.00005, "6C": 0.00005, "6S": 0.00005, BTC: 5, MBT: 5, ETH: 0.5, MET: 0.5, FDAX: 0.5, FESX: 1 };
+  let tickPushed = 0;
+  setInterval(() => { if (cfg.enabled && cfg.privacy && cfg.privacyPnl === "points" && !standDown && tickSizeOf() !== tickPushed) pushFx(); }, 3000);   // you switched symbol
+  function tickSizeOf() {
+    const q = parseTitle(); if (!q || !q.sym) return 0;
+    const root = String(q.sym).toUpperCase().replace(/^.*:/, "").replace(/\d+!$/, "").replace(/[FGHJKMNQUVXZ]\d{1,4}$/, "");
+    return TICKS[root] || 0;
+  }
   function pushFx() {
     const h = document.documentElement;
-    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent() }));
+    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent() }));
     else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     // Scale backing = real frosted glass behind the price + time scales
@@ -1442,7 +1482,7 @@
     g.fillText(goalEl.querySelector(".bd-g-val").textContent, x + w - pad, y + 24 * dpr);
     const tx = x + pad, tw = w - 2 * pad, ty = y + 34 * dpr, th = 6 * dpr;
     rr(g, tx, ty, tw, th, th / 2); g.fillStyle = "rgba(255,255,255,.12)"; g.fill();
-    const fill = goalEl.querySelector(".bd-g-fill"), fl = parseFloat(fill.style.left) || 50, fw = cfg.privacy ? 0 : parseFloat(fill.style.width) || 0;
+    const fill = goalEl.querySelector(".bd-g-fill"), fl = parseFloat(fill.style.left) || 50, fw = hideMoney() ? 0 : parseFloat(fill.style.width) || 0;
     if (fw > 0) { rr(g, tx + tw * fl / 100, ty, Math.max(th, tw * fw / 100), th, th / 2); g.fillStyle = col; g.fill(); }
     g.fillStyle = "rgba(255,255,255,.55)"; g.fillRect(tx + tw / 2 - dpr, ty, 2 * dpr, th);
     g.font = `700 ${10 * dpr}px ui-monospace, Menlo, Consolas, monospace`; g.fillStyle = "rgba(223,229,241,.75)";
@@ -1568,7 +1608,7 @@
       .msg{font-size:12px;color:#8b8fa0}
     </style>
     <div class="bg"><div class="card">
-      <div class="top"><div><b>Edit your clip</b><small>Drag the box to crop · drag the green handles to trim</small></div><div style="display:flex;gap:8px">${hasAudio ? '<button data-a="snd">\u{1F50A} Sound on</button>' : ""}<button data-a="discard">Discard</button></div></div>
+      <div class="top"><div><b>Edit your clip</b><small>Drag the box to crop · drag the green handles to trim</small></div><div style="display:flex;gap:8px">${hasAudio ? '<button data-a="snd">\u{1F508} Play sound</button>' : ""}<button data-a="discard">Discard</button></div></div>
       <div class="stage"><video muted playsinline></video><div class="shade s1"></div><div class="shade s2"></div><div class="shade s3"></div><div class="shade s4"></div>
         <div class="crop"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i></div></div>
       <div class="row"><span>Crop</span><button data-r="free" class="on">Free</button><button data-r="full">Whole video</button><button data-r="16:9">16:9 (YouTube)</button><button data-r="9:16">9:16 (TikTok / Reels)</button><button data-r="1:1">1:1 (square)</button><button data-r="4:5">4:5</button></div>
@@ -1667,9 +1707,15 @@
     }
     r0.oninput = function () { trimUi.call(this); if (dur) v.currentTime = t0; };
     r1.oninput = function () { trimUi.call(this); if (dur) v.currentTime = Math.max(t0, t1 - 0.5); };
-    root.addEventListener("pointerdown", () => { audioUp(); if (ac && ac.state === "suspended") ac.resume().catch(() => {}); }, true);
+    // The preview is silent until the browser allows sound (your first click in the editor). The first click on the sound
+    // button just turns the sound on (it used to start it and mute it again in the same click, so clips seemed silent).
     const sb = root.querySelector("[data-a=snd]");
-    if (sb) sb.onclick = () => { audioUp(); soundOn = !soundOn; if (pv) pv.gain.value = soundOn ? 1 : 0; sb.textContent = soundOn ? "\u{1F50A} Sound on" : "\u{1F507} Muted"; };
+    let justStarted = false;
+    const label = () => { if (sb) sb.textContent = !ac ? "\u{1F508} Play sound" : soundOn ? "\u{1F50A} Sound on" : "\u{1F507} Muted"; };
+    const startSound = () => { const was = !!ac; audioUp(); if (ac && ac.state === "suspended") ac.resume().catch(() => {}); justStarted = !was && !!ac; label(); };
+    root.addEventListener("pointerdown", startSound, true);
+    if (sb) sb.onclick = () => { startSound(); if (!justStarted) { soundOn = !soundOn; if (pv) pv.gain.value = soundOn ? 1 : 0; } justStarted = false; label(); };
+    if (hasAudio && navigator.userActivation && navigator.userActivation.isActive) startSound();   // just clicked Stop: sound can start now
     root.querySelector("[data-a=discard]").onclick = () => { if (!busy) close(); };
     root.querySelector("[data-a=orig]").onclick = () => { if (busy) return; saveBlob(blob, name); flash("Clip saved to your downloads"); close(); };
     root.querySelector("[data-a=save]").onclick = async () => {
@@ -2123,21 +2169,31 @@
       if (cur.id !== ME.id) reportDuplicate();
       if (verCmp(cur.ver, ME.ver) >= 0 && cur.id !== ME.id) return false;     // a same-or-newer copy already owns it
     }
+    if (cur && cur.id === ME.id && cur.token !== ME.token) handedFrom = cur.token;   // our own earlier copy (update / reload)
     writeOwner(); owner = true; return true;
   }
+  let handedFrom = "";
   // remove anything drawn by another (older) copy, now and later
   const mine = (el) => el.dataset && el.dataset.bdOwner === ME.token;
-  function sweep() {
-    for (const el of document.querySelectorAll("#bd-layer, #bd-wm")) if (!mine(el)) { el.remove(); reportDuplicate(); }
+  // After the extension updates or reloads, this copy's connection to the extension is gone (the panel can't reach
+  // it any more) and the background worker injects a fresh copy into the tab — so a dead copy hands over to it.
+  const ctxDead = () => !!EXT && !(chrome.runtime && chrome.runtime.id);
+  const shouldYield = () => { const cur = readOwner();
+    return !!cur && cur.token !== ME.token && Date.now() - cur.ts < 6000 &&
+      (verCmp(cur.ver, ME.ver) > 0 || (cur.id === ME.id && ctxDead())); };
+  function yieldPage() {
+    standDown = true; teardown(); if (wmEl) { wmEl.remove(); wmEl = null; }
+    if (timerEl) { timerEl.remove(); timerEl = null; } clearInterval(timerIv); timerIv = 0;
+    if (goalEl) { goalEl.remove(); goalEl = null; }
+    if (dlgObs) { dlgObs.disconnect(); dlgObs = null; }
   }
-  new MutationObserver(() => { if (owner && !standDown) sweep(); }).observe(document.documentElement, { childList: true });
+  function sweep() {
+    for (const el of document.querySelectorAll("#bd-layer, #bd-wm, #bd-timer, #bd-goal, #bd-pnl")) if (!mine(el)) { el.remove(); if (/^bd-(layer|wm)$/.test(el.id) && el.dataset.bdOwner !== handedFrom) reportDuplicate(); }
+  }
+  new MutationObserver(() => { if (!owner || standDown) return; if (shouldYield()) return yieldPage(); sweep(); }).observe(document.documentElement, { childList: true });
   setInterval(() => {
     if (!owner || standDown) return;
-    const cur = readOwner();
-    if (cur && cur.token !== ME.token && Date.now() - cur.ts < 6000 && verCmp(cur.ver, ME.ver) > 0) {
-      standDown = true; teardown(); if (wmEl) { wmEl.remove(); wmEl = null; }   // a newer copy took over
-      return;
-    }
+    if (shouldYield()) return yieldPage();                                       // a newer / live copy took over
     writeOwner();                                                                // heartbeat
   }, 2000);
 

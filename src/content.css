@@ -240,15 +240,16 @@ html.bd-focus #bd-layer { opacity: 0 !important; }
 #bd-timer b { font: 800 11px ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; color: rgba(223,229,241,.65); }
 #bd-timer span { font: 700 12px ui-monospace, Menlo, Consolas, monospace; color: #eef1f7; font-variant-numeric: tabular-nums; }
 
-/* Streamer mode: TradingView's account, positions and order panels are blurred (on screen and in any recording) */
-html.bd-privacy .layout__area--bottom,
-html.bd-privacy [class*="layout__area--tradingpanel"],
-html.bd-privacy [data-name="account-manager"],
-html.bd-privacy [class*="accountManager"],
-html.bd-privacy [data-name="order-panel"],
-html.bd-privacy [class*="orderPanel"] { filter: blur(9px) saturate(.6) !important; transition: filter .2s; }
-html.bd-privacy.bd-peek .layout__area--bottom:hover,
-html.bd-privacy.bd-peek [class*="layout__area--tradingpanel"]:hover,
-html.bd-privacy.bd-peek [data-name="account-manager"]:hover,
-html.bd-privacy.bd-peek [data-name="order-panel"]:hover { filter: none !important; }
-html.bd-privacy #bd-goal .bd-g-fill { opacity: 0 !important; }   /* the fill would show how close you are to your goal */
+/* Streamer mode: TradingView's account panel (balance, positions, history) and, if you choose, the order panel are
+   blurred (on screen and in any recording). The order panel stays usable by default, so you can still place trades. */
+html.bd-priv-acct .layout__area--bottom,
+html.bd-priv-acct [data-name="account-manager"],
+html.bd-priv-acct [class*="accountManager"],
+html.bd-priv-order [class*="layout__area--tradingpanel"],
+html.bd-priv-order [data-name="order-panel"],
+html.bd-priv-order [class*="orderPanel"] { filter: blur(9px) saturate(.6) !important; transition: filter .2s; }
+html.bd-peek .layout__area--bottom:hover,
+html.bd-peek [class*="layout__area--tradingpanel"]:hover,
+html.bd-peek [data-name="account-manager"]:hover,
+html.bd-peek [data-name="order-panel"]:hover { filter: none !important; }
+html.bd-priv-money #bd-goal .bd-g-fill { opacity: 0 !important; }   /* the fill would show how close you are to your goal */

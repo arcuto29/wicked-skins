@@ -148,6 +148,7 @@
         <div class="row"><span>Number colour</span><div class="seg bk-mode" id="bracketTextMode"></div><input type="color" id="bracketText" title="Number colour" /></div>
         <div class="row" id="bracketPLRow"><span>Profit · Loss</span>
           <input type="color" id="bracketProfit" title="Profit number" /> <input type="color" id="bracketLoss" title="Loss number" /></div>
+        <div class="row"><span>Lot size colour</span><div class="seg bk-mode" id="bracketQtyMode"></div><input type="color" id="bracketQty" title="Lot size / quantity colour" /></div>
         <div class="row"><span>Outline</span><div class="seg bk-mode" id="bracketBorderMode"></div><input type="color" id="bracketBorderColor" title="Outline colour" /></div>
         <div class="row" id="bracketBorderWRow"><span>Outline width</span><div class="seg" id="bracketBorderW"></div></div>
         <div class="row"><span>Level line</span><div class="seg bk-mode" id="bracketLineMode"></div><input type="color" id="bracketLineColor" title="Level line colour" /></div>
@@ -213,8 +214,12 @@
     <section id="tab-capture" hidden>
       <details class="grp" data-grp="privacy">
         <summary>Streamer mode <label class="switch" title="Hide your money on screen and in recordings"><input type="checkbox" id="privacyOn" /><span></span></label></summary>
-        <p class="hint">Hides your money while you stream or record: the numbers in your TP / Stop / P&amp;L labels become dots, Priism's readouts too, and TradingView's account and order panels are blurred.</p>
-        <div class="row"><span>Panels under your mouse</span><div class="seg" id="privacyPeek"></div></div>
+        <p class="hint">Hides your money while you stream or record, on screen and in clips. You choose what viewers see.</p>
+        <div class="row"><span>P&amp;L on your trades</span><div class="seg" id="privacyPnl"></div></div>
+        <p class="hint" id="privacyPnlHint"></p>
+        <div class="row"><span style="flex:1;white-space:nowrap">Blur account panel</span><label class="switch" title="Balance, positions and history at the bottom"><input type="checkbox" id="privacyAcct" /><span></span></label></div>
+        <div class="row"><span style="flex:1;white-space:nowrap">Blur order panel</span><label class="switch" title="The Buy / Sell panel on the right. Off = you can still see and use it"><input type="checkbox" id="privacyOrder" /><span></span></label></div>
+        <div class="row"><span>Blurred panels under your mouse</span><div class="seg" id="privacyPeek"></div></div>
       </details>
       <details class="grp" data-grp="snap" open>
         <summary>Snapshot</summary>
