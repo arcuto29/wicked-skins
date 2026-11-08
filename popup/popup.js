@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -17,7 +17,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
@@ -1105,12 +1105,16 @@ const dayKeyP = () => { const d = new Date(); return d.getFullYear() + "-" + Str
 const fmtMoneyP = (v, u) => `${v >= 0 ? "+" : "\u2212"}${u && u.length === 1 ? u : ""}${Math.abs(v).toFixed(2)}${u && u.length > 1 ? " " + u : ""}`;
 const fmtDurP = (s) => (s < 90 ? s + "s" : s < 5400 ? Math.round(s / 60) + "m" : (s / 3600).toFixed(1) + "h");
 const storeGet = (defaults) => new Promise((res) => { try { chrome.storage.local.get(defaults, res); } catch { res(defaults); } });
+// Trading sounds (src/sounds.js): picking Soft or Loud plays the sound once so you know what you'll hear.
+const SOUND_LEVELS = [["off", "Off"], ["soft", "Soft"], ["loud", "Loud"]];
+const preview = (kind, level) => { try { window.PriismSounds && window.PriismSounds.play(kind, level); } catch {} };
 function syncGoal() {
   if (!$("goalOn")) return;
   $("goalOn").checked = !!cfg.goalOn;
   if (document.activeElement !== $("goalTarget")) $("goalTarget").value = cfg.goalTarget;
   if (document.activeElement !== $("goalLimit")) $("goalLimit").value = cfg.goalLimit;
   seg("goalPos", [["bl", "Bottom left"], ["tl", "Top left"], ["tc", "Top"]], () => cfg.goalPos || "bl", (v) => set({ goalPos: v }));
+  seg("goalSound", SOUND_LEVELS, () => cfg.goalSound || "off", (v) => { set({ goalSound: v }); preview("goal", v); });
   storeGet({ dayPnl: null }).then((s) => {
     const d = s.dayPnl && s.dayPnl.date === dayKeyP() ? s.dayPnl : null;
     $("goalToday").textContent = d ? `${fmtMoneyP(d.realized, d.unit)} \u00B7 ${d.trades} closed trade${d.trades === 1 ? "" : "s"}` : "no closed trades yet";
@@ -1229,6 +1233,30 @@ function renderChartStyle() {
     if (p.glow) { seg("cs-ch-glow", [[false, "Off"], [true, "On"]], () => !!cfg.chGlow, (v) => set({ chGlow: v }));
       seg("cs-ch-lab", [[false, "Own"], [true, "Match crosshair"]], () => !!cfg.chLabels, (v) => set({ chLabels: v })); }
   }
+  renderTicker(box);
+}
+// The ticker: the symbol name at the top left of the chart (plus timeframe and exchange). Not a line, but it lives
+// with the other parts of the chart you can style.
+function renderTicker(box) {
+  const card = document.createElement("div"); card.className = "cpart";
+  card.innerHTML = `<div class="cpart-h"><div><b>Ticker</b><small>The symbol name at the top left of the chart.</small></div><div class="seg cpart-mode" id="tk-on"></div></div>`;
+  box.appendChild(card);
+  seg("tk-on", [[false, "Own"], [true, "Styled"]], () => !!cfg.tkOn, (v) => { set({ tkOn: v }); renderChartStyle(); });
+  if (!cfg.tkOn) return;
+  const cur = cfg.tkColor || "", body = document.createElement("div"); body.className = "cpart-b";
+  body.innerHTML = `<div class="row"><span>Colour</span><div class="seg" id="tk-cm"></div><input type="color" id="tk-col" ${/^#/.test(cur) ? "" : "hidden"} /></div>
+    <div class="row"><span>Size</span><div class="seg" id="tk-size"></div></div>
+    <div class="row"><span>Font</span><div class="seg" id="tk-font"></div></div>
+    <div class="row"><span>Glow</span><div class="seg" id="tk-glow"></div></div>
+    <div class="row"><span>Show</span><div class="seg" id="tk-only"></div></div>`;
+  card.appendChild(body);
+  seg("tk-cm", [["", "Skin colour"], ["candle", "Candle"], ["custom", "Custom"]], () => (/^#/.test(cfg.tkColor || "") ? "custom" : cfg.tkColor || ""),
+    (v) => { set({ tkColor: v === "custom" ? ($("tk-col").value || "#ffffff") : v }); renderChartStyle(); });
+  const ci = $("tk-col"); ci.value = /^#/.test(cur) ? cur : "#ffffff"; ci.oninput = (e) => set({ tkColor: e.target.value });
+  seg("tk-size", [[0, "Normal"], [1, "Large"], [2, "XL"], [3, "Huge"]], () => +cfg.tkSize || 0, (v) => set({ tkSize: v }));
+  seg("tk-font", [["default", "Default"], ["mono", "Mono"], ["rounded", "Rounded"]], () => cfg.tkFont || "default", (v) => set({ tkFont: v }));
+  seg("tk-glow", [[false, "Off"], [true, "On"]], () => !!cfg.tkGlow, (v) => set({ tkGlow: v }));
+  seg("tk-only", [[false, "Name, timeframe, exchange"], [true, "Name only"]], () => !!cfg.tkOnly, (v) => set({ tkOnly: v }));
 }
 // ---------- shortcuts ----------
 const KEY_NAMES = { focusKey: "Focus mode", privacyKey: "Streamer mode", recordKey: "Record a clip", snapKey: "Snapshot", toggleKey: "Turn everything on/off" };
@@ -1268,6 +1296,7 @@ function syncTimer() {
   if (!$("timerOn")) return;
   $("timerOn").checked = !!cfg.timerOn; $("timerMarket").value = cfg.timerMarket || "auto";
   seg("timerPos", [["bl", "Bottom left"], ["bc", "Bottom centre"], ["br", "Bottom right"]], () => (["bl", "bc", "br"].includes(cfg.timerPos) ? cfg.timerPos : "bc"), (v) => set({ timerPos: v, timerOn: true }));
+  seg("sessionSound", SOUND_LEVELS, () => cfg.sessionSound || "off", (v) => { set({ sessionSound: v }); preview("bell", v); });
 }
 if ($("timerOn")) { $("timerOn").onchange = (e) => set({ timerOn: e.target.checked }); $("timerMarket").onchange = (e) => set({ timerMarket: e.target.value, timerOn: true }); }
 
@@ -1884,7 +1913,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["New Nebula wallpaper: glowing gas clouds and bright stars (Skins › Cosmos)",
+const WHATS_NEW = ["Style your ticker: colour, size, font and glow for the symbol name (Style › Chart lines & ticker)",
+  "Trading sounds: a chime at your goal, a warning near your max loss, a ping before the session opens or closes",
+  "New Nebula wallpaper: glowing gas clouds and bright stars (Skins › Cosmos)",
   "Streamer mode: show P&L as ticks, points or dollars, and the order panel stays usable",
   "Trade brackets: give the lot size its own colour",
   "One click to turn on a platform, and no page refresh needed after an update",
@@ -1892,8 +1923,7 @@ const WHATS_NEW = ["New Nebula wallpaper: glowing gas clouds and bright stars (S
   "Desktop app: a full-window design, and sign in to your real TradingView account in the chart window",
   "Sound in clips: your voice, your computer's sound (music, videos), or both (Capture › Clip)",
   "Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)",
-  "Auto trade clips: a clip of each trade saved when it closes (Trading › After each trade)",
-  "Tidier panel: switched-off sections fold down, and Uploads lives in Skins"];
+  "Auto trade clips: a clip of each trade saved when it closes (Trading › After each trade)"];
 (function onboarding() {
   let ver = ""; try { ver = chrome.runtime.getManifest().version; } catch {}
   const seen = localStorage.getItem("seenVer");

@@ -70,6 +70,10 @@
     pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
     // Daily goal / loss limit bar + automatic trade journal (both opt-in; estimates from the P&L drawn on the chart).
     goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false,
+    // the ticker in the chart's top-left legend (symbol name, timeframe, exchange)
+    tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false,
+    goalSound: "off",      // off | soft | loud: a chime at your goal, a warning at 80% of the loss limit, a low tone at the limit
+    sessionSound: "off",   // off | soft | loud: a ping 5 minutes before the session opens / closes, two pings when it does
     // Glow on indicators / lines / P&L, and price scale styling
     lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
     scaleSize: 0, scaleFont: "default",
@@ -511,9 +515,9 @@
   // The goal / limit bar. Left half of the track = how much of your max loss is used, right half = progress to the goal.
   function checkFlags(total, T, L) {
     const f = day.flags || (day.flags = {}); let changed = false;
-    if (L > 0 && total <= -L * 0.8 && !f.w80) { f.w80 = 1; flash("Daily loss limit: 80% used"); changed = true; }
-    if (L > 0 && total <= -L && !f.lim) { f.lim = 1; flash("Daily loss limit reached"); changed = true; }
-    if (T > 0 && total >= T && !f.goal) { f.goal = 1; flash("Daily goal reached"); changed = true; }
+    if (L > 0 && total <= -L * 0.8 && !f.w80) { f.w80 = 1; flash("Daily loss limit: 80% used"); sound("warn", cfg.goalSound, "w80"); changed = true; }
+    if (L > 0 && total <= -L && !f.lim) { f.lim = 1; flash("Daily loss limit reached"); sound("limit", cfg.goalSound, "lim"); changed = true; }
+    if (T > 0 && total >= T && !f.goal) { f.goal = 1; flash("Daily goal reached"); sound("goal", cfg.goalSound, "goal"); changed = true; }
     if (changed) persistDay();
   }
   function renderGoal() {
@@ -749,6 +753,28 @@
 
   // UI style: font / size / accent for TradingView's own HTML panels (watchlist, toolbars, order area, timeframes).
   const UI_FONTS = { mono: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace', rounded: '"SF Pro Rounded", "Nunito", "Varela Round", ui-rounded, system-ui, sans-serif' };
+  // ---------- the ticker (TradingView's legend: symbol name · timeframe · exchange) ----------
+  // Only the main symbol's line (legendMainSourceWrapper), never indicator names like Vol. One <style>, no per-frame work.
+  const TK_SIZES = [14, 17, 21, 26];
+  let tkApplied = "";
+  function applyTicker() {
+    const on = cfg.enabled && cfg.tkOn;
+    const col = cfg.tkColor === "candle" ? upColor() : /^#[0-9a-f]{6}$/i.test(cfg.tkColor || "") ? cfg.tkColor : (skinAccent() || upColor());
+    const px = TK_SIZES[Math.max(0, Math.min(3, +cfg.tkSize || 0))], font = UI_FONTS[cfg.tkFont] || "";
+    const sig = on ? [col, px, font, !!cfg.tkGlow, !!cfg.tkOnly].join("|") : "";
+    if (sig === tkApplied) return; tkApplied = sig;
+    let st = document.getElementById("bd-ticker-css");
+    if (!on) { if (st) st.textContent = ""; return; }
+    if (!st) { st = document.createElement("style"); st.id = "bd-ticker-css"; (document.head || document.documentElement).appendChild(st); }
+    const glow = cfg.tkGlow ? `text-shadow:0 0 10px ${col}99,0 0 2px ${col}cc!important;` : "";
+    const ff = font ? `font-family:${font}!important;` : "";
+    // the html:root + legend prefix outranks the legend readability rule in content.css, which would win otherwise
+    const P = 'html:root:root:root:root [class*="legend-"] [class*="legendMainSourceWrapper-"]', M = `${P} [class*="mainTitle-"] > [class*="title-"]`,
+      side = `${P} [class*="intervalTitle-"] > [class*="title-"], ${P} [class*="exchangeTitle-"] > [class*="title-"]`;
+    st.textContent = `${M}{color:${col}!important;font-size:${px}px!important;line-height:1.25!important;font-weight:700!important;${ff}${glow}}` +
+      (cfg.tkOnly ? `${P} [class*="intervalTitle-"], ${P} [class*="exchangeTitle-"]{display:none!important}`
+        : `${side}{color:${col}!important;opacity:.78;font-size:${Math.round(px * 0.85)}px!important;line-height:1.25!important;font-weight:600!important;${ff}}`);
+  }
   function applyUiStyle() {
     const h = document.documentElement;
     const font = ["mono", "rounded"].includes(cfg.uiFont) ? cfg.uiFont : "";
@@ -793,7 +819,7 @@
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
     document.documentElement.classList.toggle("bd-on", cfg.enabled && !focusAll());
-    applySides(); applyUiStyle(); applyPanels(); applyDialogs();
+    applySides(); applyUiStyle(); applyPanels(); applyDialogs(); applyTicker();
     if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
@@ -1179,7 +1205,7 @@
     // the skin colour is taken ONCE per wallpaper (animated wallpapers shift colour all the time; following that
     // re-coloured lines and panels again and again)
     const srcSig = String(cfg.skin) + "|" + String(cfg.mediaId || "");
-    if (srcSig !== accentFor && rawAccent()) { accentFor = srcSig; lastAccent = rawAccent(); pushFx(); applyPanels(); applyDialogs(); }
+    if (srcSig !== accentFor && rawAccent()) { accentFor = srcSig; lastAccent = rawAccent(); pushFx(); applyPanels(); applyDialogs(); applyTicker(); }
     const lit = views.filter((v) => v.lum);
     if (!lit.length) return;
     applyAutoMatch();
@@ -1356,6 +1382,7 @@
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
     if (keys.some((k) => k === "panelMode" || k === "panelColor" || k === "candleUp")) applyPanels();
+    if (keys.some((k) => k.startsWith("tk") || k === "candleUp" || k === "enabled")) applyTicker();
     if (keys.some((k) => k.startsWith("dlg") || k === "panelMode" || k === "panelColor")) applyDialogs();
     if (keys.includes("sides") || keys.includes("leftBar") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
@@ -1364,7 +1391,7 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -2102,6 +2129,30 @@
     const when = far ? new Intl.DateTimeFormat("en-US", { timeZone: sess.tz, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(nx[0])) : `in ${dur(nx[0] - now)}`;
     return { open: !!open.length, name: M.name, text: `${head} \u00B7 ${nx[1]} ${when}` };
   }
+  // ---------- trading sounds (src/sounds.js) ----------
+  // Only the page that owns the chart plays, and with several TradingView tabs open only one of them: the first to
+  // claim the event in this site's storage.
+  const soundsPlayed = new Set();
+  function sound(kind, level, key) {
+    if (!level || level === "off" || !cfg.enabled || !owner || standDown || !window.PriismSounds) return;
+    const k = dayKey() + ":" + key;
+    if (soundsPlayed.has(k)) return; soundsPlayed.add(k);
+    try { if (localStorage.getItem("bdSoundLast") === k) return; localStorage.setItem("bdSoundLast", k); } catch {}
+    window.PriismSounds.play(kind, level);
+  }
+  // Session heads-up: 5 minutes before the market you trade opens or closes, and when it does (same market as the timer).
+  setInterval(() => {
+    if (!cfg.enabled || !cfg.timerOn || !cfg.sessionSound || cfg.sessionSound === "off" || !owner || standDown || IN_FRAME) return;
+    const key = cfg.timerMarket === "auto" ? autoMarket() : cfg.timerMarket, M = MARKETS[key];
+    if (!M || M.daily) return;
+    const now = Date.now();
+    for (const sn of M.sessions) if (M.main.includes(sn.id)) for (const pair of sessionTimes(sn, now)) for (const ev of pair) {
+      const until = ev - now;
+      if (until > 0 && until <= 300000 && until > 240000) sound("heads", cfg.sessionSound, "h" + ev);
+      else if (until <= 0 && until > -60000) sound("bell", cfg.sessionSound, "b" + ev);
+    }
+  }, 5000);
+
   let timerEl = null, timerIv = 0;
   function renderTimer() {
     if (!(cfg.enabled && cfg.timerOn)) { if (timerEl) { timerEl.remove(); timerEl = null; } clearInterval(timerIv); timerIv = 0; return; }

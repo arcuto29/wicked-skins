@@ -22,7 +22,7 @@ async function refreshOpenTabs() {
     try {
       await chrome.scripting.executeScript({ target, world: "MAIN", files: ["src/candlelooks.js", "src/hook.js", "src/lw.js"] });
       await chrome.scripting.insertCSS({ target, files: ["src/content.css"] });
-      await chrome.scripting.executeScript({ target, files: ["src/skins.js", "src/content.js"] });
+      await chrome.scripting.executeScript({ target, files: ["src/skins.js", "src/sounds.js", "src/content.js"] });
     } catch {}   // a tab we can't reach (error page, permission removed) just keeps its old copy until refreshed
   }
 }

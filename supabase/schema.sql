@@ -7,7 +7,18 @@
 --   * signed-in users can upload; uploads wait for review ("pending")
 --   * admins' uploads are approved immediately; only admins can approve / reject
 --   * 3 reports hide an approved wallpaper again until an admin re-reviews it
---   * nobody can make themselves admin (only you, with the SQL at the bottom)
+--   * nobody can make themselves admin: only the owner emails listed in public.owner_emails() (bottom of this
+--     file) are admins, automatically, whether they signed up before or after you run this
+
+-- ---------- owners ----------
+-- The site owner's sign-in email(s). These accounts are admins: their uploads go live without review, and the
+-- website's Workshop page shows them a Review list for everyone else's uploads. Change / add emails here and re-run.
+create or replace function public.owner_emails()
+returns text[]
+language sql
+immutable
+as $$ select array['arcuto2978@gmail.com']::text[] $$;
+revoke execute on function public.owner_emails() from public, anon, authenticated;   -- not callable from the website
 
 -- ---------- profiles ----------
 create table if not exists public.profiles (
@@ -25,8 +36,9 @@ security definer
 set search_path = ''
 as $$
 begin
-  insert into public.profiles (id, display_name)
-  values (new.id, coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)))
+  insert into public.profiles (id, display_name, is_admin)
+  values (new.id, coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)),
+          lower(coalesce(new.email, '')) = any (public.owner_emails()))
   on conflict (id) do nothing;
   return new;
 end;
@@ -216,12 +228,19 @@ values ('workshop', 'workshop', true, 52428800,
 on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
-drop policy if exists "workshop: upload to own folder" on storage.objects;
-create policy "workshop: upload to own folder" on storage.objects for insert to authenticated
-  with check (bucket_id = 'workshop' and (storage.foldername(name))[1] = (select auth.uid())::text);
-drop policy if exists "workshop: delete own or admin" on storage.objects;
-create policy "workshop: delete own or admin" on storage.objects for delete to authenticated
-  using (bucket_id = 'workshop' and ((storage.foldername(name))[1] = (select auth.uid())::text or public.is_admin((select auth.uid()))));
+-- (in a block of its own: if a project doesn't allow these from the SQL editor, the rest of this file still runs
+-- and a notice says so; then add the two policies under Storage -> Policies instead)
+do $$
+begin
+  drop policy if exists "workshop: upload to own folder" on storage.objects;
+  create policy "workshop: upload to own folder" on storage.objects for insert to authenticated
+    with check (bucket_id = 'workshop' and (storage.foldername(name))[1] = (select auth.uid())::text);
+  drop policy if exists "workshop: delete own or admin" on storage.objects;
+  create policy "workshop: delete own or admin" on storage.objects for delete to authenticated
+    using (bucket_id = 'workshop' and ((storage.foldername(name))[1] = (select auth.uid())::text or public.is_admin((select auth.uid()))));
+exception when others then
+  raise notice 'Storage policies not created (%). Add them in Storage -> Policies: insert into own folder, delete own.', sqlerrm;
+end $$;
 
 -- ---------- community looks ----------
 -- A "look" is a whole setup (built-in wallpaper + candles, glow, chart styling, panels...) stored as settings,
@@ -333,7 +352,8 @@ drop trigger if exists look_reports_count on public.look_reports;
 create trigger look_reports_count after insert on public.look_reports
   for each row execute function public.look_reports_count();
 
--- ---------- make yourself admin ----------
--- After you've signed in once from the extension, run this with YOUR email:
---   update public.profiles set is_admin = true
---    where id = (select id from auth.users where email = 'you@example.com');
+-- ---------- owners are admins ----------
+-- Accounts that already exist with an owner email become admins now (new ones are handled on sign-up above).
+insert into public.profiles (id, display_name, is_admin)
+select u.id, split_part(u.email, '@', 1), true from auth.users u where lower(u.email) = any (public.owner_emails())
+on conflict (id) do update set is_admin = true;

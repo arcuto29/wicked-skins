@@ -92,7 +92,7 @@
 
 
       <details class="grp" data-grp="chart">
-        <summary>Chart lines</summary>
+        <summary>Chart lines &amp; ticker</summary>
         <p class="hint">Every line on the chart: keep TradingView's own, or style it. Skin colour follows your wallpaper; Candle uses your up-candle colour.</p>
         <div id="chartStyle"></div>
         <div class="row"><span>Line glow</span><input type="range" id="lineGlow" min="0" max="1" step="0.05" /><output id="lineGlowOut"></output></div>
@@ -178,6 +178,7 @@
         <div class="row"><span>Profit goal</span><input class="field" id="goalTarget" type="number" min="0" step="10" style="max-width:110px" /></div>
         <div class="row"><span>Max loss</span><input class="field" id="goalLimit" type="number" min="0" step="10" style="max-width:110px" /></div>
         <div class="row"><span>Position</span><div class="seg" id="goalPos"></div></div>
+        <div class="row"><span>Sound</span><div class="seg" id="goalSound"></div></div>
         <div class="row"><span>Today</span><b id="goalToday" style="font-weight:600">—</b><button id="goalReset" style="margin-left:auto">Reset today</button></div>
       </details>
       <details class="grp" data-grp="mood">
@@ -196,6 +197,8 @@
           <option value="auto">Auto (from your symbol)</option><option value="cme">CME futures (NQ, ES, GC…)</option><option value="nyse">US stocks</option>
           <option value="forex">Forex (Tokyo, London, New York)</option><option value="london">London</option><option value="tokyo">Tokyo</option><option value="crypto">Crypto (daily close, UTC)</option></select></div>
         <div class="row"><span>Position</span><div class="seg" id="timerPos"></div></div>
+        <div class="row"><span>Heads-up sound</span><div class="seg" id="sessionSound"></div></div>
+        <p class="hint">A soft ping 5 minutes before the session opens or closes, and two pings when it does.</p>
       </details>
       <details class="grp" data-grp="journal">
         <summary>After each trade</summary>
@@ -393,6 +396,7 @@
   <script src="../src/migrate.js"></script>
   <script src="../src/mediadb.js"></script>
   <script src="../src/skins.js"></script>
+  <script src="../src/sounds.js"></script>
   <script src="../src/candlelooks.js"></script>
   <script src="popup.js"></script>
 </body>

@@ -26,6 +26,12 @@ await db.exec(`grant select, insert, delete on all tables in schema public to an
 const ADMIN = "00000000-0000-0000-0000-00000000000a", U1 = "00000000-0000-0000-0000-000000000001", U2 = "00000000-0000-0000-0000-000000000002", U3 = "00000000-0000-0000-0000-000000000003", U4 = "00000000-0000-0000-0000-000000000004";
 for (const [id, e] of [[ADMIN, "you@example.com"], [U1, "a@x.com"], [U2, "b@x.com"], [U3, "c@x.com"], [U4, "d@x.com"]]) await db.query("insert into auth.users (id, email) values ($1, $2)", [id, e]);
 ok("profile auto-created on sign-up", (await db.query("select count(*)::int n from public.profiles")).rows[0].n === 5);
+const OWNER = "00000000-0000-0000-0000-0000000000ff";
+await db.query("insert into auth.users (id, email) values ($1, 'Arcuto2978@gmail.com')", [OWNER]);
+ok("the owner's email is an admin automatically (no SQL step)", (await db.query("select is_admin from public.profiles where id = $1", [OWNER])).rows[0].is_admin === true);
+ok("other sign-ups are not", (await db.query("select count(*)::int n from public.profiles where is_admin")).rows[0].n === 1);
+await db.exec(fs.readFileSync(new URL("./schema.sql", import.meta.url), "utf8"));   // re-running is safe and keeps it
+ok("re-running the schema keeps the owner admin", (await db.query("select is_admin from public.profiles where id = $1", [OWNER])).rows[0].is_admin === true);
 await db.exec(`update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com')`);
 const as = async (uid, sql, params) => {
   await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid || ""}', false);`);
