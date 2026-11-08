@@ -61,15 +61,25 @@ function renderSkins() {
   $("skinCards").innerHTML = "";
   previews = [];
   let shown = 0;
-  for (const [id, s] of Object.entries(WickedSkins)) {
-    if (activeCat === "Wow" ? !s.wow : activeCat !== "All" && s.cat !== activeCat) continue;
+  const big = document.body.classList.contains("desk");
+  // in the app, "All" is shown as sections (the showpieces first), like a gallery
+  let list = Object.entries(WickedSkins);
+  const grouped = big && activeCat === "All" && !skinQuery();
+  if (grouped) {
+    const cats = [...new Set(list.map(([, s]) => s.cat))];
+    list = [["__h", "\u2726 Wow \u00B7 showpieces"], ...list.filter(([, s]) => s.wow), ...cats.flatMap((c) => [["__h", c], ...list.filter(([, s]) => !s.wow && s.cat === c)])];
+  }
+  for (const [id, s] of list) {
+    if (id === "__h") { const h = document.createElement("h5"); h.className = "grp-h"; h.textContent = s; $("skinCards").appendChild(h); continue; }
+    if (!grouped && (activeCat === "Wow" ? !s.wow : activeCat !== "All" && s.cat !== activeCat)) continue;
     if (!matchQ(s.name, s.cat, s.wow ? "wow" : "")) continue;
     shown++;
     const card = document.createElement("button");
     card.className = "card" + (currentSrc() === id ? " on" : "");
     const cv = document.createElement("canvas");
-    cv.width = 160; cv.height = 76;
-    const skin = s.create(cv.getContext("2d")); skin.resize(160, 76);
+    const CW = big ? 260 : 160, CH = big ? 128 : 76;
+    cv.width = CW; cv.height = CH;
+    const skin = s.create(cv.getContext("2d")); skin.resize(CW, CH);
     previews.push(watchPreview({ skin, t: 0 }, cv));
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span><div class="label">${esc(s.name)}</div>`);
@@ -77,6 +87,7 @@ function renderSkins() {
     $("skinCards").appendChild(card);
   }
   updateEmpty(shown);
+  renderHero();
 }
 // Only animate previews that are actually on screen (dozens of live canvases would load the computer for nothing).
 // Each preview draws one still frame straight away, so off-screen cards still show a picture.
@@ -94,6 +105,99 @@ let last = 0;
   if (document.hidden) return;
   for (const p of [...previews, ...quickPreviews, ...lookPreviews]) if (p.vis !== false) p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1));
 })(0);
+
+// ---------- desktop app: a full-window layout of its own (the extension keeps its compact panel) ----------
+// Same controls and settings as the extension (nothing duplicated): the app just lays them out for a big window:
+// a sidebar, a top bar with live stats, a big live preview of your look, a gallery of wallpapers, two-column settings.
+const heroP = { p: null, key: "" };
+function renderHero() {
+  if (!document.body.classList.contains("desk")) return;
+  const bg = $("dhBg"), fg = $("dhFg"); if (!bg || !fg) return;
+  const r = bg.getBoundingClientRect(); if (r.width < 50) return;
+  const W = Math.round(r.width * 0.8), H = Math.round(r.height * 0.8);
+  const src = cfg.skin, sk = WickedSkins[src], key = src + "|" + W + "x" + H;
+  if (heroP.key !== key) {
+    heroP.key = key; bg.width = W; bg.height = H; heroP.p = null;
+    if (sk) { const s = sk.create(bg.getContext("2d")); s.resize(W, H); heroP.p = { skin: s, t: 3 }; s.frame(3, 0.016); }
+    else { const g = bg.getContext("2d"); g.fillStyle = "#0b0d14"; g.fillRect(0, 0, W, H); }
+  }
+  const media = src === "media" && (cfg.media || []).find((m) => m.id === cfg.mediaId);
+  $("dhName").textContent = sk ? sk.name : media ? media.name || "Your upload" : "Your wallpaper";
+  const tags = [cfg.enabled ? "\u25CF LIVE" : "\u25CB OFF", sk ? sk.cat : "My upload", sk && sk.wow ? "\u2726 Wow" : ""].filter(Boolean);
+  $("dhTags").innerHTML = tags.map((t, i) => `<i class="${i === 0 ? (cfg.enabled ? "on" : "") : ""}">${esc(t)}</i>`).join("");
+  // candles across the stage, in your colours and look
+  const dpr = Math.min(2, devicePixelRatio || 1), fr = fg.getBoundingClientRect();
+  fg.width = Math.round(fr.width * dpr); fg.height = Math.round(fr.height * dpr);
+  const g = fg.getContext("2d"), CL = window.__bdCandleLooks, look = cfg.candleOn ? cfg.candleLook || "solid" : "solid";
+  const up = cfg.candleOn && /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#26a69a", dn = cfg.candleOn && /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ef5350";
+  let seed = 7, p = 50; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const n = Math.max(30, Math.round(fr.width / 16)), bars = [];
+  for (let i = 0; i < n; i++) { const o = p; p += (rnd() - 0.47) * 6; bars.push([o, p, Math.min(o, p) - rnd() * 3, Math.max(o, p) + rnd() * 3]); }
+  let lo = Infinity, hi = -Infinity; for (const b of bars) { lo = Math.min(lo, b[2]); hi = Math.max(hi, b[3]); }
+  const top = fg.height * 0.12, bot = fg.height * 0.62, Y = (v) => bot - ((v - lo) / (hi - lo || 1)) * (bot - top), slot = fg.width / (n + 1), bw = Math.max(2 * dpr, slot * 0.56);
+  const k = { fill: (a, b, c, d) => g.fillRect(a, b, c, d), style: (v) => { g.fillStyle = v; }, stroke: (v) => { g.strokeStyle = v; }, strokeRect: (a, b, c, d) => g.strokeRect(a, b, c, d), fillPath: () => g.fill(), px: dpr, yfrac: 0 };
+  const glow = Math.max(+cfg.candleGlow || 0, CL && CL.META[look] ? CL.META[look].minGlow : 0);
+  bars.forEach(([o, c, l, h], i) => {
+    const isUp = c >= o, col = isUp ? up : dn, cx = slot * (i + 1), t0 = Y(Math.max(o, c)), t1 = Y(Math.min(o, c)); k.yfrac = t0 / fg.height;
+    g.save(); if (glow > 0) { g.shadowColor = col; g.shadowBlur = (4 + glow * 18) * dpr * 0.7; }
+    g.fillStyle = CL ? CL.wick(look, col, k) : col; g.fillRect(Math.round(cx - dpr / 2), Y(h), dpr, Y(l) - Y(h));
+    if (CL) CL.draw(g, look, Math.round(cx - bw / 2), t0, Math.round(bw), Math.max(dpr, t1 - t0), col, isUp, k); else { g.fillStyle = col; g.fillRect(cx - bw / 2, t0, bw, t1 - t0); }
+    g.restore();
+  });
+  // your look, at a glance
+  const lm = CL && CL.META[look];
+  $("dhLook").innerHTML = `<div class="dl-row"><span>Candles</span><b>${esc(cfg.candleOn ? (lm ? lm.name : "Solid") : "TradingView's own")}</b></div>
+    <div class="dl-row"><span>Colours</span><b><i class="sw" style="background:${up}"></i><i class="sw" style="background:${dn}"></i></b></div>
+    <div class="dl-row"><span>Chart lines</span><b>${[cfg.gridOn && "grid", cfg.chOn && "crosshair", cfg.plOn && "price line"].filter(Boolean).join(", ") || "TradingView's own"}</b></div>
+    <div class="dl-row"><span>TradingView</span><b>${cfg.panelMode && cfg.panelMode !== "off" ? "styled panels" : "TradingView's own"}</b></div>`;
+}
+(function heroLoop() {                                              // the big preview runs smoother than the small cards
+  let last = 0;
+  (function f(now) {
+    requestAnimationFrame(f);
+    if (!heroP.p || document.hidden || now - last < 33 || $("tab-skins").hidden) return;
+    const dt = Math.min(0.1, (now - last) / 1000); last = now; heroP.p.skin.frame((heroP.p.t += dt), dt);
+  })(0);
+})();
+function setupDesk() {
+  if (!DESK || IS_TAB) return;
+  const B = document.body; B.classList.add("desk");
+  const nav = $("nav"), main = document.querySelector("main");
+  nav.querySelector(".brand").innerHTML = '<img src="../icons/icon-128.png" alt="" /><div><b>Priism Skins</b><small>for TradingView</small></div>';
+  // sidebar foot: the chart card + the on/off switch
+  const foot = document.createElement("div"); foot.className = "desk-foot";
+  foot.append($("deskCard"), main.querySelector(".top"));
+  nav.appendChild(foot);
+  // top bar: page title, search, live stats
+  const bar = document.createElement("header"); bar.className = "desk-bar";
+  bar.innerHTML = '<div class="desk-title"><h1 id="deskPage">Skins</h1><p id="deskSub"></p></div><div class="desk-stats" id="deskStats"></div>';
+  bar.insertBefore(main.querySelector(".finder"), $("deskStats"));
+  main.insertBefore(bar, main.firstChild);
+  const SUB = { skins: "Wallpapers and one-tap looks for your chart", candles: "Candles, chart lines and the price scale", interface: "TradingView's own panels, toolbars and windows",
+    trading: "Brackets, P&L, daily goal, session timer and trade clips", capture: "Snapshots, clips, streamer mode and watermark", workshop: "Community looks and wallpapers",
+    loadouts: "Your saved looks and share links", tune: "Picture, motion, shortcuts and advanced" };
+  const setPage = (b) => { if (!b) return; $("deskPage").textContent = b.querySelector("span").textContent; $("deskSub").textContent = SUB[b.dataset.tab] || "";
+    main.scrollTop = 0; if (b.dataset.tab === "skins") setTimeout(renderHero, 0); };
+  document.querySelectorAll("#nav button[data-tab]").forEach((b) => b.addEventListener("click", () => setPage(b)));
+  setPage(document.querySelector("#nav button.on"));
+  // the big live preview on Skins
+  const hero = document.createElement("div"); hero.id = "deskHero";
+  hero.innerHTML = '<div class="dh-stage"><canvas id="dhBg"></canvas><div class="dh-dim"></div><canvas id="dhFg"></canvas><div class="dh-text"><div id="dhTags"></div><h2 id="dhName"></h2></div></div>' +
+    '<div class="dh-side"><b class="dh-h">Your look</b><div id="dhLook"></div><div class="dh-btns"><button class="primary" id="dhShare">Copy share link</button><button id="dhSave">Save this look</button></div></div>';
+  $("tab-skins").insertBefore(hero, $("tab-skins").firstChild);
+  $("dhShare").onclick = () => { $("codeCopy").click(); toast("Share link copied. Paste it anywhere."); };
+  $("dhSave").onclick = () => { document.querySelector('#nav [data-tab="loadouts"]').click(); $("loName").focus(); };
+  addEventListener("resize", () => { clearTimeout(setupDesk.rt); setupDesk.rt = setTimeout(renderHero, 120); });
+  // live stats: chart FPS (from the chart window) and what the app is using
+  const stat = (k, v, cls) => `<span class="${cls || ""}"><small>${k}</small>${v}</span>`;
+  const tick = async () => {
+    let s = null; try { s = await DESK.stats(); } catch {}
+    if (!s) return;
+    $("deskStats").innerHTML = stat("CHART", s.open ? "Open" : "Closed", s.open ? "ok" : "") + stat("FPS", s.open && s.fps ? s.fps : "\u2013") + stat("CPU", s.cpu + "%") + stat("RAM", s.mem + " MB");
+  };
+  tick(); setInterval(() => { if (!document.hidden) tick(); }, 2000);
+}
+
 
 // ---------- candles ----------
 // [id, name, up, down, group]. Ids are stored in settings; keep them stable.
@@ -137,6 +241,7 @@ const LOOK_HINT = {
 // Candle look cards: every look, each with a small preview drawn in YOUR current candle colours (same drawing code
 // the chart uses, so the preview is what you get). Redrawn when colours or glow change.
 function renderLookGrid() {
+  setTimeout(renderHero, 0);
   const box = $("candleLook"), CL = window.__bdCandleLooks; if (!box || !CL) return;
   const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
   const sig = up + down + (+cfg.candleGlow || 0) + "|" + (cfg.skin || "");
@@ -335,6 +440,7 @@ const skinQuery = () => ($("skinSearch") ? $("skinSearch").value.trim().toLowerC
 const matchQ = (...parts) => { const q = skinQuery(); return !q || parts.join(" ").toLowerCase().includes(q); };
 function renderQuick() {
   const box = $("quickLooks"); if (!box) return;
+  setTimeout(renderHero, 0);
   if ($("lookChips")) { $("lookChips").innerHTML = "";
     for (const g of LOOK_GROUPS) { const b = document.createElement("button"); b.className = "chip" + (g === lookGroup ? " on" : ""); b.textContent = g;
       b.onclick = () => { lookGroup = g; localStorage.setItem("lookGroup", g); renderQuick(); }; $("lookChips").appendChild(b); } }
@@ -394,9 +500,9 @@ function renderDesk(open) {
   if (!DESK) return;
   $("deskCard").hidden = false;
   $("deskTitle").textContent = open ? "TradingView is open — skins are on" : "TradingView is closed";
-  $("deskHint").textContent = open ? "Your wallpaper and candle colours are live on the chart." : "Open it here and your skin loads in.";
+  $("deskHint").textContent = open ? "Your look is live on the chart." : "Your real TradingView, with your look. Sign in once in that window and your layouts, alerts and broker come with you.";
   const btn = $("deskBtn");
-  btn.textContent = open ? "Focus chart" : "Open with skins";
+  btn.textContent = open ? "Show chart" : "Open TradingView";
   btn.onclick = () => (open ? DESK.open() : DESK.open());   // both focus/open; close is via the chart window
 }
 function deskCard() {
@@ -1704,7 +1810,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
   if (+cfg.clipLen) clipSecs = [5, 10, 30, 60, 120].includes(+cfg.clipLen) ? +cfg.clipLen : clipSecs;
   renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode();
   siteBar();
-  deskCard();
+  deskCard(); if (DESK && !IS_TAB) { setupDesk(); renderSkins(); renderQuick(); }
   detectCharts();
   updates();
   const q = new URLSearchParams(location.search);
@@ -1759,7 +1865,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Sound in clips: your voice, your computer's sound (music, videos), or both (Capture › Clip)",
+const WHATS_NEW = ["Desktop app: a full-window design, and sign in to your real TradingView account in the chart window",
+  "Sound in clips: your voice, your computer's sound (music, videos), or both (Capture › Clip)",
   "Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)",
   "Auto trade clips: a clip of each trade saved when it closes (Trading › After each trade)",
   "Tidier panel: switched-off sections fold down, and Uploads lives in Skins",

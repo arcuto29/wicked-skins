@@ -285,3 +285,84 @@ select.field { padding: 7px 8px; width: 100%; }
 details.grp.is-off[open] > :not(summary):not(p.hint:first-of-type):not(.keep) { display: none !important; }
 details.grp.is-off[open] > p.hint:first-of-type { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 2px; }
 details.grp.is-off > summary { opacity: .82; }
+
+/* =====================================================================================
+   Desktop app (body.desk): a full-window layout of its own. Same controls as the extension.
+   ===================================================================================== */
+body.desk { width: 100%; height: 100vh; min-height: 0; overflow: hidden; font-size: 13.5px;
+  background: radial-gradient(1100px 600px at 100% -10%, rgba(25,211,255,.08), transparent 60%), radial-gradient(800px 500px at 20% 120%, rgba(198,255,61,.05), transparent 60%), #07080c; }
+/* sidebar */
+body.desk nav { width: 244px; flex: 0 0 244px; height: 100vh; padding: 18px 14px 14px; gap: 3px; align-items: stretch; overflow-y: auto; background: rgba(9,10,15,.85); }
+body.desk .brand { flex-direction: row; justify-content: flex-start; align-items: center; gap: 12px; padding: 2px 8px 18px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+body.desk .brand img { width: 40px; height: 40px; }
+body.desk .brand b { display: block; font: 800 16px/1.15 inherit; color: #fff; letter-spacing: .01em; }
+body.desk .brand small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+body.desk nav button { flex-direction: row; justify-content: flex-start; align-items: center; gap: 12px; padding: 10px 12px; font-size: 13.5px; font-weight: 600; border-radius: 11px; }
+body.desk nav button svg { width: 19px; height: 19px; }
+body.desk nav button.on::before { left: -14px; top: 20%; bottom: 20%; }
+.desk-foot { margin-top: auto; display: grid; gap: 10px; padding-top: 14px; }
+body.desk #deskCard { display: block; margin: 0; padding: 14px; border-radius: 14px; border: 1px solid rgba(46,242,176,.3);
+  background: linear-gradient(160deg, rgba(25,211,255,.12), rgba(46,242,176,.05) 60%, rgba(255,255,255,.01)); }
+body.desk #deskCard b { font-size: 13px; color: #fff; }
+body.desk #deskCard .hint { margin: 6px 0 10px; font-size: 11.5px; color: #b9c0cf; line-height: 1.45; }
+body.desk #deskCard button { width: 100%; }
+body.desk .desk-foot .top { margin: 0; }
+/* main area */
+body.desk main { height: 100vh; padding: 0 30px 34px; }
+.desk-bar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 18px; margin: 0 -30px 6px; padding: 18px 30px 14px;
+  background: linear-gradient(180deg, rgba(7,8,12,.96) 70%, rgba(7,8,12,0)); }
+.desk-title h1 { margin: 0; font-size: 25px; letter-spacing: -.01em; }
+.desk-title p { margin: 3px 0 0; color: var(--muted); font-size: 12.5px; }
+body.desk .desk-bar .finder { margin: 0 0 0 auto; width: 320px; }
+.desk-stats { display: flex; gap: 6px; }
+.desk-stats span { display: flex; flex-direction: column; align-items: flex-end; min-width: 62px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.025);
+  font: 700 13px ui-monospace, Menlo, Consolas, monospace; color: #e9ecf3; }
+.desk-stats span small { font: 700 9.5px system-ui, sans-serif; letter-spacing: .1em; color: var(--dim); }
+.desk-stats span.ok { color: var(--acc); }
+/* hero: a big live preview of your look */
+#deskHero { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; margin: 4px 0 20px; }
+.dh-stage { position: relative; height: 290px; border-radius: 20px; overflow: hidden; border: 1px solid rgba(255,255,255,.1); background: #05060a;
+  box-shadow: 0 30px 70px -40px rgba(0,0,0,.9), 0 0 60px -30px rgba(25,211,255,.35); }
+.dh-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dh-dim { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(4,5,9,.82) 0%, rgba(4,5,9,.25) 45%, rgba(4,5,9,.12)); pointer-events: none; }
+.dh-text { position: absolute; left: 24px; bottom: 20px; right: 24px; }
+#dhTags { display: flex; gap: 6px; }
+#dhTags i { font: 800 10.5px system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; font-style: normal; padding: 4px 9px; border-radius: 99px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.14); color: #d7dcea; }
+#dhTags i.on { color: #04130f; background: var(--grad); border-color: transparent; }
+#dhName { margin: 8px 0 0; font-size: 40px; font-weight: 900; letter-spacing: -.025em; color: #fff; text-shadow: 0 2px 20px rgba(0,0,0,.6); }
+.dh-side { display: flex; flex-direction: column; padding: 18px; border-radius: 20px; border: 1px solid var(--line2); background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.01)); }
+.dh-h { font: 800 10.5px system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.dl-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.dl-row span { color: var(--muted); } .dl-row b { color: #eef1f7; font-weight: 650; text-align: right; display: flex; gap: 6px; align-items: center; }
+.dl-row .sw { width: 18px; height: 18px; border-radius: 6px; display: inline-block; box-shadow: 0 0 0 1px rgba(255,255,255,.15); }
+.dh-btns { margin-top: auto; display: grid; gap: 8px; padding-top: 14px; }
+/* galleries: big cards that fill the width */
+body.desk .skinbar { margin-bottom: 14px; }
+body.desk .skinbar .seg { min-width: 300px; }
+body.desk .cards, body.desk .quick { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+body.desk .card canvas, body.desk .card img, body.desk .card video { height: 124px; }
+body.desk .quick .card canvas { height: 112px; }
+body.desk .quick .card .bars { top: 14px; height: 80px; }
+body.desk .card .label { font-size: 13px; padding: 9px 11px 10px; }
+body.desk .grp-h { grid-column: 1 / -1; margin: 16px 0 0; font: 800 11px system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--acc); display: flex; align-items: center; gap: 12px; }
+body.desk .grp-h::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(46,242,176,.35), transparent); }
+body.desk .grp-h:first-child { margin-top: 2px; }
+/* settings tabs: sections flow into two (or three) columns so the whole window is used */
+body.desk #tab-candles, body.desk #tab-interface, body.desk #tab-trading, body.desk #tab-capture, body.desk #tab-tune { columns: 3 330px; column-gap: 18px; }
+body.desk #tab-candles details.grp, body.desk #tab-interface details.grp, body.desk #tab-trading details.grp, body.desk #tab-capture details.grp, body.desk #tab-tune details.grp {
+  break-inside: avoid; margin: 0 0 18px; display: block; padding-left: 16px; padding-right: 16px; }
+body.desk #tab-tune h4, body.desk #tab-candles > .link, body.desk #tab-tune > .link { column-span: all; }
+body.desk .lookgrid { grid-template-columns: repeat(4, 1fr); }
+body.desk .lookcard canvas { height: 58px; }
+body.desk #tab-loadouts, body.desk #tab-workshop, body.desk #tab-skins { max-width: none; }
+body.desk .news, body.desk .sitebar { max-width: 760px; }
+body.desk .legal { text-align: center; }
+body.desk #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); min-width: 380px; }
+@media (max-width: 1180px) { #deskHero { grid-template-columns: 1fr; } .dh-side { display: none; } .desk-stats span:nth-child(4) { display: none; } }
+.desk-foot { width: 100%; min-width: 0; }
+.desk-foot > * { min-width: 0; max-width: 100%; }
+body.desk #deskCard, body.desk #deskCard * { white-space: normal; }
+body.desk #deskCard > div { min-width: 0; }
+body.desk .desk-bar .finder { order: 2; }
+body.desk .desk-stats { order: 3; }

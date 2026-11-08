@@ -914,6 +914,7 @@
   const publishQ = () => document.documentElement.setAttribute("data-bd-q", `${qLevel + 1}/${qlevels().length}@${refreshHz}`);
 
   // One animation loop drives every animated wallpaper on the page.
+  let fpsN = 0, fpsT = 0;
   function startLoop() {
     running = true;
     let last = performance.now();
@@ -932,6 +933,7 @@
       const dt = Math.min(0.1, gap / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
       last = now;
       for (const v of views) if (v.skin) { v.clock += dt; v.skin.frame(v.clock, dt); }
+      fpsN++; if (now - fpsT >= 1000) { window.__bdFpsNow = Math.round((fpsN * 1000) / (now - fpsT)); fpsN = 0; fpsT = now; }
     };
     raf = requestAnimationFrame(step);
   }
