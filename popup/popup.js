@@ -1325,7 +1325,7 @@ function syncTune() {
   seg("uiAccentMode", [["off", "Default"], ["custom", "Custom"]], () => (cfg.uiAccent ? "custom" : "off"),
     (v) => { set({ uiAccent: v === "custom" ? ($("uiAccent").value || "#2ef2b0") : "" }); syncTune(); });
   $("uiAccent").value = cfg.uiAccent || "#2ef2b0"; $("uiAccent").hidden = !cfg.uiAccent;
-  seg("react", [["off", "Off"], ["market", "Price"], ["pnl", "Position"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
+  seg("react", [["off", "Off"], ["market", "Day\u2019s move"], ["pnl", "My position"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
   syncReact();
 }
 function syncReact() {
@@ -1865,7 +1865,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Desktop app: a full-window design, and sign in to your real TradingView account in the chart window",
+const WHATS_NEW = ["Live mood is back: a soft glow around your chart that follows your P&L or the day's move (Trading)",
+  "Desktop app: a full-window design, and sign in to your real TradingView account in the chart window",
   "Sound in clips: your voice, your computer's sound (music, videos), or both (Capture › Clip)",
   "Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)",
   "Auto trade clips: a clip of each trade saved when it closes (Trading › After each trade)",

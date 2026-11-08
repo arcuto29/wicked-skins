@@ -179,6 +179,15 @@
         <div class="row"><span>Position</span><div class="seg" id="goalPos"></div></div>
         <div class="row"><span>Today</span><b id="goalToday" style="font-weight:600">—</b><button id="goalReset" style="margin-left:auto">Reset today</button></div>
       </details>
+      <details class="grp" data-grp="mood">
+        <summary>Live mood</summary>
+        <p class="hint">A soft glow around the edges of your chart that follows how you're doing: your up colour when you're up, your down colour when you're down.</p>
+        <div class="row"><span>Glow follows</span><div class="seg" id="react"></div></div>
+        <div id="reactOpts" hidden>
+          <div class="row"><span>Strength</span><input type="range" id="reactStrength" min="0.1" max="1" step="0.05" /><output id="reactStrengthOut"></output></div>
+          <p class="hint" id="reactHint"></p>
+        </div>
+      </details>
       <details class="grp" data-grp="timer">
         <summary>Session timer <label class="switch" title="Countdown to the next market open / close"><input type="checkbox" id="timerOn" /><span></span></label></summary>
         <p class="hint">A slim countdown on your chart to the next open or close, in your look's colour. Uses each exchange's regular hours in its own time zone (daylight saving included); holidays aren't included.</p>
@@ -317,11 +326,6 @@
 
       <details class="grp" data-grp="motion">
         <summary>Motion</summary>
-        <div hidden><div class="seg" id="react"></div></div>
-        <div id="reactOpts" hidden>
-          <div class="row"><span>Strength</span><input type="range" id="reactStrength" min="0.1" max="1" step="0.05" /><output id="reactStrengthOut"></output></div>
-          <p class="hint" id="reactHint"></p>
-        </div>
         <div class="row"><span>Calm</span><div class="seg" id="calm"></div></div>
         <p class="hint">Calm: when your cursor is on the chart, the wallpaper dims and slows down so you can focus.</p>
         <div class="row"><span>Animation</span><div class="seg" id="motion"></div></div>

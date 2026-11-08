@@ -366,3 +366,13 @@ body.desk #deskCard, body.desk #deskCard * { white-space: normal; }
 body.desk #deskCard > div { min-width: 0; }
 body.desk .desk-bar .finder { order: 2; }
 body.desk .desk-stats { order: 3; }
+/* dropdowns (e.g. Session timer > Market): readable everywhere, including the list that opens */
+:root { color-scheme: dark; }
+select.field, select { -webkit-appearance: none; appearance: none; width: 100%; padding: 9px 34px 9px 12px; border-radius: 10px; cursor: pointer;
+  background: #151925 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c9cfdc' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 11px center / 15px;
+  border: 1px solid rgba(255,255,255,.18); color: #eef1f7; font: 600 13px system-ui, sans-serif; }
+select.field:hover, select:hover { border-color: rgba(46,242,176,.5); }
+select option { background: #151925; color: #eef1f7; font-weight: 500; }
+select option:checked { background: #1f3b34; color: #ffffff; }
+.row:has(> select) { flex-wrap: wrap; gap: 5px 8px; min-height: 0; }
+.row:has(> select) > span { width: 100%; font-size: 12px; color: #aeb4c3; }

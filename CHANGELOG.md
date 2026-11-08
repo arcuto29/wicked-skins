@@ -8,6 +8,8 @@
   - a gallery of wallpapers in sections (Wow showpieces first, then each category), with big cards;
   - settings laid out in two or three columns, so the whole window is used.
   - The controls are the same ones as the extension, so nothing is duplicated.
+- **Live mood is back** (Trading → Live mood): a soft glow around the edges of your chart in your up or down colour. Pick whether it follows the day's move or your open position's P&L, and set its strength.
+- Dropdowns (like Session timer → Market) are easy to read now: a dark list with clear text instead of light text on a light list, an arrow so it's obviously a dropdown, and full width so the choice isn't cut off.
 - **Desktop app: your real TradingView account.** The chart window now identifies as a normal Chrome browser, and sign-in pop-ups (Google, Apple, your broker's login) open inside the app. Sign in once and your layouts, watchlists, alerts and broker come with you. Before, Google refused to sign in and you were left on a signed-out default chart.
 
 ## 0.1.36 (2026-11-04)
