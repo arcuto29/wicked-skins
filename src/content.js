@@ -2037,6 +2037,18 @@
   // tab). It saves by itself when it ends, like the chart-only clip. The card is removed before recording starts.
   let screenAsk = null, screenBusy = false;
   function cancelScreenAsk() { if (screenAsk) { screenAsk.remove(); screenAsk = null; } }
+  async function waitForFreshScreen(stream) {
+    const t = stream.getVideoTracks()[0];
+    await sleep(900);                                            // the picker fades out over ~0.3–0.6 s
+    try {                                                        // and wait for one new frame after that, if we can see frames
+      if (t) {
+        const v = document.createElement("video"); v.muted = true; v.srcObject = new MediaStream([t]);
+        await v.play().catch(() => {});
+        if (v.requestVideoFrameCallback) await Promise.race([new Promise((r) => v.requestVideoFrameCallback(() => r())), sleep(500)]);
+        v.pause(); v.srcObject = null;
+      }
+    } catch {}
+  }
   function startScreenFlow(seconds, fps) {
     if (screenBusy || clipRec) return { ok: false, reason: "Already recording." };
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return { ok: false, reason: "Your browser can't record the screen on this page." };
@@ -2069,6 +2081,9 @@
   }
   async function recordScreenStream(stream, dur) {
     screenBusy = true;
+    // The first frames of a new screen share still show Chrome's "Choose what to share" window closing (and the
+    // screen as it was a moment ago). Start recording only once the picker is gone and a fresh frame has arrived.
+    await waitForFreshScreen(stream);
     let au = null; try { au = await clipAudioTrack(stream); } catch {}
     const recStream = new MediaStream([...stream.getVideoTracks(), ...(au && au.track ? [au.track] : [])]);
     const mime = clipMime(!!au);
