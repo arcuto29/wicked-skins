@@ -45,7 +45,8 @@ html.bd-on { background: var(--bd-page-bg, #131722) !important; }
 html.bd-on.theme-light .layout__area--top,
 html.bd-on.theme-light .layout__area--left,
 html.bd-on.theme-light .layout__area--right,
-html.bd-on.theme-light .layout__area--bottom { background: #ffffff !important; }
+html.bd-on.theme-light .layout__area--bottom,
+html.bd-on.theme-light [class*="chart-controls-bar"] { background: #ffffff !important; }
 html.bd-on body {
   background: transparent !important;
   --tv-color-pane-background: transparent !important;

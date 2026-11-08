@@ -10,7 +10,7 @@ Chrome Web Store Developer Dashboard → **New item** → upload `priism-skins-<
 ## 2. Store listing
 **Name:** Priism Skins: Live Wallpapers for TradingView
 **Summary (132 chars max):**
-Live wallpapers, your own videos, candle colours, glow and a readable price scale behind your TradingView charts.
+Live wallpapers, candle looks, chart styling and streamer mode for your TradingView charts. Smooth, private, no account.
 
 **Description** (paste into the big "Description" box; it allows up to 16,000 chars and is NOT the 132-char manifest description).
 Keep it plain sentences: the first version was rejected (Yellow Argon, "excessive keywords") for listing video file formats.
@@ -19,19 +19,22 @@ Don't add lists of file formats, platforms, chart types or skin names.
 Your charts, in full spectrum. Priism Skins puts calm, animated wallpapers behind your TradingView candles and lets you restyle the chart to match. It is purely cosmetic: your data, orders and account are never touched.
 
 Live wallpapers
-Choose from dozens of animated scenes, from quiet night skies and ocean depths to glowing city grids. You can also use your own pictures or videos; if the browser can't play a video, it is converted on your computer. The Workshop lets you try wallpapers shared by other traders in one tap.
+Choose from dozens of animated scenes, from quiet night skies and glowing nebulas to ocean depths and city grids. You can also use your own pictures or videos, privately on your computer. The Workshop lets you try wallpapers and complete looks shared by other traders in one tap. Wallpapers are drawn in the background so your chart stays smooth.
 
-Candles and glow
-Recolour your candles with ready-made colour sets or your own colours and pick from sixteen candle looks, from glass and chrome to soft outlines. Style the grid, crosshair and price line, and recolour TradingView's own panels to match. It works with your existing TradingView colours and chart styles.
-
-Readable and calm
-The price scale adjusts its text so it stays readable on any wallpaper. You can darken or blur the wallpaper, and Calm mode quietly dims it while you're working on the chart. Eco mode keeps it light on your computer.
+Candles, chart and ticker
+Recolour your candles and pick from sixteen candle looks, from glass and neon to soft outlines. Style the grid, crosshair, price line, price scale and the ticker at the top of your chart, and recolour TradingView's own panels and menus to match.
 
 For traders
-Make your take-profit, stop and P&L labels bigger and easier to read in one tap. Set a daily goal and loss limit, keep an automatic trade journal based on the P&L your chart already shows, save a snapshot or a short clip of your chart (and crop or trim it before saving), and add a watermark for recordings. Everything stays on your computer.
+Make your take-profit, stop and P&L labels bigger and easier to read, and give each part its own colour. Set a daily goal and loss limit with an optional chime, get a soft heads-up before the session opens or closes, and let the edges of your chart glow with your P&L.
+
+For streamers
+Streamer mode hides your money on screen and in recordings, and you choose whether P&L shows as ticks, points or dollars. Save snapshots and clips of your chart, with your voice or your computer's sound, crop or trim them before saving, and let a clip of each trade save itself when it closes.
+
+Other platforms
+Turn it on for other charting platforms you trade on, with one click and your permission.
 
 Looks
-Apply a complete look in one click, undo it just as fast, save your own and share them as a short code.
+Apply a complete look in one click, undo it just as fast, save your own and share them with a link.
 
 Privacy
 Priism Skins never reads your orders, positions or account and sends nothing from the chart anywhere. Your settings and wallpapers stay on your computer. No account is needed.
@@ -42,7 +45,7 @@ Not affiliated with, endorsed or sponsored by TradingView, Inc. Not financial ad
 
 **Images** — all staged, exact sizes, in `store/submit/`:
 - Store icon 128×128: `store/submit/store-icon-128.png`
-- Screenshots 1280×800: `store/submit/screenshot-1-neon-night.png`, `-2-blackout`, `-3-interface`, `-4-ocean`
+- Screenshots 1280×800 (live TradingView, retaken for 0.1.45): `store/submit/screenshot-1-event-horizon.png`, `-2-nebula`, `-3-synapse`, `-4-streamer` (streamer mode hiding the TP amount, SL in points)
 - Small promo tile 440×280: `store/submit/promo-small.png`
 - Marquee 1400×560 (optional): `store/submit/promo-marquee.png`
 

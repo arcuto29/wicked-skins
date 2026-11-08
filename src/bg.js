@@ -7,6 +7,12 @@ WickedMigrate.run();                                   // every worker start: ch
 chrome.runtime.onInstalled.addListener((d) => {
   WickedMigrate.run();
   WickedSites.sync().then(() => { if (d.reason === "install" || d.reason === "update") refreshOpenTabs(); });
+  // First install (e.g. from the Chrome Web Store): open a TradingView chart, where a welcome card explains how to
+  // pin Priism Skins and pick a look. The chart is already skinned, so you see what it does straight away.
+  if (d.reason === "install") {
+    chrome.storage.local.set({ welcomePending: Date.now() });
+    chrome.tabs.create({ url: "https://www.tradingview.com/chart/" }).catch(() => {});
+  }
 });
 
 // After an install or update, charts that were already open still run the old copy, which can no longer talk to the
@@ -20,6 +26,9 @@ async function refreshOpenTabs() {
     if (tab.discarded || !tab.id) continue;
     const target = { tabId: tab.id, allFrames: true };
     try {
+      // already running the current copy (e.g. a tab that opened during the install): nothing to do
+      const probe = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => !!window.__bdContentAlive }).catch(() => []);
+      if (probe.some((r) => r.result)) continue;
       await chrome.scripting.executeScript({ target, world: "MAIN", files: ["src/candlelooks.js", "src/hook.js", "src/lw.js"] });
       await chrome.scripting.insertCSS({ target, files: ["src/content.css"] });
       await chrome.scripting.executeScript({ target, files: ["src/skins.js", "src/sounds.js", "src/content.js"] });

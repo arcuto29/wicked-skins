@@ -1925,7 +1925,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",
+const WHATS_NEW = ["Smoother charts: wallpapers are now drawn in the background, leaving TradingView's thread free",
+  "nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",
   "TradingView's light theme is readable over your wallpaper, and one tap switches to dark",
   "Candle looks now work on more Lightweight Charts platforms (like nq.vision)",
   "Style your ticker: colour, size, font and glow for the symbol name (Style › Chart lines & ticker)",
@@ -1943,17 +1944,26 @@ const WHATS_NEW = ["nq.vision and other Lightweight Charts platforms: panels, wa
   const seen = localStorage.getItem("seenVer");
   if (!seen) {
     localStorage.setItem("seenVer", ver || "1");
+    // A hands-on tour: each step can do the thing for you (never a blocking overlay, Skip any time).
+    const go = (tab) => { const b = document.querySelector(`#nav button[data-tab="${tab}"]`); if (b) b.click(); };
+    const wow = QUICK_LOOKS.filter((q) => groupOf(q) === "Wow" && WickedSkins[q.skin]);
     const steps = [
-      ["Pick a look", "Skins \u203a Looks puts a matching wallpaper, candles and glow on your chart in one tap. Undo is one tap too."],
-      ["Make it yours", "Style has 16 candle looks, chart styling (grid, crosshair, price line) and TradingView's own panel colours."],
-      ["Find anything", "Type in \u201cFind any setting\u201d at the top and jump straight to it. Have fun!"],
+      ["Pick a look", "One tap puts a matching wallpaper, candles and glow on your chart. Undo is one tap too.",
+        ["Try a Wow look", () => { const q = wow[(Math.random() * wow.length) | 0]; if (q) applyWithUndo({ enabled: true, skin: q.skin, ...q.set }, `Look: ${q.name}`); }]],
+      ["Make it yours", "Style has 16 candle looks, your candle colours, chart lines and the ticker. TradingView styles its own panels and menus.",
+        ["Open Style", () => go("candles")]],
+      ["Your platform too", "Trade on a prop firm platform or another charting site (TopstepX, nq.vision…)? Open it, then tap Turn on here at the top of this panel.", null],
+      ["Find anything", "Type in \u201cFind any setting\u201d at the top to jump straight to it. Alt+Shift+W on the chart turns everything on or off.", null],
     ];
     // a friendly card at the top (never a blocking overlay)
     let i = 0; const el = $("news"); if (!el) return;
-    const draw = () => { el.innerHTML = `<b>Welcome! ${steps[i][0]}</b><p class="hint" style="color:#cfd5e2;margin:2px 0 10px">${steps[i][1]}</p>
+    const draw = () => { const act = steps[i][2];
+      el.innerHTML = `<b>Welcome! ${steps[i][0]}</b><p class="hint" style="color:#cfd5e2;margin:2px 0 10px">${steps[i][1]}</p>
+      ${act ? `<button class="primary keep" data-a="do" style="width:100%;margin:0 0 10px">${esc(act[0])}</button>` : ""}
       <div class="tour-bar"><div class="dots">${steps.map((_, j) => `<i class="${j === i ? "on" : ""}"></i>`).join("")}</div>
-      <div><button class="link" data-a="skip" style="margin:0 8px 0 0">Skip</button><button class="primary" data-a="next">${i < steps.length - 1 ? "Next" : "Let's go"}</button></div></div>`;
+      <div><button class="link" data-a="skip" style="margin:0 8px 0 0">Skip</button><button class="${act ? "" : "primary"}" data-a="next">${i < steps.length - 1 ? "Next" : "Let's go"}</button></div></div>`;
       el.hidden = false;
+      if (act) el.querySelector("[data-a=do]").onclick = () => { act[1](); if (++i >= steps.length) el.hidden = true; else draw(); };
       el.querySelector("[data-a=skip]").onclick = () => { el.hidden = true; };
       el.querySelector("[data-a=next]").onclick = () => { if (++i >= steps.length) el.hidden = true; else draw(); }; };
     draw();

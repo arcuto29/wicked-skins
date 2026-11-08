@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 8;
+  const HOOK_VERSION = 9;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -889,7 +889,10 @@
       const nf = styledFont(pFont);
       if (nf !== pFont) { this.font = nf; if (a[3] === undefined && w0 > 0) a[3] = w0 * 1.06; }
       // text on a recoloured tag: dark on bright tags, white on dark ones
-      const tag = tagsRecoloured && lastTag.get(this), r = tag && rgbKey(tag);
+      // only the text drawn right after a price box sits on it (a price + countdown = 2 lines); later numbers are plain
+      // scale labels. Remembering the box for longer turned every later number dark on dark wallpapers.
+      const lt = lastTag.get(this); if (lt && --lt.left <= 0) lastTag.delete(this);
+      const tag = tagsRecoloured && lt && lt.col, r = tag && rgbKey(tag);
       if (r) {
         const [R, G, B] = r.key.split(",").map((n) => { n /= 255; return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); });
         const L = 0.2126 * R + 0.7152 * G + 0.0722 * B;
@@ -975,7 +978,7 @@
       origFillDesc.set.call(this, col); chLabel.set(this, col);
       const r = origFillPath.apply(this, a); origFillDesc.set.call(this, pF); return r;
     }
-    if (on && c && isAxis(c)) lastTag.set(this, this.fillStyle);
+    if (on && c && isAxis(c)) lastTag.set(this, { col: this.fillStyle, left: 2 });
     if (on && c && fx.scaleGlow > 0 && isAxis(c)) {
       const col = this.fillStyle;
       if (typeof col === "string" && glowable(col)) {
