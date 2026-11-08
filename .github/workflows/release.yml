@@ -79,12 +79,14 @@ jobs:
       # same action the extension job uses, which works reliably.
       - name: Build installers
         shell: bash
+        # retried: electron-builder downloads its tools from GitHub, which sometimes times out (504) for a few minutes
         run: |
           case "${{ matrix.os }}" in
-            macos-latest)   npx electron-builder --mac --publish never ;;
-            windows-latest) npx electron-builder --win --publish never ;;
-            *)              npx electron-builder --linux --publish never ;;
+            macos-latest)   T=--mac ;;
+            windows-latest) T=--win ;;
+            *)              T=--linux ;;
           esac
+          for i in 1 2 3 4; do npx electron-builder $T --publish never && exit 0; echo "retry $i"; sleep 45; done; exit 1
       - name: Attach installers + update manifests to the release
         uses: softprops/action-gh-release@v2
         with:
