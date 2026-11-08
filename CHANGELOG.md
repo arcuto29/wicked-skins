@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.40 (2026-11-04)
+- **TradingView's light theme is readable now.** Its top bar, toolbars and side panels have dark text and no background of their own, so over a wallpaper they were close to invisible, and it didn't look like TradingView. They now keep TradingView's own light background.
+  - The first time, a card on the chart offers **Use dark theme**, which flips TradingView's own theme setting (same as its menu's switch), or Keep light. Priism Skins looks best on dark.
+- **Desktop app: sign in to your TradingView.** If the chart window isn't signed in (you'd see "Upgrade" and a default watchlist), a card offers **Sign in**. After signing in you're taken back to your chart, with your own layouts, watchlists, alerts and broker.
+- **Lightweight Charts platforms (like nq.vision): candle looks on every kind of chart.** Some apps draw candle bodies as shapes instead of plain rectangles. Looks like Neon, Glass and Outline now work there too. Before, they couldn't apply, and on such a chart a look could even stop the candles from drawing.
+  - Candle colours are now also learned on apps whose candles are white, grey or black (not only coloured ones).
+  - Diagnose shows more about the chart (how candles are drawn, the most-drawn colours) so problems can be pinned down.
+- **Your own wallpaper, no sharing needed.** It was already possible but easy to miss: Skins → Wallpapers and the Workshop now have a "Use your own image or video" link straight to **My uploads**. Your files stay private, on your computer.
+
 ## 0.1.39 (2026-11-04)
 - **Style your ticker** (Style → Chart lines & ticker → Ticker): the symbol name at the top left of the chart.
   - Colour: your skin's colour, your candle colour, or any colour.

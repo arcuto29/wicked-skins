@@ -514,6 +514,8 @@
   // asked for by content.js before it decides a position has closed: a quiet market stops the chart redrawing, so the
   // position pill (our P&L signal) would go stale even though the trade is still open. A soft redraw refreshes it, no blink.
   document.addEventListener("bd-softrepaint", () => { try { apiRepaint(); } catch {} });
+  // "Use dark theme" on Priism's card: switch TradingView's own theme setting (same as its menu's Dark theme switch)
+  document.addEventListener("bd-theme-dark", () => { try { window.TradingViewApi.themes().setStdTheme("dark"); } catch {} });
 
   // ---------- helpers ----------
   const chartCache = new WeakMap();

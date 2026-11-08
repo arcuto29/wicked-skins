@@ -2005,6 +2005,36 @@
   }
 
   // ---------- Alt+Shift+W: everything on/off, right on the chart ----------
+  // ---------- a one-time tip card on the chart (TradingView's light theme; not signed in, in the desktop app) ----------
+  function tipCard(id, text, actions) {
+    if (document.getElementById("bd-tip") || IN_FRAME) return;
+    try { if (localStorage.getItem("bdTip:" + id)) return; } catch {}
+    const card = document.createElement("div"); card.id = "bd-tip"; card.dataset.bdOwner = ME.token;
+    card.style.cssText = "position:fixed;z-index:2147483646;top:56px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;max-width:min(720px,92vw);padding:11px 14px;border-radius:14px;background:rgba(10,12,18,.96);color:#fff;font:600 13px system-ui,sans-serif;border:1px solid rgba(46,242,176,.55);box-shadow:0 12px 40px rgba(0,0,0,.6)";
+    const t = document.createElement("span"); t.textContent = text; t.style.cssText = "flex:1;line-height:1.35"; card.append(t);
+    const done = () => { try { localStorage.setItem("bdTip:" + id, String(Date.now())); } catch {} card.remove(); };
+    actions.forEach(([label, fn], i) => { const b = document.createElement("button"); b.textContent = label;
+      b.style.cssText = i === 0 ? "all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;background:linear-gradient(90deg,#19d3ff,#2ef2b0);color:#04140f;font:800 13px system-ui,sans-serif;white-space:nowrap"
+        : "all:unset;cursor:pointer;padding:8px 8px;opacity:.75;font:600 13px system-ui,sans-serif;white-space:nowrap";
+      b.onclick = () => { done(); if (fn) fn(); }; card.append(b); });
+    document.documentElement.appendChild(card);
+  }
+  let tipsShown = false;
+  function chartTips() {
+    if (tipsShown || !cfg.enabled || !owner || standDown || IN_FRAME || !/(^|\.)tradingview\.com$/.test(location.hostname)) return;
+    const h = document.documentElement;
+    if (h.classList.contains("theme-light")) {
+      tipsShown = true;
+      return tipCard("theme", "TradingView is in its light theme, which is hard to read over a wallpaper. Priism Skins looks best with TradingView's dark theme.",
+        [["Use dark theme", () => document.dispatchEvent(new CustomEvent("bd-theme-dark"))], ["Keep light", null]]);
+    }
+    if (ME.id === "desktop" && h.classList.contains("is-not-authenticated")) {
+      tipsShown = true;
+      tipCard("signin", "You're not signed in to TradingView here. Sign in once to get your own layouts, watchlists, alerts and broker in this window.",
+        [["Sign in", () => { location.href = "https://www.tradingview.com/accounts/signin/"; }], ["Not now", null]]);
+    }
+  }
+  setTimeout(() => { setInterval(chartTips, 4000); chartTips(); }, 6000);   // after TradingView has settled
   function flash(msg) {
     const t = document.createElement("div"); t.className = "bd-flash"; t.textContent = msg;
     document.documentElement.appendChild(t); setTimeout(() => t.remove(), 1400);
@@ -2236,6 +2266,7 @@
     standDown = true; teardown(); if (wmEl) { wmEl.remove(); wmEl = null; }
     if (timerEl) { timerEl.remove(); timerEl = null; } clearInterval(timerIv); timerIv = 0;
     if (goalEl) { goalEl.remove(); goalEl = null; }
+    const tip = document.getElementById("bd-tip"); if (tip && tip.dataset.bdOwner === ME.token) tip.remove();
     if (dlgObs) { dlgObs.disconnect(); dlgObs = null; }
   }
   function sweep() {

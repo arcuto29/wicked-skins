@@ -172,12 +172,16 @@
   function colourful(key) { const [R, G, B] = key.split(",").map(Number); const mx = Math.max(R, G, B), mn = Math.min(R, G, B); return mx - mn > 28 && mx > 40; }
   function learnFromDrawing() {
     lastTally = [...tally].sort((a, b) => b[1] - a[1]).slice(0, 6);
-    const cands = [...tally].filter(([c, n]) => n >= 6).map(([c, n]) => [rgbKey(c), n]).filter(([r]) => r && (r.a === null || +r.a >= 0.6) && colourful(r.key))
-      .sort((a, b) => b[1] - a[1]).slice(0, 2);
+    const all = [...tally].filter(([c, n]) => n >= 6).map(([c, n]) => [rgbKey(c), n]).filter(([r]) => r && (r.a === null || +r.a >= 0.6)).sort((a, b) => b[1] - a[1]);
     tally.clear();
+    // usually the two most-drawn colourful fills are the candles; some apps use white / grey / black candles instead,
+    // so if there aren't two colourful ones, take the two most-drawn of any colour (brighter = up)
+    let cands = all.filter(([r]) => colourful(r.key)).slice(0, 2), mono = false;
+    if (cands.length < 2) { cands = all.slice(0, 2); mono = true; }
     if (cands.length < 2) return [];
-    const dGreen = (k) => Math.min(Math.abs(hueOf(k) - 140), 360 - Math.abs(hueOf(k) - 140));
     const [a, b] = cands.map(([r]) => r.key);
+    if (mono) { const lum = (k) => k.split(",").reduce((s, v) => s + +v, 0); return lum(a) >= lum(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]]; }
+    const dGreen = (k) => Math.min(Math.abs(hueOf(k) - 140), 360 - Math.abs(hueOf(k) - 140));
     return dGreen(a) <= dGreen(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]];
   }
 
@@ -247,6 +251,29 @@
       fill(x, y, w, h) { origFillRect.call(lk.g, x, y, w, h); }, style(v) { fillDesc.set.call(lk.g, v); },
       stroke(v) { strokeDesc.set.call(lk.g, v); }, strokeRect(x, y, w, h) { origStrokeRectL.call(lk.g, x, y, w, h); },
       fillPath() { origFillPathL.call(lk.g); } };
+    // Draw a candle body / wick in the chosen look (glow, neon, glass…). Used for fillRect bodies and for bodies some
+    // builds draw as a one-rectangle path (rect / roundRect + fill). Returns false when it isn't a candle.
+    let inLook = false;   // while a look draws, its own drawing must not be taken for another candle (no recursion)
+    function candleLook(g, c, x, y, w, h) {
+      if (inLook) return false;
+      const L = window.__bdCandleLooks, look = candles && L && L.META[candles.look] ? candles.look : "solid";
+      const meta = L && L.META[look], glow = candles ? Math.max(candles.glow, meta ? meta.minGlow : 0) : 0;
+      if (!(on && candles && (glow > 0 || (look !== "solid" && look !== "shift")) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(g.fillStyle))) return false;
+      const t = g.getTransform(), sx = t.a || 1, sy = t.d || 1, col = toHexCol(g.fillStyle), isUp = col === candles.upHex;
+      lk.g = g; lk.px = 1 / sx; lk.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
+      g.save(); inLook = true;
+      try {
+        if (glow > 0) { g.shadowColor = L ? L.tone(look, col, lk) : col; g.shadowBlur = 3 + glow * 16; }
+        if (L && look !== "solid" && Math.abs(w * sx) >= 3 && Math.abs(h * sy) >= 3) L.draw(g, look, x, y, w, h, col, isUp, lk);
+        else { if (L) fillDesc.set.call(g, L.wick(look, col, lk)); origFillRect.call(g, x, y, w, h); }
+      } finally { inLook = false; g.restore(); }
+      return true;
+    }
+    // the path being built is exactly one rectangle? (rect / roundRect, nothing else)
+    const pbox = new WeakMap();
+    const oRect = proto.rect, oRound = proto.roundRect;
+    proto.rect = function (x, y, w, h) { if (on && candles) { const b = pbox.get(this); pbox.set(this, b === undefined ? { x, y, w, h } : null); } return oRect.call(this, x, y, w, h); };
+    if (oRound) proto.roundRect = function (x, y, w, h, ...r) { if (on && candles) { const b = pbox.get(this); pbox.set(this, b === undefined ? { x, y, w, h } : null); } return oRound.call(this, x, y, w, h, ...r); };
     const toHexCol = (v) => { const r = rgbKey(v); return r ? "#" + r.key.split(",").map((n) => (+n).toString(16).padStart(2, "0")).join("") : v; };
     proto.fillRect = function (x, y, w, h) {
       const c = this.canvas;
@@ -263,17 +290,7 @@
         }
       }
       drawCalls.fillRect++;
-      const L = window.__bdCandleLooks, look = candles && L && L.META[candles.look] ? candles.look : "solid";
-      const meta = L && L.META[look], glow = candles ? Math.max(candles.glow, meta ? meta.minGlow : 0) : 0;
-      if (on && candles && (glow > 0 || (look !== "solid" && look !== "shift")) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(this.fillStyle)) {
-        const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, col = toHexCol(this.fillStyle), isUp = col === candles.upHex;
-        lk.g = this; lk.px = 1 / sx; lk.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
-        this.save();
-        if (glow > 0) { this.shadowColor = L ? L.tone(look, col, lk) : col; this.shadowBlur = 3 + glow * 16; }
-        if (L && look !== "solid" && Math.abs(w * sx) >= 3 && Math.abs(h * sy) >= 3) L.draw(this, look, x, y, w, h, col, isUp, lk);
-        else { if (L) fillDesc.set.call(this, L.wick(look, col, lk)); origFillRect.call(this, x, y, w, h); }
-        this.restore(); return;
-      }
+      if (candleLook(this, c, x, y, w, h)) return;
       return origFillRect.call(this, x, y, w, h);
     };
     // Some (modified) builds draw candle bodies as paths (rounded bodies, custom series) instead of fillRect:
@@ -282,6 +299,7 @@
     proto.fill = function (...a) {
       const c = this.canvas;
       if (on && c && typeof this.__bdLwOrig === "string" && isChart(c)) { noteFill(this.__bdLwOrig); drawCalls.fill++; }
+      if (on && candles && c && !a.length && !inLook) { const b = pbox.get(this); if (b && candleLook(this, c, b.x, b.y, b.w, b.h)) { drawCalls.pathLook = (drawCalls.pathLook || 0) + 1; return; } }
       if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.fillStyle)) {
         const pB = this.shadowBlur, pC = this.shadowColor;
         this.shadowColor = this.fillStyle; this.shadowBlur = 3 + candles.glow * 16;
@@ -308,8 +326,8 @@
     const seg = new WeakMap();   // ctx -> { n, ok, x0, y0, last:[x,y] }
     const oBegin = proto.beginPath, oMove = proto.moveTo, oLine = proto.lineTo;
     const lineFx = () => on && lfx;
-    proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null }); return oBegin.call(this); };
-    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) k.p = [x, y]; return oMove.call(this, x, y); };
+    proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null }); pbox.delete(this); return oBegin.call(this); };
+    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) k.p = [x, y]; if (on && candles) pbox.set(this, null); return oMove.call(this, x, y); };
     proto.lineTo = function (x, y) {
       const k = lineFx() && seg.get(this);
       if (k && k.ok) {
@@ -321,8 +339,10 @@
           k.n++; k.p = [x, y];
         }
       }
+      if (on && candles) pbox.set(this, null);
       return oLine.call(this, x, y);
     };
+    for (const nm of ["arc", "arcTo", "quadraticCurveTo", "bezierCurveTo", "ellipse"]) { const o = proto[nm]; if (o) proto[nm] = function (...a) { if (on && candles) pbox.set(this, null); return o.apply(this, a); }; }
     const DASH = { solid: [], dotted: [1, 3], dashed: [5, 5] };
     // grid colours are muted: little colour in them (dark navy greys count), or mostly transparent
     const greyish = (col) => { const r = rgbKey(col); if (!r) return false; const [R, G, B] = r.key.split(",").map(Number);
