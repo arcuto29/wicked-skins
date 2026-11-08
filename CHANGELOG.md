@@ -2,6 +2,11 @@
 
 ## 0.1.42 (2026-11-04)
 - **Fixed on Lightweight Charts platforms (like nq.vision):** Priism could take the platform's white, grey, black or dark-navy drawing for candle colours, then recolour everything drawn in those shades (e.g. black areas turning your down colour). Only colourful candle colours are learned now, and greys / white / black are never treated as candles. Refresh the nq.vision tab once after updating, so the old copy is gone.
+- **More customization on Lightweight Charts platforms:**
+  - **Ticker** (Style → Chart lines & ticker): the platform's symbol name above the chart and its timeframe buttons take your ticker colour, size, font and glow.
+  - **Accent** (TradingView tab → Text & accent): tints the platform's watchlist symbols and timeframe buttons. Panels already recolours the watchlist panel itself.
+  - **Crosshair:** "Glow at the pointer" and "Price & time labels: Match crosshair" work there now.
+  - **Line glow** (Style → Chart lines): indicator lines (EMA, VWAP…) and drawings glow. Candles, grid and crosshair don't.
 
 ## 0.1.41 (2026-11-04)
 - **Platforms on Lightweight Charts (like nq.vision): the rest of your customization now works there too.**

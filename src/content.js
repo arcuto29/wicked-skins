@@ -688,12 +688,14 @@
   // them, and give them the panel colour. Re-checked only when the page adds elements, at most every 2 s.
   const isLwPage = () => document.documentElement.getAttribute("data-bd-lw") === "on" && !document.querySelector(".chart-markup-table");
   let surfT = 0, surfObs = null;
+  const surfSeen = new WeakSet();   // elements already looked at: getComputedStyle once per element, not every rescan
   function markSurfaces() {
     surfT = 0;
     const root = document.querySelector("[data-bd-lwroot], .tv-lightweight-charts");
     let n = 0;
     for (const el of document.body ? document.body.querySelectorAll("div, aside, header, nav, section, main, footer, ul, li, table, td, th, button, input, select") : []) {
       if (++n > 6000) break;
+      if (surfSeen.has(el)) continue; surfSeen.add(el);
       if (el.hasAttribute("data-bd-surf") || el.closest("#bd-layer, #bd-timer, #bd-goal, #bd-pnl, #bd-wm, #bd-tip") || (root && root.contains(el))) continue;
       const bg = getComputedStyle(el).backgroundColor, m = bg.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/);
       if (!m || (m[4] !== undefined && +m[4] < 0.5)) continue;
@@ -702,12 +704,47 @@
       el.setAttribute("data-bd-surf", L < 0.5 ? "d" : "l");    // dark or light surface (its text colour is left alone)
     }
   }
+  // The platform's ticker, timeframe buttons and watchlist symbols are its own HTML too. Short text-only elements are
+  // recognised by their text: "1m" / "15m" / "4H" / "1D" = a timeframe; "NQ", "MNQZ5", "ES1!" = a symbol. The symbol just
+  // above the chart is the ticker; the others (watchlist) take the accent colour.
+  const TF_RE = /^(\d{1,3}\s?(s|m|min|h|hr|d|w|mo)|[DWM]|1Y)$/i, SYM_RE = /^[A-Z][A-Z0-9.\-]{0,9}!?$/;
+  const COMBO_RE = /^[A-Z][A-Z0-9.\-]{0,9}!?\s*[\u00b7\u2022|,\-]\s*(\d{1,3}\s?(s|m|min|h|hr|d|w|mo)|[DWM])$/i;   // "NQ1! · 1m"
+  const NOT_SYM = new Set(["BUY", "SELL", "USD", "OK", "ON", "OFF", "LIVE", "PNL", "LONG", "SHORT", "MARKET", "LIMIT", "STOP", "CLOSE", "OPEN", "HIGH", "LOW", "VOL", "AUTO", "LOG", "ALL", "TP", "SL", "QTY", "AM", "PM", "UTC", "ET", "EST", "NEW", "BETA", "PRO", "FAQ", "ID", "X"]);
+  function markTickers() {
+    const root = document.querySelector("[data-bd-lwroot], .tv-lightweight-charts"), cr = root ? root.getBoundingClientRect() : null;
+    let main = null, best = Infinity, n = 0;
+    for (const el of document.body ? document.body.querySelectorAll("span, div, button, a, b, strong, td, li, p, h1, h2, h3, h4, label") : []) {
+      if (++n > 8000) break;
+      if (el.childElementCount || (root && root.contains(el)) || el.closest("#bd-layer, #bd-timer, #bd-goal, #bd-pnl, #bd-wm, #bd-tip")) continue;
+      const t = (el.textContent || "").trim(); if (!t || t.length > 22) { if (el.dataset.bdTk) delete el.dataset.bdTk; continue; }
+      let kind = TF_RE.test(t) ? "tf" : (t.length <= 12 && SYM_RE.test(t) && /[A-Z]/.test(t) && !NOT_SYM.has(t.replace(/!$/, "")) && t.length >= 2) || COMBO_RE.test(t) ? "list" : "";
+      if (!kind) { if (el.dataset.bdTk) delete el.dataset.bdTk; continue; }
+      if (kind === "list" && cr) {                  // the ticker: a symbol in the band just above (or at the top of) the chart
+        const r = el.getBoundingClientRect(), dy = cr.top - r.bottom;
+        if (r.width && dy > -60 && dy < 120 && r.left < cr.right && r.right > cr.left - 40) { const d = Math.abs(dy) + Math.abs(r.left - cr.left) * 0.2; if (d < best) { best = d; main = el; } }
+      }
+      el.dataset.bdTk = kind;
+    }
+    if (main) main.dataset.bdTk = "main";
+  }
+  // one observer for the platform's page: re-mark panels / tickers after it changes (at most every 2 s)
+  let tkT = 0;
+  function appWanted() { return isLwPage() && cfg.enabled && (!!panelApplied || cfg.tkOn || !!cfg.uiAccent); }
+  function watchApp() {
+    if (!appWanted()) { if (surfObs) { surfObs.disconnect(); surfObs = null; } return; }
+    if (surfObs || !document.body) return;
+    surfObs = new MutationObserver(() => {
+      if (panelApplied && !surfT) surfT = setTimeout(markSurfaces, 2000);
+      if ((cfg.tkOn || cfg.uiAccent) && !tkT) tkT = setTimeout(() => { tkT = 0; markTickers(); }, 2000);
+    });
+    surfObs.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
   function applyAppPanels(col) {
     const h = document.documentElement, on = !!col && isLwPage();
     h.classList.toggle("bd-app-panels", on);
-    if (!on) { if (surfObs) { surfObs.disconnect(); surfObs = null; } return; }
+    if (!on) { watchApp(); return; }
     markSurfaces();
-    if (!surfObs && document.body) { surfObs = new MutationObserver(() => { if (!surfT) surfT = setTimeout(markSurfaces, 2000); }); surfObs.observe(document.body, { childList: true, subtree: true }); }
+    watchApp();
     const rgb = [1, 3, 5].map((i) => parseInt(col.slice(i, i + 2), 16)), up = (f) => `rgb(${rgb.map((v) => Math.round(v + (255 - v) * f)).join(",")})`;
     let st = document.getElementById("bd-app-css");
     if (!st) { st = document.createElement("style"); st.id = "bd-app-css"; (document.head || h).appendChild(st); }
@@ -817,7 +854,10 @@
     // the html:root + legend prefix outranks the legend readability rule in content.css, which would win otherwise
     const P = 'html:root:root:root:root [class*="legend-"] [class*="legendMainSourceWrapper-"]', M = `${P} [class*="mainTitle-"] > [class*="title-"]`,
       side = `${P} [class*="intervalTitle-"] > [class*="title-"], ${P} [class*="exchangeTitle-"] > [class*="title-"]`;
-    st.textContent = `${M}{color:${col}!important;font-size:${px}px!important;line-height:1.25!important;font-weight:700!important;${ff}${glow}}` +
+    if (isLwPage()) { markTickers(); watchApp(); }
+    const LWM = 'html.bd-lwpage [data-bd-tk="main"]', LWT = 'html.bd-lwpage [data-bd-tk="tf"]';
+    st.textContent = `${M}, ${LWM}{color:${col}!important;font-size:${px}px!important;line-height:1.25!important;font-weight:700!important;${ff}${glow}}` +
+      `${LWT}{color:${col}!important;${ff}${cfg.tkGlow ? `text-shadow:0 0 8px ${col}88!important;` : ""}}` +
       (cfg.tkOnly ? `${P} [class*="intervalTitle-"], ${P} [class*="exchangeTitle-"]{display:none!important}`
         : `${side}{color:${col}!important;opacity:.78;font-size:${Math.round(px * 0.85)}px!important;line-height:1.25!important;font-weight:600!important;${ff}}`);
   }
@@ -833,9 +873,10 @@
     h.style.setProperty("--bd-ui-accent", accent || "");
     h.classList.toggle("bd-ui-accent", !!(on && accent));
     h.classList.toggle("bd-lwpage", isLwPage());
+    if (isLwPage() && (accent || cfg.tkOn)) { markTickers(); watchApp(); }
   }
   // lw.js marks the page once it finds a Lightweight Charts chart (can be after we start): apply the app styling then
-  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelApplied) applyAppPanels(panelApplied); } })
+  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelApplied) applyAppPanels(panelApplied); tkApplied = ""; applyTicker(); } })
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-bd-lw"] });
 
   // Pages built on Lightweight Charts (not TradingView's own charts), like nq.vision: the app around the chart has solid
