@@ -262,7 +262,14 @@
         chosen = null; thumbBlob = null; $("file").value = ""; $("title").value = ""; $("rights").checked = false;
         $("preview").hidden = true; $("preview").innerHTML = ""; $("dropTitle").textContent = "Choose an image or video"; update();
         if (ins.data.status === "approved") { sort = "new"; load(true); }
-      } catch (e) { say("shareMsg", "Couldn't share: " + (e.message || e)); $("share").disabled = false; }
+      } catch (e) {
+        const m = String((e && e.message) || e);
+        // the most common setup gap: supabase/schema.sql hasn't been run (or not all of it), so there's no file storage yet
+        say("shareMsg", /bucket not found|relation .* does not exist|schema cache/i.test(m)
+          ? "Uploads aren't set up on the server yet (the site owner needs to run supabase/schema.sql in Supabase). Nothing was shared."
+          : "Couldn't share: " + m);
+        $("share").disabled = false;
+      }
     };
     async function renderMine() {
       if (!user) return;

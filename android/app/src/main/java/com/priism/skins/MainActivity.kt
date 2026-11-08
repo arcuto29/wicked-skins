@@ -76,6 +76,7 @@ class MainActivity : Activity() {
             append("window.__BD_CFG=").append(cfg).append(";")
             append("if(window.__bdUpdate){window.__bdUpdate(window.__BD_CFG);}else{")
             append(asset("shared/src/skins.js")).append("\n")
+            append(asset("shared/src/sounds.js")).append("\n")
             append(asset("shared/src/content.js"))
             append("}})();")
         }

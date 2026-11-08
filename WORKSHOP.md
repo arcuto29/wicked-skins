@@ -24,12 +24,12 @@ a few emails per hour — for a real launch, add custom SMTP (e.g. Resend) under
 3. Supabase → Authentication → URL Configuration → **Redirect URLs** → add your website URL
    (e.g. `https://arcuto29.github.io/wicked-skins/**`), where Google returns after sign-in.
 
-## 3. Make yourself admin
-Sign in once on the **website** (Workshop → Share), then in the SQL Editor run, with your email:
-```sql
-update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com');
-```
-Now your uploads go live immediately, and **Workshop → Review** shows everyone else's for you to approve or reject.
+## 3. You're the admin automatically
+The owner email is set at the top of `supabase/schema.sql` (`public.owner_emails()`, currently arcuto2978@gmail.com).
+Sign in on the website with that email, before or after running the schema, and you're an admin. No extra SQL needed.
+Admins' uploads go live immediately, with no review. On the website's **Workshop** page, signed in, a **Review ADMIN**
+section lists everyone else's uploads and shared looks: tap Approve or Reject (with a reason the sharer sees).
+To add another admin, add their email to that list and run the schema again.
 
 ## Community looks (added in 0.1.27)
 Re-run `supabase/schema.sql` once (SQL Editor -> paste -> Run). It's safe to re-run and adds the `looks` table and
