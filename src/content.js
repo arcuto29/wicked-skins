@@ -1,4 +1,8 @@
 (function () {
+  // One copy per extension instance per page. The background re-injects us after an update (old copies can't talk to
+  // the panel any more); if this copy of the extension is already running here, don't start a second one.
+  if (window.__bdContentAlive) return;
+  window.__bdContentAlive = true;
   const DEFAULTS = {
     enabled: true,
     skin: "aurora",        // built-in id, or "media"
@@ -72,6 +76,7 @@
     goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false,
     // the ticker in the chart's top-left legend (symbol name, timeframe, exchange)
     tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false,
+    welcomePending: 0,     // set on first install: show the welcome card on the chart once
     goalSound: "off",      // off | soft | loud: a chime at your goal, a warning at 80% of the loss limit, a low tone at the limit
     sessionSound: "off",   // off | soft | loud: a ping 5 minutes before the session opens / closes, two pings when it does
     // Glow on indicators / lines / P&L, and price scale styling
@@ -625,6 +630,58 @@
     frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed * calmFactor(), paused: cfg.paused } }, "*");
   }
 
+  // ---------- built-in wallpapers drawn off TradingView's main thread ----------
+  // Each animated wallpaper canvas is handed to one background worker (OffscreenCanvas), which runs the same skins.js
+  // code there. The page only sends "draw frame t" messages, so TradingView keeps its main thread for the chart.
+  // Timing, pausing and auto quality stay here unchanged. If a page or browser doesn't allow it, it falls back to
+  // drawing on the main thread exactly as before.
+  let wallWorker = null, workerBroken = !!window.__bdNoWorker, workerSeq = 0;
+  const WORKER_MAIN = `
+    const document = { createElement: () => new OffscreenCanvas(2, 2) };
+    (__SKINS__)(self, document);
+    const V = new Map();
+    onmessage = (e) => {
+      const m = e.data, v = V.get(m.id);
+      try {
+        if (m.type === "add") { const def = self.WickedSkins[m.skin] || self.WickedSkins.aurora; V.set(m.id, { c: m.canvas, s: def.create(m.canvas.getContext("2d")) }); }
+        else if (!v) return;
+        else if (m.type === "resize") { v.c.width = m.w; v.c.height = m.h; v.s.resize(m.w, m.h); v.s.frame(m.t || 0, 0); }
+        else if (m.type === "frame") v.s.frame(m.t, m.dt);
+        else if (m.type === "remove") V.delete(m.id);
+      } catch (err) {}
+      if (m.type === "frame") postMessage({ type: "done", id: m.id });
+    };
+    postMessage({ type: "ready" });`;
+  function getWorker() {
+    if (workerBroken || wallWorker) return wallWorker;
+    if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined" || !window.__priismSkinsSrc || !HTMLCanvasElement.prototype.transferControlToOffscreen) { workerBroken = true; return null; }
+    try {
+      const url = URL.createObjectURL(new Blob([WORKER_MAIN.replace("__SKINS__", window.__priismSkinsSrc)], { type: "text/javascript" }));
+      const w = new Worker(url); URL.revokeObjectURL(url);
+      w.ready = false; w.views = new Map();
+      w.onmessage = (e) => { const m = e.data; if (m.type === "ready") w.ready = true; else if (m.type === "done") { const p = w.views.get(m.id); if (p) p.busy = false; } };
+      // blocked (page rules) or crashed before it started: draw on the main thread instead, from now on
+      w.onerror = () => { if (wallWorker === w) { workerBroken = true; wallWorker = null; try { w.terminate(); } catch {} if (layer) build(); } };
+      wallWorker = w;
+    } catch { workerBroken = true; wallWorker = null; }
+    return wallWorker;
+  }
+  // A stand-in for a skin with the same resize / frame calls, which forwards them to the worker.
+  function workerSkin(canvas, skinId) {
+    const w = getWorker(); if (!w) return null;
+    let off; try { off = canvas.transferControlToOffscreen(); } catch { return null; }
+    const id = ++workerSeq, p = { busy: false, dt: 0, lastT: 0 };
+    w.views.set(id, p);
+    w.postMessage({ type: "add", id, skin: skinId, canvas: off }, [off]);
+    return {
+      offThread: true,
+      resize(W, H) { p.w = W; p.h = H; w.postMessage({ type: "resize", id, w: W, h: H, t: p.lastT }); },
+      // if the worker is still drawing the last frame, don't queue another: the time carries over to the next one
+      frame(t, dt) { p.lastT = t; if (p.busy) { p.dt += dt; return; } p.busy = true; w.postMessage({ type: "frame", id, t, dt: dt + p.dt }); p.dt = 0; },
+      remove() { w.views.delete(id); w.postMessage({ type: "remove", id }); },
+    };
+  }
+
   // One wallpaper element for a source ("aurora", "media:<id>").
   function makeContent(src, view) {
     const m = src.startsWith("media:") ? cfg.media.find((x) => x.id === src.slice(6)) : null;
@@ -644,9 +701,9 @@
         el.src = m.src; // GIFs animate natively
       }
     } else {
-      const def = window.WickedSkins[src] || window.WickedSkins[cfg.skin] || window.WickedSkins.aurora;
+      const id = window.WickedSkins[src] ? src : window.WickedSkins[cfg.skin] ? cfg.skin : "aurora";
       el = document.createElement("canvas");
-      view.skin = def.create(el.getContext("2d"));
+      view.skin = workerSkin(el, id) || window.WickedSkins[id].create(el.getContext("2d"));
       view.clock = 0;
     }
     return el;
@@ -999,6 +1056,7 @@
     const base = cfg.powerSaver ? 0.5 : 0.75;
     const scale = Math.max(0.35, base * qlv().res);
     const w = Math.max(2, (v.w * scale) | 0), h = Math.max(2, (v.h * scale) | 0);
+    if (v.skin.offThread) { if (v.cw !== w || v.ch !== h) { v.cw = w; v.ch = h; v.skin.resize(w, h); } return; }   // sized in the worker
     if (v.content.width !== w || v.content.height !== h) {
       v.content.width = w; v.content.height = h; v.skin.resize(w, h);
       // Resizing wipes the canvas. Draw straight away so there is never a blank flash, and a paused wallpaper doesn't stay empty.
@@ -1099,6 +1157,7 @@
 
   function teardown() {
     releaseStack();
+    for (const v of views) if (v.skin && v.skin.remove) try { v.skin.remove(); } catch {}
     running = false;
     cancelAnimationFrame(raf);
     if (layer) {
@@ -1482,7 +1541,7 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound", "welcomePending"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -2129,6 +2188,12 @@
   function chartTips() {
     if (tipsShown || !cfg.enabled || !owner || standDown || IN_FRAME || !/(^|\.)tradingview\.com$/.test(location.hostname)) return;
     const h = document.documentElement;
+    if (EXT && cfg.welcomePending && Date.now() - cfg.welcomePending < 864e5) {
+      tipsShown = true;
+      try { chrome.storage.local.set({ welcomePending: 0 }); } catch {}
+      return tipCard("welcome", "Priism Skins is on! To change your look: click the puzzle icon in Chrome's toolbar, pin Priism Skins, then click it. One tap on a look changes the whole chart.",
+        [["Got it", null]]);
+    }
     if (h.classList.contains("theme-light")) {
       tipsShown = true;
       return tipCard("theme", "TradingView is in its light theme, which is hard to read over a wallpaper. Priism Skins looks best with TradingView's dark theme.",

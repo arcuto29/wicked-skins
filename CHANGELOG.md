@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.45 (2026-11-04)
+- **Smoother charts: wallpapers are drawn in the background.** Built-in animated wallpapers now render on a background thread (a worker), so TradingView's own thread is free for the chart: scrolling, drawing tools and order entry. With a heavy wallpaper, TradingView got 1.4–1.7× more free time in tests (10× with Nebula), and wallpapers still run at 60 fps. Snapshots, clips, auto-contrast and every setting work as before. Pages or browsers that don't allow it fall back to the old way automatically.
+- **Fixed for new installs: the first chart had no wallpaper.** On a first install, Priism opens a TradingView chart, and that tab could get the extension twice; the two copies removed each other's wallpaper. Each tab now runs exactly one copy.
+- **Welcome for new users:**
+  - On first install, a TradingView chart opens with a card explaining how to pin Priism Skins and change your look.
+  - The panel's tour is hands-on: "Try a Wow look" applies one in a single tap, "Open Style" takes you there, and a step explains turning it on for your trading platform.
+- **Fixed: price-scale numbers could turn dark on dark wallpapers.** After a coloured price tag, the following plain numbers were drawn in the tag's dark text colour. Only the text on the tag itself uses it now.
+- **TradingView light theme:** the chart's bottom bar (1D 5D 1M…) is readable now too.
+- Nebula is a little softer, so the price numbers and candles read better over its brightest clouds.
+- New store screenshots and description for the Chrome Web Store listing (STORE.md).
+
 ## 0.1.44 (2026-11-04)
 - **Fixed: candles not changing on nq.vision.** Its candles are grey/white and black. Priism ignores those shades on purpose (apps draw text, boxes and backgrounds in them), so they were never recoloured. Now it recognises grey candles by their shape (many narrow bars across the chart) and recolours only those bars. Candle looks work on them too. Text and boxes in the same shades stay as they are.
 - Diagnose shows "grey candles found" when this applies.

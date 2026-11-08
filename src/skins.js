@@ -1,6 +1,9 @@
 /* Built-in animated skins. Each factory gets a 2D canvas context and returns
-   { resize(w,h), frame(t,dt) }. t = seconds, dt = seconds since last frame. */
+   { resize(w,h), frame(t,dt) }. t = seconds, dt = seconds since last frame.
+   The whole module is one function of (window, document), so the chart can also run it inside a background worker
+   (window = the worker, document = a stand-in whose createElement gives an OffscreenCanvas). See content.js. */
 (function () {
+function priismSkins(window, document) {
   const rnd = (a, b) => a + Math.random() * (b - a);
 
   const aurora = (ctx) => {
@@ -1274,9 +1277,10 @@
         drawStars(ctx, st, t, 0.55);
         const T = nebTextures(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
         ctx.globalCompositeOperation = "lighter";
-        draw(T.dust, t, 0.03, 0.05, 1.3, 0.03, 0.03, 0.85);
-        draw(T.glow, t + 40, 0.022, -0.06, 1.22 + Math.sin(t * 0.05) * 0.03, 0.025, 0.02, 0.62 + 0.12 * Math.sin(t * 0.21));
-        draw(T.glow, t + 90, 0.017, 0.08, 1.55, 0.04, 0.03, 0.22);   // a second, softer pass gives the gas depth
+        // kept a little below full strength so price-scale numbers and candles stay readable on top
+        draw(T.dust, t, 0.03, 0.05, 1.3, 0.03, 0.03, 0.68);
+        draw(T.glow, t + 40, 0.022, -0.06, 1.22 + Math.sin(t * 0.05) * 0.03, 0.025, 0.02, 0.5 + 0.1 * Math.sin(t * 0.21));
+        draw(T.glow, t + 90, 0.017, 0.08, 1.55, 0.04, 0.03, 0.18);   // a second, softer pass gives the gas depth
         for (const b of big) {
           const tw = 0.75 + 0.25 * Math.sin(t * 0.9 + b.p), L = b.r * 7 * tw;
           glowDot(ctx, b.x, b.y, b.r * 5, b.c, 0.5 * tw);
@@ -1347,4 +1351,7 @@
   // Retired because they were too busy behind a chart. Not listed any more, but anyone who had one selected (or saved
   // in a look, session or symbol) gets the calm Fog Bank instead of a broken wallpaper. Non-enumerable = hidden from lists.
   for (const old of ["equalizer", "candlefall", "depthmap", "ghostcharts"]) Object.defineProperty(window.WickedSkins, old, { value: window.WickedSkins.mist, enumerable: false });
+}
+priismSkins(window, document);
+window.__priismSkinsSrc = "(" + priismSkins.toString() + ")";   // for the off-main-thread wallpaper worker
 })();
