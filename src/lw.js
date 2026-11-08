@@ -183,13 +183,11 @@
     lastTally = [...tally].sort((a, b) => b[1] - a[1]).slice(0, 6);
     const all = [...tally].filter(([c, n]) => n >= 6).map(([c, n]) => [rgbKey(c), n]).filter(([r]) => r && (r.a === null || +r.a >= 0.6)).sort((a, b) => b[1] - a[1]);
     tally.clear();
-    // usually the two most-drawn colourful fills are the candles; some apps use white / grey / black candles instead,
-    // so if there aren't two colourful ones, take the two most-drawn of any colour (brighter = up)
-    let cands = all.filter(([r]) => colourful(r.key)).slice(0, 2), mono = false;
-    if (cands.length < 2) { cands = all.slice(0, 2); mono = true; }
+    // The two most-drawn COLOURFUL fills are the candles. Never greys, white or black: apps draw text, boxes and
+    // backgrounds in those, and treating them as candles recoloured half the platform (seen on nq.vision).
+    const cands = all.filter(([r]) => colourful(r.key)).slice(0, 2);
     if (cands.length < 2) return [];
     const [a, b] = cands.map(([r]) => r.key);
-    if (mono) { const lum = (k) => k.split(",").reduce((s, v) => s + +v, 0); return lum(a) >= lum(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]]; }
     const dGreen = (k) => Math.min(Math.abs(hueOf(k) - 140), 360 - Math.abs(hueOf(k) - 140));
     return dGreen(a) <= dGreen(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]];
   }
@@ -203,8 +201,8 @@
     for (const [c, s] of DEFAULTS) add(c, s, 0);
     const api = learnFromApi(); for (const [c, s] of api) add(c, s, 3);
     if (!api.length) {
-      for (const [k, s] of learnFromDrawing()) if (!learnedDrawn.has(k) && learnedDrawn.size < 8) learnedDrawn.set(k, s);
-      for (const [k, s] of learnedDrawn) { const cur = best.get(k); if (!cur) best.set(k, { side: s, rank: 2, tie: false }); }
+      for (const [k, s] of learnFromDrawing()) if (colourful(k) && !learnedDrawn.has(k) && learnedDrawn.size < 8) learnedDrawn.set(k, s);
+      for (const [k, s] of learnedDrawn) { if (!colourful(k)) continue; const cur = best.get(k); if (!cur) best.set(k, { side: s, rank: 2, tie: false }); }
     }
     const next = new Map(); for (const [k, v] of best) if (!v.tie) next.set(k, v.side);
     const sig = [...next].sort().join("|");

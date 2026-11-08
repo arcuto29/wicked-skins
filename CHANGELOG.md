@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.42 (2026-11-04)
+- **Fixed on Lightweight Charts platforms (like nq.vision):** Priism could take the platform's white, grey, black or dark-navy drawing for candle colours, then recolour everything drawn in those shades (e.g. black areas turning your down colour). Only colourful candle colours are learned now, and greys / white / black are never treated as candles. Refresh the nq.vision tab once after updating, so the old copy is gone.
+
 ## 0.1.41 (2026-11-04)
 - **Platforms on Lightweight Charts (like nq.vision): the rest of your customization now works there too.**
   - **Panels** (TradingView tab → Panels: Skin or Colour) recolours the platform's own sidebars, headers and cards. Light surfaces (inputs, cards) get a light version of the colour so their text stays readable.
