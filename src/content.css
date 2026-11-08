@@ -166,6 +166,9 @@ html.bd-ui-font.bd-lwpage body,
 html.bd-ui-font.bd-lwpage body *:not(i):not([class*="icon"]):not([class*="Icon"]):not([class*="material"]):not([class*="fa-"]) {
   font-family: var(--bd-ui-font) !important;
 }
+/* …and Accent: the platform's watchlist symbols and timeframe buttons (found by their text, see markTickers) */
+html.bd-lwpage.bd-ui-accent [data-bd-tk="list"],
+html.bd-lwpage.bd-ui-accent [data-bd-tk="tf"] { color: var(--bd-ui-accent) !important; }
 /* --- UI style: font / size / accent for TradingView's own HTML panels --- */
 /* Font: applied to the panels around the chart (not the canvas chart itself). */
 /* Font: the watchlist panel, the top toolbar (symbol + timeframes) and the bottom time bar.

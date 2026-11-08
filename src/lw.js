@@ -98,7 +98,7 @@
     try {
       const f = JSON.parse(htmlEl().getAttribute("data-ws-fx") || "null");
       const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
-      const any = f && (f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
+      const any = f && (f.lineGlow > 0 || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
       lfx = any ? {
         // price scale text + backing
         scaleText: hex(f.scaleText), scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)), scaleBold: !!f.scaleBold, scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
@@ -109,8 +109,9 @@
         privacy: !!f.privacy, privacyPnl: ["hide", "ticks", "points", "show"].includes(f.privacyPnl) ? f.privacyPnl : "hide",
         gridOn: !!f.gridOn, gridColor: colOk(f.gridColor), gridAlpha: Math.max(0.03, Math.min(1, f.gridAlpha === undefined ? 0.35 : +f.gridAlpha || 0)),
         gridW: Math.max(0, Math.min(2, +f.gridW || 0)), gridStyle: styleOk(f.gridStyle, "dotted", ["none"]),
-        chOn: !!f.chOn, chColor: colOk(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)), chStyle: styleOk(f.chStyle, "dashed"),
+        chOn: !!f.chOn, chColor: colOk(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)), chStyle: styleOk(f.chStyle, "dashed"), chGlow: !!f.chGlow, chLabels: !!f.chLabels,
         plOn: !!f.plOn, plColor: colOk(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)), plStyle: styleOk(f.plStyle, "dotted"),
+        lineGlow: Math.max(0, Math.min(1, +f.lineGlow || 0)),   // Style → Line glow: indicator lines and drawings
         accent: hex(f.accent) } : null;
     } catch { lfx = null; }
   }
@@ -183,13 +184,11 @@
     lastTally = [...tally].sort((a, b) => b[1] - a[1]).slice(0, 6);
     const all = [...tally].filter(([c, n]) => n >= 6).map(([c, n]) => [rgbKey(c), n]).filter(([r]) => r && (r.a === null || +r.a >= 0.6)).sort((a, b) => b[1] - a[1]);
     tally.clear();
-    // usually the two most-drawn colourful fills are the candles; some apps use white / grey / black candles instead,
-    // so if there aren't two colourful ones, take the two most-drawn of any colour (brighter = up)
-    let cands = all.filter(([r]) => colourful(r.key)).slice(0, 2), mono = false;
-    if (cands.length < 2) { cands = all.slice(0, 2); mono = true; }
+    // The two most-drawn COLOURFUL fills are the candles. Never greys, white or black: apps draw text, boxes and
+    // backgrounds in those, and treating them as candles recoloured half the platform (seen on nq.vision).
+    const cands = all.filter(([r]) => colourful(r.key)).slice(0, 2);
     if (cands.length < 2) return [];
     const [a, b] = cands.map(([r]) => r.key);
-    if (mono) { const lum = (k) => k.split(",").reduce((s, v) => s + +v, 0); return lum(a) >= lum(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]]; }
     const dGreen = (k) => Math.min(Math.abs(hueOf(k) - 140), 360 - Math.abs(hueOf(k) - 140));
     return dGreen(a) <= dGreen(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]];
   }
@@ -203,8 +202,8 @@
     for (const [c, s] of DEFAULTS) add(c, s, 0);
     const api = learnFromApi(); for (const [c, s] of api) add(c, s, 3);
     if (!api.length) {
-      for (const [k, s] of learnFromDrawing()) if (!learnedDrawn.has(k) && learnedDrawn.size < 8) learnedDrawn.set(k, s);
-      for (const [k, s] of learnedDrawn) { const cur = best.get(k); if (!cur) best.set(k, { side: s, rank: 2, tie: false }); }
+      for (const [k, s] of learnFromDrawing()) if (colourful(k) && !learnedDrawn.has(k) && learnedDrawn.size < 8) learnedDrawn.set(k, s);
+      for (const [k, s] of learnedDrawn) { if (!colourful(k)) continue; const cur = best.get(k); if (!cur) best.set(k, { side: s, rank: 2, tie: false }); }
     }
     const next = new Map(); for (const [k, v] of best) if (!v.tie) next.set(k, v.side);
     const sig = [...next].sort().join("|");
@@ -243,7 +242,7 @@
   function inLwTable(c) { let v = lwTableCache.get(c); if (v === undefined) { try { v = !!(c.closest && c.closest(ROOT_SEL)); } catch { v = false; } lwTableCache.set(c, v); } return v; }
 
   // ---------- install the canvas hooks (once, when this is a LW page) ----------
-  let active = false, lineHook = null;
+  let active = false, lineHook = null, lineIsCurve = () => false;
   function install() {
     if (active) return;
     active = true;
@@ -303,6 +302,10 @@
         }
       }
       drawCalls.fillRect++;
+      if (on && c && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle) && labelBox(this, w, h)) {
+        const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p);
+        lastBox.set(this, "xh:" + col); return;
+      }
       if (on && c && (isAxis(c) || isPaneC(c))) {
         noteBox(this, w, h);
         if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) {
@@ -318,6 +321,8 @@
     proto.fill = function (...a) {
       const c = this.canvas;
       if (on && c && typeof this.__bdLwOrig === "string" && isChart(c)) { noteFill(this.__bdLwOrig); drawCalls.fill++; }
+      if (on && c && !inLook && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle)) { const b = pbox.get(this);
+        if (b && labelBox(this, b.w, b.h)) { const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); lastBox.set(this, "xh:" + col); return r; } }
       if (on && c && !inLook && (isAxis(c) || isPaneC(c))) { const b = pbox.get(this); if (b && labelBox(this, b.w, b.h)) { noteBox(this, b.w, b.h);
         if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); return r; } } }
       if (on && candles && c && !a.length && !inLook) { const b = pbox.get(this); if (b && candleLook(this, c, b.x, b.y, b.w, b.h)) { drawCalls.pathLook = (drawCalls.pathLook || 0) + 1; return; } }
@@ -332,6 +337,13 @@
     proto.stroke = function (...a) {
       const c = this.canvas;
       if (on && lfx && lineHook && !a.length && lineHook(this)) return;
+      // Line glow: indicator lines and drawings are long paths that aren't straight across the chart (grid, crosshair,
+      // price lines are), in a colour that isn't grey and isn't a candle
+      if (on && lfx && lfx.lineGlow > 0 && !inLook && c && c.width > 200 && c.height > 120 && isChart(c) && lineIsCurve(this)) {
+        const pB = this.shadowBlur, pC = this.shadowColor;
+        this.shadowColor = this.strokeStyle; this.shadowBlur = 2 + lfx.lineGlow * 14;
+        const r = origStrokeP.apply(this, a); this.shadowBlur = pB; this.shadowColor = pC; return r;
+      }
       if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.strokeStyle)) {
         drawCalls.stroke++;
         const pB = this.shadowBlur, pC = this.shadowColor;
@@ -351,7 +363,8 @@
     proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) k.p = [x, y]; if (on) pbox.set(this, null); return oMove.call(this, x, y); };
     proto.lineTo = function (x, y) {
       const k = lineFx() && seg.get(this);
-      if (k && k.ok) {
+      if (k && !k.ok) k.n++;                    // a curve (indicator line): just count its points, for Line glow
+      else if (k && k.ok) {
         const c = this.canvas, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, p = k.p;
         if (!p || !c) k.ok = false;
         else {
@@ -388,8 +401,23 @@
       drawCalls.lines++;
       origStrokeP.call(ctx);
       strokeDesc.set.call(ctx, pS); ctx.lineWidth = pLW; ctx.setLineDash(pD); ctx.globalAlpha = pA;
+      // Glow at the pointer: once both crosshair lines of this frame are known, a soft light where they cross
+      if (part === "ch" && lfx.chGlow) {
+        const now = performance.now(), m = xhair.get(ctx) || {}, t = ctx.getTransform();
+        if (now - (m.t || 0) > 40) { m.x = null; m.y = null; }
+        m.t = now; if (k.v) m.x = k.p[0] * (t.a || 1) + t.e; else m.y = k.p[1] * (t.d || 1) + t.f; xhair.set(ctx, m);
+        if (m.x !== null && m.y !== null) {
+          const R = 34 * ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1), rgb = rgbKey(pickCol(lfx.chColor, cur)), k3 = rgb ? rgb.key : "255,255,255";
+          ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+          const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, R);
+          g.addColorStop(0, `rgba(${k3},0.45)`); g.addColorStop(0.35, `rgba(${k3},0.14)`); g.addColorStop(1, `rgba(${k3},0)`);
+          fillDesc.set.call(ctx, g); origFillRect.call(ctx, m.x - R, m.y - R, R * 2, R * 2); ctx.restore();
+        }
+      }
       return true;
     }
+    const xhair = new WeakMap();   // canvas ctx -> where this frame's crosshair lines are
+    lineIsCurve = (ctx) => { const k = seg.get(ctx), col = strokeDesc.get.call(ctx); return !!k && !k.ok && k.n >= 3 && typeof col === "string" && !greyish(col) && !isCandleCol(col); };
     lineHook = styleLines;
 
     // ---------- price scale text, bracket labels, P&L and last price ----------
@@ -436,7 +464,10 @@
       if (!isAxis(c)) return oText.call(this, t, x, y, ...rest);
       const box = lastBox.get(this); lastBox.delete(this);
       const pF = this.font, pS = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
-      if (box && isCandleCol(box)) {                      // the last-price tag: remember the price (Live mood: day move)
+      if (box && box.startsWith("xh:")) {                // crosshair label we coloured: dark or light text, whichever reads
+        const r = rgbKey(box.slice(3)), L = r ? r.key.split(",").reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0) / 255 : 0;
+        fillDesc.set.call(this, L > 0.55 ? "#06110d" : "#ffffff");
+      } else if (box && isCandleCol(box)) {                      // the last-price tag: remember the price (Live mood: day move)
         const n = parseFloat(String(t).replace(/[^\d.\-]/g, ""));
         const now = performance.now(); if (isFinite(n) && now - lastQuoteWrite > 1000) { lastQuoteWrite = now; htmlEl().setAttribute("data-bd-lwquote", JSON.stringify({ p: n, ts: Date.now() })); }
       } else if (box && !greyish(box)) {                 // a coloured tag that isn't the price: an order / position label

@@ -1924,7 +1924,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["nq.vision and other Lightweight Charts platforms: panels, font, price scale, brackets, streamer mode and Live mood now work there",
+const WHATS_NEW = ["nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",
   "TradingView's light theme is readable over your wallpaper, and one tap switches to dark",
   "Candle looks now work on more Lightweight Charts platforms (like nq.vision)",
   "Style your ticker: colour, size, font and glow for the symbol name (Style › Chart lines & ticker)",
