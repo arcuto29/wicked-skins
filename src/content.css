@@ -161,6 +161,11 @@ html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="bu
 /* Soften the hairline borders on just those bars. */
 html.bd-sides [class*="layout__area--top"] { border-color: rgba(255,255,255,.08) !important; }
 
+/* Platforms on Lightweight Charts (nq.vision…): the font applies to the app's own text (icons keep their icon font) */
+html.bd-ui-font.bd-lwpage body,
+html.bd-ui-font.bd-lwpage body *:not(i):not([class*="icon"]):not([class*="Icon"]):not([class*="material"]):not([class*="fa-"]) {
+  font-family: var(--bd-ui-font) !important;
+}
 /* --- UI style: font / size / accent for TradingView's own HTML panels --- */
 /* Font: applied to the panels around the chart (not the canvas chart itself). */
 /* Font: the watchlist panel, the top toolbar (symbol + timeframes) and the bottom time bar.

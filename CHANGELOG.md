@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.41 (2026-11-04)
+- **Platforms on Lightweight Charts (like nq.vision): the rest of your customization now works there too.**
+  - **Panels** (TradingView tab → Panels: Skin or Colour) recolours the platform's own sidebars, headers and cards. Light surfaces (inputs, cards) get a light version of the colour so their text stays readable.
+  - **Font** (TradingView tab → Text & accent) changes the platform's text; icons keep their icon font.
+  - **Price scale** (Style tab): text colour, size, font, bold and glow on the price and time numbers, and Backing (Default keeps the platform's own, Colour uses yours).
+  - **Trade brackets** (Trading tab): the platform's order and position lines take your level-line colour and width, and their labels (on the price scale and on the chart) your box colour, number colour, profit/loss colours and size.
+  - **Streamer mode** hides the amounts in those labels and in P&L text drawn on the chart, using your P&L option.
+  - **Live mood:** "P&L" follows P&L the chart draws; "day's move" follows the last price, measured from the first price seen today on that site, because these platforms don't put the price in the tab title.
+  - Options that only style TradingView's own interface (top & bottom bars, left toolbar, windows & menus, text size, accent) are hidden on these platforms, with a note saying what applies.
+  - Picture and Motion settings (strength, dim, blur, colour, tint, vignette, black & white, animation) already worked there.
+
 ## 0.1.40 (2026-11-04)
 - **TradingView's light theme is readable now.** Its top bar, toolbars and side panels have dark text and no background of their own, so over a wallpaper they were close to invisible, and it didn't look like TradingView. They now keep TradingView's own light background.
   - The first time, a card on the chart offers **Use dark theme**, which flips TradingView's own theme setting (same as its menu's switch), or Keep light. Priism Skins looks best on dark.

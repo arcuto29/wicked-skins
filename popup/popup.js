@@ -1769,6 +1769,9 @@ async function siteBar() {
   };
   const enabled = await WickedSites.find(origin);
   if (enabled) {
+    // a Lightweight Charts platform (lw.js marks it): hide the options that only style TradingView's own interface
+    chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => document.documentElement.getAttribute("data-bd-lw") === "on" })
+      .then((rs) => { if (rs.some((r) => r.result)) document.body.classList.add("lw-page"); }).catch(() => {});
     return show("on", `On for ${host}`, "Wallpaper, candles, candle looks and chart lines (Style tab) work here. The TradingView tab styles TradingView's own panels and menus; this platform's own layout around the chart stays as it is.", "Turn off", async () => {
       await WickedSites.disable(enabled.origin); chrome.tabs.reload(tab.id); window.close();
     });
@@ -1921,7 +1924,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["TradingView's light theme is readable over your wallpaper, and one tap switches to dark",
+const WHATS_NEW = ["nq.vision and other Lightweight Charts platforms: panels, font, price scale, brackets, streamer mode and Live mood now work there",
+  "TradingView's light theme is readable over your wallpaper, and one tap switches to dark",
   "Candle looks now work on more Lightweight Charts platforms (like nq.vision)",
   "Style your ticker: colour, size, font and glow for the symbol name (Style › Chart lines & ticker)",
   "Trading sounds: a chime at your goal, a warning near your max loss, a ping before the session opens or closes",
