@@ -39,6 +39,10 @@
     focus: false, focusHides: "wallpaper",   // Focus mode: hide just the wallpaper, or the wallpaper AND all styling
     // Session timer: a slim countdown to the next market open / close, styled to match your look.
     timerOn: false, timerMarket: "auto", timerPos: "bc",
+    timerShow: "full",      // full = "NY session open · closes in 1h 20m" | next = just "closes in 1h 20m" (no open / closed status)
+    timerFormat: "in",      // in = a countdown ("in 1h 20m") | at = the time it happens ("at 4:00 PM", your time)
+    timerClosed: "show",    // show | hide: hide the timer while the market is closed
+    timerStyle: "pill",     // pill | glass (a card: big countdown + how far into the session you are) | minimal (glowing text only)
     // Streamer mode: hides your money on screen and in every recording (labels on the chart, Priism's readouts,
     // TradingView's account / order panels). privacyPeek = un-blur a panel while your mouse is over it.
     privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP",
@@ -2330,9 +2334,10 @@
   function timerText(now = Date.now()) {
     const key = cfg.timerMarket === "auto" ? autoMarket() : cfg.timerMarket, M = MARKETS[key] || MARKETS.nyse;
     if (M.daily) { const n = new Date(now), next = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate() + 1); return { open: true, name: M.name, text: `Daily close in ${dur(next - now)}` }; }
-    const open = [], events = [];
+    const open = [], events = []; let prog = null;
     for (const s of M.sessions) for (const [o, c] of sessionTimes(s, now)) {
       if (now >= o && now < c && !open.includes(s.label)) open.push(s.label);
+      if (now >= o && now < c && M.main.includes(s.id)) prog = (now - o) / (c - o);   // how far into the main session
       if (M.main.includes(s.id)) { if (o > now) events.push([o, s.label + " opens"]); if (c > now) events.push([c, s.label + " closes"]); }
     }
     // fully closed (weekend, CME daily break): the soonest reopening of ANY session matters most
@@ -2341,8 +2346,12 @@
     const nx = events[0], head = open.length ? open.join(" + ") + " open" : "Closed";
     if (!nx) return { open: !!open.length, name: M.name, text: head };
     const far = nx[0] - now > 864e5, sess = M.sessions.find((s) => nx[1].startsWith(s.label));
-    const when = far ? new Intl.DateTimeFormat("en-US", { timeZone: sess.tz, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(nx[0])) : `in ${dur(nx[0] - now)}`;
-    return { open: !!open.length, name: M.name, text: `${head} \u00B7 ${nx[1]} ${when}` };
+    // "at": the moment it happens, in your own time (with the day when it isn't today); "in": a countdown
+    const at = () => { const d = new Date(nx[0]), today = new Date(now).toDateString() === d.toDateString();
+      return "at " + new Intl.DateTimeFormat(undefined, today ? { hour: "numeric", minute: "2-digit" } : { weekday: "short", hour: "numeric", minute: "2-digit" }).format(d); };
+    const when = cfg.timerFormat === "at" ? at() : far ? new Intl.DateTimeFormat("en-US", { timeZone: sess.tz, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(nx[0])) : `in ${dur(nx[0] - now)}`;
+    const next = `${nx[1]} ${when}`;
+    return { open: !!open.length, name: M.name, prog, text: cfg.timerShow === "next" ? next : `${head} \u00B7 ${next}` };
   }
   // ---------- trading sounds (src/sounds.js) ----------
   // Only the page that owns the chart plays, and with several TradingView tabs open only one of them: the first to
@@ -2373,9 +2382,11 @@
     if (!(cfg.enabled && cfg.timerOn)) { if (timerEl) { timerEl.remove(); timerEl = null; } clearInterval(timerIv); timerIv = 0; return; }
     if (!timerEl) {
       timerEl = document.createElement("div"); timerEl.id = "bd-timer"; timerEl.dataset.bdOwner = ME.token;
-      timerEl.innerHTML = '<i></i><b></b><span></span>';
+      timerEl.innerHTML = '<i></i><b></b><span></span><u></u>';
       document.documentElement.appendChild(timerEl);
     }
+    const sty = ["pill", "glass", "minimal"].includes(cfg.timerStyle) ? cfg.timerStyle : "pill";
+    timerEl.classList.toggle("bd-t-glass", sty === "glass"); timerEl.classList.toggle("bd-t-min", sty === "minimal");
     timerEl.style.setProperty("--tc", upColor());
     tickTimer(); placeTimer();
     if (!timerIv) timerIv = setInterval(() => { if (!document.hidden) tickTimer(); }, 1000);
@@ -2384,6 +2395,8 @@
     if (!timerEl) return;
     let t; try { t = timerText(); } catch { t = { open: false, name: "", text: "" }; }
     timerEl.classList.toggle("bd-t-open", t.open);
+    timerEl.style.setProperty("--tp", t.prog != null ? (Math.round(t.prog * 1000) / 10) + "%" : "0%");
+    timerEl.style.display = cfg.timerClosed === "hide" && !t.open ? "none" : "";      // "hide while the market is closed"
     const b = timerEl.querySelector("b"), sp = timerEl.querySelector("span");
     if (b.textContent !== t.name) b.textContent = t.name;
     if (sp.textContent !== t.text) sp.textContent = t.text;

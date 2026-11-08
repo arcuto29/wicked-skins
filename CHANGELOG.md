@@ -8,6 +8,12 @@
   - A tab you're not looking at pauses its wallpaper, so extra tabs don't slow your computer.
   - The **Skins** button on the tab bar opens Priism Skins' settings.
 - **nq.vision: the legend over the chart is readable.** Its symbol line and indicator names (EMA, VWAP…) are dark text made for its own dark-grey chart, so they disappeared on a wallpaper. They now get a soft dark halo, and text that's too dark is lightened. Coloured indicator values keep their colour. The ticker in that legend takes your Ticker styling, and indicator names are never mistaken for watchlist symbols.
+- **Session timer: choose what it shows and how it looks** (Trading → Session timer).
+  - **Style:** Pill, Glass card (market name on top, a big countdown, and a thin bar showing how far into the session you are) or Minimal (glowing text, no box).
+  - **Shows:** "Status + next" ("NY session open · closes in 1h 20m") or "Next only" (no open/closed status).
+  - **Time as:** a countdown ("in 1h 20m") or clock time ("at 4:00 PM", in your own time zone).
+  - **While closed:** keep showing it, or hide it until the market opens.
+  - The panel shows an example of what the timer will read.
 - **nq.vision: the price line no longer gets the crosshair's glow.** nq.vision draws its price line in its own grey/black candle colour, which Priism mistook for a crosshair line. The line was styled like the crosshair and glowed where the crosshair crossed it. It now takes your price-line style, and the glow only appears where the crosshair's own two lines cross.
 
 ## 0.1.46 (2026-11-04)

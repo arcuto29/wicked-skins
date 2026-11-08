@@ -257,6 +257,21 @@ html.bd-focus #bd-layer { opacity: 0 !important; }
 #bd-timer.bd-t-open i { background: var(--tc, #2ef2b0); box-shadow: 0 0 8px var(--tc, #2ef2b0); }
 #bd-timer b { font: 800 11px ui-sans-serif, system-ui, sans-serif; letter-spacing: .02em; color: rgba(223,229,241,.65); }
 #bd-timer span { font: 700 12px ui-monospace, Menlo, Consolas, monospace; color: #eef1f7; font-variant-numeric: tabular-nums; }
+#bd-timer u { display: none; }
+/* Glass card: market name small on top, the countdown big, and a thin bar for how far into the session you are */
+#bd-timer.bd-t-glass { height: auto; flex-direction: column; align-items: flex-start; gap: 3px; padding: 9px 16px 12px; border-radius: 14px;
+  background: linear-gradient(160deg, rgba(20,24,36,.72), rgba(8,11,18,.62)); border-color: color-mix(in srgb, var(--tc, #2ef2b0) 35%, rgba(255,255,255,.08));
+  box-shadow: 0 14px 34px -14px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.06); -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3); }
+#bd-timer.bd-t-glass i { position: absolute; top: 12px; right: 12px; }
+#bd-timer.bd-t-glass b { font-size: 10px; text-transform: uppercase; letter-spacing: .09em; padding-right: 16px; }
+#bd-timer.bd-t-glass span { font-size: 15px; letter-spacing: .01em; }
+#bd-timer.bd-t-glass.bd-t-open u { display: block; position: absolute; left: 16px; right: 16px; bottom: 6px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); text-decoration: none; }
+#bd-timer.bd-t-glass.bd-t-open u::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--tp, 0%); border-radius: 3px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tc, #2ef2b0) 60%, transparent), var(--tc, #2ef2b0)); box-shadow: 0 0 8px var(--tc, #2ef2b0); }
+/* Minimal: no box, just glowing text */
+#bd-timer.bd-t-min { background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0 4px; }
+#bd-timer.bd-t-min b, #bd-timer.bd-t-min span { text-shadow: 0 0 2px rgba(0,0,0,.95), 0 0 10px rgba(0,0,0,.75); }
+#bd-timer.bd-t-min.bd-t-open span { text-shadow: 0 0 2px rgba(0,0,0,.95), 0 0 12px color-mix(in srgb, var(--tc, #2ef2b0) 55%, transparent); }
 
 /* Streamer mode: TradingView's account panel (balance, positions, history) and, if you choose, the order panel are
    blurred (on screen and in any recording). The order panel stays usable by default, so you can still place trades. */
