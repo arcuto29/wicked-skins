@@ -24,10 +24,11 @@ jobs:
           packages: "platform-tools platforms;android-34 build-tools;34.0.0"
       - name: Generate the Gradle wrapper (jar isn't committed)
         working-directory: android
-        run: gradle wrapper --gradle-version 8.9
+        # retried: the Gradle download is sometimes briefly unavailable, which shouldn't fail a release
+        run: for i in 1 2 3 4 5; do gradle wrapper --gradle-version 8.9 && exit 0; echo "retry $i"; sleep 30; done; exit 1
       - name: Build debug APK
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug
+        run: for i in 1 2 3; do ./gradlew --no-daemon assembleDebug && exit 0; echo "retry $i"; sleep 30; done; exit 1
       - name: Rename the APK
         working-directory: android
         run: |
