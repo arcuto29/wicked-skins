@@ -20,6 +20,15 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
   ok("Open with skins launches the chart", !!tv);
   if (!tv) { await app.close(); process.exit(1); }
   const errors = []; tv.on("pageerror", (e) => errors.push(e.message));
+  // signing in to TradingView has to work inside the app (or you're stuck on a signed-out chart)
+  const ua = await tv.evaluate(() => navigator.userAgent).catch(() => "");
+  ok("TradingView sees a normal Chrome browser (so Google sign-in works)", !!ua && !/Electron|priism/i.test(ua), ua);
+  const before = app.windows().length;
+  await tv.evaluate(() => { window.open("https://accounts.google.com/signin", "_blank", "width=480,height=640"); }).catch(() => {});
+  await tv.waitForTimeout(3000);
+  const opened = app.windows().filter((w) => !w.isClosed()).length > before;
+  ok("sign-in popups open inside the app", opened);
+  for (const w of app.windows()) if (/accounts\.google\.com|about:blank/.test(w.url())) await w.close().catch(() => {});
   await tv.waitForSelector(".chart-markup-table canvas", { timeout: 60000 }).catch(() => {});
   await tv.waitForTimeout(8000);
   const st = await tv.evaluate(() => {
@@ -49,6 +58,8 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
     const cards = await settings.waitForSelector("#skinCards .card", { timeout: 20000 }).catch(() => null);
     await settings.screenshot({ path: path.join(OUT, "settings-start.png") });
     ok("settings panel renders skins", !!cards);
+    ok("app uses its own full-window layout", await settings.evaluate(() => document.body.classList.contains("desk") && !!document.getElementById("deskHero") && document.body.getBoundingClientRect().width > 900));
+    ok("live stats bar answers", await settings.evaluate(async () => { const s = await window.wickedStore.tv.stats(); return !!s && typeof s.cpu === "number"; }));
     if (cards) await settings.click("#skinCards .card:has-text('Cyber Grid')", { timeout: 30000 });
     await tv.waitForTimeout(2500);
     const saved = JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf8"));

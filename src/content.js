@@ -914,6 +914,7 @@
   const publishQ = () => document.documentElement.setAttribute("data-bd-q", `${qLevel + 1}/${qlevels().length}@${refreshHz}`);
 
   // One animation loop drives every animated wallpaper on the page.
+  let fpsN = 0, fpsT = 0;
   function startLoop() {
     running = true;
     let last = performance.now();
@@ -932,6 +933,7 @@
       const dt = Math.min(0.1, gap / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
       last = now;
       for (const v of views) if (v.skin) { v.clock += dt; v.skin.frame(v.clock, dt); }
+      fpsN++; if (now - fpsT >= 1000) { window.__bdFpsNow = Math.round((fpsN * 1000) / (now - fpsT)); fpsN = 0; fpsT = now; }
     };
     raf = requestAnimationFrame(step);
   }
@@ -2155,26 +2157,25 @@
   }
 
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored, react: "off" /* Live mood retired: too distracting */ }; build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); }));
+    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); }));
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       // today's total is shared between tabs (and reset from the panel); the journal is just stored data
       if (changes.dayPnl) { const nv = changes.dayPnl.newValue; day = nv && nv.date ? { ...freshDay(), ...nv } : freshDay(); renderGoal(); }
       const keys = Object.keys(changes).filter((k) => k !== "dayPnl" && k !== "journal");
       for (const k of keys) cfg[k] = changes[k].newValue;
-      cfg.react = "off";
       if (keys.length) apply(keys);
     });
   } else {
     // Desktop app: host injects window.__BD_CFG and calls window.__bdUpdate on change.
-    cfg = { ...DEFAULTS, ...(window.__BD_CFG || {}), react: "off" };
+    cfg = { ...DEFAULTS, ...(window.__BD_CFG || {}) };
     build();
     pushCandles();
     pushFx();
     renderWatermark(); applyFocus(); renderTimer(); applyPrivacy();
     window.__bdUpdate = (next) => {
       const keys = Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(cfg[k]));
-      cfg = { ...cfg, ...next, react: "off" };
+      cfg = { ...cfg, ...next };
       if (keys.length) apply(keys);
     };
   }

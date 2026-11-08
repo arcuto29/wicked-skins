@@ -10,6 +10,16 @@ const POPUP = path.join(ROOT, "popup", "popup.html");
 const ICON = path.join(ROOT, "icons", "icon-512.png");
 const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
 
+// Look like a normal Chrome to TradingView and Google. With Electron's default identity Google refuses "Sign in with
+// Google" ("This browser or app may not be secure") and you'd be stuck on a signed-out chart with no layouts.
+try {
+  const plat = (app.userAgentFallback.match(/\(([^)]+)\)/) || [, process.platform === "darwin" ? "Macintosh; Intel Mac OS X 10_15_7" : process.platform === "win32" ? "Windows NT 10.0; Win64; x64" : "X11; Linux x86_64"])[1];
+  app.userAgentFallback = `Mozilla/5.0 (${plat}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${process.versions.chrome} Safari/537.36`;
+} catch {}
+// Sign-in and broker-connection popups (Google, Apple, your broker's login...) must open INSIDE the app, in the same
+// session, or the sign-in never reaches TradingView. Everything else (news, help pages) opens in your browser.
+const AUTH_URL = /(accounts|signin|sign-in|login|log-in|oauth|authori[sz]e|\/auth\b|\bauth\.|sso|consent|appleid|connect\/)/i;
+
 let cfg = {};
 let tvWin, settingsWin;
 
@@ -44,7 +54,14 @@ function openTV() {
   tvWin.webContents.on("did-navigate-in-page", inject);
   tvWin.on("closed", () => { tvWin = null; notifyTV(); });
   // links that open new windows (news, help) go to the normal browser
-  tvWin.webContents.setWindowOpenHandler(({ url }) => { if (/^https:/.test(url)) shell.openExternal(url); return { action: "deny" }; });
+  tvWin.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:/.test(url) && AUTH_URL.test(url))
+      return { action: "allow", overrideBrowserWindowOptions: { parent: tvWin, width: 520, height: 720, autoHideMenuBar: true, backgroundColor: "#ffffff",
+        title: "Sign in", webPreferences: { contextIsolation: true, sandbox: true } } };
+    if (/^https:/.test(url)) shell.openExternal(url);
+    return { action: "deny" };
+  });
+  tvWin.setMenuBarVisibility(false);
   notifyTV();
 }
 function closeTV() { if (tvWin && !tvWin.isDestroyed()) tvWin.close(); }
@@ -57,7 +74,7 @@ function notifyTV() {
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) return settingsWin.focus();
   settingsWin = new BrowserWindow({
-    width: 460, height: 720, minWidth: 380, title: "Priism Skins", icon: ICON, autoHideMenuBar: true,
+    width: 1360, height: 880, minWidth: 1040, minHeight: 680, title: "Priism Skins", icon: ICON, autoHideMenuBar: true, backgroundColor: "#07080c",
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: false },
   });
   // web links from the panel (Share my look, Workshop website) open in your normal browser
@@ -71,6 +88,14 @@ function openSettings() {
 ipcMain.handle("tv:open", () => { openTV(); return tvOpen(); });
 ipcMain.handle("tv:close", () => { closeTV(); return false; });
 ipcMain.handle("tv:state", () => ({ open: tvOpen() }));
+// Live numbers for the app's top bar: the chart's wallpaper FPS, and how much of the computer the app is using.
+ipcMain.handle("app:stats", async () => {
+  let cpu = 0, mem = 0;
+  try { for (const p of app.getAppMetrics()) { cpu += (p.cpu && p.cpu.percentCPUUsage) || 0; mem += (p.memory && p.memory.workingSetSize) || 0; } } catch {}
+  let fps = null;
+  if (tvOpen()) { try { fps = await tvWin.webContents.executeJavaScript("window.__bdFpsNow || null", true); } catch {} }
+  return { open: tvOpen(), fps, cpu: Math.round(cpu / Math.max(1, require("os").cpus().length)), mem: Math.round(mem / 1024) };
+});
 // Record / snapshot buttons in the app's panel: run them in the chart window as if you'd pressed the shortcut there
 // (userGesture = true, so screen sharing and sound are allowed).
 ipcMain.handle("tv:action", async (_e, kind) => {
