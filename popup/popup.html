@@ -120,21 +120,22 @@
       <details class="grp" data-grp="tvui" open>
         <summary>TradingView interface</summary>
         <p class="hint">Style TradingView itself around your chart. Everything here stays TradingView's own until you pick something.</p>
-        <div class="row" id="sidesRow"><span>Top &amp; bottom bars</span><div class="seg" id="sides"></div></div>
-        <div class="row" id="leftBarRow"><span>Left toolbar</span><div class="seg" id="leftBar"></div></div>
-        <p class="hint">Glass: the wallpaper flows across the bars with a frosted tint so text stays readable. Clear: fully see-through.</p>
+        <p class="hint lw-note">On this platform: <b>Panels</b> recolours the app's own panels and <b>Font</b> changes its text. The other options here style TradingView's own interface, so they're hidden.</p>
+        <div class="row" id="sidesRow" data-tvonly><span>Top &amp; bottom bars</span><div class="seg" id="sides"></div></div>
+        <div class="row" id="leftBarRow" data-tvonly><span>Left toolbar</span><div class="seg" id="leftBar"></div></div>
+        <p class="hint" data-tvonly>Glass: the wallpaper flows across the bars with a frosted tint so text stays readable. Clear: fully see-through.</p>
         <div class="row"><span>Panels</span><div class="seg" id="panelMode"></div><input type="color" id="panelColor" title="Panel colour" hidden /></div>
         <p class="hint">Watchlist, toolbars and side panels. Skin tints them with your wallpaper's colour; text stays readable.</p>
-        <div class="row"><span>Windows &amp; menus</span><div class="seg" id="dlgMode"></div><input type="color" id="dlgColor" title="Window colour" hidden /></div>
-        <div class="row" id="dlgAlphaRow"><span>Strength</span><input type="range" id="dlgAlpha" min="0.4" max="1" step="0.02" /><output id="dlgAlphaOut"></output></div>
-        <p class="hint">TradingView's Settings window, other dialogs and dropdown menus. Glass is frosted so your wallpaper glows through.</p>
+        <div class="row" data-tvonly><span>Windows &amp; menus</span><div class="seg" id="dlgMode"></div><input type="color" id="dlgColor" title="Window colour" hidden /></div>
+        <div class="row" id="dlgAlphaRow" data-tvonly><span>Strength</span><input type="range" id="dlgAlpha" min="0.4" max="1" step="0.02" /><output id="dlgAlphaOut"></output></div>
+        <p class="hint" data-tvonly>TradingView's Settings window, other dialogs and dropdown menus. Glass is frosted so your wallpaper glows through.</p>
       </details>
       <details class="grp" data-grp="ui">
         <summary>Text &amp; accent</summary>
         <div class="row"><span>Font</span><div class="seg" id="uiFont"></div></div>
-        <div class="row"><span>Text size</span><div class="seg" id="uiSize"></div></div>
-        <div class="row"><span>Accent</span><div class="seg" id="uiAccentMode"></div><input type="color" id="uiAccent" title="Accent colour" hidden /></div>
-        <p class="hint">Accent tints the watchlist symbols, timeframe buttons and toolbar labels. Leave on Default for TradingView's own colours.</p>
+        <div class="row" data-tvonly><span>Text size</span><div class="seg" id="uiSize"></div></div>
+        <div class="row" data-tvonly><span>Accent</span><div class="seg" id="uiAccentMode"></div><input type="color" id="uiAccent" title="Accent colour" hidden /></div>
+        <p class="hint" data-tvonly>Accent tints the watchlist symbols, timeframe buttons and toolbar labels. Leave on Default for TradingView's own colours.</p>
       </details>
     </section>
     <section id="tab-trading" hidden>

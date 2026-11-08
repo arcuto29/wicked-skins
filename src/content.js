@@ -283,6 +283,18 @@
     }
   }
 
+  // Lightweight Charts platforms (nq.vision…) don't put the price in the tab title. lw.js reads the last-price tag
+  // from the chart instead; the day move is measured from the first price seen today on this site.
+  setInterval(() => {
+    if (!cfg.enabled || parseTitle()) return;
+    let q; try { q = JSON.parse(document.documentElement.getAttribute("data-bd-lwquote") || "null"); } catch { q = null; }
+    if (!q || !isFinite(q.p) || Date.now() - q.ts > 15000) return;
+    const k = "bdLwOpen:" + dayKey(); let open = NaN;
+    try { open = +localStorage.getItem(k); if (!open) { open = q.p; localStorage.setItem(k, String(q.p)); } } catch { open = open || q.p; }
+    const tick = lastPrice !== null && q.p !== lastPrice ? (q.p > lastPrice ? 1 : -1) : 0;
+    quote = { sym: "chart", price: q.p, chg: open ? ((q.p - open) / open) * 100 : 0 }; lastPrice = q.p;
+    updateReact(tick);
+  }, 1000);
   function onTitle() {
     const q = parseTitle();
     if (!q) return;
@@ -670,11 +682,45 @@
       return "#" + r.map((v, i) => Math.round([11, 13, 19][i] + (v - [11, 13, 19][i]) * 0.14).toString(16).padStart(2, "0")).join(""); }
     return "";
   }
+  // ---------- platforms on Lightweight Charts (nq.vision…): the app's own panels and font ----------
+  // TradingView's panel colours come from its theme variables; another app has its own CSS we can't know. So we find the
+  // app's solid surfaces (sidebars, headers, cards: opaque backgrounds of a decent size, outside the chart) once, mark
+  // them, and give them the panel colour. Re-checked only when the page adds elements, at most every 2 s.
+  const isLwPage = () => document.documentElement.getAttribute("data-bd-lw") === "on" && !document.querySelector(".chart-markup-table");
+  let surfT = 0, surfObs = null;
+  function markSurfaces() {
+    surfT = 0;
+    const root = document.querySelector("[data-bd-lwroot], .tv-lightweight-charts");
+    let n = 0;
+    for (const el of document.body ? document.body.querySelectorAll("div, aside, header, nav, section, main, footer, ul, li, table, td, th, button, input, select") : []) {
+      if (++n > 6000) break;
+      if (el.hasAttribute("data-bd-surf") || el.closest("#bd-layer, #bd-timer, #bd-goal, #bd-pnl, #bd-wm, #bd-tip") || (root && root.contains(el))) continue;
+      const bg = getComputedStyle(el).backgroundColor, m = bg.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/);
+      if (!m || (m[4] !== undefined && +m[4] < 0.5)) continue;
+      const r = el.getBoundingClientRect(); if (r.width * r.height < 600) continue;
+      const L = (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255;
+      el.setAttribute("data-bd-surf", L < 0.5 ? "d" : "l");    // dark or light surface (its text colour is left alone)
+    }
+  }
+  function applyAppPanels(col) {
+    const h = document.documentElement, on = !!col && isLwPage();
+    h.classList.toggle("bd-app-panels", on);
+    if (!on) { if (surfObs) { surfObs.disconnect(); surfObs = null; } return; }
+    markSurfaces();
+    if (!surfObs && document.body) { surfObs = new MutationObserver(() => { if (!surfT) surfT = setTimeout(markSurfaces, 2000); }); surfObs.observe(document.body, { childList: true, subtree: true }); }
+    const rgb = [1, 3, 5].map((i) => parseInt(col.slice(i, i + 2), 16)), up = (f) => `rgb(${rgb.map((v) => Math.round(v + (255 - v) * f)).join(",")})`;
+    let st = document.getElementById("bd-app-css");
+    if (!st) { st = document.createElement("style"); st.id = "bd-app-css"; (document.head || h).appendChild(st); }
+    // dark surfaces take the colour; light ones (inputs, cards on a light app) a light version of it, so their dark text stays readable
+    st.textContent = `html.bd-app-panels [data-bd-surf="d"]{background-color:${col}!important;border-color:${up(0.12)}!important}` +
+      `html.bd-app-panels [data-bd-surf="l"]{background-color:${up(0.86)}!important}`;
+  }
   let panelApplied = null;
   function applyPanels() {
     const h = document.documentElement, col = cfg.enabled ? panelColour() : "";
     if (col === panelApplied) return;            // nothing changed: never restyle the page for nothing (keeps it smooth)
     panelApplied = col;
+    applyAppPanels(col);
     h.classList.toggle("bd-panels", !!col && !focusAll());
     // ONE stylesheet holds every override, written in a single update (setting hundreds of properties one by one made
     // the browser restyle TradingView's whole page each time: a multi-second freeze while picking a colour).
@@ -786,7 +832,11 @@
     h.style.setProperty("--bd-ui-font", font ? UI_FONTS[font] : "");
     h.style.setProperty("--bd-ui-accent", accent || "");
     h.classList.toggle("bd-ui-accent", !!(on && accent));
+    h.classList.toggle("bd-lwpage", isLwPage());
   }
+  // lw.js marks the page once it finds a Lightweight Charts chart (can be after we start): apply the app styling then
+  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelApplied) applyAppPanels(panelApplied); } })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ["data-bd-lw"] });
 
   // Pages built on Lightweight Charts (not TradingView's own charts), like nq.vision: the app around the chart has solid
   // backgrounds we can't know about, so a layer behind the whole page would be hidden. Instead the wallpaper goes INSIDE the

@@ -97,12 +97,21 @@
   function readFx() {
     try {
       const f = JSON.parse(htmlEl().getAttribute("data-ws-fx") || "null");
-      lfx = f && (f.gridOn || f.chOn || f.plOn) ? {
+      const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
+      const any = f && (f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
+      lfx = any ? {
+        // price scale text + backing
+        scaleText: hex(f.scaleText), scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)), scaleBold: !!f.scaleBold, scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
+        scaleFont: ["mono", "rounded"].includes(f.scaleFont) ? f.scaleFont : "default", scaleBg: ["auto", "glass", "color", "default"].includes(f.scaleBg) ? f.scaleBg : "auto", scaleBgColor: hex(f.scaleBgColor) || "#0b1320",
+        // trade brackets = the platform's own level lines (orders / positions) and their price-scale labels
+        bracketOn: !!f.bracketOn, bracketFill: hex(f.bracketFill), bracketText: hex(f.bracketText), bracketProfit: hex(f.bracketProfit), bracketLoss: hex(f.bracketLoss),
+        bracketSize: Math.max(0, Math.min(3, +f.bracketSize || 0)), bracketLineColor: hex(f.bracketLineColor), bracketLineW: Math.max(0, Math.min(3, +f.bracketLineW || 0)),
+        privacy: !!f.privacy, privacyPnl: ["hide", "ticks", "points", "show"].includes(f.privacyPnl) ? f.privacyPnl : "hide",
         gridOn: !!f.gridOn, gridColor: colOk(f.gridColor), gridAlpha: Math.max(0.03, Math.min(1, f.gridAlpha === undefined ? 0.35 : +f.gridAlpha || 0)),
         gridW: Math.max(0, Math.min(2, +f.gridW || 0)), gridStyle: styleOk(f.gridStyle, "dotted", ["none"]),
         chOn: !!f.chOn, chColor: colOk(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)), chStyle: styleOk(f.chStyle, "dashed"),
         plOn: !!f.plOn, plColor: colOk(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)), plStyle: styleOk(f.plStyle, "dotted"),
-        accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "" } : null;
+        accent: hex(f.accent) } : null;
     } catch { lfx = null; }
   }
   let lfxSig = "null", candSig = null, onWas = null;
@@ -272,8 +281,8 @@
     // the path being built is exactly one rectangle? (rect / roundRect, nothing else)
     const pbox = new WeakMap();
     const oRect = proto.rect, oRound = proto.roundRect;
-    proto.rect = function (x, y, w, h) { if (on && candles) { const b = pbox.get(this); pbox.set(this, b === undefined ? { x, y, w, h } : null); } return oRect.call(this, x, y, w, h); };
-    if (oRound) proto.roundRect = function (x, y, w, h, ...r) { if (on && candles) { const b = pbox.get(this); pbox.set(this, b === undefined ? { x, y, w, h } : null); } return oRound.call(this, x, y, w, h, ...r); };
+    proto.rect = function (x, y, w, h) { if (on) { const b = pbox.get(this); pbox.set(this, b === undefined ? { x, y, w, h } : null); } return oRect.call(this, x, y, w, h); };
+    if (oRound) proto.roundRect = function (x, y, w, h, ...r) { if (on) { const b = pbox.get(this); pbox.set(this, b === undefined ? { x, y, w, h } : null); } return oRound.call(this, x, y, w, h, ...r); };
     const toHexCol = (v) => { const r = rgbKey(v); return r ? "#" + r.key.split(",").map((n) => (+n).toString(16).padStart(2, "0")).join("") : v; };
     proto.fillRect = function (x, y, w, h) {
       const c = this.canvas;
@@ -286,10 +295,20 @@
         // the price / time scale strips: a translucent dark panel instead of solid, so the wallpaper shows through but the numbers stay readable
         const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1;
         if (Math.abs(w * sx) >= c.width * 0.9 && Math.abs(h * sy) >= c.height * 0.9) {
-          const prev = this.fillStyle; fillDesc.set.call(this, "rgba(6,9,16,0.5)"); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, prev); return;
+          // Style → Price scale → Backing: Default = the app's own; Colour = your colour; Auto / Glass = this soft dark tint
+          const mode = lfx ? lfx.scaleBg : "auto";
+          if (mode === "default") return origFillRect.call(this, x, y, w, h);
+          const tint = mode === "color" ? `rgba(${hexToRgb(lfx.scaleBgColor).join(",")},0.72)` : "rgba(6,9,16,0.5)";
+          const prev = this.fillStyle; fillDesc.set.call(this, tint); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, prev); return;
         }
       }
       drawCalls.fillRect++;
+      if (on && c && (isAxis(c) || isPaneC(c))) {
+        noteBox(this, w, h);
+        if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) {
+          if (labelBox(this, w, h)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p); return; }
+        }
+      }
       if (candleLook(this, c, x, y, w, h)) return;
       return origFillRect.call(this, x, y, w, h);
     };
@@ -299,6 +318,8 @@
     proto.fill = function (...a) {
       const c = this.canvas;
       if (on && c && typeof this.__bdLwOrig === "string" && isChart(c)) { noteFill(this.__bdLwOrig); drawCalls.fill++; }
+      if (on && c && !inLook && (isAxis(c) || isPaneC(c))) { const b = pbox.get(this); if (b && labelBox(this, b.w, b.h)) { noteBox(this, b.w, b.h);
+        if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); return r; } } }
       if (on && candles && c && !a.length && !inLook) { const b = pbox.get(this); if (b && candleLook(this, c, b.x, b.y, b.w, b.h)) { drawCalls.pathLook = (drawCalls.pathLook || 0) + 1; return; } }
       if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.fillStyle)) {
         const pB = this.shadowBlur, pC = this.shadowColor;
@@ -327,7 +348,7 @@
     const oBegin = proto.beginPath, oMove = proto.moveTo, oLine = proto.lineTo;
     const lineFx = () => on && lfx;
     proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null }); pbox.delete(this); return oBegin.call(this); };
-    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) k.p = [x, y]; if (on && candles) pbox.set(this, null); return oMove.call(this, x, y); };
+    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) k.p = [x, y]; if (on) pbox.set(this, null); return oMove.call(this, x, y); };
     proto.lineTo = function (x, y) {
       const k = lineFx() && seg.get(this);
       if (k && k.ok) {
@@ -339,10 +360,10 @@
           k.n++; k.p = [x, y];
         }
       }
-      if (on && candles) pbox.set(this, null);
+      if (on) pbox.set(this, null);
       return oLine.call(this, x, y);
     };
-    for (const nm of ["arc", "arcTo", "quadraticCurveTo", "bezierCurveTo", "ellipse"]) { const o = proto[nm]; if (o) proto[nm] = function (...a) { if (on && candles) pbox.set(this, null); return o.apply(this, a); }; }
+    for (const nm of ["arc", "arcTo", "quadraticCurveTo", "bezierCurveTo", "ellipse"]) { const o = proto[nm]; if (o) proto[nm] = function (...a) { if (on) pbox.set(this, null); return o.apply(this, a); }; }
     const DASH = { solid: [], dotted: [1, 3], dashed: [5, 5] };
     // grid colours are muted: little colour in them (dark navy greys count), or mostly transparent
     const greyish = (col) => { const r = rgbKey(col); if (!r) return false; const [R, G, B] = r.key.split(",").map(Number);
@@ -354,14 +375,15 @@
       const cur = strokeDesc.get.call(ctx), dashed = ctx.getLineDash().length > 0;
       let part = null;
       if (k.n === 1 && dashed && k.h && isCandleCol(cur)) part = lfx.plOn ? "pl" : null;
+      else if (k.n === 1 && k.h && !greyish(cur) && !isCandleCol(cur)) part = lfx.bracketOn && (lfx.bracketLineColor || lfx.bracketLineW) ? "lvl" : null;   // an order / position line
       else if (k.n === 1 && dashed) part = lfx.chOn ? "ch" : null;
       else if (greyish(cur)) part = lfx.gridOn ? "grid" : null;
       if (!part) return false;
       if (part === "grid" && lfx.gridStyle === "none") return true;
-      const opt = part === "grid" ? [lfx.gridColor, lfx.gridW, lfx.gridStyle] : part === "ch" ? [lfx.chColor, lfx.chW, lfx.chStyle] : [lfx.plColor, lfx.plW, lfx.plStyle];
+      const opt = part === "grid" ? [lfx.gridColor, lfx.gridW, lfx.gridStyle] : part === "ch" ? [lfx.chColor, lfx.chW, lfx.chStyle] : part === "lvl" ? [lfx.bracketLineColor || cur, lfx.bracketLineW, null] : [lfx.plColor, lfx.plW, lfx.plStyle];
       const sxx = ctx.getTransform().a || 1, pS = cur, pLW = ctx.lineWidth, pD = ctx.getLineDash(), pA = ctx.globalAlpha;
-      strokeDesc.set.call(ctx, pickCol(opt[0], cur)); ctx.lineWidth = (1 + opt[1]) / sxx;
-      ctx.setLineDash(DASH[opt[2]].map((d) => d * (1 + opt[1] * 0.5) / sxx));
+      strokeDesc.set.call(ctx, part === "lvl" ? opt[0] : pickCol(opt[0], cur)); ctx.lineWidth = part === "lvl" ? Math.max(pLW, (1 + opt[1]) / sxx) : (1 + opt[1]) / sxx;
+      if (opt[2]) ctx.setLineDash(DASH[opt[2]].map((d) => d * (1 + opt[1] * 0.5) / sxx));
       if (part === "grid") ctx.globalAlpha = pA * lfx.gridAlpha;
       drawCalls.lines++;
       origStrokeP.call(ctx);
@@ -369,6 +391,74 @@
       return true;
     }
     lineHook = styleLines;
+
+    // ---------- price scale text, bracket labels, P&L and last price ----------
+    // On the price-scale canvas Lightweight Charts draws each tag as a box and then its text; plain tick numbers
+    // have no box. We remember the box drawn just before a text to tell them apart.
+    const lastBox = new WeakMap();   // ctx -> fill colour of the label box drawn just before
+    const FONTS = { mono: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace', rounded: '"SF Pro Rounded", "Nunito", "Varela Round", ui-rounded, system-ui, sans-serif' };
+    const PNL_RE = /^(?:p\s*(?:&|n|\/)?\s*l\s*:?\s*)?([+\-\u2212])?\s*([$\u20ac\u00a3\u00a5])?\s*([+\-\u2212])?\s*(\d{1,3}(?:,\d{3})*|\d+)(\.\d{1,2})\s*(usd|usdt|usdc|eur|gbp|jpy|aud|cad|chf|nzd|pts|points)?$/i;
+    // the chart pane is big; the price scale (narrow) and time scale (short) canvases sit in the same table
+    const isPaneC = (c) => c && isChart(c) && c.width > 200 && c.height > 120;
+    const isAxis = (c) => c && inLwTable(c) && !(c.width > 200 && c.height > 120);
+    const mask = (t) => String(t).replace(/[+\-\u2212]?\s*[$\u20ac\u00a3\u00a5]?\s*\d[\d.,\s]*/g, (m) => "\u2022".repeat(Math.max(3, Math.min(7, m.replace(/\D/g, "").length))));
+    const privText = (t) => { if (!lfx || !lfx.privacy || lfx.privacyPnl === "show") return t; if (lfx.privacyPnl === "hide") return mask(t);
+      return /[$\u20ac\u00a3\u00a5]|\b(USD|EUR|GBP)\b/i.test(String(t)) ? mask(t) : t; };
+    const sizeUp = (font, px) => String(font).replace(/(\d+(?:\.\d+)?)px/, (m, n) => (+n + px) + "px");
+    let pnlSum = 0, pnlFrame = -1, frameNo = 0, lastQuoteWrite = 0, pnlWrite = 0;
+    (function tick() { frameNo++; requestAnimationFrame(tick); })();
+    // a label box: 8–60 px tall; on the chart itself also wide (≥ 24 px, so candle and volume bars never count) and coloured
+    const labelBox = (g, w, h) => { const c = g.canvas, t = g.getTransform(), H = Math.abs(h * (t.d || 1)), W = Math.abs(w * (t.a || 1));
+      if (H < 8 || H > 60 || W < 12 || W > c.width * 1.01) return false;
+      return isAxis(c) || (isPaneC(c) && W >= 24 && W < c.width * 0.5 && !greyish(g.fillStyle) && !isCandleCol(g.fillStyle)); };
+    function noteBox(g, w, h) { if (labelBox(g, w, h)) lastBox.set(g, String(g.fillStyle)); }
+    const oText = proto.fillText;
+    proto.fillText = function (t, x, y, ...rest) {
+      const c = this.canvas;
+      if (!on || !c || inLook) return oText.call(this, t, x, y, ...rest);
+      if (isPaneC(c)) {                                   // text on the chart itself: a P&L readout (for Live mood: P&L)
+        const m = typeof t === "string" && t.length < 40 && t.trim().match(PNL_RE);
+        if (m && (m[1] || m[2] || m[3] || m[6] || /^p/i.test(t.trim()))) {
+          const v = parseFloat((m[4] + m[5]).replace(/,/g, "")) * ((m[1] || m[3]) === "-" || (m[1] || m[3]) === "\u2212" ? -1 : 1);
+          if (frameNo !== pnlFrame) { pnlFrame = frameNo; pnlSum = 0; } pnlSum += v;
+          const now = performance.now(); if (now - pnlWrite > 400) { pnlWrite = now; htmlEl().setAttribute("data-ws-pnl", JSON.stringify({ v: Math.round(pnlSum * 100) / 100, unit: m[2] || (m[6] || "").toUpperCase(), ts: Date.now() })); }
+          if (lfx && lfx.privacy) t = privText(t);
+        }
+        const pb = lastBox.get(this); lastBox.delete(this);
+        if (pb && lfx && (lfx.bracketOn || lfx.privacy)) {     // the title box of an order / position line on the chart
+          const pF = this.font, pS = this.fillStyle, sign = /^\s*\w*\s*[+]/.test(t) ? 1 : /^\s*\w*\s*[-\u2212]/.test(t) ? -1 : 0;
+          if (lfx.bracketOn) { const col = sign > 0 && lfx.bracketProfit ? lfx.bracketProfit : sign < 0 && lfx.bracketLoss ? lfx.bracketLoss : lfx.bracketText;
+            if (col) fillDesc.set.call(this, col); if (lfx.bracketSize) this.font = sizeUp(pF, lfx.bracketSize); }
+          const r = oText.call(this, privText(t), x, y, ...rest); this.font = pF; fillDesc.set.call(this, pS); return r;
+        }
+        return oText.call(this, t, x, y, ...rest);
+      }
+      if (!isAxis(c)) return oText.call(this, t, x, y, ...rest);
+      const box = lastBox.get(this); lastBox.delete(this);
+      const pF = this.font, pS = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
+      if (box && isCandleCol(box)) {                      // the last-price tag: remember the price (Live mood: day move)
+        const n = parseFloat(String(t).replace(/[^\d.\-]/g, ""));
+        const now = performance.now(); if (isFinite(n) && now - lastQuoteWrite > 1000) { lastQuoteWrite = now; htmlEl().setAttribute("data-bd-lwquote", JSON.stringify({ p: n, ts: Date.now() })); }
+      } else if (box && !greyish(box)) {                 // a coloured tag that isn't the price: an order / position label
+        if (lfx && lfx.bracketOn) {
+          const sign = /^\s*[+]/.test(t) ? 1 : /^\s*[-\u2212]/.test(t) ? -1 : 0;
+          const col = sign > 0 && lfx.bracketProfit ? lfx.bracketProfit : sign < 0 && lfx.bracketLoss ? lfx.bracketLoss : lfx.bracketText;
+          if (col) fillDesc.set.call(this, col);
+          if (lfx.bracketSize) this.font = sizeUp(pF, lfx.bracketSize);
+        }
+        t = privText(t);
+      } else if (!box && lfx) {                           // plain price / time numbers
+        if (lfx.scaleText) fillDesc.set.call(this, lfx.scaleText);
+        let f = pF; if (lfx.scaleSize) f = sizeUp(f, lfx.scaleSize * 1.5);
+        if (lfx.scaleFont !== "default") f = f.replace(/(\d+(?:\.\d+)?px)\s+.*$/, (m, sz) => sz + " " + FONTS[lfx.scaleFont]);
+        if (lfx.scaleBold && !/\bbold\b|\b[6-9]00\b/.test(f)) f = "bold " + f;
+        this.font = f;
+        if (lfx.scaleGlow > 0) { this.shadowColor = lfx.scaleText || String(pS); this.shadowBlur = 2 + lfx.scaleGlow * 8; }
+      }
+      const r = oText.call(this, t, x, y, ...rest);
+      this.font = pF; fillDesc.set.call(this, pS); this.shadowBlur = pB; this.shadowColor = pC;
+      return r;
+    };
 
     setInterval(markRoots, 2000);
 
