@@ -1,7 +1,7 @@
 {
   "name": "priism-skins-desktop",
   "productName": "Priism Skins",
-  "version": "0.1.35",
+  "version": "0.1.36",
   "description": "Priism Skins desktop app: TradingView with live wallpapers (Windows, macOS, Linux)",
   "author": "arcuto29",
   "main": "main.js",
@@ -57,7 +57,11 @@
       ],
       "category": "public.app-category.finance",
       "icon": "../icons/icon-1024.png",
-      "identity": null
+      "identity": null,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Priism Skins records your voice into clips when you turn on Sound: Voice.",
+        "NSAudioCaptureUsageDescription": "Priism Skins can include your computer's sound in clips."
+      }
     },
     "linux": {
       "target": "AppImage",

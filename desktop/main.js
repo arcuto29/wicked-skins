@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, session, dialog, shell } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, session, dialog, shell, desktopCapturer } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -71,6 +71,14 @@ function openSettings() {
 ipcMain.handle("tv:open", () => { openTV(); return tvOpen(); });
 ipcMain.handle("tv:close", () => { closeTV(); return false; });
 ipcMain.handle("tv:state", () => ({ open: tvOpen() }));
+// Record / snapshot buttons in the app's panel: run them in the chart window as if you'd pressed the shortcut there
+// (userGesture = true, so screen sharing and sound are allowed).
+ipcMain.handle("tv:action", async (_e, kind) => {
+  if (!tvOpen()) return { ok: false, reason: "Open your chart first (Open TradingView with skins), then try again." };
+  if (!["record", "snapshot"].includes(kind)) return { ok: false };
+  try { return await tvWin.webContents.executeJavaScript(`window.__bdAction ? window.__bdAction(${JSON.stringify(kind)}) : { ok: false, reason: "The chart is still loading." }`, true); }
+  catch { return { ok: false, reason: "Couldn't reach the chart window." }; }
+});
 
 ipcMain.handle("store:get", (_e, defaults) => ({ ...defaults, ...cfg }));
 ipcMain.handle("store:set", (_e, obj) => {
@@ -110,6 +118,16 @@ async function checkNow() {
 }
 
 app.whenReady().then(() => {
+  // Whole-screen recording + computer sound: Electron has no screen picker of its own, so give it the main screen
+  // (macOS 15+ shows the system picker instead). Windows can also capture the computer's sound ("loopback").
+  try {
+    session.defaultSession.setDisplayMediaRequestHandler((req, cb) => {
+      desktopCapturer.getSources({ types: ["screen"] }).then((src) => {
+        if (!src[0]) return cb({});
+        cb({ video: src[0], ...(req.audioRequested && process.platform === "win32" ? { audio: "loopback" } : {}) });
+      }).catch(() => cb({}));
+    }, { useSystemPicker: true });
+  } catch {}
   load();
   // Allow user-chosen wallpapers (data:/blob:) regardless of the site's media CSP.
   session.defaultSession.webRequest.onHeadersReceived({ urls: ["https://*.tradingview.com/*"] }, (d, cb) => {

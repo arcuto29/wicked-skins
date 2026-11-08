@@ -101,7 +101,7 @@
     { tab: "Trading", img: "img/tour-trading.png", h: "Built for traders", p: "Readable TP / Stop / P&L labels and the tools prop traders asked for.",
       li: ["One tap makes TP / Stop / P&L easy to see", "Session timer: next open or close for futures, stocks, forex and crypto", "Daily goal & limit bar, plus a picture or clip of every trade"] },
     { tab: "Capture", img: "img/tour-capture.png", h: "Stream and post with confidence", p: "Snapshots and clips with your effects in them, and Streamer mode to hide your money.",
-      li: ["Streamer mode: your numbers become dots, on screen and in recordings", "Clips with crop & trim (16:9, 9:16, square) and quality choices", "Shortcuts for focus, recording and snapshots, all changeable"] },
+      li: ["Streamer mode: your numbers become dots, on screen and in recordings", "Clips with your voice or computer sound, crop & trim (16:9, 9:16, square) and quality choices", "Shortcuts for focus, recording and snapshots, all changeable"] },
   ];
   const tabs = $("tourTabs");
   if (tabs) {

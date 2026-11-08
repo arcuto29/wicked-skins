@@ -17,7 +17,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
@@ -902,6 +902,10 @@ if ($("codeApply")) {
 if ($("snapBtn")) $("snapBtn").onclick = async () => {
   const msg = $("snapMsg"), prev = $("snapPreview"), img = $("snapImg");
   const show = (t, ok) => { msg.style.display = ""; msg.textContent = t; msg.style.color = ok === false ? "#ff8a8a" : ""; };
+  if (DESK && DESK.action) {
+    const r = await DESK.action("snapshot");
+    return r && r.ok !== false ? show("Snapshot taken in your chart window. Choose where to save it.", true) : show((r && r.reason) || "Open your chart first (Open TradingView with skins).", false);
+  }
   if (!EXT_MODE || IS_TAB) return show("Open this on a TradingView chart tab to capture.", false);
   show("Capturing…"); prev.style.display = "none";
   const r = await tabMsgAnyFrame({ ws: "snapshot" });
@@ -924,7 +928,14 @@ const CLIP_HINTS = {
   chart: "Records an animated clip (WebM) of your chart with the live wallpaper and effects moving, from 2 seconds up to 2 minutes. Click Record, then close this panel if you like: it downloads by itself when it ends. A badge on the chart shows the countdown; click it to stop and save early. Keep the chart tab visible. An uploaded wallpaper can't be read this way; use Whole screen for that.",
   screen: "Records exactly what you see, so every effect and any uploaded wallpaper is in it. After you click Record, a card appears on your chart: click \u201cChoose what to record\u201d and pick Entire Screen (or a window / this tab) in Chrome's box. It records for the length below, then downloads by itself. Stop early with Chrome's \u201cStop sharing\u201d button.",
 };
+const AUDIO_HINT = {
+  mic: "Your voice: Chrome asks once to use your microphone on tradingview.com.",
+  computer: "Computer sound (music, videos, alerts): Chrome asks what to share when you record. On Windows pick Entire screen and tick \u201cShare system audio\u201d. On a Mac Chrome can only take a tab's sound, so pick the tab that's playing and keep \u201cShare tab audio\u201d on.",
+  both: "Your voice and the computer's sound, mixed. Chrome asks once for the microphone, then what to share: on Windows tick \u201cShare system audio\u201d; on a Mac pick the tab that's playing.",
+};
 const syncClipMode = () => {
+  if ($("clipAudio")) { seg("clipAudio", [["none", "Off"], ["mic", "Voice"], ["computer", "Computer"], ["both", "Both"]], () => cfg.clipAudio || "none", (v) => { set({ clipAudio: v }); syncClipMode(); });
+    $("clipAudioHint").hidden = !AUDIO_HINT[cfg.clipAudio]; $("clipAudioHint").textContent = AUDIO_HINT[cfg.clipAudio] || ""; }
   if ($("clipQuality")) seg("clipQuality", [["high", "High"], ["balanced", "Balanced"], ["small", "Small file"]], () => cfg.clipQuality || "balanced", (v) => set({ clipQuality: v }));
   if ($("clipEdit")) seg("clipEdit", [[true, "Crop & trim first"], [false, "Download right away"]], () => cfg.clipEdit !== false, (v) => set({ clipEdit: v }));
   seg("clipFps", [[30, "30 fps"], [60, "60 fps"]], () => (+cfg.clipFps === 60 ? 60 : 30), (v) => { set({ clipFps: v }); syncClipMode(); });
@@ -940,8 +951,20 @@ const clipLength = () => { const c = Math.round(+($("clipCustom") && $("clipCust
 if ($("clipBtn")) $("clipBtn").onclick = async () => {
   const msg = $("clipMsg"), prev = $("clipPreview"), vid = $("clipVid"), btn = $("clipBtn");
   const show = (t, ok) => { msg.style.display = ""; msg.textContent = t; msg.style.color = ok === false ? "#ff8a8a" : ""; };
-  if (!EXT_MODE || IS_TAB) return show("Open this on a TradingView chart tab to record.", false);
   const secs = clipLength();
+  if (DESK && DESK.action) {                                   // desktop app: record in the chart window
+    set({ clipLen: secs });
+    const r = await DESK.action("record");
+    if (!r || r.ok === false) return show((r && r.reason) || "Open your chart first (Open TradingView with skins), then record.", false);
+    return show(r.stopped ? "Stopped. Your clip is saving." : `Recording on your chart window for ${secs}s. It saves by itself when it ends.`, true);
+  }
+  if (!EXT_MODE || IS_TAB) return show("Open this on a TradingView chart tab to record.", false);
+  if (cfg.clipMode !== "screen" && (cfg.clipAudio === "computer" || cfg.clipAudio === "both")) {
+    const r1 = await tabMsgAnyFrame({ ws: "clip", seconds: secs, fps: +cfg.clipFps === 60 ? 60 : 30 });
+    if (!r1) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
+    if (!r1.ok) return show(r1.reason || "Couldn't start the recording.", false);
+    return show(`Now click \u201cChoose sound\u201d on your chart and pick what to share. It records ${secs}s, then downloads by itself.`, true);
+  }
   if (cfg.clipMode === "screen") {
     const r0 = await tabMsgAnyFrame({ ws: "clip", seconds: secs, mode: "screen", fps: +cfg.clipFps === 60 ? 60 : 30 });
     if (!r0) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
@@ -1736,7 +1759,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)",
+const WHATS_NEW = ["Sound in clips: your voice, your computer's sound (music, videos), or both (Capture › Clip)",
+  "Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)",
   "Auto trade clips: a clip of each trade saved when it closes (Trading › After each trade)",
   "Tidier panel: switched-off sections fold down, and Uploads lives in Skins",
   "Clip quality options, and instant saving when you don't crop or trim",

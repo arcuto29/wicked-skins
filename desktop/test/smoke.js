@@ -54,6 +54,10 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
     const saved = JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf8"));
     ok("settings change saved", saved.skin === "cybergrid");
     ok("settings change reaches the chart", await tv.evaluate(() => !!document.getElementById("bd-layer")));
+    // the panel's Record / Snapshot buttons reach the chart window (desktop bridge)
+    ok("chart window takes Record / Snapshot from the panel", await tv.evaluate(() => typeof window.__bdAction === "function"));
+    const bad = await settings.evaluate(() => window.wickedStore.tv.action("nope")).catch((e) => ({ err: String(e) }));
+    ok("panel -> chart action bridge answers", !!bad && bad.ok === false, JSON.stringify(bad));
     await settings.screenshot({ path: path.join(OUT, "settings.png") });
   }
   await tv.screenshot({ path: path.join(OUT, "tradingview-after.png") });

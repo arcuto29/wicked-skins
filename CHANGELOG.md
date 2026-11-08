@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.36 (2026-11-04)
+- **Sound in clips** (Capture → Clip → Sound): Off, Voice, Computer or Both.
+  - **Voice** records your microphone, so you can talk through a trade. Chrome asks once to use the mic on tradingview.com.
+  - **Computer** includes whatever is playing: music, videos, TradingView alerts. Chrome asks what to share when you record. On Windows pick Entire screen and tick "Share system audio"; on a Mac Chrome can only take a tab's sound, so pick the tab that's playing.
+  - **Both** mixes them into one track.
+  - Works for chart-only and whole-screen clips, and from the Record shortcut.
+  - The crop & trim editor keeps the sound, with a Sound on / Muted button for the preview.
+- Recording from the panel now opens Chrome's share picker straight away. A card on the chart only asks first when Chrome doesn't pass your click on.
+- **Desktop app**:
+  - The panel's Record and Snapshot buttons now work (they run in the chart window).
+  - Whole-screen recording works.
+  - On Windows it can include the computer's sound.
+
 ## 0.1.35 (2026-11-04)
 - **Streamer mode** (Capture → Streamer mode, or Alt+Shift+P on the chart): hides your money while you stream or record.
   - The numbers in your TP / Stop / P&L labels become dots, right where TradingView draws them, so they're hidden on screen and in any recording.
