@@ -19,5 +19,6 @@ contextBridge.exposeInMainWorld("wickedStore", {
     close: () => ipcRenderer.invoke("tv:close"),
     state: () => ipcRenderer.invoke("tv:state"),
     onState: (cb) => ipcRenderer.on("tv:state", (_e, s) => cb(s)),
+    action: (kind) => ipcRenderer.invoke("tv:action", kind),   // "record" | "snapshot", run in the chart window
   },
 });

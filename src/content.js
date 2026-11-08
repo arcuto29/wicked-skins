@@ -28,6 +28,7 @@
     // glows through) | color (your colour). dlgAlpha = how solid (0.4 see-through .. 1 solid).
     dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78,
     clipEdit: true,
+    clipAudio: "none",        // sound in clips: none | mic (your voice) | computer (what's playing: music, videos) | both
     // Shortcuts (changeable in Adjust > Shortcuts). Stored as "Alt+Shift+KeyF" (modifiers + the key's code).
     toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS",
     clipLen: 10,              // seconds a shortcut recording lasts (the Clip section's length)
@@ -994,6 +995,7 @@
       if (msg.ws === "clip") {
         if (!owner || standDown) return;
         if (msg.mode === "screen") { reply(startScreenFlow(+msg.seconds || 5, +msg.fps || 30)); return; }   // the user finishes this on the page
+        if (wantSys()) { reply(startSoundFlow(+msg.seconds || 5, +msg.fps || 30)); return; }                  // picks the sound on the page first
         captureClip(+msg.seconds || 5, +msg.fps || 30).then((r) => reply(r)).catch((e) => reply({ ok: false, reason: String(e && e.message || e) }));
         return true;   // async reply (takes a few seconds while recording)
       }
@@ -1320,7 +1322,7 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -1531,7 +1533,7 @@
     a.href = url; a.download = name; document.documentElement.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
-  function openClipEditor(blob, name, fps) {
+  function openClipEditor(blob, name, fps, hasAudio) {
     const host = document.createElement("div"); host.id = "bd-clip-editor";
     host.style.cssText = "position:fixed;inset:0;z-index:2147483646";
     const root = host.attachShadow({ mode: "open" });
@@ -1564,7 +1566,7 @@
       .msg{font-size:12px;color:#8b8fa0}
     </style>
     <div class="bg"><div class="card">
-      <div class="top"><div><b>Edit your clip</b><small>Drag the box to crop · drag the green handles to trim</small></div><button data-a="discard">Discard</button></div>
+      <div class="top"><div><b>Edit your clip</b><small>Drag the box to crop · drag the green handles to trim</small></div><div style="display:flex;gap:8px">${hasAudio ? '<button data-a="snd">\u{1F50A} Sound on</button>' : ""}<button data-a="discard">Discard</button></div></div>
       <div class="stage"><video muted playsinline></video><div class="shade s1"></div><div class="shade s2"></div><div class="shade s3"></div><div class="shade s4"></div>
         <div class="crop"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i></div></div>
       <div class="row"><span>Crop</span><button data-r="free" class="on">Free</button><button data-r="full">Whole video</button><button data-r="16:9">16:9 (YouTube)</button><button data-r="9:16">9:16 (TikTok / Reels)</button><button data-r="1:1">1:1 (square)</button><button data-r="4:5">4:5</button></div>
@@ -1587,7 +1589,15 @@
     const estimate = () => { const [W, H] = outDims(), d = Math.max(0.5, t1 - t0), bps = clipBps(W, H, fps || 30, d, quality);
       root.querySelector(".est").textContent = `≈ ${Math.max(0.1, (bps * d) / 8e6).toFixed(1)} MB · ${W}×${H}`; };
     const untouched = () => crop.x === 0 && crop.y === 0 && crop.w === 1 && crop.h === 1 && t0 <= 0.05 && t1 >= dur - 0.05 && !outSize && quality === ((cfg.clipQuality === "high" || cfg.clipQuality === "small") ? cfg.clipQuality : "balanced");
-    const close = () => { busy = false; try { v.pause(); } catch {} URL.revokeObjectURL(url); host.remove(); removeEventListener("keydown", onKey, true); };
+    // Sound: the preview plays muted until you click in the editor (browsers only allow sound after a click); then it
+    // runs through an audio graph so the same sound can be both heard and re-recorded when you save an edit.
+    let ac = null, asrc = null, pv = null, soundOn = true;
+    const audioUp = () => {
+      if (!hasAudio || ac) return;
+      try { ac = new (window.AudioContext || window.webkitAudioContext)(); asrc = ac.createMediaElementSource(v); pv = ac.createGain(); pv.gain.value = soundOn ? 1 : 0;
+        asrc.connect(pv); pv.connect(ac.destination); v.muted = false; } catch { ac = null; }
+    };
+    const close = () => { busy = false; try { v.pause(); } catch {} try { ac && ac.close(); } catch {} URL.revokeObjectURL(url); host.remove(); removeEventListener("keydown", onKey, true); };
     const onKey = (e) => { if (e.key === "Escape" && !busy) { e.stopPropagation(); close(); } };
     addEventListener("keydown", onKey, true);
     // MediaRecorder WebM files don't store their length: seek far ahead once so the browser works it out
@@ -1655,6 +1665,9 @@
     }
     r0.oninput = function () { trimUi.call(this); if (dur) v.currentTime = t0; };
     r1.oninput = function () { trimUi.call(this); if (dur) v.currentTime = Math.max(t0, t1 - 0.5); };
+    root.addEventListener("pointerdown", () => { audioUp(); if (ac && ac.state === "suspended") ac.resume().catch(() => {}); }, true);
+    const sb = root.querySelector("[data-a=snd]");
+    if (sb) sb.onclick = () => { audioUp(); soundOn = !soundOn; if (pv) pv.gain.value = soundOn ? 1 : 0; sb.textContent = soundOn ? "\u{1F50A} Sound on" : "\u{1F507} Muted"; };
     root.querySelector("[data-a=discard]").onclick = () => { if (!busy) close(); };
     root.querySelector("[data-a=orig]").onclick = () => { if (busy) return; saveBlob(blob, name); flash("Clip saved to your downloads"); close(); };
     root.querySelector("[data-a=save]").onclick = async () => {
@@ -1668,8 +1681,9 @@
         const [OW, OH] = outDims();
         const cv = document.createElement("canvas"); cv.width = OW; cv.height = OH; const g = cv.getContext("2d");
         const stream = cv.captureStream(fps || 30);
-        const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
-        const mime = mimes.find((m) => MediaRecorder.isTypeSupported(m)) || "";
+        let withSound = false;
+        if (hasAudio) { audioUp(); if (ac) { try { await ac.resume(); const d = ac.createMediaStreamDestination(); asrc.connect(d); stream.addTrack(d.stream.getAudioTracks()[0]); withSound = true; } catch {} } }
+        const mime = clipMime(withSound);
         const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: clipBps(OW, OH, fps || 30, Math.max(0.5, t1 - t0), quality) } : undefined);
         const chunks = []; rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
         const done = new Promise((res) => (rec.onstop = res));
@@ -1725,7 +1739,64 @@
   // than a PNG, so we cap it (default ~5s) and downscale to keep it shareable.
   let clipRec = null, stopClip = null;
   const MAX_CLIP_SECONDS = 120;
-  async function captureClip(seconds, fpsWanted) {
+  // ---------- sound in clips ----------
+  // Your voice (microphone), the computer's sound (music / videos playing, through Chrome's share picker), or both,
+  // mixed into one track. Chrome asks once to use the microphone on this site, and shows its share picker for the
+  // computer's sound (Windows: tick "Share system audio"; Mac: Chrome can only take a tab's sound).
+  const wantMic = () => cfg.clipAudio === "mic" || cfg.clipAudio === "both";
+  const wantSys = () => cfg.clipAudio === "computer" || cfg.clipAudio === "both";
+  function clipMime(withAudio) {
+    const list = withAudio ? ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"] : ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+    return list.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+  }
+  async function clipAudioTrack(display) {
+    const srcs = [], stops = [];
+    if (display) for (const t of display.getAudioTracks()) if (t.readyState === "live") srcs.push(new MediaStream([t]));
+    if (wantMic() && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try { const m = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); srcs.push(m); stops.push(() => m.getTracks().forEach((t) => t.stop())); }
+      catch (e) { flash(e && e.name === "NotAllowedError" ? "Microphone blocked: allow it for this site to add your voice" : "No microphone found, recording without your voice"); }
+    }
+    if (!srcs.length) return null;
+    if (srcs.length === 1) return { track: srcs[0].getAudioTracks()[0], stop: () => stops.forEach((f) => f()) };
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)(); try { await ac.resume(); } catch {}
+      const dest = ac.createMediaStreamDestination();
+      for (const s of srcs) ac.createMediaStreamSource(s).connect(dest);
+      return { track: dest.stream.getAudioTracks()[0], stop: () => { stops.forEach((f) => f()); try { ac.close(); } catch {} } };
+    } catch { return { track: srcs[0].getAudioTracks()[0], stop: () => stops.forEach((f) => f()) }; }
+  }
+  const displayOpts = (fps, soundOnly) => ({
+    video: soundOnly ? true : { frameRate: { ideal: Math.max(10, Math.min(60, +fps || 30)) }, displaySurface: "monitor" },
+    audio: wantSys() ? { suppressLocalAudioPlayback: false, echoCancellation: false, noiseSuppression: false, autoGainControl: false } : false,
+    systemAudio: wantSys() ? "include" : "exclude", selfBrowserSurface: "include", surfaceSwitching: "include", monitorTypeSurfaces: "include",
+  });
+  const noSysHint = () => flash("No computer sound was shared. Next time tick \u201cShare system audio\u201d (or pick a tab with \u201cShare tab audio\u201d)");
+  // Chart-only clip WITH the computer's sound: Chrome only opens its share picker from a click on the page, so from the
+  // panel a small card asks first; from a shortcut (a key press on the page) the picker opens straight away.
+  function startSoundFlow(dur, fps) {
+    if (screenBusy || clipRec) return { ok: false, reason: "Already recording." };
+    const pick = async () => {
+      let disp = null;
+      try { disp = await navigator.mediaDevices.getDisplayMedia(displayOpts(fps, true)); } catch { disp = null; }
+      if (disp) { disp.getVideoTracks().forEach((t) => t.stop()); if (!disp.getAudioTracks().length) noSysHint(); }   // only the sound is used
+      captureClip(dur, fps, disp, true).then((r) => { if (r && r.ok === false) flash(r.reason); }).catch(() => {});
+    };
+    if (navigator.userActivation && navigator.userActivation.isActive) { pick(); return { ok: true, awaiting: true }; }
+    cancelScreenAsk();
+    const card = document.createElement("div"); card.id = "bd-screenask"; screenAsk = card;
+    card.style.cssText = "position:fixed;z-index:2147483647;top:70px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:rgba(10,12,18,.96);color:#fff;font:600 13px system-ui,sans-serif;border:1px solid rgba(46,242,176,.6);box-shadow:0 12px 40px rgba(0,0,0,.6)";
+    const txt = document.createElement("span"); txt.textContent = `Priism Skins \u00B7 add your computer's sound to the ${dur}s clip`;
+    const go = document.createElement("button"), no = document.createElement("button");
+    go.textContent = "Choose sound"; no.textContent = "Record without it";
+    go.style.cssText = "all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;background:linear-gradient(90deg,#19d3ff,#2ef2b0);color:#04140f;font:800 13px system-ui,sans-serif";
+    no.style.cssText = "all:unset;cursor:pointer;padding:8px 10px;opacity:.75;font:600 13px system-ui,sans-serif";
+    card.append(txt, go, no); document.documentElement.appendChild(card);
+    go.onclick = () => { cancelScreenAsk(); pick(); };
+    no.onclick = () => { cancelScreenAsk(); captureClip(dur, fps, null, true).catch(() => {}); };
+    setTimeout(() => { if (screenAsk === card) cancelScreenAsk(); }, 90000);
+    return { ok: true, awaiting: true };
+  }
+  async function captureClip(seconds, fpsWanted, display, soundAsked) {
     if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
     if (clipRec) return { ok: false, reason: "Already recording a clip." };
     if (typeof MediaRecorder === "undefined") return { ok: false, reason: "Your browser can't record clips." };
@@ -1742,14 +1813,16 @@
     let stream;
     const capFps = Math.max(10, Math.min(60, +fpsWanted || 30));
     try { stream = cap.captureStream(capFps); } catch { return { ok: false, reason: "Your browser can't record this chart." }; }
-    const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
-    const mime = mimes.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+    let au = null; try { au = await clipAudioTrack(display || null); } catch {}
+    if (au && au.track) stream.addTrack(au.track);
+    const mime = clipMime(!!au);
+    const stopAudio = () => { try { au && au.stop(); } catch {} try { display && display.getTracks().forEach((t) => t.stop()); } catch {} };
     let rec;
     // Any length from 2s to 2 minutes, at the quality you picked (based on the clip's real size + frame rate).
     const dur = Math.max(2, Math.min(MAX_CLIP_SECONDS, +seconds || 5));
     const bps = clipBps(cap.width, cap.height, capFps, dur, cfg.clipQuality);
     try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: bps } : undefined); }
-    catch { return { ok: false, reason: "Your browser can't record clips." }; }
+    catch { stopAudio(); return { ok: false, reason: "Your browser can't record clips." }; }
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
     clipRec = rec;
@@ -1773,18 +1846,19 @@
       rec.onstop = async () => {
         cleanup();
         try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+        stopAudio();
         if (!chunks.length) return resolve({ ok: false, reason: "The browser blocked recording (a cross-origin chart)." });
         const blob = new Blob(chunks, { type: mime || "video/webm" });
         if (autoSave) {
           const q = parseTitle(), name = `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${Math.round((performance.now() - t0) / 1000)}s.webm`;
-          if (cfg.clipEdit !== false) { openClipEditor(blob, name, cfg.clipFps); return resolve({ ok: true, saved: true, editing: true, name, mediaMissed, bytes: blob.size, w: W, h: H }); }
+          if (cfg.clipEdit !== false) { openClipEditor(blob, name, cfg.clipFps, !!au); return resolve({ ok: true, saved: true, editing: true, name, mediaMissed, bytes: blob.size, w: W, h: H }); }
           saveBlob(blob, name);
           flash("Clip saved to your downloads");
           return resolve({ ok: true, saved: true, name, mediaMissed, bytes: blob.size, w: W, h: H });
         }
         resolve({ ok: true, url: await blobToDataURL(blob), mediaMissed, bytes: blob.size, w: W, h: H });
       };
-      rec.onerror = () => { cleanup(); resolve({ ok: false, reason: "Recording failed." }); };
+      rec.onerror = () => { cleanup(); stopAudio(); resolve({ ok: false, reason: "Recording failed." }); };
       try { rec.start(); draw(); stopTimer = setTimeout(stop, dur * 1000); }
       catch { cleanup(); resolve({ ok: false, reason: "Recording failed." }); }
     });
@@ -1814,36 +1888,39 @@
     go.onclick = async () => {
       let stream;
       try {
-        stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: Math.max(10, Math.min(60, +fps || 30)) }, displaySurface: "monitor" }, audio: false,
-          selfBrowserSurface: "include", surfaceSwitching: "include", monitorTypeSurfaces: "include" });
+        stream = await navigator.mediaDevices.getDisplayMedia(displayOpts(fps, false));
       } catch (e) {
         txt.textContent = e && e.name === "NotAllowedError" ? "Not started: sharing was cancelled or isn't allowed on this page." : "Couldn't start the screen recording.";
         go.remove(); setTimeout(cancelScreenAsk, 3500); return;
       }
       cancelScreenAsk();                       // keep our card out of the recording
+      if (wantSys() && !stream.getAudioTracks().length) noSysHint();
       recordScreenStream(stream, dur);
     };
+    if (navigator.userActivation && navigator.userActivation.isActive) { go.onclick(); return { ok: true, awaiting: true }; }   // a shortcut: open the picker now
     setTimeout(() => { if (screenAsk === card) cancelScreenAsk(); }, 90000);
     return { ok: true, awaiting: true };
   }
-  function recordScreenStream(stream, dur) {
+  async function recordScreenStream(stream, dur) {
     screenBusy = true;
-    const mimes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
-    const mime = mimes.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+    let au = null; try { au = await clipAudioTrack(stream); } catch {}
+    const recStream = new MediaStream([...stream.getVideoTracks(), ...(au && au.track ? [au.track] : [])]);
+    const mime = clipMime(!!au);
     const vs = (stream.getVideoTracks()[0] && stream.getVideoTracks()[0].getSettings()) || {};
     const bps = clipBps(vs.width || 1920, vs.height || 1080, vs.frameRate || 30, dur, cfg.clipQuality);
-    let rec; try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: bps } : undefined); }
-    catch { stream.getTracks().forEach((t) => t.stop()); screenBusy = false; return; }
+    let rec; try { rec = new MediaRecorder(recStream, mime ? { mimeType: mime, videoBitsPerSecond: bps } : undefined); }
+    catch { stream.getTracks().forEach((t) => t.stop()); try { au && au.stop(); } catch {} screenBusy = false; return; }
     const chunks = [], t0 = performance.now(); let timer = 0, finished = false;
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
     const stop = () => { clearTimeout(timer); try { rec.state !== "inactive" && rec.stop(); } catch {} };
     rec.onstop = () => {
       if (finished) return; finished = true; screenBusy = false; clearTimeout(timer);
       stream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+      try { au && au.stop(); } catch {}
       if (!chunks.length) return;
       const secs = Math.round((performance.now() - t0) / 1000), q = parseTitle();
       const blob = new Blob(chunks, { type: mime || "video/webm" }), name = `priism-screen-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${secs}s.webm`;
-      if (cfg.clipEdit !== false) return void openClipEditor(blob, name, cfg.clipFps);
+      if (cfg.clipEdit !== false) return void openClipEditor(blob, name, cfg.clipFps, !!au);
       saveBlob(blob, name);
       flash("Screen clip saved to your downloads");
     };
@@ -1876,23 +1953,29 @@
     if (isToggle) { const next = !cfg.enabled; save({ enabled: next }); flash(next ? "Priism Skins on" : "Priism Skins off"); return; }
     if (isPriv) { const next = !cfg.privacy; save({ privacy: next }); flash(next ? "Streamer mode on \u00B7 your numbers are hidden" : "Streamer mode off"); return; }
     if (EXT && !owner) return;                      // only the frame that owns the chart records / snaps
-    if (isRec) {
-      if (clipRec && stopClip) { stopClip(); return; }               // pressed again: stop and save now
-      const secs = Math.max(2, Math.min(120, +cfg.clipLen || 10));
-      if (cfg.clipMode === "screen") { const r = startScreenFlow(secs, +cfg.clipFps === 60 ? 60 : 30); if (r && r.ok === false) flash(r.reason); }
-      else captureClip(secs, +cfg.clipFps === 60 ? 60 : 30).then((r) => { if (r && r.ok === false) flash(r.reason); }).catch(() => {});
-      return;
-    }
-    if (isSnap) {
-      captureSnapshot().then((r) => {
-        if (!r.ok) return flash(r.reason || "Couldn't take a snapshot");
-        const q = parseTitle(); saveBlob(r.blob, `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}.png`); flash("Snapshot saved to your downloads");
-      }).catch(() => flash("Couldn't take a snapshot"));
-      return;
-    }
+    if (isRec) { doRecord(); return; }
+    if (isSnap) { doSnap(); return; }
     const next = !cfg.focus; save({ focus: next });
     flash(next ? `Focus on \u00B7 ${keyLabel(cfg.focusKey)} to bring it back` : "Focus off");
   }, true);
+
+  // Record / snapshot: the shortcuts and the desktop app's panel buttons both land here.
+  function doRecord() {
+    if (clipRec && stopClip) { stopClip(); return { ok: true, stopped: true }; }   // pressed again: stop and save now
+    const secs = Math.max(2, Math.min(120, +cfg.clipLen || 10)), fps = +cfg.clipFps === 60 ? 60 : 30;
+    if (cfg.clipMode === "screen") { const r = startScreenFlow(secs, fps); if (r && r.ok === false) flash(r.reason); return r; }
+    if (wantSys()) { const r = startSoundFlow(secs, fps); if (r && r.ok === false) flash(r.reason); return r; }
+    captureClip(secs, fps).then((r) => { if (r && r.ok === false) flash(r.reason); }).catch(() => {});
+    return { ok: true };
+  }
+  function doSnap() {
+    captureSnapshot().then((r) => {
+      if (!r.ok) return flash(r.reason || "Couldn't take a snapshot");
+      const q = parseTitle(); saveBlob(r.blob, `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}.png`); flash("Snapshot saved to your downloads");
+    }).catch(() => flash("Couldn't take a snapshot"));
+    return { ok: true };
+  }
+  if (!(typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id)) window.__bdAction = (k) => (k === "record" ? doRecord() : k === "snapshot" ? doSnap() : { ok: false });   // desktop app panel
 
   // ---------- Focus mode ----------
   // Fades the wallpaper away (and pauses it) so only your chart is left; "everything" also drops all styling.
