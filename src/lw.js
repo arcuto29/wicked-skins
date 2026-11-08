@@ -453,7 +453,11 @@
       if (!k || !k.ok || !k.n || !c || !isChart(c)) return false;
       const cur = strokeDesc.get.call(ctx), dashed = ctx.getLineDash().length > 0;
       let part = null;
-      if (k.n === 1 && dashed && k.h && isCandleCol(cur)) part = lfx.plOn ? "pl" : null;
+      // the price line is drawn in the candle colour: the chosen one, or (grey / black candles we recolour by shape)
+      // the platform's original one; never take it for a crosshair line
+      const r0 = rgbKey(cur), candleOrig = !!r0 && shapeSides.has(r0.key);
+      strokeNo++;
+      if (k.n === 1 && dashed && k.h && (isCandleCol(cur) || candleOrig)) part = lfx.plOn ? "pl" : null;
       else if (k.n === 1 && k.h && !greyish(cur) && !isCandleCol(cur)) part = lfx.bracketOn && (lfx.bracketLineColor || lfx.bracketLineW) ? "lvl" : null;   // an order / position line
       else if (k.n === 1 && dashed) part = lfx.chOn ? "ch" : null;
       else if (greyish(cur)) part = lfx.gridOn ? "grid" : null;
@@ -472,9 +476,12 @@
         // each line keeps its own time: in a pane the pointer has left, only the vertical line is still drawn, and an
         // old horizontal position must not light up a second glow there
         const now = performance.now(), m = xhair.get(ctx) || {}, t = ctx.getTransform();
-        if (k.v) { m.x = k.p[0] * (t.a || 1) + t.e; m.xt = now; } else { m.y = k.p[1] * (t.d || 1) + t.f; m.yt = now; }
+        if (k.v) { m.x = k.p[0] * (t.a || 1) + t.e; m.xt = now; m.vs = strokeNo; } else { m.y = k.p[1] * (t.d || 1) + t.f; m.yt = now; m.hs = strokeNo; }
         xhair.set(ctx, m);
-        if (m.x != null && m.y != null && Math.abs((m.xt || 0) - (m.yt || 0)) < 30) {
+        // only where the two crosshair lines cross: they're drawn one right after the other; any other dashed
+        // horizontal line on the chart (a price or level line) must not light up a second glow
+        if (m.x != null && m.y != null && Math.abs((m.xt || 0) - (m.yt || 0)) < 30 && Math.abs((m.vs || 0) - (m.hs || 0)) === 1) {
+          if (window.__bdGlowDebug) window.__bdGlowDebug.push([Math.round(m.x), Math.round(m.y), String(cur)]);   // tests
           const R = 34 * ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1), rgb = rgbKey(pickCol(lfx.chColor, cur)), k3 = rgb ? rgb.key : "255,255,255";
           ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
           const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, R);
@@ -485,6 +492,7 @@
       return true;
     }
     const xhair = new WeakMap();   // canvas ctx -> where this frame's crosshair lines are
+    let strokeNo = 0;              // counts restyled lines, to know which two were drawn back to back
     lineIsCurve = (ctx) => { const k = seg.get(ctx), col = strokeDesc.get.call(ctx); return !!k && !k.ok && k.n >= 3 && typeof col === "string" && !greyish(col) && !isCandleCol(col); };
     lineHook = styleLines;
 

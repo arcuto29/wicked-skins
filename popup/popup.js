@@ -17,7 +17,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
@@ -1302,6 +1302,14 @@ function syncTimer() {
   if (!$("timerOn")) return;
   $("timerOn").checked = !!cfg.timerOn; $("timerMarket").value = cfg.timerMarket || "auto";
   seg("timerPos", [["bl", "Bottom left"], ["bc", "Bottom centre"], ["br", "Bottom right"]], () => (["bl", "bc", "br"].includes(cfg.timerPos) ? cfg.timerPos : "bc"), (v) => set({ timerPos: v, timerOn: true }));
+  seg("timerStyle", [["pill", "Pill"], ["glass", "Glass card"], ["minimal", "Minimal"]], () => cfg.timerStyle || "pill", (v) => set({ timerStyle: v, timerOn: true }));
+  seg("timerShow", [["full", "Status + next"], ["next", "Next only"]], () => cfg.timerShow || "full", (v) => { set({ timerShow: v, timerOn: true }); syncTimer(); });
+  seg("timerFormat", [["in", "Countdown"], ["at", "Clock time"]], () => cfg.timerFormat || "in", (v) => { set({ timerFormat: v, timerOn: true }); syncTimer(); });
+  seg("timerClosed", [["show", "Keep showing"], ["hide", "Hide"]], () => cfg.timerClosed || "show", (v) => { set({ timerClosed: v, timerOn: true }); syncTimer(); });
+  if ($("timerPreview")) {   // what the timer will read, with these choices
+    const when = cfg.timerFormat === "at" ? "at " + new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(2026, 0, 1, 16, 0)) : "in 1h 20m";
+    $("timerPreview").textContent = `Example: \u201c${cfg.timerShow === "next" ? "" : "NY session open \u00B7 "}NY session closes ${when}\u201d${cfg.timerClosed === "hide" ? ". Hidden while the market is closed." : ""}`;
+  }
   seg("sessionSound", SOUND_LEVELS, () => cfg.sessionSound || "off", (v) => { set({ sessionSound: v }); preview("bell", v); });
 }
 if ($("timerOn")) { $("timerOn").onchange = (e) => set({ timerOn: e.target.checked }); $("timerMarket").onchange = (e) => set({ timerMarket: e.target.value, timerOn: true }); }
@@ -1925,7 +1933,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Smoother charts: wallpapers are now drawn in the background, leaving TradingView's thread free",
+const WHATS_NEW = ["Desktop app: TradingView in tabs, opens with your last layouts and keeps you signed in",
+  "Smoother charts: wallpapers are now drawn in the background, leaving TradingView's thread free",
   "nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",
   "TradingView's light theme is readable over your wallpaper, and one tap switches to dark",
   "Candle looks now work on more Lightweight Charts platforms (like nq.vision)",
