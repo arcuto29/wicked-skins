@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.43 (2026-11-04)
+- **Screen recordings no longer start with Chrome's "Choose what to share" window in them.** The first frames of a new screen share still showed the picker closing. Recording now starts about a second later, once the picker is gone and a fresh frame of your screen has arrived. Same in the desktop app.
+
 ## 0.1.42 (2026-11-04)
 - **Fixed on Lightweight Charts platforms (like nq.vision):** Priism could take the platform's white, grey, black or dark-navy drawing for candle colours, then recolour everything drawn in those shades (e.g. black areas turning your down colour). Only colourful candle colours are learned now, and greys / white / black are never treated as candles. Refresh the nq.vision tab once after updating, so the old copy is gone.
 - **More customization on Lightweight Charts platforms:**
