@@ -73,7 +73,34 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
   }
   await tv.screenshot({ path: path.join(OUT, "tradingview-after.png") });
   ok("no page errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+
+  // ---- tabs, like TradingView Desktop ----
+  const bar = app.windows().find((w) => w.url().endsWith("tabs.html"));
+  ok("chart window has a tab bar", !!bar);
+  if (bar) {
+    await bar.screenshot({ path: path.join(OUT, "tabbar.png") }).catch(() => {});
+    const tvPages = () => app.windows().filter((w) => !w.isClosed() && /tradingview\.com\/chart/.test(w.url()));
+    const n0 = tvPages().length;
+    await bar.evaluate(() => window.priismTabs.add());
+    const t2 = await app.waitForEvent("window", { predicate: (w) => /tradingview/.test(w.url()), timeout: 30000 }).catch(() => null);
+    await (t2 || tv).waitForTimeout(12000);
+    ok("+ opens a second chart tab", tvPages().length === n0 + 1, `${n0} -> ${tvPages().length}`);
+    ok("the new tab is skinned too", !!t2 && await t2.evaluate(() => !!document.getElementById("bd-layer")).catch(() => false));
+    ok("the tab you're not looking at pauses its wallpaper", await tv.evaluate(() => window.__bdBackground === true).catch(() => false));
+    const tabsShown = await bar.evaluate(() => document.querySelectorAll(".tab").length);
+    ok("tab bar shows both tabs", tabsShown === 2, String(tabsShown));
+  }
   await app.close();
+  // ---- next launch: your tabs come back ----
+  const desk = (() => { try { return JSON.parse(fs.readFileSync(path.join(userData, "chart-window.json"), "utf8")); } catch { return null; } })();
+  ok("your tabs and window size are saved", !!desk && Array.isArray(desk.tabs) && desk.tabs.length === 2 && !!desk.bounds, JSON.stringify(desk && { tabs: desk.tabs, bounds: desk.bounds }));
+  const app2 = await _electron.launch({ args: [DESK, "--no-sandbox", `--user-data-dir=${userData}`], timeout: 60000 });
+  const s2 = await app2.waitForEvent("window", { predicate: (w) => w.url().includes("popup.html"), timeout: 60000 }).catch(() => app2.windows().find((w) => w.url().includes("popup.html")));
+  if (s2) { await s2.waitForTimeout(1500); await s2.evaluate(() => window.wickedStore.tv.open()); }
+  await new Promise((r) => setTimeout(r, 8000));
+  const back = app2.windows().filter((w) => /tradingview\.com\//.test(w.url())).length;
+  ok("next time: your tabs come back", back === 2, String(back));
+  await app2.close();
   console.log(failed ? `\n${failed} check(s) failed` : "\nall desktop checks passed");
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

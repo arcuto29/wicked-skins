@@ -1,0 +1,45 @@
+<!doctype html>
+<!-- The chart window's tab bar (like TradingView Desktop). Each tab is a real tradingview.com page below this bar,
+     with Priism Skins on it. Ctrl+T new tab, Ctrl+W close, Ctrl+Tab next, Ctrl+1-9 jump. -->
+<html><head><meta charset="utf-8"><title>TradingView · Priism Skins</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #0b0d12; font: 600 12px system-ui, -apple-system, "Segoe UI", sans-serif; color: #cfd5e2; overflow: hidden; user-select: none; }
+  #bar { height: 36px; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; border-bottom: 1px solid #1c2030; -webkit-app-region: drag; }
+  .tab { -webkit-app-region: no-drag; display: flex; align-items: center; gap: 8px; height: 29px; min-width: 60px; max-width: 220px; flex: 0 1 200px;
+    padding: 0 8px 0 12px; border-radius: 9px 9px 0 0; background: #121521; color: #8b93a7; cursor: default; box-sizing: border-box; }
+  .tab:hover { background: #171b29; color: #cfd5e2; }
+  .tab.on { background: #1b2030; color: #f1f4fa; box-shadow: inset 0 2px 0 #2ef2b0; }
+  .tab b { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 700; }
+  .tab .x { width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; opacity: .55; font-size: 13px; }
+  .tab .x:hover { background: #2a3044; opacity: 1; }
+  .btn { -webkit-app-region: no-drag; height: 26px; min-width: 26px; margin-bottom: 2px; border-radius: 7px; display: grid; place-items: center; color: #9aa3b8; cursor: default; padding: 0 8px; }
+  .btn:hover { background: #1b2030; color: #fff; }
+  #plus { font-size: 18px; font-weight: 500; }
+  #spacer { flex: 1; }
+  #skins { gap: 6px; display: flex; align-items: center; font-weight: 700; }
+  #skins i { width: 10px; height: 10px; border-radius: 3px; background: linear-gradient(135deg, #19d3ff, #2ef2b0); }
+</style></head>
+<body>
+  <div id="bar"><div id="tabs" style="display:contents"></div><div class="btn" id="plus" title="New chart tab (Ctrl+T)">+</div>
+    <div id="spacer"></div><div class="btn" id="skins" title="Priism Skins settings (Ctrl+,)"><i></i>Skins</div></div>
+<script>
+  const T = window.priismTabs, box = document.getElementById("tabs");
+  // TradingView's tab titles look like "NQ1! 27,085.25 ▲ +1.25% Unnamed": keep the symbol and the price
+  const short = (t) => { const m = String(t || "").match(/^(\S+)\s+([\d,.]+)/); return m ? `${m[1]}  ${m[2]}` : (t || "TradingView").replace(/\s*[—|-]\s*TradingView.*$/, "") || "TradingView"; };
+  T.onState((st) => {
+    box.innerHTML = "";
+    for (const t of st.tabs) {
+      const el = document.createElement("div"); el.className = "tab" + (t.id === st.active ? " on" : ""); el.title = t.title || "";
+      el.innerHTML = `<b></b><span class="x" title="Close tab (Ctrl+W)">\u2715</span>`; el.querySelector("b").textContent = short(t.title);
+      el.onmousedown = (e) => { if (e.button === 1) { e.preventDefault(); T.close(t.id); } else if (!e.target.classList.contains("x")) T.select(t.id); };
+      el.querySelector(".x").onclick = (e) => { e.stopPropagation(); T.close(t.id); };
+      box.appendChild(el);
+    }
+  });
+  document.getElementById("plus").onclick = () => T.add();
+  document.getElementById("skins").onclick = () => T.settings();
+  document.getElementById("bar").ondblclick = (e) => { if (e.target.id === "bar" || e.target.id === "spacer") T.add(); };
+  T.ready();
+</script>
+</body></html>

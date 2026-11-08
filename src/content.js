@@ -1124,7 +1124,7 @@
     const step = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(step);
-      if (document.hidden || cfg.paused || (cfg.focus && cfg.enabled) || dlgOpen) { last = now; hLast = 0; return; }
+      if (document.hidden || window.__bdBackground || cfg.paused || (cfg.focus && cfg.enabled) || dlgOpen) { last = now; hLast = 0; return; }   // __bdBackground: a desktop-app tab you're not looking at
       const watch = cfg.autoQuality && !cfg.powerSaver && (cfg.fps === "auto" || cfg.fps === "max");
       if (watch) trackHealth(now);
       // Target fps: user setting, power saver, or the current auto-quality cap (whichever is lowest).
