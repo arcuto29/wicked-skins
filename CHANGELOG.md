@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.46 (2026-11-04)
+- **nq.vision: your candle colours and looks now stay on.** They used to show for a couple of seconds after a refresh, then disappear. nq.vision first draws candles in default colours, then switches them to its own grey and black. Priism had also picked up blue and pink that nq.vision draws elsewhere, and took those for the candles, so it never noticed the switch.
+  - Candles are now recognised by their shape: narrow bars spread across the chart that end at different heights. That works for coloured, grey, white or black candles. Volume bars and buttons are ignored, and only the candle bars are recoloured.
+  - Changes show straight away, with no refresh. nq.vision never resizes its chart, so the old "redraw" nudge did nothing there. Priism now sends a tiny mouse-wheel nudge on the chart (and undoes it), which makes it redraw without changing your zoom.
+- **Fixed: two "glow at the pointer" lights.** With more than one chart pane, a second glow stayed in the pane you'd just left. Fixed on TradingView (charts with indicator panes) and on Lightweight Charts platforms.
+- Diagnose on those platforms shows "candles found by shape".
+
 ## 0.1.45 (2026-11-04)
 - **Smoother charts: wallpapers are drawn in the background.** Built-in animated wallpapers now render on a background thread (a worker), so TradingView's own thread is free for the chart: scrolling, drawing tools and order entry. With a heavy wallpaper, TradingView got 1.4–1.7× more free time in tests (10× with Nebula), and wallpapers still run at 60 fps. Snapshots, clips, auto-contrast and every setting work as before. Pages or browsers that don't allow it fall back to the old way automatically.
 - **Fixed for new installs: the first chart had no wallpaper.** On a first install, Priism opens a TradingView chart, and that tab could get the extension twice; the two copies removed each other's wallpaper. Each tab now runs exactly one copy.

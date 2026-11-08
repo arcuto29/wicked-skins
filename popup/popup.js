@@ -1702,7 +1702,7 @@ if ($("bracketDiag")) $("bracketDiag").onclick = async () => {
         `wallpaper ${r.layer ? (r.layer.embedded ? "mounted inside the chart box" : "mounted behind the page") + ` (${r.layer.w}\u00D7${r.layer.h})` : "NOT mounted"}`,
         L && L.candles ? `candle colours set (${L.candles.up}/${L.candles.down})` : "candle colours: not enabled (Style \u2192 Candles)",
         L && L.sides ? `${L.sides.length} candle colours known, learned: ${L.learned.map((x) => x[0] + " " + x[1]).join(", ") || "none yet"}` : "",
-        L && L.mono && L.mono.length ? `grey candles found: ${L.mono.map((x) => x[0] + " " + x[1]).join(", ")}` : "",
+        L && L.mono && L.mono.length ? `candles found by shape: ${L.mono.map((x) => x[0] + " " + x[1]).join(", ")}` : "",
         `${r.canvases} chart canvas(es)`,
         L && L.drawCalls ? `draws: ${L.drawCalls.fillRect || 0} rect, ${L.drawCalls.fill || 0} path, ${L.drawCalls.pathLook || 0} path-looks, ${L.drawCalls.lines || 0} lines` : "",
         L && L.lastTally && L.lastTally.length ? `most drawn: ${L.lastTally.slice(0, 4).map((x) => x[0] + "\u00D7" + x[1]).join(", ")}` : "",
