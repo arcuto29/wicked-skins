@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.38 (2026-11-04)
+- **New wallpaper: Nebula** (Cosmos, Wow). Glowing gas clouds in violet, magenta and a warm orange core, with dark dust lanes, twinkling stars and a few bright stars with spikes. The clouds drift, turn and breathe slowly. It's light to run: the clouds are painted once, so each frame is only a few image draws.
+- **Streamer mode, more control** (Capture → Streamer mode):
+  - **P&L on your trades:** Hidden, Ticks, Points or Dollars.
+    - *Ticks*: dollar amounts become dots, and TradingView's tick and % values stay visible. Set TradingView to show ticks in Settings → Trading.
+    - *Points*: like Ticks, shown as points (e.g. −8 ticks on NQ shows as −2 pts). Works for the common futures (NQ, ES, YM, RTY, CL, GC and their micros, and more). Other symbols stay in ticks.
+  - **The order panel is no longer blurred by default**, so you can still see and use it. Switch on "Blur order panel" if you want it hidden. "Blur account panel" (balance, positions, history) is on by default.
+- **Trade brackets: lot size colour.** Give the quantity pill on your brackets its own colour (Trading → Trade brackets → Lot size colour).
+- **Turning Priism Skins on for a platform takes one click.** Before, Chrome's permission prompt could close the panel before it finished, so you had to click Turn on twice. The background now finishes the job and reloads the tab.
+- **No refresh needed after an update.** Charts that were already open get the new version straight away, and the panel can reach them. Before, the panel couldn't talk to the chart until you refreshed the page.
+- **TradingView's big windows open smoother.** Trade / broker login, Settings, Indicators and Alerts open over a blurred chart. The wallpaper now holds still while one is open, so the blur isn't redone every frame. Small pop-ups don't pause it.
+- **Lightweight Charts platforms (like nq.vision): chart lines.** Grid, crosshair and price-line styling (Style tab) now work there too, not only on TradingView. Wallpaper, candle colours and candle looks already worked. The TradingView tab styles TradingView's own panels, so it can't change a platform's own layout; the panel now says so on those sites.
+- **Clip editor sound:** the button now says "Play sound" until the preview can actually play sound. Before, it said "Sound on" over a silent preview, and the first click muted it again.
+- **Workshop** reloads every time you open it, so newly approved wallpapers and looks show up without closing the panel. When the list is empty it explains that shared items appear after a moderator approves them.
+- **Desktop app:** press Ctrl+, (⌘, on Mac) or F1 in the chart window to bring the Priism Skins settings back to the front.
+
 ## 0.1.37 (2026-11-04)
 - **Desktop app: a full-window design of its own.** Before, it showed the extension's small panel squeezed to the left. The app now has:
   - a sidebar with your chart's status and the on/off switch;

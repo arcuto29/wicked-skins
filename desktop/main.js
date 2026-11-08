@@ -62,6 +62,10 @@ function openTV() {
     return { action: "deny" };
   });
   tvWin.setMenuBarVisibility(false);
+  // No menu bar in the chart window, so Ctrl+, (Cmd+, on Mac) or F1 brings the Priism Skins settings to the front.
+  tvWin.webContents.on("before-input-event", (e, i) => {
+    if (i.type === "keyDown" && ((i.key === "," && (i.control || i.meta)) || i.key === "F1")) { e.preventDefault(); openSettings(); }
+  });
   notifyTV();
 }
 function closeTV() { if (tvWin && !tvWin.isDestroyed()) tvWin.close(); }
@@ -72,7 +76,7 @@ function notifyTV() {
 }
 
 function openSettings() {
-  if (settingsWin && !settingsWin.isDestroyed()) return settingsWin.focus();
+  if (settingsWin && !settingsWin.isDestroyed()) { if (settingsWin.isMinimized()) settingsWin.restore(); settingsWin.show(); return settingsWin.focus(); }
   settingsWin = new BrowserWindow({
     width: 1360, height: 880, minWidth: 1040, minHeight: 680, title: "Priism Skins", icon: ICON, autoHideMenuBar: true, backgroundColor: "#07080c",
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: false },

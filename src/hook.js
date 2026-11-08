@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 7;
+  const HOOK_VERSION = 8;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -74,6 +74,11 @@
     bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
     bracketDebug: false,
     privacy: false,           // Streamer mode: the numbers in TradingView's trade labels are drawn as dots
+    // what Streamer mode does to the P&L in those labels: hide = every number becomes dots; ticks = money becomes dots,
+    // TradingView's tick / % values stay; points = like ticks, but "+8 ticks" is shown as "+2 pts" (needs tickSize);
+    // show = labels untouched (only the panels are blurred)
+    privacyPnl: "hide", tickSize: 0,
+    bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chLabels: false,
@@ -109,6 +114,9 @@
         bracketLineColor: /^#[0-9a-f]{6}$/i.test(f.bracketLineColor || "") ? f.bracketLineColor : "",
         bracketLineW: Math.max(0, Math.min(3, +f.bracketLineW || 0)),
         bracketDebug: !!f.bracketDebug, privacy: !!f.privacy,
+        privacyPnl: ["hide", "ticks", "points", "show"].includes(f.privacyPnl) ? f.privacyPnl : "hide",
+        tickSize: Math.max(0, +f.tickSize || 0),
+        bracketQty: /^#[0-9a-f]{6}$/i.test(f.bracketQty || "") ? f.bracketQty : "",
         gridOn: !!f.gridOn, gridColor: colOpt(f.gridColor), gridAlpha: Math.max(0.03, Math.min(1, f.gridAlpha === undefined ? 0.35 : +f.gridAlpha || 0)),
         gridW: Math.max(0, Math.min(2, +f.gridW || 0)), gridStyle: ["solid", "dotted", "dashed", "none"].includes(f.gridStyle) ? f.gridStyle : "dotted",
         chOn: !!f.chOn, chColor: colOpt(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)),
@@ -129,7 +137,7 @@
     remapCache.clear();
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
-      fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy,
+      fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
       fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
@@ -622,6 +630,22 @@
     pillFill.delete(ctx); return null;     // box unchanged: TradingView's own text already reads on it
   }
   // Streamer mode: a label's number becomes dots (keeping roughly its width, so the label doesn't jump)
+  // Streamer mode, per the chosen P&L option. Money is anything with a currency sign or code.
+  const MONEY_TXT = /[$\u20ac\u00a3\u00a5\u20b9]|\b(USD|EUR|GBP|JPY|AUD|CAD|CHF|USDT|USDC)\b/i;
+  const TICKS_TXT = /([+\-\u2212]?)\s*([\d][\d.,]*)\s*(ticks?|pips?)\b/i;
+  function privText(t) {
+    const m = fx.privacyPnl;
+    if (m === "show") return t;
+    if (m === "hide") return maskNum(t);
+    const s = String(t);
+    if (MONEY_TXT.test(s)) return maskNum(s);
+    if (m === "points" && fx.tickSize > 0) return s.replace(TICKS_TXT, (all, sg, n) => {
+      const v = parseFloat(n.replace(/,/g, "")) * fx.tickSize; if (!isFinite(v)) return all;
+      return `${sg}${+v.toFixed(fx.tickSize < 0.01 ? 5 : fx.tickSize < 1 ? 2 : 0)} pts`; });
+    return s;
+  }
+  // the lot size / quantity pill: a plain whole number, no sign, money or unit
+  const isQty = (t) => /^\s*\d{1,5}(\s*(x|lots?|contracts?|shares?))?\s*$/i.test(String(t));
   const maskNum = (t) => { const s = String(t); return s.replace(/[+\-\u2212]?\s*[$\u20ac\u00a3\u00a5]?\s*[\d][\d.,\s]*/g, (m) => "\u2022".repeat(Math.max(3, Math.min(7, m.replace(/\D/g, "").length)))); };
   function boxSign(col) {
     const r = rgbKey(col); if (!r) return 0; const [R, G, B] = r.key.split(",").map(Number);
@@ -780,8 +804,9 @@
     origFillDesc.set.call(ctx, fill); origFillRect.call(ctx, x, y, w, h);
     if (fx.bracketBorderColor || fx.bracketBorderW > 0) { strokeDesc.set.call(ctx, fx.bracketBorderColor || info.fill || "#ffffff"); ctx.lineWidth = (fx.bracketBorderW + 1) / sx; origStrokeRectRaw.call(ctx, x, y, w, h); }
     // number: profit / loss colour, or your colour, or a readable colour for the box
-    if (fx.privacy) info = { ...info, text: maskNum(info.text) };
-    let col = sign > 0 && fx.bracketProfit ? fx.bracketProfit : sign < 0 && fx.bracketLoss ? fx.bracketLoss : fx.bracketText || "";
+    const qty = isQty(info.text);
+    if (fx.privacy) info = { ...info, text: privText(info.text) };
+    let col = qty && fx.bracketQty ? fx.bracketQty : sign > 0 && fx.bracketProfit ? fx.bracketProfit : sign < 0 && fx.bracketLoss ? fx.bracketLoss : fx.bracketText || "";
     if (!col || lowContrast(col, fill, fx.bracketProfit || fx.bracketLoss || fx.bracketText ? 2.2 : 3)) col = readableOn(fill) || "#ffffff";
     const basePx = +((info.font || "").match(/(\d+(?:\.\d+)?)px/) || [0, 11])[1];
     let px = basePx + fx.bracketSize, font = (info.font || "bold 11px Verdana").replace(/(\d+(?:\.\d+)?)px/, px + "px");
@@ -814,7 +839,8 @@
         const pill = lastPill.get(this);
         if (pill) pill.used = true;
         const sign = pillSign(a[0]) || (pill && pill.sign) || 0;   // "40.75" on a green box = profit
-        if (fx.privacy) a[0] = maskNum(a[0]);                         // Streamer mode: hide the amount, on screen and in recordings
+        const qty = isQty(a[0]);
+        if (fx.privacy) a[0] = privText(a[0]);                        // Streamer mode: hide the amount, on screen and in recordings
         if (!fx.bracketOn) { origText.apply(this, a); return; }
         // remember this pill's row so stroke() can find the level line. Prefer the box centre; else the text's y.
         const rowY = pill && pill.box ? pill.box.y + pill.box.h / 2 : (() => { const t = this.getTransform(); return (a[2] || 0) * (t.d || 1) + t.f; })();
@@ -840,7 +866,8 @@
         }
         // text colour: profit/loss by sign, else a single custom colour, else auto-readable if we changed the box
         let col = "";
-        if (sign > 0 && fx.bracketProfit) col = fx.bracketProfit;
+        if (qty && fx.bracketQty) col = fx.bracketQty;
+        else if (sign > 0 && fx.bracketProfit) col = fx.bracketProfit;
         else if (sign < 0 && fx.bracketLoss) col = fx.bracketLoss;
         else if (fx.bracketText) col = fx.bracketText;
         // never let the number match its box: if the chosen (or TradingView's) colour is too close to the box we

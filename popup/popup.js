@@ -9,7 +9,7 @@ const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="tru
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const CHART_KEYS = ["dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
-const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
+const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -17,7 +17,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
@@ -500,7 +500,7 @@ function renderDesk(open) {
   if (!DESK) return;
   $("deskCard").hidden = false;
   $("deskTitle").textContent = open ? "TradingView is open — skins are on" : "TradingView is closed";
-  $("deskHint").textContent = open ? "Your look is live on the chart." : "Your real TradingView, with your look. Sign in once in that window and your layouts, alerts and broker come with you.";
+  $("deskHint").textContent = open ? `Your look is live on the chart. In the chart window, press ${/Mac/.test(navigator.platform) ? "\u2318," : "Ctrl+,"} to come back here.` : "Your real TradingView, with your look. Sign in once in that window and your layouts, alerts and broker come with you.";
   const btn = $("deskBtn");
   btn.textContent = open ? "Show chart" : "Open TradingView";
   btn.onclick = () => (open ? DESK.open() : DESK.open());   // both focus/open; close is via the chart window
@@ -744,7 +744,7 @@ async function wsLoad(reset) {
     const rows = await W().list(wsSort, wsPage);
     wsItems = reset ? rows : [...wsItems, ...rows];
     $("wsMore").hidden = rows.length < 24;
-    $("wsMsg").textContent = wsItems.length ? "" : "No wallpapers yet. Be the first — submit one on the website!";
+    $("wsMsg").textContent = wsItems.length ? "" : "No approved wallpapers yet. Shared one? It shows here once it's approved: on the website, check \u201cMy uploads\u201d (moderators approve under Review).";
   } catch (e) { $("wsMsg").textContent = "Couldn't load the Workshop: " + e.message; }
   wsRender();
 }
@@ -760,7 +760,7 @@ async function wsLoadLooks(reset) {
     if (wsSort === "mine") {
       const mine = myShared();
       rows = mine.length ? (await W().listLooks("new", 0)).filter((r) => mine.some((m) => m.t === r.title && m.s === r.skin)) : [];
-      $("wsMsg").textContent = rows.length ? "" : "Looks you share appear here once they're approved. Tap \u201cShare my current look\u201d to share one.";
+      $("wsMsg").textContent = rows.length ? "" : mine.length ? `You've shared ${mine.length} look${mine.length === 1 ? "" : "s"}. They appear here once approved (moderators approve them on the website under Review).` : "Looks you share appear here once they're approved. Tap \u201cShare my current look\u201d to share one.";
     } else {
       rows = await W().listLooks(wsSort === "new" ? "new" : "top", wsPage);
       $("wsMsg").textContent = "";
@@ -844,8 +844,10 @@ function initWorkshop() {
   if (!on) return;
   $("wsSubmit").href = WS_SITE() + "workshop.html#submit";
   $("wsReportLink").href = WS_SITE() + "workshop.html";
-  let loaded = false;
-  document.querySelector('#nav [data-tab="workshop"]').addEventListener("click", () => { if (!loaded) { loaded = true; wsLoad(true); } });
+  // Load fresh every time you open the tab (at most every 15 s), so something just approved shows up without
+  // closing the panel; the desktop settings window stays open for hours.
+  let loadedAt = 0;
+  document.querySelector('#nav [data-tab="workshop"]').addEventListener("click", () => { if (Date.now() - loadedAt > 15000) { loadedAt = Date.now(); wsLoad(true); } });
 }
 
 // ---------- saved looks ----------
@@ -1136,7 +1138,7 @@ function renderJournal() {
         a.append(im); row.append(a);
       }
       const meta = document.createElement("div"); meta.className = "jmeta";
-      meta.innerHTML = `<b>${esc(e.sym || "Trade")}</b> <span class="${e.v >= 0 ? "jup" : "jdn"}">${esc(cfg.privacy ? "\u2022\u2022\u2022\u2022\u2022" : fmtMoneyP(e.v, e.unit))}</span><small>${esc(when)} \u00B7 held ${fmtDurP(e.secs || 0)}</small>`;
+      meta.innerHTML = `<b>${esc(e.sym || "Trade")}</b> <span class="${e.v >= 0 ? "jup" : "jdn"}">${esc(cfg.privacy && cfg.privacyPnl !== "show" ? "\u2022\u2022\u2022\u2022\u2022" : fmtMoneyP(e.v, e.unit))}</span><small>${esc(when)} \u00B7 held ${fmtDurP(e.secs || 0)}</small>`;
       const del = document.createElement("button"); del.className = "x"; del.title = "Delete"; del.innerHTML = ICON_X;
       del.onclick = async () => { const cur = (await storeGet({ journal: [] })).journal || []; chrome.storage.local.set({ journal: cur.filter((x) => x.id !== e.id) }, renderJournal); };
       row.append(meta, del); box.append(row);
@@ -1145,10 +1147,20 @@ function renderJournal() {
 }
 // streamer mode + auto trade clips
 function syncExtras() {
-  if ($("privacyOn")) { $("privacyOn").checked = !!cfg.privacy; seg("privacyPeek", [[false, "Stay blurred"], [true, "Clear while pointing"]], () => !!cfg.privacyPeek, (v) => set({ privacyPeek: v })); }
+  if ($("privacyOn")) { $("privacyOn").checked = !!cfg.privacy; seg("privacyPeek", [[false, "Stay blurred"], [true, "Clear while pointing"]], () => !!cfg.privacyPeek, (v) => set({ privacyPeek: v }));
+    seg("privacyPnl", [["hide", "Hidden"], ["ticks", "Ticks"], ["points", "Points"], ["show", "Dollars"]], () => cfg.privacyPnl || "hide", (v) => { set({ privacyPnl: v }); syncPrivHint(); renderJournal(); });
+    $("privacyAcct").checked = cfg.privacyAcct !== false; $("privacyOrder").checked = !!cfg.privacyOrder; syncPrivHint(); }
   if ($("tradeClipOn")) { $("tradeClipOn").checked = !!cfg.tradeClipOn; $("tradeClipLenRow").hidden = !cfg.tradeClipOn;
     seg("tradeClipLen", [[15, "Last 15s"], [30, "Last 30s"], [60, "Last 1 min"]], () => +cfg.tradeClipLen || 30, (v) => set({ tradeClipLen: v })); }
 }
+function syncPrivHint() {
+  const m = cfg.privacyPnl || "hide";
+  $("privacyPnlHint").textContent = m === "hide" ? "Every number in your trade labels becomes dots."
+    : m === "show" ? "Your P&L stays visible in dollars; only the panels you pick below are blurred."
+    : `Dollar amounts become dots; ${m === "points" ? "TradingView's tick values are shown in points (futures we know the tick size of; others stay in ticks)" : "tick and % values stay visible"}. Set TradingView to show ticks: Settings \u203A Trading \u203A P&L in Ticks.`;
+}
+if ($("privacyAcct")) $("privacyAcct").onchange = (e) => set({ privacyAcct: e.target.checked });
+if ($("privacyOrder")) $("privacyOrder").onchange = (e) => set({ privacyOrder: e.target.checked });
 if ($("privacyOn")) $("privacyOn").onchange = (e) => { set({ privacy: e.target.checked }); renderJournal(); };
 if ($("tradeClipOn")) $("tradeClipOn").onchange = (e) => { set({ tradeClipOn: e.target.checked }); syncExtras(); };
 if ($("journalOn")) {
@@ -1529,6 +1541,9 @@ function syncBracket() {
   });
   $("bracketText").value = cfg.bracketText || "#ffffff"; $("bracketText").hidden = textMode !== "custom";
   $("bracketPLRow").hidden = textMode !== "pl";
+  seg("bracketQtyMode", [["keep", "Keep"], ["custom", "Custom"]], () => (cfg.bracketQty ? "custom" : "keep"),
+    (v) => { set({ bracketQty: v === "custom" ? ($("bracketQty").value || "#ffd166") : "" }); bkOn(); });
+  $("bracketQty").value = cfg.bracketQty || "#ffd166"; $("bracketQty").hidden = !cfg.bracketQty;
   $("bracketProfit").value = cfg.bracketProfit || cfg.candleUp || "#00e08a";
   $("bracketLoss").value = cfg.bracketLoss || cfg.candleDown || "#ff3355";
 
@@ -1717,7 +1732,7 @@ async function siteBar() {
   };
   const enabled = await WickedSites.find(origin);
   if (enabled) {
-    return show("on", `On for ${host}`, "Skins, candles and glow are active on this site's charts.", "Turn off", async () => {
+    return show("on", `On for ${host}`, "Wallpaper, candles, candle looks and chart lines (Style tab) work here. The TradingView tab styles TradingView's own panels and menus; this platform's own layout around the chart stays as it is.", "Turn off", async () => {
       await WickedSites.disable(enabled.origin); chrome.tabs.reload(tab.id); window.close();
     });
   }
@@ -1742,8 +1757,12 @@ async function siteBar() {
   } catch {}
   const turnOn = async () => {
     const origins = [origin, ...found.frames];
+    // Chrome's permission prompt often closes this panel before the answer comes back, which is why it used to take
+    // two clicks. So the background worker is told what we're turning on, and finishes the job itself if we're gone.
+    await chrome.storage.local.set({ pendingSite: { origin, frames: found.frames, tabId: tab.id, t: Date.now() } });
     const ok = await chrome.permissions.request({ origins: origins.map((o) => o + "/*") });  // Chrome shows its prompt here
-    if (!ok) { $("siteHint").textContent = "Not turned on: Chrome's permission was declined."; return; }
+    if (!ok) { chrome.storage.local.remove("pendingSite"); $("siteHint").textContent = "Not turned on: Chrome's permission was declined."; return; }
+    await chrome.storage.local.remove("pendingSite");
     await WickedSites.enable(origin, found.frames);
     chrome.tabs.reload(tab.id); window.close();
   };
@@ -1865,17 +1884,16 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Live mood is back: a soft glow around your chart that follows your P&L or the day's move (Trading)",
+const WHATS_NEW = ["New Nebula wallpaper: glowing gas clouds and bright stars (Skins › Cosmos)",
+  "Streamer mode: show P&L as ticks, points or dollars, and the order panel stays usable",
+  "Trade brackets: give the lot size its own colour",
+  "One click to turn on a platform, and no page refresh needed after an update",
+  "Live mood is back: a soft glow around your chart that follows your P&L or the day's move (Trading)",
   "Desktop app: a full-window design, and sign in to your real TradingView account in the chart window",
   "Sound in clips: your voice, your computer's sound (music, videos), or both (Capture › Clip)",
   "Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)",
   "Auto trade clips: a clip of each trade saved when it closes (Trading › After each trade)",
-  "Tidier panel: switched-off sections fold down, and Uploads lives in Skins",
-  "Clip quality options, and instant saving when you don't crop or trim",
-  "Smoother: fixed the brief freezes; trade brackets work with the newer rounded labels",
-  "Community looks: share your whole setup, browse Top / New / Mine (Workshop)",
-  "Crosshair labels in your crosshair colour, plus session breaks and scale borders in Chart styling",
-  "A cleaner, modern panel where every option reads in full"];
+  "Tidier panel: switched-off sections fold down, and Uploads lives in Skins"];
 (function onboarding() {
   let ver = ""; try { ver = chrome.runtime.getManifest().version; } catch {}
   const seen = localStorage.getItem("seenVer");
