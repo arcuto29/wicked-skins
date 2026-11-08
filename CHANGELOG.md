@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.44 (2026-11-04)
+- **Fixed: candles not changing on nq.vision.** Its candles are grey/white and black. Priism ignores those shades on purpose (apps draw text, boxes and backgrounds in them), so they were never recoloured. Now it recognises grey candles by their shape (many narrow bars across the chart) and recolours only those bars. Candle looks work on them too. Text and boxes in the same shades stay as they are.
+- Diagnose shows "grey candles found" when this applies.
+- Releases publish to the Chrome Web Store automatically once the store keys are added (RELEASING.md); the release log says when they're missing.
+
 ## 0.1.43 (2026-11-04)
 - **Screen recordings no longer start with Chrome's "Choose what to share" window in them.** The first frames of a new screen share still showed the picker closing. Recording now starts about a second later, once the picker is gone and a fresh frame of your screen has arrived. Same in the desktop app.
 

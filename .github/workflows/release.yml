@@ -40,8 +40,11 @@ jobs:
           body_path: notes.md
           files: dist/priism-skins-*.zip
       - name: Publish to Chrome Web Store
-        if: env.EXTENSION_ID != '' && env.REFRESH_TOKEN != ''
+        if: env.EXTENSION_ID != '' && env.REFRESH_TOKEN != '' && env.CLIENT_ID != '' && env.PUBLISHER_ID != ''
         run: npx --yes chrome-webstore-upload-cli@4 --source "dist/priism-skins-${GITHUB_REF_NAME#v}.zip"
+      - name: Chrome Web Store not connected yet
+        if: env.EXTENSION_ID == '' || env.REFRESH_TOKEN == '' || env.CLIENT_ID == '' || env.PUBLISHER_ID == ''
+        run: echo "::notice::Not published to the Chrome Web Store - add the CWS_* secrets (see RELEASING.md) and every tag publishes automatically."
 
   desktop:
     needs: extension

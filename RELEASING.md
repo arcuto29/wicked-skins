@@ -33,6 +33,9 @@ that launches the real app against TradingView and uploads screenshots.
    description, privacy policy URL; say it doesn't collect data) and submit for review.
 3. Create API credentials for automatic uploads (Google Cloud OAuth client + refresh token). The
    [chrome-webstore-upload guide](https://github.com/fregante/chrome-webstore-upload-keys) walks through it.
+   With a normal Gmail account choose **External** (not Internal), add yourself as a test user, then on the OAuth
+   consent screen click **Publish app** (to "In production"). Otherwise Google expires the refresh token after 7 days.
+   The **publisher ID** is in the developer dashboard under Account (or in the dashboard's URL).
 4. In GitHub → repo **Settings → Secrets and variables → Actions**, add:
    `CWS_EXTENSION_ID`, `CWS_PUBLISHER_ID`, `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`, `CWS_REFRESH_TOKEN`.
    From then on every tag publishes to the store. (Store review still applies; small updates usually pass within a day.)
