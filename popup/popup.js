@@ -476,6 +476,12 @@ function syncSkinView() {
   if (skinView === "mine") return renderMedia();
   if (skinView === "looks") renderQuick(); else renderSkins();
 }
+// "Use your own wallpaper" links (Wallpapers view, Workshop): open Skins › My uploads
+document.querySelectorAll("[data-goto-mine]").forEach((b) => b.addEventListener("click", () => {
+  skinView = "mine"; localStorage.setItem("skinView", "mine");
+  const t = document.querySelector('#nav button[data-tab="skins"]'); if (t) t.click();
+  syncSkinView();
+}));
 if ($("skinSearch")) $("skinSearch").oninput = () => (skinView === "looks" ? renderQuick() : renderSkins());
 if ($("keepBg")) { $("keepBg").checked = localStorage.getItem("keepBg") === "1"; $("keepBg").onchange = (e) => localStorage.setItem("keepBg", e.target.checked ? "1" : "0"); }
 
@@ -1697,6 +1703,8 @@ if ($("bracketDiag")) $("bracketDiag").onclick = async () => {
         L && L.candles ? `candle colours set (${L.candles.up}/${L.candles.down})` : "candle colours: not enabled (Style \u2192 Candles)",
         L && L.sides ? `${L.sides.length} candle colours known, learned: ${L.learned.map((x) => x[0] + " " + x[1]).join(", ") || "none yet"}` : "",
         `${r.canvases} chart canvas(es)`,
+        L && L.drawCalls ? `draws: ${L.drawCalls.fillRect || 0} rect, ${L.drawCalls.fill || 0} path, ${L.drawCalls.pathLook || 0} path-looks, ${L.drawCalls.lines || 0} lines` : "",
+        L && L.lastTally && L.lastTally.length ? `most drawn: ${L.lastTally.slice(0, 4).map((x) => x[0] + "\u00D7" + x[1]).join(", ")}` : "",
         r.stack && r.stack.length ? `over the chart: ${r.stack.join(" < ")}` : "",
       ].filter(Boolean).join(" \u00B7 ");
       out.textContent = `Lightweight Charts detected. Wallpaper and candle colours are supported here (broker pills are not, that chart has none). ${facts}. If something isn't showing, copy this whole message and send it to me.`;
@@ -1913,7 +1921,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Style your ticker: colour, size, font and glow for the symbol name (Style › Chart lines & ticker)",
+const WHATS_NEW = ["TradingView's light theme is readable over your wallpaper, and one tap switches to dark",
+  "Candle looks now work on more Lightweight Charts platforms (like nq.vision)",
+  "Style your ticker: colour, size, font and glow for the symbol name (Style › Chart lines & ticker)",
   "Trading sounds: a chime at your goal, a warning near your max loss, a ping before the session opens or closes",
   "New Nebula wallpaper: glowing gas clouds and bright stars (Skins › Cosmos)",
   "Streamer mode: show P&L as ticks, points or dollars, and the order panel stays usable",
@@ -1922,8 +1932,7 @@ const WHATS_NEW = ["Style your ticker: colour, size, font and glow for the symbo
   "Live mood is back: a soft glow around your chart that follows your P&L or the day's move (Trading)",
   "Desktop app: a full-window design, and sign in to your real TradingView account in the chart window",
   "Sound in clips: your voice, your computer's sound (music, videos), or both (Capture › Clip)",
-  "Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)",
-  "Auto trade clips: a clip of each trade saved when it closes (Trading › After each trade)"];
+  "Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)"];
 (function onboarding() {
   let ver = ""; try { ver = chrome.runtime.getManifest().version; } catch {}
   const seen = localStorage.getItem("seenVer");

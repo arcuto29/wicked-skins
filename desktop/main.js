@@ -52,6 +52,12 @@ function openTV() {
   tvWin.loadURL("https://www.tradingview.com/chart/");
   tvWin.webContents.on("did-finish-load", inject);
   tvWin.webContents.on("did-navigate-in-page", inject);
+  // After signing in, TradingView lands on its home page: bring you back to your chart.
+  let signingIn = false;
+  tvWin.webContents.on("did-navigate", (_e, url) => {
+    if (/tradingview\.com\/accounts\/signin/.test(url)) signingIn = true;
+    else if (signingIn && /^https:\/\/(www\.)?tradingview\.com\/?(\?.*)?$/.test(url)) { signingIn = false; tvWin.loadURL("https://www.tradingview.com/chart/"); }
+  });
   tvWin.on("closed", () => { tvWin = null; notifyTV(); });
   // links that open new windows (news, help) go to the normal browser
   tvWin.webContents.setWindowOpenHandler(({ url }) => {

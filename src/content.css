@@ -40,6 +40,12 @@
   box-shadow: 0 0 calc(var(--g) * 22px) calc(var(--g) * -2px) currentColor, inset 0 0 calc(var(--g) * 10px) -4px currentColor; }
 
 html.bd-on { background: var(--bd-page-bg, #131722) !important; }
+/* TradingView's LIGHT theme: its menus have dark text and no background of their own (they show the page), so over a
+   wallpaper they'd be unreadable. Give them TradingView's own light background back; the chart stays skinned. */
+html.bd-on.theme-light .layout__area--top,
+html.bd-on.theme-light .layout__area--left,
+html.bd-on.theme-light .layout__area--right,
+html.bd-on.theme-light .layout__area--bottom { background: #ffffff !important; }
 html.bd-on body {
   background: transparent !important;
   --tv-color-pane-background: transparent !important;
