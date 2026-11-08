@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 3;
+  const LW_VERSION = 4;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -86,6 +86,19 @@
         const was = h.style.width, wasMax = h.style.maxWidth;
         h.style.width = (r.width - 1) + "px"; h.style.maxWidth = (r.width - 1) + "px";
         requestAnimationFrame(() => requestAnimationFrame(() => { h.style.width = was; h.style.maxWidth = wasMax; }));
+      }
+      // Apps that never resize their chart (nq.vision) ignore both of those. What always makes Lightweight Charts
+      // redraw is a mouse-wheel event on the chart: we send a ten-thousandth of a notch, then the same back, so the
+      // zoom doesn't change but the whole chart is drawn again, in the new colours.
+      for (const root of document.querySelectorAll(ROOT_SEL)) {
+        let pane = null, area = 0;
+        for (const cv of root.querySelectorAll("canvas")) { const r = cv.getBoundingClientRect(); if (r.width * r.height > area) { area = r.width * r.height; pane = cv; } }
+        if (!pane || area < 200 * 120) continue;
+        const r = pane.getBoundingClientRect(), target = pane.parentElement || pane, at = { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+        try {
+          target.dispatchEvent(new WheelEvent("wheel", { ...at, deltaY: 0.0001 }));
+          requestAnimationFrame(() => { try { target.dispatchEvent(new WheelEvent("wheel", { ...at, deltaY: -0.0001 })); } catch {} });
+        } catch {}
       }
     }, 150);
   }
@@ -194,26 +207,30 @@
   }
 
   const learnedDrawn = new Map();   // colour key -> "up" | "down", learned from what the chart really draws; kept once learned
-  // ---------- grey / white / black candles (some platforms, e.g. nq.vision) ----------
-  // Greys are everywhere in an app (text, boxes, backgrounds), so they're never recoloured by colour alone. Instead we
-  // count, per colour, the candle-SHAPED fills on the chart pane: narrow bars spread across many x positions. If no
-  // colourful candles are found, the two greys drawn that way the most are the candles (brighter = up), and only
-  // candle-shaped fills in those colours are recoloured.
-  const monoTally = new Map();      // colour key -> { n, xs:Set }
-  let monoSides = new Map();        // colour key -> "up" | "down"
-  function noteMono(col, x) {
-    const r = rgbKey(col); if (!r || colourful(r.key) || (r.a !== null && +r.a < 0.6)) return;
-    let m = monoTally.get(r.key); if (!m) { if (monoTally.size > 60) return; m = { n: 0, xs: new Set() }; monoTally.set(r.key, m); }
-    m.n++; if (m.xs.size < 400) m.xs.add(Math.round(x / 2));
+  // ---------- candles recognised by their SHAPE ----------
+  // The reliable way to tell candles apart from everything else an app draws (buttons, markers, text boxes, volume):
+  // candle bodies and wicks are narrow bars spread across many x positions, and they end at many different heights
+  // (volume bars all end at the bottom). Per colour we count those fills on the chart pane; the two colours drawn that
+  // way the most are the candles, whatever they are: coloured, grey, white or black (nq.vision uses grey/black).
+  // Only candle-shaped fills in those colours are recoloured, so the rest of the app is never touched.
+  const shapeTally = new Map();     // colour key -> { n, xs:Set, bs:Set }
+  let shapeSides = new Map();       // colour key -> "up" | "down"
+  function noteShape(col, x, bottom) {
+    const r = rgbKey(col); if (!r || (r.a !== null && +r.a < 0.6)) return;
+    let m = shapeTally.get(r.key); if (!m) { if (shapeTally.size > 80) return; m = { n: 0, xs: new Set(), bs: new Set() }; shapeTally.set(r.key, m); }
+    m.n++; if (m.xs.size < 400) m.xs.add(Math.round(x / 2)); if (m.bs.size < 200) m.bs.add(Math.round(bottom / 3));
   }
-  function learnMono() {
-    const c = [...monoTally].filter(([, m]) => m.n >= 20 && m.xs.size >= 12).sort((a, b) => b[1].n - a[1].n).slice(0, 2);
-    monoTally.clear();
-    if (c.length < 2) return;
-    const lum = (k) => k.split(",").reduce((s, v) => s + +v, 0), [a, b] = c.map(([k]) => k);
-    const next = lum(a) >= lum(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]];
-    if (next.map((x) => x.join()).join("|") !== [...monoSides].map((x) => x.join()).join("|")) { monoSides = new Map(next); repaint(); }
+  function learnShape() {
+    const c = [...shapeTally].filter(([, m]) => m.n >= 20 && m.xs.size >= 12 && m.bs.size >= 8).sort((a, b) => b[1].n - a[1].n).slice(0, 2);
+    lastShape = [...shapeTally].sort((a, b) => b[1].n - a[1].n).slice(0, 5).map(([k, m]) => [k, m.n, m.xs.size, m.bs.size]);
+    shapeTally.clear();
+    if (c.length < 2) return null;
+    const [a, b] = c.map(([k]) => k);
+    if (colourful(a) && colourful(b)) { const dG = (k) => Math.min(Math.abs(hueOf(k) - 140), 360 - Math.abs(hueOf(k) - 140)); return dG(a) <= dG(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]]; }
+    const lum = (k) => k.split(",").reduce((s, v) => s + +v, 0);
+    return lum(a) >= lum(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]];
   }
+  let lastShape = [];
   function learnSides() {
     if (!active) return;
     const best = new Map();
@@ -222,11 +239,16 @@
     for (const [c, s] of DEFAULTS) add(c, s, 0);
     const api = learnFromApi(); for (const [c, s] of api) add(c, s, 3);
     if (!api.length) {
-      for (const [k, s] of learnFromDrawing()) if (colourful(k) && !learnedDrawn.has(k) && learnedDrawn.size < 8) learnedDrawn.set(k, s);
-      for (const [k, s] of learnedDrawn) { if (!colourful(k)) continue; const cur = best.get(k); if (!cur) best.set(k, { side: s, rank: 2, tie: false }); }
-    }
-    // only when there are no colourful candles (learned or from the API) do the grey ones count
-    if (!api.length && ![...learnedDrawn.keys()].some(colourful)) learnMono(); else { monoSides = new Map(); monoTally.clear(); }
+      const sh = learnShape();
+      if (sh) {                                             // found by shape: these are the candles, nothing else
+        const sig = sh.map((x) => x.join()).join("|");
+        if (sig !== [...shapeSides].map((x) => x.join()).join("|")) { shapeSides = new Map(sh); learnedDrawn.clear(); repaint(); }
+      }
+      if (!shapeSides.size) {                               // not found (yet): the older colour-frequency guess
+        for (const [k, s] of learnFromDrawing()) if (colourful(k) && !learnedDrawn.has(k) && learnedDrawn.size < 8) learnedDrawn.set(k, s);
+        for (const [k, s] of learnedDrawn) { if (!colourful(k)) continue; const cur = best.get(k); if (!cur) best.set(k, { side: s, rank: 2, tie: false }); }
+      } else tally.clear();
+    } else { shapeSides = new Map(); shapeTally.clear(); }
     const next = new Map(); for (const [k, v] of best) if (!v.tie) next.set(k, v.side);
     const sig = [...next].sort().join("|");
     if (sig !== sidesSig) { sides = next; sidesSig = sig; cache.clear(); remapCache.clear(); repaint(); }   // new colours learned: the chart has to redraw to show them
@@ -334,11 +356,11 @@
           if (labelBox(this, w, h)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p); return; }
         }
       }
-      if (on && candles && isPaneC(c) && !inLook) {
+      if (on && isPaneC(c) && !inLook) {
         const t = this.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
         if (W > 0 && W <= 60 && H < c.height * 0.8) {
-          noteMono(this.__bdLwOrig, x * (t.a || 1) + t.e);
-          const side = monoSides.size ? monoSides.get((rgbKey(this.__bdLwOrig) || {}).key) : null;
+          noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);
+          const side = candles && shapeSides.size ? shapeSides.get((rgbKey(this.__bdLwOrig) || {}).key) : null;
           if (side) {                                          // a grey / black candle: paint it in your candle colour
             const p = this.fillStyle; fillDesc.set.call(this, side === "up" ? candles.upHex : candles.downHex);
             if (!candleLook(this, c, x, y, w, h)) origFillRect.call(this, x, y, w, h);
@@ -359,14 +381,16 @@
         if (b && labelBox(this, b.w, b.h)) { const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); lastBox.set(this, "xh:" + col); return r; } }
       if (on && c && !inLook && (isAxis(c) || isPaneC(c))) { const b = pbox.get(this); if (b && labelBox(this, b.w, b.h)) { noteBox(this, b.w, b.h);
         if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); return r; } } }
-      if (on && candles && c && !a.length && !inLook) { const b = pbox.get(this);
-        if (b && monoSides.size && isPaneC(c)) {             // grey candles drawn as one-rectangle shapes
+      if (on && c && !a.length && !inLook && isPaneC(c)) { const b = pbox.get(this);
+        if (b) {                                             // candles drawn as one-rectangle shapes
           const t = this.getTransform(), W = Math.abs(b.w * (t.a || 1)), H = Math.abs(b.h * (t.d || 1));
-          if (W > 0 && W <= 60 && H < c.height * 0.8) { noteMono(this.__bdLwOrig, b.x * (t.a || 1) + t.e);
-            const side = monoSides.get((rgbKey(this.__bdLwOrig) || {}).key);
+          if (W > 0 && W <= 60 && H < c.height * 0.8) { noteShape(this.__bdLwOrig, b.x * (t.a || 1) + t.e, Math.max(b.y, b.y + b.h) * (t.d || 1) + t.f);
+            const side = candles && shapeSides.size ? shapeSides.get((rgbKey(this.__bdLwOrig) || {}).key) : null;
             if (side) { const p = this.fillStyle; fillDesc.set.call(this, side === "up" ? candles.upHex : candles.downHex);
               if (!candleLook(this, c, b.x, b.y, b.w, b.h)) origFillP.apply(this, a); fillDesc.set.call(this, p); return; } }
-        } else if (b && isPaneC(c)) { const t = this.getTransform(), W = Math.abs(b.w * (t.a || 1)), H = Math.abs(b.h * (t.d || 1)); if (W > 0 && W <= 60 && H < c.height * 0.8) noteMono(this.__bdLwOrig, b.x * (t.a || 1) + t.e); }
+        }
+      }
+      if (on && candles && c && !a.length && !inLook) { const b = pbox.get(this);
         if (b && candleLook(this, c, b.x, b.y, b.w, b.h)) { drawCalls.pathLook = (drawCalls.pathLook || 0) + 1; return; } }
       if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.fillStyle)) {
         const pB = this.shadowBlur, pC = this.shadowColor;
@@ -445,10 +469,12 @@
       strokeDesc.set.call(ctx, pS); ctx.lineWidth = pLW; ctx.setLineDash(pD); ctx.globalAlpha = pA;
       // Glow at the pointer: once both crosshair lines of this frame are known, a soft light where they cross
       if (part === "ch" && lfx.chGlow) {
+        // each line keeps its own time: in a pane the pointer has left, only the vertical line is still drawn, and an
+        // old horizontal position must not light up a second glow there
         const now = performance.now(), m = xhair.get(ctx) || {}, t = ctx.getTransform();
-        if (now - (m.t || 0) > 40) { m.x = null; m.y = null; }
-        m.t = now; if (k.v) m.x = k.p[0] * (t.a || 1) + t.e; else m.y = k.p[1] * (t.d || 1) + t.f; xhair.set(ctx, m);
-        if (m.x !== null && m.y !== null) {
+        if (k.v) { m.x = k.p[0] * (t.a || 1) + t.e; m.xt = now; } else { m.y = k.p[1] * (t.d || 1) + t.f; m.yt = now; }
+        xhair.set(ctx, m);
+        if (m.x != null && m.y != null && Math.abs((m.xt || 0) - (m.yt || 0)) < 30) {
           const R = 34 * ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1), rgb = rgbKey(pickCol(lfx.chColor, cur)), k3 = rgb ? rgb.key : "255,255,255";
           ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
           const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, R);
@@ -543,7 +569,7 @@
 
   // Diagnostics (read by the panel's Diagnose button): what the adapter currently believes about this page.
   window.__bdLwInfo = () => ({ active, on, candles: candles ? { up: candles.upHex, down: candles.downHex } : null,
-    sides: [...sides].slice(0, 12), learned: [...learnedDrawn], mono: [...monoSides], lastTally: lastTally, canvases: document.querySelectorAll("[data-bd-lwroot] canvas, .tv-lightweight-charts canvas").length, roots: document.querySelectorAll(ROOT_SEL).length,
+    sides: [...sides].slice(0, 12), learned: [...learnedDrawn], mono: [...shapeSides], shape: lastShape, lastTally: lastTally, canvases: document.querySelectorAll("[data-bd-lwroot] canvas, .tv-lightweight-charts canvas").length, roots: document.querySelectorAll(ROOT_SEL).length,
     drawCalls: { ...drawCalls }, lines: lfx });
   const drawCalls = { fillRect: 0, fill: 0, stroke: 0, lines: 0 };
   let lastTally = [];

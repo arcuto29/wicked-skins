@@ -408,10 +408,12 @@
     strokeDesc.set.call(ctx, pS); ctx.lineWidth = pLW; ctx.setLineDash(pD); ctx.globalAlpha = pA;
     // glow at the pointer: once both crosshair lines of this frame are known, a soft light where they cross
     if (part === "ch" && fx.chGlow) {
+      // each line keeps its own time: panes the pointer isn't over only draw the vertical line, and an old horizontal
+      // position there would light up a second glow
       const now = performance.now(), m = xhair.get(ctx) || {};
-      if (now - (m.t || 0) > 40) { m.x = null; m.y = null; }
-      m.t = now; if (vert) m.x = s.x0; else m.y = s.y0; xhair.set(ctx, m);
-      if (m.x !== null && m.y !== null) {
+      if (vert) { m.x = s.x0; m.xt = now; } else { m.y = s.y0; m.yt = now; }
+      xhair.set(ctx, m);
+      if (m.x != null && m.y != null && Math.abs((m.xt || 0) - (m.yt || 0)) < 30) {
         const t = ctx.getTransform(), R = 34 * ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
         ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
         const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, R), rgb = rgbKey(col);
