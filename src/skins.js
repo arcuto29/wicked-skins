@@ -1567,6 +1567,307 @@ function priismSkins(window, document) {
       },
     };
   };
+
+  // ===================== Pack 4: detailed showpieces =====================
+
+  // Koi Pond: looking down into a dark pond. Koi glide slowly (bodies that bend and follow the head, fins, waving
+  // tails, patterned scales), light ripples across the water, lily pads float on top.
+  const koiPond = (ctx) => {
+    let w = 0, h = 0, k = 1, fish = [], pads = null, caust = null, base = null, ripples = [], nextRipple = 3;
+    const PAL = [["#f3efe6", "#ff6328"], ["#ffb42e", "#ff7a1a"], ["#f3efe6", "#17161b"], ["#ff5a1f", "#f3efe6"], ["#ece5d4", "#ffcf3a"], ["#f3efe6", "#ff6328"]];
+    const newFish = (i) => {
+      const L = rnd(95, 150) * k, x = rnd(0.15, 0.85) * w, y = rnd(0.15, 0.85) * h, a = rnd(0, T2);
+      const f = { x, y, a, sp: rnd(18, 30) * k, L, pal: PAL[i % PAL.length], ph: rnd(0, T2), trail: [], spots: [] };
+      for (let j = 0; j < 5; j++) f.spots.push({ u: rnd(0.12, 0.75), side: rnd(-0.6, 0.6), r: rnd(0.12, 0.26) });
+      for (let j = 0; j < 80; j++) f.trail.push([x - Math.cos(a) * j * 2.2 * k, y - Math.sin(a) * j * 2.2 * k]);
+      return f;
+    };
+    // a point a given distance back along the fish's trail (its body follows where its head has been)
+    const along = (tr, d) => { let acc = 0; for (let i = 1; i < tr.length; i++) { const dx = tr[i][0] - tr[i - 1][0], dy = tr[i][1] - tr[i - 1][1], s = Math.hypot(dx, dy); if (acc + s >= d) { const u = s ? (d - acc) / s : 0; return [tr[i - 1][0] + dx * u, tr[i - 1][1] + dy * u]; } acc += s; } return tr[tr.length - 1]; };
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h); fish = Array.from({ length: 6 }, (_, i) => newFish(i)); ripples = [];
+        // light on the water: soft bright patches, drawn small and blurred, then scrolled over the pond
+        base = offscreen(w, h); const bgx = base.getContext("2d"), bg = bgx.createRadialGradient(w * 0.5, h * 0.45, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
+        bg.addColorStop(0, "#0d3c3f"); bg.addColorStop(1, "#03141a"); bgx.fillStyle = bg; bgx.fillRect(0, 0, w, h);
+        caust = offscreen(w / 4, h / 4); const cg = caust.getContext("2d");
+        for (let i = 0; i < 70; i++) glowDot(cg, rnd(0, caust.width), rnd(0, caust.height), rnd(4, 12), "160,240,220", rnd(0.12, 0.3));
+        // lily pads + a few flowers (they don't move)
+        pads = offscreen(w, h); const g = pads.getContext("2d");
+        const pad = (x, y, r, rot) => {
+          g.save(); g.translate(x, y); g.rotate(rot);
+          g.fillStyle = "rgba(0,0,0,0.35)"; g.beginPath(); g.ellipse(5 * k, 8 * k, r, r, 0, 0.18, T2 - 0.18); g.lineTo(5 * k, 8 * k); g.fill();
+          const pg = g.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r); pg.addColorStop(0, "#5d9a4a"); pg.addColorStop(1, "#24502c");
+          g.fillStyle = pg; g.beginPath(); g.arc(0, 0, r, 0.18, T2 - 0.18); g.lineTo(0, 0); g.closePath(); g.fill();
+          g.strokeStyle = "rgba(170,220,140,0.25)"; g.lineWidth = Math.max(1, k * 0.8);
+          for (let i = 0; i < 9; i++) { const an = 0.4 + i * (T2 - 0.8) / 8; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(an) * r * 0.92, Math.sin(an) * r * 0.92); g.stroke(); }
+          g.restore();
+        };
+        const flower = (x, y, r) => {
+          for (let ring = 0; ring < 2; ring++) for (let i = 0; i < 8; i++) {
+            const an = i * T2 / 8 + ring * 0.4, rr = r * (ring ? 0.62 : 1);
+            g.save(); g.translate(x, y); g.rotate(an); const fg = g.createLinearGradient(0, 0, rr, 0); fg.addColorStop(0, "#fff4f8"); fg.addColorStop(1, ring ? "#ff9cc0" : "#ffc4d8");
+            g.fillStyle = fg; g.beginPath(); g.ellipse(rr * 0.5, 0, rr * 0.55, rr * 0.22, 0, 0, T2); g.fill(); g.restore();
+          }
+          glowDot(g, x, y, r * 0.35, "255,220,90", 0.95);
+        };
+        const spots = [[0.08, 0.15], [0.16, 0.24], [0.9, 0.12], [0.85, 0.82], [0.12, 0.85], [0.7, 0.92], [0.95, 0.5], [0.04, 0.55]];
+        for (const [u, v] of spots) pad(u * w, v * h, rnd(34, 58) * k, rnd(0, T2));
+        flower(0.16 * w + 10 * k, 0.24 * h - 6 * k, 15 * k); flower(0.85 * w - 8 * k, 0.82 * h + 4 * k, 13 * k);
+      },
+      frame(t, dt) {
+        ctx.drawImage(base, 0, 0);
+        ctx.globalCompositeOperation = "lighter"; ctx.imageSmoothingEnabled = true;
+        const o1 = (t * 5 * k) % w, o2 = (t * 3.5 * k) % h;
+        ctx.globalAlpha = 0.22; ctx.drawImage(caust, o1, 0, w, h); ctx.drawImage(caust, o1 - w, 0, w, h);
+        ctx.globalAlpha = 0.14; ctx.drawImage(caust, 0, -o2, w, h); ctx.drawImage(caust, 0, h - o2, w, h);
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+        // ripples now and then, where a fish nears the surface
+        nextRipple -= dt;
+        if (nextRipple <= 0) { const f = fish[(Math.random() * fish.length) | 0]; ripples.push({ x: f.x, y: f.y, r: 4 * k, a: 0.35 }); nextRipple = rnd(4, 9); }
+        for (let i = ripples.length - 1; i >= 0; i--) { const r = ripples[i]; r.r += 22 * k * dt; r.a -= 0.06 * dt;
+          if (r.a <= 0) { ripples.splice(i, 1); continue; }
+          ctx.strokeStyle = `rgba(200,255,240,${r.a})`; ctx.lineWidth = 1.2 * k; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, T2); ctx.stroke();
+          ctx.strokeStyle = `rgba(200,255,240,${r.a * 0.5})`; ctx.beginPath(); ctx.arc(r.x, r.y, r.r * 0.7, 0, T2); ctx.stroke(); }
+        for (const f of fish) {
+          // swim: wander gently, turn back towards the middle near the edges
+          const cx = w / 2 - f.x, cy = h / 2 - f.y, edge = Math.min(f.x, w - f.x, f.y, h - f.y) < 0.12 * Math.min(w, h);
+          let turn = Math.sin(t * 0.25 + f.ph) * 0.35 + Math.sin(t * 0.61 + f.ph * 2) * 0.2;
+          if (edge) { const want = Math.atan2(cy, cx); let d = want - f.a; d = Math.atan2(Math.sin(d), Math.cos(d)); turn += d * 1.2; }
+          f.a += turn * dt; f.x += Math.cos(f.a) * f.sp * dt; f.y += Math.sin(f.a) * f.sp * dt;
+          f.trail.unshift([f.x, f.y]); if (f.trail.length > 120) f.trail.length = 120;
+          drawKoi(f, t);
+        }
+        ctx.drawImage(pads, 0, 0);
+      },
+    };
+    function drawKoi(f, t) {
+      const N = 14, P = [], W = f.L * 0.17;
+      for (let i = 0; i <= N; i++) P.push(along(f.trail, (i / N) * f.L * 0.82));
+      const prof = (u) => W * (u < 0.25 ? 0.62 + u * 1.5 : 1.0 - (u - 0.25) * 1.18) * (u > 0.9 ? 0.6 : 1);
+      const side = (s) => P.map((p, i) => { const q = P[Math.min(N, i + 1)], r = P[Math.max(0, i - 1)], ang = Math.atan2(r[1] - q[1], r[0] - q[0]) + Math.PI / 2, wd = prof(i / N) * s;
+        return [p[0] + Math.cos(ang) * wd, p[1] + Math.sin(ang) * wd]; });
+      const L = side(1), R = side(-1);
+      const hd = Math.atan2(P[0][1] - P[1][1], P[0][0] - P[1][0]), nx = P[0][0] + Math.cos(hd) * W * 0.75, ny = P[0][1] + Math.sin(hd) * W * 0.75;
+      const body = (g, dx = 0, dy = 0) => { g.beginPath(); g.moveTo(R[0][0] + dx, R[0][1] + dy); g.quadraticCurveTo(nx + (R[0][0] - P[0][0]) * 0.9 + dx, ny + (R[0][1] - P[0][1]) * 0.9 + dy, nx + dx, ny + dy);
+        g.quadraticCurveTo(nx + (L[0][0] - P[0][0]) * 0.9 + dx, ny + (L[0][1] - P[0][1]) * 0.9 + dy, L[0][0] + dx, L[0][1] + dy);
+        for (let i = 1; i <= N; i++) g.lineTo(L[i][0] + dx, L[i][1] + dy); for (let i = N; i >= 0; i--) g.lineTo(R[i][0] + dx, R[i][1] + dy); g.closePath(); };
+      // tail fan, waving
+      const tip = P[N], pre = P[N - 2], ta = Math.atan2(tip[1] - pre[1], tip[0] - pre[0]) + Math.sin(t * 3 + f.ph) * 0.35, tl = f.L * 0.22;
+      const tail = (g, dx = 0, dy = 0) => { g.beginPath(); g.moveTo(tip[0] + dx, tip[1] + dy);
+        g.quadraticCurveTo(tip[0] + Math.cos(ta - 0.5) * tl * 0.7 + dx, tip[1] + Math.sin(ta - 0.5) * tl * 0.7 + dy, tip[0] + Math.cos(ta - 0.45) * tl + dx, tip[1] + Math.sin(ta - 0.45) * tl + dy);
+        g.quadraticCurveTo(tip[0] + Math.cos(ta) * tl * 0.75 + dx, tip[1] + Math.sin(ta) * tl * 0.75 + dy, tip[0] + Math.cos(ta + 0.45) * tl + dx, tip[1] + Math.sin(ta + 0.45) * tl + dy);
+        g.quadraticCurveTo(tip[0] + Math.cos(ta + 0.5) * tl * 0.7 + dx, tip[1] + Math.sin(ta + 0.5) * tl * 0.7 + dy, tip[0] + dx, tip[1] + dy); g.closePath(); };
+      // shadow on the pond floor
+      ctx.fillStyle = "rgba(0,0,0,0.28)"; body(ctx, 7 * k, 10 * k); ctx.fill(); tail(ctx, 7 * k, 10 * k); ctx.fill();
+      // fins (pectorals, translucent)
+      const hp = P[3], hq = P[5], ha = Math.atan2(hp[1] - hq[1], hp[0] - hq[0]), flap = Math.sin(t * 2.2 + f.ph) * 0.25;
+      ctx.fillStyle = "rgba(255,240,225,0.4)";
+      for (const sgn of [1, -1]) { ctx.save(); ctx.translate(hp[0], hp[1]); ctx.rotate(ha + sgn * (1.9 + flap)); ctx.beginPath(); ctx.ellipse(W * 0.9, 0, W * 0.9, W * 0.38, 0, 0, T2); ctx.fill(); ctx.restore(); }
+      ctx.fillStyle = "rgba(255,230,210,0.55)"; tail(ctx); ctx.fill();
+      // body with its pattern
+      ctx.fillStyle = f.pal[0]; body(ctx); ctx.fill();
+      ctx.save(); body(ctx); ctx.clip(); ctx.fillStyle = f.pal[1];
+      for (const sp of f.spots) { const p = P[Math.round(sp.u * N)], q = P[Math.min(N, Math.round(sp.u * N) + 1)], an = Math.atan2(p[1] - q[1], p[0] - q[0]) + Math.PI / 2, ww = prof(sp.u);
+        ctx.beginPath(); ctx.ellipse(p[0] + Math.cos(an) * ww * sp.side, p[1] + Math.sin(an) * ww * sp.side, ww * sp.r * 4.2, ww * sp.r * 3, an, 0, T2); ctx.fill(); }
+      const sh = ctx.createLinearGradient(L[4][0], L[4][1], R[4][0], R[4][1]); sh.addColorStop(0, "rgba(255,255,255,0.25)"); sh.addColorStop(0.5, "rgba(255,255,255,0)"); sh.addColorStop(1, "rgba(0,0,0,0.25)");
+      ctx.fillStyle = sh; body(ctx); ctx.fill(); ctx.restore();
+      // eyes
+      const e = P[1], ea = Math.atan2(P[0][1] - P[2][1], P[0][0] - P[2][0]) + Math.PI / 2;
+      ctx.fillStyle = "#101014"; for (const sgn of [1, -1]) { ctx.beginPath(); ctx.arc(e[0] + Math.cos(ea) * W * 0.45 * sgn, e[1] + Math.sin(ea) * W * 0.45 * sgn, Math.max(1, 1.4 * k), 0, T2); ctx.fill(); }
+    }
+  };
+
+  // Rain on Glass: a rainy window over a blurred city at night. Drops slide down in little runs, leaving a trail, and
+  // each big drop shows the city upside down inside it, like a real one.
+  const rainGlass = (ctx) => {
+    let w = 0, h = 0, k = 1, city = null, sharp = null, fine = null, trails = null, comp = null, beads = [], drops = [];
+    const C = ["255,170,80", "255,90,80", "90,200,255", "255,230,190", "170,120,255", "255,140,60"];
+    const newDrop = (init) => ({ x: rnd(0, w), y: init ? rnd(0, h) : rnd(-0.1, 0.4) * h, r: rnd(4, 10) * k, vy: 0, wait: rnd(0.5, 6), wob: rnd(0, T2) });
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h);
+        // the city behind the glass: lights, out of focus (drawn once)
+        city = offscreen(w, h); const g = city.getContext("2d");
+        const sg = g.createLinearGradient(0, 0, 0, h); sg.addColorStop(0, "#070b1c"); sg.addColorStop(0.55, "#121434"); sg.addColorStop(1, "#24132a"); g.fillStyle = sg; g.fillRect(0, 0, w, h);
+        g.filter = `blur(${Math.round(6 * k)}px)`;
+        for (let i = 0; i < 110; i++) { const y = h * (0.35 + Math.pow(Math.random(), 0.7) * 0.65), r = rnd(10, 46) * k; bokehDisc(g, rnd(-0.05, 1.05) * w, y, r, C[i % C.length], rnd(0.25, 0.55)); }
+        for (let i = 0; i < 18; i++) { const x = rnd(0, w), y = rnd(0.55, 0.95) * h; g.fillStyle = `rgba(${C[i % C.length]},0.06)`; g.fillRect(x - 30 * k, y, 60 * k, h); }   // light spill on wet streets
+        g.filter = "none";
+        // the same city through clear glass (where a drop has wiped a path): less blur, a touch brighter
+        sharp = offscreen(w, h); const sx = sharp.getContext("2d"); sx.filter = `blur(${Math.max(1, Math.round(1.5 * k))}px) brightness(1.12)`; sx.drawImage(city, 0, 0); sx.filter = "none";
+        sx.globalCompositeOperation = "lighter"; for (let i = 0; i < 60; i++) { const y = h * (0.4 + Math.random() * 0.6); glowDot(sx, rnd(0, w), y, rnd(2, 6) * k, C[i % C.length], 0.5); } sx.globalCompositeOperation = "source-over";
+        // fine droplets all over the glass (drawn once)
+        fine = offscreen(w, h); const f = fine.getContext("2d");
+        f.fillStyle = "rgba(150,160,195,0.09)"; f.fillRect(0, 0, w, h);   // mist on the glass
+        const n = Math.round(900 * Math.min(2.2, (w * h) / (1280 * 720)));
+        for (let i = 0; i < n; i++) {
+          const x = rnd(0, w), y = rnd(0, h), r = rnd(0.6, 2.4) * k;
+          f.fillStyle = "rgba(255,255,255,0.07)"; f.beginPath(); f.ellipse(x, y, r, r * 1.1, 0, 0, T2); f.fill();
+          f.fillStyle = "rgba(0,0,0,0.22)"; f.beginPath(); f.ellipse(x, y + r * 0.35, r * 0.9, r * 0.7, 0, 0, Math.PI); f.fill();
+          f.fillStyle = "rgba(255,255,255,0.45)"; f.fillRect(x - r * 0.35, y - r * 0.45, Math.max(0.7, r * 0.3), Math.max(0.7, r * 0.3));
+        }
+        trails = offscreen(w, h); comp = offscreen(w, h); beads = [];
+        drops = Array.from({ length: Math.round(16 + 10 * Math.min(2, (w * h) / (1280 * 720))) }, () => newDrop(true));
+      },
+      frame(t, dt) {
+        ctx.drawImage(city, 0, 0);
+        // the trails fade slowly (the glass beads up again)
+        const tg = trails.getContext("2d"); tg.globalCompositeOperation = "destination-out"; tg.fillStyle = `rgba(0,0,0,${Math.min(1, 0.12 * dt)})`; tg.fillRect(0, 0, w, h); tg.globalCompositeOperation = "source-over";
+        for (let i = 0; i < drops.length; i++) {
+          const d = drops[i];
+          if (d.vy === 0) { d.wait -= dt; if (d.wait <= 0) d.vy = rnd(50, 140) * k; }
+          else {
+            d.y += d.vy * dt; d.x += Math.sin(t * 3 + d.wob) * 6 * k * dt; d.vy *= 1 - 0.6 * dt;
+            tg.fillStyle = "rgba(255,255,255,0.9)"; tg.beginPath(); tg.ellipse(d.x, d.y - d.r * 0.6, d.r * 0.72, d.r * 1.1, 0, 0, T2); tg.fill();   // the clear path it wipes
+            if (Math.random() < 5 * dt && beads.length < 260) beads.push({ x: d.x + rnd(-0.5, 0.5) * d.r, y: d.y - d.r * 2, r: d.r * rnd(0.18, 0.34), life: 1 });   // tiny beads left behind
+            if (d.vy < 12 * k) { d.vy = 0; d.wait = rnd(1, 5); }
+          }
+          if (d.y - d.r > h) drops[i] = newDrop(false);
+        }
+        // the wiped paths show the city sharper; the misted glass (fine droplets) only where it hasn't been wiped
+        const cg = comp.getContext("2d"); cg.globalCompositeOperation = "copy"; cg.drawImage(trails, 0, 0); cg.globalCompositeOperation = "source-in"; cg.drawImage(sharp, 0, 0);
+        ctx.drawImage(fine, 0, 0); cg.globalCompositeOperation = "source-over"; ctx.drawImage(comp, 0, 0);
+        for (let i = beads.length - 1; i >= 0; i--) { const b = beads[i]; b.life -= dt * 0.1; if (b.life <= 0) { beads.splice(i, 1); continue; }
+          ctx.fillStyle = `rgba(0,0,0,${0.3 * b.life})`; ctx.beginPath(); ctx.arc(b.x, b.y + b.r * 0.3, b.r, 0, T2); ctx.fill();
+          ctx.fillStyle = `rgba(255,255,255,${0.5 * b.life})`; ctx.beginPath(); ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.4, 0, T2); ctx.fill(); }
+        // the big drops: a tiny upside-down city inside each, a dark rim at the bottom, a bright glint at the top
+        for (const d of drops) {
+          const rx = d.r, ry = d.r * (d.vy > 0 ? 1.25 : 1.1);
+          ctx.save(); ctx.beginPath(); ctx.ellipse(d.x, d.y, rx, ry, 0, 0, T2); ctx.clip();
+          const S = d.r * 7; ctx.translate(d.x, d.y); ctx.scale(1, -1);
+          ctx.drawImage(city, Math.max(0, d.x - S), Math.max(0, d.y - S), S * 2, S * 2, -rx * 1.15, -ry * 1.15, rx * 2.3, ry * 2.3);
+          ctx.restore();
+          ctx.strokeStyle = "rgba(0,0,0,0.38)"; ctx.lineWidth = Math.max(1, d.r * 0.22); ctx.beginPath(); ctx.ellipse(d.x, d.y, rx, ry, 0, 0.15, Math.PI - 0.15); ctx.stroke();
+          ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.ellipse(d.x - rx * 0.35, d.y - ry * 0.45, rx * 0.22, ry * 0.16, -0.6, 0, T2); ctx.fill();
+        }
+      },
+    };
+  };
+
+  // Ringed Giant: a huge ringed planet rising in the corner of deep space: banded clouds, the rings' shadow on the
+  // planet, a soft atmosphere, stars, a faint nebula, and a small moon drifting across very slowly.
+  const ringedGiant = (ctx) => {
+    let w = 0, h = 0, k = 1, st = [], planet = null, px = 0, py = 0, neb = [];
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h); st = starsOf(w, h, 260, k);
+        neb = Array.from({ length: 5 }, (_, i) => ({ x: rnd(0, 0.6) * w, y: rnd(0, 0.6) * h, r: rnd(0.2, 0.4) * Math.max(w, h), c: ["80,60,160", "40,90,170", "120,50,130"][i % 3] }));
+        const R = Math.min(w, h) * 0.42, S = Math.ceil(R * 5.2);
+        planet = offscreen(S, S); const g = planet.getContext("2d"), c = S / 2; px = w * 0.8 - c; py = h * 0.7 - c;
+        const TILT = -0.3, RY = 0.3;
+        const ringsAt = (gg) => {   // the rings: many thin bands with gaps, in the planet's colours
+          gg.save(); gg.translate(c, c); gg.rotate(TILT); gg.scale(1, RY);
+          for (let r = R * 1.22; r < R * 2.35; r += R * 0.012) {
+            const u = (r - R * 1.22) / (R * 1.13), gap = Math.abs(u - 0.58) < 0.035 || Math.abs(u - 0.86) < 0.012;
+            if (gap) continue;
+            const a = (0.22 + 0.5 * Math.abs(Math.sin(u * 31) * Math.sin(u * 7.3))) * (u < 0.1 ? u * 10 : 1) * (u > 0.94 ? (1 - u) * 16 : 1);
+            gg.strokeStyle = `rgba(${(220 + 20 * Math.sin(u * 9)) | 0},${(196 + 22 * Math.sin(u * 13)) | 0},${(158 + 20 * Math.sin(u * 5)) | 0},${a})`;
+            gg.lineWidth = R * 0.014; gg.beginPath(); gg.arc(0, 0, r, 0, T2); gg.stroke();
+          }
+          gg.restore();
+        };
+        ringsAt(g);                                            // the rings behind the planet
+        // the planet: cloud bands, then night side, then atmosphere
+        g.save(); g.beginPath(); g.arc(c, c, R, 0, T2); g.clip(); g.translate(c, c); g.rotate(TILT);
+        for (let y = -R; y < R; y += R * 0.02) {
+          const u = (y + R) / (2 * R), n = Math.sin(u * 37) * 0.5 + Math.sin(u * 91) * 0.25 + Math.sin(u * 13) * 0.35;
+          g.fillStyle = `rgb(${(204 + 30 * n) | 0},${(168 + 26 * n) | 0},${(120 + 24 * n) | 0})`; g.fillRect(-R * 1.5, y, R * 3, R * 0.022);
+        }
+        g.fillStyle = "rgba(160,110,70,0.35)"; g.beginPath(); g.ellipse(R * 0.25, -R * 0.42, R * 0.16, R * 0.06, 0, 0, T2); g.fill();   // a storm
+        g.fillStyle = "rgba(20,14,10,0.42)"; g.save(); g.scale(1, RY); g.beginPath(); g.arc(0, R * 0.9 / RY * 0.12, R * 1.9, Math.PI * 1.02, Math.PI * 1.98); g.lineWidth = R * 0.32 / RY * 0.25; g.strokeStyle = "rgba(20,14,10,0.35)"; g.stroke(); g.restore();   // the rings' shadow
+        g.restore();
+        const sh = g.createLinearGradient(c + R * 0.7, c - R * 0.7, c - R * 0.8, c + R * 0.8); sh.addColorStop(0, "rgba(0,0,0,0)"); sh.addColorStop(0.45, "rgba(0,0,0,0.25)"); sh.addColorStop(0.75, "rgba(2,3,10,0.88)"); sh.addColorStop(1, "rgba(2,3,10,0.97)");
+        g.fillStyle = sh; g.beginPath(); g.arc(c, c, R, 0, T2); g.fill();
+        const at = g.createRadialGradient(c, c, R * 0.96, c, c, R * 1.06); at.addColorStop(0, "rgba(255,220,170,0)"); at.addColorStop(0.5, "rgba(255,214,160,0.3)"); at.addColorStop(1, "rgba(255,214,160,0)");
+        g.fillStyle = at; g.beginPath(); g.arc(c, c, R * 1.06, 0, T2); g.fill();
+        // the front half of the rings, over the planet
+        // clipped to the planet disc so the rings outside it are not drawn twice
+        g.save(); g.beginPath(); g.arc(c, c, R * 1.01, 0, T2); g.clip(); g.translate(c, c); g.rotate(TILT); g.beginPath(); g.rect(-S, 0, S * 2, S); g.setTransform(1, 0, 0, 1, 0, 0); g.clip(); ringsAt(g); g.restore();
+      },
+      frame(t) {
+        sky(ctx, w, h, [[0, "#02030a"], [1, "#070815"]]);
+        for (const n of neb) glowDot(ctx, n.x, n.y, n.r, n.c, 0.07);
+        drawStars(ctx, st, t, 0.7);
+        // a small moon crossing very slowly (about four minutes)
+        const mu = (t * 0.004) % 1, mx = w * (-0.05 + mu * 1.1), my = h * (0.18 + 0.08 * Math.sin(mu * Math.PI)), mr = Math.min(w, h) * 0.018;
+        ctx.fillStyle = "#cfcac2"; ctx.beginPath(); ctx.arc(mx, my, mr, 0, T2); ctx.fill();
+        ctx.fillStyle = "rgba(2,3,10,0.82)"; ctx.beginPath(); ctx.arc(mx - mr * 0.45, my + mr * 0.45, mr * 1.05, 0, T2); ctx.fill();
+        ctx.drawImage(planet, px + Math.sin(t * 0.02) * 6 * k, py + Math.cos(t * 0.017) * 4 * k);
+      },
+    };
+  };
+
+  // Deep Blue: a giant manta ray gliding slowly through the deep ocean, under shifting sunbeams, with marine snow
+  // drifting down and the odd stream of bubbles.
+  const deepBlue = (ctx) => {
+    let w = 0, h = 0, k = 1, snow = [], bubbles = [], beams = null;
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h);
+        snow = Array.from({ length: 160 }, () => ({ x: rnd(0, w), y: rnd(0, h), r: rnd(0.5, 1.8) * k, s: rnd(3, 10) * k, p: rnd(0, T2), a: rnd(0.15, 0.5) }));
+        bubbles = [];
+        // sunbeams, drawn once at half size and blurred so their edges are soft; swayed each frame with a skew
+        beams = [0, 1].map((layer) => { const B = offscreen(Math.ceil(w * 0.75), Math.ceil(h / 2)), g = B.getContext("2d"), bw = B.width, bh = B.height;
+          g.filter = `blur(${Math.round(10 * k)}px)`;
+          for (let i = 0; i < 6; i++) { const x = rnd(0, bw), top = rnd(6, 20) * k, bot = rnd(30, 80) * k, a = rnd(0.12, 0.24) * (layer ? 0.7 : 1);
+            const gr = g.createLinearGradient(0, 0, 0, bh); gr.addColorStop(0, `rgba(170,230,255,${a})`); gr.addColorStop(0.7, `rgba(170,230,255,${a * 0.25})`); gr.addColorStop(1, "rgba(170,230,255,0)");
+            g.fillStyle = gr; g.beginPath(); g.moveTo(x - top, -10); g.lineTo(x + top, -10); g.lineTo(x + bot + bh * 0.15, bh); g.lineTo(x - bot + bh * 0.15, bh); g.closePath(); g.fill(); }
+          g.filter = "none"; return B; });
+      },
+      frame(t, dt) {
+        sky(ctx, w, h, [[0, "#0b5f8e"], [0.45, "#063758"], [1, "#010c1c"]]);
+        // sunbeams from the surface, swaying
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < 2; i++) {
+          const sk = Math.sin(t * (0.09 + i * 0.05) + i * 2) * 0.12, x0 = -w * 0.15 + (i ? w * 0.12 : 0);
+          ctx.globalAlpha = 0.75 + 0.25 * Math.sin(t * (0.3 + i * 0.17) + i); ctx.save(); ctx.transform(1, 0, sk, 1, 0, 0);
+          ctx.drawImage(beams[i], x0, 0, w * 1.3, h); ctx.restore();
+        }
+        ctx.globalAlpha = 1;
+        // the shimmer of the surface at the top
+        const sg = ctx.createLinearGradient(0, 0, 0, h * 0.08); sg.addColorStop(0, "rgba(200,245,255,0.18)"); sg.addColorStop(1, "rgba(200,245,255,0)"); ctx.fillStyle = sg; ctx.fillRect(0, 0, w, h * 0.08);
+        ctx.globalCompositeOperation = "source-over";
+        // marine snow
+        for (const s of snow) { s.y += s.s * dt; s.x += Math.sin(t * 0.3 + s.p) * 3 * k * dt; if (s.y > h) { s.y = -2; s.x = rnd(0, w); }
+          ctx.fillStyle = `rgba(210,240,255,${s.a})`; ctx.fillRect(s.x, s.y, s.r, s.r); }
+        // the manta: a long slow loop across the scene, gently banking, wings beating slowly
+        const u = t * 0.035 + 0.6, x = w * 0.5 + Math.cos(u) * w * 0.4, y = h * 0.52 + Math.sin(u * 2) * h * 0.14;
+        const vx = -Math.sin(u) * w * 0.4, vy = Math.cos(u * 2) * h * 0.28, head = Math.atan2(vy, vx), depth = 0.82 + 0.18 * Math.sin(u + 1.3);
+        drawManta(x, y, head, depth, t);
+        // bubbles: a stream now and then from below
+        if (Math.random() < dt * 0.25) { const bx = rnd(0.1, 0.9) * w; for (let i = 0; i < 6; i++) bubbles.push({ x: bx + rnd(-8, 8) * k, y: h + i * 18 * k, r: rnd(1.5, 4) * k, s: rnd(28, 46) * k, p: rnd(0, T2) }); }
+        for (let i = bubbles.length - 1; i >= 0; i--) { const b = bubbles[i]; b.y -= b.s * dt; b.x += Math.sin(t * 2 + b.p) * 10 * k * dt; if (b.y < -10) { bubbles.splice(i, 1); continue; }
+          ctx.strokeStyle = "rgba(210,245,255,0.5)"; ctx.lineWidth = Math.max(1, 0.8 * k); ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, T2); ctx.stroke();
+          ctx.fillStyle = "rgba(255,255,255,0.6)"; ctx.fillRect(b.x - b.r * 0.4, b.y - b.r * 0.5, Math.max(1, b.r * 0.35), Math.max(1, b.r * 0.35)); }
+      },
+    };
+    function drawManta(x, y, a, depth, t) {
+      const L = Math.min(w, h) * 0.27 * depth, W = L * 2.1, flap = Math.sin(t * 0.9), tipY = W * 0.5 * (0.86 + 0.14 * flap), tipX = -L * 0.3 + flap * L * 0.06;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+      const body = () => { ctx.beginPath(); ctx.moveTo(L * 0.42, 0);
+        ctx.bezierCurveTo(L * 0.38, -W * 0.18, L * 0.1, -tipY * 0.8, tipX, -tipY);
+        ctx.bezierCurveTo(-L * 0.12, -tipY * 0.7, -L * 0.3, -W * 0.16, -L * 0.36, 0);
+        ctx.bezierCurveTo(-L * 0.3, W * 0.16, -L * 0.12, tipY * 0.7, tipX, tipY);
+        ctx.bezierCurveTo(L * 0.1, tipY * 0.8, L * 0.38, W * 0.18, L * 0.42, 0); ctx.closePath(); };
+      // a soft dark halo, then the body: dark on top, lit along its leading edges
+      ctx.shadowColor = "rgba(0,8,20,0.6)"; ctx.shadowBlur = 24 * k;
+      const g = ctx.createLinearGradient(L * 0.4, 0, -L * 0.4, 0); g.addColorStop(0, "#1a3d5e"); g.addColorStop(0.5, "#0d243c"); g.addColorStop(1, "#08182a");
+      ctx.fillStyle = g; body(); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.strokeStyle = "rgba(150,210,240,0.22)"; ctx.lineWidth = Math.max(1, 1.4 * k); body(); ctx.stroke();
+      // the raised body down the middle, lit from above
+      const bg = ctx.createLinearGradient(0, -W * 0.12, 0, W * 0.12); bg.addColorStop(0, "rgba(120,180,220,0.10)"); bg.addColorStop(0.5, "rgba(40,80,120,0.18)"); bg.addColorStop(1, "rgba(0,0,0,0.25)");
+      ctx.fillStyle = bg; ctx.beginPath(); ctx.ellipse(-L * 0.02, 0, L * 0.4, W * 0.11, 0, 0, T2); ctx.fill();
+      // cephalic fins: two horns pointing forward from the wide head
+      ctx.fillStyle = "#0f2a44";
+      for (const s of [1, -1]) { ctx.beginPath(); ctx.moveTo(L * 0.36, s * L * 0.06); ctx.quadraticCurveTo(L * 0.56, s * L * 0.08, L * 0.6, s * L * 0.14); ctx.quadraticCurveTo(L * 0.5, s * L * 0.17, L * 0.34, s * L * 0.13); ctx.closePath(); ctx.fill(); }
+      ctx.strokeStyle = "#0b2036"; ctx.lineWidth = Math.max(1, 2 * k * depth); ctx.beginPath(); ctx.moveTo(-L * 0.34, 0);
+      ctx.quadraticCurveTo(-L * 0.7, Math.sin(t * 1.2) * L * 0.08, -L * 1.05, Math.sin(t * 1.2 + 1) * L * 0.12); ctx.stroke();
+      // faint pale markings on the back
+      ctx.fillStyle = "rgba(190,225,245,0.08)"; for (const s of [1, -1]) { ctx.beginPath(); ctx.moveTo(L * 0.22, s * W * 0.1); ctx.quadraticCurveTo(L * 0.02, s * W * 0.17, -L * 0.14, s * W * 0.3); ctx.quadraticCurveTo(L * 0.0, s * W * 0.2, L * 0.12, s * W * 0.1); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+    }
+  };
   // ---------- a wallpaper's colours ----------
   // From RGBA pixel data: the strongest hue (accent) and a readable up / down candle pair. Used by the chart (auto
   // contrast, Skin colour, Auto-match) and by the panel's "Match everything".
@@ -1694,6 +1995,11 @@ function priismSkins(window, document) {
     helix:       { name: "Double Helix",   cat: "Wild",     create: helix, wow: true },
     synapse:     { name: "Synapse",        cat: "Electric", create: synapse, wow: true },
     nebulacore:  { name: "Nebula",         cat: "Cosmos",   create: nebulaCore, wow: true },
+    // pack 4: detailed showpieces
+    koi:         { name: "Koi Pond",       cat: "Chill",    create: koiPond, wow: true },
+    rainglass:   { name: "Rain on Glass",  cat: "Urban",    create: rainGlass, wow: true },
+    ringed:      { name: "Ringed Giant",   cat: "Cosmos",   create: ringedGiant, wow: true },
+    deepblue:    { name: "Deep Blue",      cat: "Chill",    create: deepBlue, wow: true },
     // seasonal drops (featured in their month by the panel)
     christmas:   { name: "Christmas Eve",  cat: "Seasonal", create: christmas, season: "christmas" },
     treelights:  { name: "Tree Lights",    cat: "Seasonal", create: treeLights, season: "christmas" },

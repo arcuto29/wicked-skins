@@ -6,6 +6,12 @@
   - **Winter Village:** snowy rooftops at night, warm lit windows, chimney smoke drifting up, snowfall and a crescent moon. Look: **Silent Night** (ice candles).
   - **Northern Noel:** northern lights rippling over snowy hills, pines and a little cabin with a warm window. Look: **Northern Noel** (glass candles).
   - That's 4 Christmas wallpapers plus Hallows Night. In December the Skins card offers Christmas Spirit and points you to the others.
+- **Four new Wow wallpapers**, each with its own one-tap look (Skins → Wow, Looks → Wow):
+  - **Koi Pond:** six koi seen from above, swimming with real body bends, waving tails and fins, each with its own pattern (kohaku, showa, yamabuki and more). Light ripples over the water, the odd ring spreads where a fish nears the surface, and lily pads with pink flowers float on top. Look: **Koi Pond** (3D candles).
+  - **Rain on Glass:** a rainy window over a blurred city at night. The glass is misted; drops slide down in little runs and wipe a clear streak where you see the city sharper, leaving tiny beads behind. Each big drop shows the city upside down inside it. Look: **Rainy Night** (glass candles).
+  - **Ringed Giant:** a huge ringed planet rising in the corner of deep space: banded clouds and a storm, the rings' shadow across it, the near side of the rings passing in front, a soft atmosphere and a small moon drifting across. Look: **Ringed Giant** (holo candles).
+  - **Deep Blue:** a manta ray gliding slowly through the deep ocean under soft swaying sunbeams, with marine snow and the odd stream of bubbles. Look: **Deep Blue** (ice candles).
+  - All four draw off the chart's thread like the other wallpapers, so the chart stays smooth.
 
 ## 0.1.50 (2026-11-04)
 - **Seasonal drops.** Two new wallpapers, each with a matching one-tap look:
