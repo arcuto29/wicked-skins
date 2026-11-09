@@ -31,7 +31,7 @@ const DEFAULTS = {
   bracketOn: false, bracketSize: 1, bracketBack: "keep",
   bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
   bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
-  goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false, clipMode: "chart", clipFps: 30,
+  goalOn: false, goalGuard: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false, clipMode: "chart", clipFps: 30,
 };
 let cfg = { ...DEFAULTS };
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
@@ -1114,12 +1114,14 @@ const storeGet = (defaults) => new Promise((res) => { try { chrome.storage.local
 // Trading sounds (src/sounds.js): picking Soft or Loud plays the sound once so you know what you'll hear.
 const SOUND_LEVELS = [["off", "Off"], ["soft", "Soft"], ["loud", "Loud"]];
 const preview = (kind, level) => { try { window.PriismSounds && window.PriismSounds.play(kind, level); } catch {} };
+if ($("goalGuard")) $("goalGuard").onchange = (e) => set({ goalGuard: e.target.checked, goalOn: cfg.goalOn || e.target.checked });
 function syncGoal() {
   if (!$("goalOn")) return;
   $("goalOn").checked = !!cfg.goalOn;
   if (document.activeElement !== $("goalTarget")) $("goalTarget").value = cfg.goalTarget;
   if (document.activeElement !== $("goalLimit")) $("goalLimit").value = cfg.goalLimit;
   seg("goalPos", [["bl", "Bottom left"], ["tl", "Top left"], ["tc", "Top"]], () => cfg.goalPos || "bl", (v) => set({ goalPos: v }));
+  if ($("goalGuard")) $("goalGuard").checked = !!cfg.goalGuard;
   seg("goalSound", SOUND_LEVELS, () => cfg.goalSound || "off", (v) => { set({ goalSound: v }); preview("goal", v); });
   storeGet({ dayPnl: null }).then((s) => {
     const d = s.dayPnl && s.dayPnl.date === dayKeyP() ? s.dayPnl : null;
@@ -1933,7 +1935,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Desktop app: TradingView in tabs, opens with your last layouts and keeps you signed in",
+const WHATS_NEW = ["Focus guard: lock trading for the day at your max loss (Trading › Daily goal & limit)",
+  "Desktop app: TradingView in tabs, opens with your last layouts and keeps you signed in",
   "Smoother charts: wallpapers are now drawn in the background, leaving TradingView's thread free",
   "nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",
   "TradingView's light theme is readable over your wallpaper, and one tap switches to dark",

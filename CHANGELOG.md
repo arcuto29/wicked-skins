@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.48 (2026-11-04)
+- **Focus guard** (Trading → Daily goal & limit → Lock trading at max loss; off by default).
+  - Once today's loss reaches your max loss, TradingView's order panel and the chart's Buy / Sell buttons dim and can't be clicked.
+  - A calm "Done for today" card shows your limit. No flashing and no alarms (the optional limit sound is separate).
+  - To trade anyway, **hold Unlock for 3 seconds**. A short press does nothing, so it's a moment to think, not a wall. Unlocking lasts for the rest of today.
+  - Every TradingView tab locks and unlocks together, and it resets the next day.
+  - It works from the P&L your chart shows, like the daily bar. It's a nudge, not a block at your broker: orders placed elsewhere (your broker's app, another platform) aren't affected.
+
 ## 0.1.47 (2026-11-04)
 - **Desktop app: TradingView in tabs, like TradingView Desktop.**
   - The chart window has a tab bar. **+** (or Ctrl+T) opens another chart, Ctrl+W closes one, Ctrl+Tab and Ctrl+1–9 switch. Chart links open as a new tab. Every tab is skinned.

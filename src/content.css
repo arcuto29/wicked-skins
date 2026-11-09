@@ -286,3 +286,26 @@ html.bd-peek [class*="layout__area--tradingpanel"]:hover,
 html.bd-peek [data-name="account-manager"]:hover,
 html.bd-peek [data-name="order-panel"]:hover { filter: none !important; }
 html.bd-priv-money #bd-goal .bd-g-fill { opacity: 0 !important; }   /* the fill would show how close you are to your goal */
+
+/* Focus guard (Trading → Daily goal & limit): at your max loss, TradingView's order panel and the chart's Buy / Sell
+   buttons are dimmed and can't be clicked until you hold "Unlock" for 3 seconds. Calm on purpose: no flashing. */
+html.bd-guard [data-name="buy-sell-buttons"],
+html.bd-guard [data-name="order-panel"],
+html.bd-guard [class*="layout__area--tradingpanel"] { pointer-events: none !important; filter: grayscale(1) opacity(.35) !important; transition: filter .6s; }
+#bd-guard { position: fixed; z-index: 2147483002; transform: translateX(-50%); width: min(340px, 86vw); box-sizing: border-box; padding: 16px 18px 14px;
+  border-radius: 16px; background: linear-gradient(160deg, rgba(20,24,36,.92), rgba(8,11,18,.9)); border: 1px solid rgba(255,90,110,.35);
+  box-shadow: 0 18px 46px -16px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.06); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  color: #e9ebf2; font: 500 12.5px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; text-align: center; animation: bd-guard-in .5s ease-out; }
+@keyframes bd-guard-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+#bd-guard i { display: block; width: 30px; height: 30px; margin: 0 auto 8px; border-radius: 50%; border: 2px solid rgba(255,110,125,.75);
+  background: radial-gradient(circle, rgba(255,110,125,.25), transparent 70%); position: relative; }
+#bd-guard i::before, #bd-guard i::after { content: ""; position: absolute; top: 7px; width: 3.5px; height: 12px; border-radius: 1.5px; background: rgba(255,140,150,.95); }
+#bd-guard i::before { left: 8.5px; } #bd-guard i::after { right: 8.5px; }
+#bd-guard b { display: block; font: 800 16px system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .01em; }
+#bd-guard p { margin: 4px 0 12px; color: #c3c9d6; }
+#bd-guard small { display: block; margin-top: 9px; color: #8b93a7; font-size: 11px; }
+#bd-guard button { all: unset; position: relative; overflow: hidden; display: block; width: 100%; box-sizing: border-box; padding: 9px 0; border-radius: 10px; cursor: pointer;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: #e9ebf2; font: 700 12.5px system-ui, sans-serif; user-select: none; touch-action: none; }
+#bd-guard button::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, rgba(255,110,125,.35), rgba(255,110,125,.6)); }
+#bd-guard button.bd-holding::before { width: 100%; transition: width 3s linear; }
+#bd-guard button span { position: relative; }

@@ -78,6 +78,7 @@
     pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
     // Daily goal / loss limit bar + automatic trade journal (both opt-in; estimates from the P&L drawn on the chart).
     goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false,
+    goalGuard: false,      // Focus guard: at your max loss, lock TradingView's order panel and Buy / Sell buttons for the day
     // the ticker in the chart's top-left legend (symbol name, timeframe, exchange)
     tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false,
     welcomePending: 0,     // set on first install: show the welcome card on the chart once
@@ -543,7 +544,7 @@
   }
   function renderGoal() {
     const T = Math.max(0, +cfg.goalTarget || 0), L = Math.max(0, +cfg.goalLimit || 0);
-    if (!(cfg.enabled && cfg.goalOn && (T || L))) { if (goalEl) { goalEl.remove(); goalEl = null; } return; }
+    if (!(cfg.enabled && cfg.goalOn && (T || L))) { if (goalEl) { goalEl.remove(); goalEl = null; } applyGuard(); return; }
     if (!goalEl) {
       goalEl = document.createElement("div"); goalEl.id = "bd-goal"; goalEl.dataset.bdOwner = ME.token;
       goalEl.title = "Estimated from the P&L text drawn on your chart. Not your broker's statement.";
@@ -562,8 +563,45 @@
     goalEl.querySelector(".bd-g-l").textContent = L ? `limit \u2212${fmtAbs(L, u)}` : "";
     goalEl.querySelector(".bd-g-r").textContent = T ? `goal ${fmtAbs(T, u)}` : "";
     placeGoal();
+    applyGuard();
+  }
+  // ---------- Focus guard ----------
+  // Opt-in (Trading → Daily goal & limit). Once today's loss reaches your max loss, TradingView's order panel and the
+  // chart's Buy / Sell buttons are dimmed and can't be clicked, and a calm card says you're done for today. Holding
+  // "Unlock" for 3 seconds lifts it until tomorrow (a moment to think, not a wall). The unlock is stored with today's
+  // P&L, so every TradingView tab locks and unlocks together, and it all resets the next day.
+  // It's a nudge from what your chart shows, not a broker-level block: orders placed elsewhere aren't affected.
+  let guardEl = null, holdT = 0;
+  const guardLocked = () => !!(cfg.enabled && cfg.goalOn && cfg.goalGuard && +cfg.goalLimit > 0 && day.flags && day.flags.lim && !day.guardOff && !IN_FRAME && owner && !standDown);
+  function applyGuard() {
+    const on = guardLocked();
+    document.documentElement.classList.toggle("bd-guard", on);
+    if (!on) { if (guardEl) { guardEl.remove(); guardEl = null; } clearTimeout(holdT); return; }
+    if (!guardEl) {
+      guardEl = document.createElement("div"); guardEl.id = "bd-guard"; guardEl.dataset.bdOwner = ME.token;
+      guardEl.innerHTML = '<i></i><b>Done for today</b><p></p><button type="button"><span>Hold to unlock</span></button><small>Trading is paused until tomorrow. Holding unlocks it for the rest of today.</small>';
+      document.documentElement.appendChild(guardEl);
+      const btn = guardEl.querySelector("button");
+      const stop = () => { clearTimeout(holdT); btn.classList.remove("bd-holding"); };
+      btn.addEventListener("pointerdown", (e) => {
+        e.preventDefault(); btn.classList.add("bd-holding");
+        holdT = setTimeout(() => { btn.classList.remove("bd-holding"); day.guardOff = Date.now(); persistDay(); applyGuard(); flash("Unlocked for the rest of today"); }, 3000);
+      });
+      for (const ev of ["pointerup", "pointerleave", "pointercancel"]) btn.addEventListener(ev, stop);
+    }
+    const L = Math.max(0, +cfg.goalLimit || 0), u = day.unit || "";
+    guardEl.querySelector("p").textContent = `You reached your max loss of ${fmtAbs(L, u)}. Step away, come back fresh tomorrow.`;
+    placeGuard();
+  }
+  function placeGuard() {
+    if (!guardEl) return;
+    // over the order panel when it's open, otherwise near the top of the chart (by the Buy / Sell buttons)
+    const panel = [...document.querySelectorAll('[data-name="order-panel"], [class*="layout__area--tradingpanel"]')].map((e) => e.getBoundingClientRect()).find((r) => r.width > 160 && r.height > 160);
+    const r = panel || chartsBox(), st = guardEl.style;
+    st.left = r.left + r.width / 2 + "px"; st.top = (panel ? r.top + Math.min(160, r.height * 0.25) : r.top + 64) + "px";
   }
   function placeGoal() {
+    placeGuard();
     if (!goalEl) return;
     const r = chartsBox(), pad = 16, st = goalEl.style, pos = cfg.goalPos || "bl";
     st.left = st.right = st.top = st.bottom = st.transform = "";
@@ -2464,6 +2502,7 @@
     standDown = true; teardown(); if (wmEl) { wmEl.remove(); wmEl = null; }
     if (timerEl) { timerEl.remove(); timerEl = null; } clearInterval(timerIv); timerIv = 0;
     if (goalEl) { goalEl.remove(); goalEl = null; }
+    if (guardEl) { guardEl.remove(); guardEl = null; } document.documentElement.classList.remove("bd-guard");
     const tip = document.getElementById("bd-tip"); if (tip && tip.dataset.bdOwner === ME.token) tip.remove();
     if (dlgObs) { dlgObs.disconnect(); dlgObs = null; }
   }
