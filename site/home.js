@@ -92,8 +92,8 @@
 
   // ---------- tour (same tabs as the panel) ----------
   const TOUR = [
-    { tab: "Skins", img: "img/tour-skins.png", h: "Wallpapers and one-tap looks", p: "50 live wallpapers behind your candles, or your own videos and pictures.",
-      li: ["31 one-tap looks: wallpaper, candles, glow and scale together", "Groups for Wow, Calm and Glow, plus search", "Keep your own wallpaper and borrow just a look's styling"] },
+    { tab: "Skins", img: "img/tour-skins.png", h: "Wallpapers and one-tap looks", p: "60 live wallpapers behind your candles, or your own videos and pictures.",
+      li: ["40 one-tap looks: wallpaper, candles, glow and scale together", "Groups for Wow, Seasonal, Calm and Glow, plus search", "Keep your own wallpaper and borrow just a look's styling"] },
     { tab: "Style", img: "img/tour-style.png", h: "Candles and every line", p: "16 candle looks in any colours, and every line on the chart styled your way.",
       li: ["Glass, Chrome, Ice, Lava, Holo, 3D, Pixel and more", "Grid, crosshair (with a glow at your pointer), price line, session breaks", "A price scale that stays readable on any wallpaper"] },
     { tab: "TradingView", img: "img/tour-tradingview.png", h: "TradingView itself, in your style", p: "The watchlist, toolbars, Settings window and menus can match your look.",

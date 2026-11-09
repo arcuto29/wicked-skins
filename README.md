@@ -51,7 +51,7 @@ See **[RELEASING.md](RELEASING.md)**: one command + a tag push publishes everywh
 - **Auto readability**: scale and legend text switch light/dark per label from the brightness behind it (videos too).
 - **Alt+Shift+W** on the chart: everything on/off.
 - **Candles**: recolour up/down candles and volume (18 presets or custom colours; works with your own TradingView colours and candle/hollow/Heikin Ashi/bar styles) with optional glow. Changes apply live.
-- **Skins**: 50 live wallpapers in 9 categories (Wild, Cosmos, Fire, Electric, Urban, Chill, Elements, Markets, Abstract), plus a Wow set.
+- **Skins**: 60 live wallpapers in 10 categories (Wild, Cosmos, Fire, Electric, Urban, Chill, Elements, Markets, Abstract, Seasonal), plus a Wow set, and 40 one-tap looks.
 - **Uploads**: your own images/GIFs/videos, **almost any video**. Ones the browser
   can't play are converted to WebM on your computer (ffmpeg.wasm, see `vendor/ffmpeg/NOTICE.md`).
   Files are stored in the extension's own database (up to 2 GB each) and played by `player/player.html`.
