@@ -78,7 +78,7 @@
     pnlShow: false, pnlStyle: "color", pnlPos: "tc", pnlSize: 1, pnlBack: "glass", pnlUp: "", pnlDown: "",
     // Daily goal / loss limit bar + automatic trade journal (both opt-in; estimates from the P&L drawn on the chart).
     goalOn: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false,
-    goalGuard: false,      // Focus guard: at your max loss, lock TradingView's order panel and Buy / Sell buttons for the day
+    goalGuard: false,      // max-loss reminder: a calm "Done for today" card the moment today's loss reaches your max loss
     // the ticker in the chart's top-left legend (symbol name, timeframe, exchange)
     tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false,
     welcomePending: 0,     // set on first install: show the welcome card on the chart once
@@ -407,6 +407,9 @@
     renderGoal();
   }
   setInterval(tickTrades, 700);
+  // ...and the moment a new P&L is drawn, so the daily bar and the max-loss reminder never lag behind your chart
+  new MutationObserver(() => { if (cfg.enabled && cfg.goalOn) tickTrades(); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ["data-ws-pnl"] });
 
   // ---------- auto trade clips ----------
   // Only records while you're in a trade (nothing runs when you're flat). Two overlapping recorders share one
@@ -565,40 +568,29 @@
     placeGoal();
     applyGuard();
   }
-  // ---------- Focus guard ----------
-  // Opt-in (Trading → Daily goal & limit). Once today's loss reaches your max loss, TradingView's order panel and the
-  // chart's Buy / Sell buttons are dimmed and can't be clicked, and a calm card says you're done for today. Holding
-  // "Unlock" for 3 seconds lifts it until tomorrow (a moment to think, not a wall). The unlock is stored with today's
-  // P&L, so every TradingView tab locks and unlocks together, and it all resets the next day.
-  // It's a nudge from what your chart shows, not a broker-level block: orders placed elsewhere aren't affected.
-  let guardEl = null, holdT = 0;
-  const guardLocked = () => !!(cfg.enabled && cfg.goalOn && cfg.goalGuard && +cfg.goalLimit > 0 && day.flags && day.flags.lim && !day.guardOff && !IN_FRAME && owner && !standDown);
+  // ---------- max-loss reminder ----------
+  // Opt-in (Trading → Daily goal & limit). The moment today's loss (closed trades + your open position, read from the
+  // P&L your chart draws) reaches your max loss, a calm "Done for today" card appears on the chart. Purely visual:
+  // nothing on TradingView is blocked. "Got it" hides it for the rest of today (in every tab); it comes back tomorrow.
+  let guardEl = null;
+  const guardOn = () => !!(cfg.enabled && cfg.goalOn && cfg.goalGuard && +cfg.goalLimit > 0 && day.flags && day.flags.lim && !day.guardOff && !IN_FRAME && owner && !standDown);
   function applyGuard() {
-    const on = guardLocked();
-    document.documentElement.classList.toggle("bd-guard", on);
-    if (!on) { if (guardEl) { guardEl.remove(); guardEl = null; } clearTimeout(holdT); return; }
+    if (!guardOn()) { if (guardEl) { guardEl.remove(); guardEl = null; } return; }
     if (!guardEl) {
       guardEl = document.createElement("div"); guardEl.id = "bd-guard"; guardEl.dataset.bdOwner = ME.token;
-      guardEl.innerHTML = '<i></i><b>Done for today</b><p></p><button type="button"><span>Hold to unlock</span></button><small>Trading is paused until tomorrow. Holding unlocks it for the rest of today.</small>';
+      guardEl.innerHTML = '<i></i><b>Done for today</b><p></p><button type="button">Got it</button>';
       document.documentElement.appendChild(guardEl);
-      const btn = guardEl.querySelector("button");
-      const stop = () => { clearTimeout(holdT); btn.classList.remove("bd-holding"); };
-      btn.addEventListener("pointerdown", (e) => {
-        e.preventDefault(); btn.classList.add("bd-holding");
-        holdT = setTimeout(() => { btn.classList.remove("bd-holding"); day.guardOff = Date.now(); persistDay(); applyGuard(); flash("Unlocked for the rest of today"); }, 3000);
-      });
-      for (const ev of ["pointerup", "pointerleave", "pointercancel"]) btn.addEventListener(ev, stop);
+      guardEl.querySelector("button").onclick = () => { day.guardOff = Date.now(); persistDay(); applyGuard(); };
     }
-    const L = Math.max(0, +cfg.goalLimit || 0), u = day.unit || "";
-    guardEl.querySelector("p").textContent = `You reached your max loss of ${fmtAbs(L, u)}. Step away, come back fresh tomorrow.`;
+    const L = Math.max(0, +cfg.goalLimit || 0), u = day.unit || (openTrade && openTrade.unit) || "";
+    guardEl.querySelector("p").textContent = `You reached your max loss of ${fmtAbs(L, u)}. Step away and come back fresh tomorrow.`;
     placeGuard();
   }
   function placeGuard() {
     if (!guardEl) return;
-    // over the order panel when it's open, otherwise near the top of the chart (by the Buy / Sell buttons)
-    const panel = [...document.querySelectorAll('[data-name="order-panel"], [class*="layout__area--tradingpanel"]')].map((e) => e.getBoundingClientRect()).find((r) => r.width > 160 && r.height > 160);
-    const r = panel || chartsBox(), st = guardEl.style;
-    st.left = r.left + r.width / 2 + "px"; st.top = (panel ? r.top + Math.min(160, r.height * 0.25) : r.top + 64) + "px";
+    // near the top of the chart, clear of TradingView's legend; it never covers the order panel
+    const r = chartsBox(), st = guardEl.style;
+    st.left = r.left + r.width / 2 + "px"; st.top = r.top + 64 + "px";
   }
   function placeGoal() {
     placeGuard();
@@ -2502,7 +2494,7 @@
     standDown = true; teardown(); if (wmEl) { wmEl.remove(); wmEl = null; }
     if (timerEl) { timerEl.remove(); timerEl = null; } clearInterval(timerIv); timerIv = 0;
     if (goalEl) { goalEl.remove(); goalEl = null; }
-    if (guardEl) { guardEl.remove(); guardEl = null; } document.documentElement.classList.remove("bd-guard");
+    if (guardEl) { guardEl.remove(); guardEl = null; }
     const tip = document.getElementById("bd-tip"); if (tip && tip.dataset.bdOwner === ME.token) tip.remove();
     if (dlgObs) { dlgObs.disconnect(); dlgObs = null; }
   }

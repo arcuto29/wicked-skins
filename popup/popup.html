@@ -181,8 +181,8 @@
         <div class="row"><span>Max loss</span><input class="field" id="goalLimit" type="number" min="0" step="10" style="max-width:110px" /></div>
         <div class="row"><span>Position</span><div class="seg" id="goalPos"></div></div>
         <div class="row"><span>Sound</span><div class="seg" id="goalSound"></div></div>
-        <div class="row"><span style="flex:1">Lock trading at max loss</span><label class="switch" title="Focus guard"><input type="checkbox" id="goalGuard" /><span></span></label></div>
-        <p class="hint">Focus guard: at your max loss, TradingView's order panel and Buy / Sell buttons lock for the day, with a calm "Done for today" card. Hold Unlock for 3 seconds if you really need to. It's a nudge based on your chart's P&amp;L, not a block at your broker.</p>
+        <div class="row"><span style="flex:1">"Done for today" at max loss</span><label class="switch" title="A calm reminder on the chart"><input type="checkbox" id="goalGuard" /><span></span></label></div>
+        <p class="hint">The moment today's loss (including your open position) reaches your max loss, a calm card on the chart tells you you're done for today. It's only a reminder: nothing on TradingView is blocked.</p>
         <div class="row"><span>Today</span><b id="goalToday" style="font-weight:600">—</b><button id="goalReset" style="margin-left:auto">Reset today</button></div>
       </details>
       <details class="grp" data-grp="mood">
