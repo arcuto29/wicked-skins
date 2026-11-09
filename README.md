@@ -5,7 +5,10 @@
 Live backgrounds (animated skins, images, GIFs, video) behind TradingView charts.
 Purely cosmetic. It does not read orders, positions or account data and makes no network requests.
 
-## Try it
+## Install
+**[Get it on the Chrome Web Store](https://chromewebstore.google.com/detail/priism-skins-for-tradingv/ilmoloilbeblmgkanbiekhdegagfdloa)**: one click, and it updates itself.
+
+## Try the source
 1. Open `chrome://extensions`, enable **Developer mode**.
 2. **Load unpacked** and select this `wicked-skins/` folder.
 3. Open a TradingView chart and click the Priism Skins icon.

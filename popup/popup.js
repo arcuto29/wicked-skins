@@ -1829,6 +1829,7 @@ async function siteBar() {
 // Zip / "Load unpacked" installs can't auto-update, so we check GitHub Releases (max every 6 h) and offer the download.
 const REPO = "arcuto29/wicked-skins";
 const RELEASES = `https://github.com/${REPO}/releases`;
+const STORE_URL = "https://chromewebstore.google.com/detail/priism-skins-for-tradingv/ilmoloilbeblmgkanbiekhdegagfdloa";
 const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number);
   for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 function notice(title, hintText, linkText, href, onClose) {
@@ -1866,8 +1867,9 @@ async function updates() {
     if (latest) chrome.storage.local.set({ updCheck: { at: Date.now(), latest } });
   }
   if (latest && newer(latest, me)) {
-    notice(`Update available: ${latest}`, "Download it, replace the files in your Priism Skins folder, then click the reload arrow on its card in chrome://extensions. Your settings are kept.",
-      "Download", `${RELEASES}/latest`);
+    // the easiest fix is the store copy, which updates itself from then on (remove this copy afterwards)
+    notice(`Update available: ${latest}`, "Get Priism Skins from the Chrome Web Store and it updates itself from now on (then remove this copy in chrome://extensions). Or download the new zip and reload it as before.",
+      "Chrome Web Store", STORE_URL);
   }
 }
 
