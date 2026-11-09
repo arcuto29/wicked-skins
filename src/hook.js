@@ -601,11 +601,20 @@
     const v = parseFloat((m[4] + m[5]).replace(/,/g, "")) * (sign === "-" || sign === "\u2212" ? -1 : 1);
     if (frameNo !== pnlFrame) { pnlFrame = frameNo; pnlSum = 0; }
     pnlSum += v; pnlUnit = cur || (code ? code.toUpperCase() : "");
-    const now = performance.now();
-    if (now - pnlLastWrite > 400) {
-      pnlLastWrite = now;
-      htmlEl().setAttribute && htmlEl().setAttribute("data-ws-pnl", JSON.stringify({ v: Math.round(pnlSum * 100) / 100, unit: pnlUnit, ts: Date.now() }));
+    if (!pnlQueued) { pnlQueued = true; queueMicrotask(publishPnl); }    // once this frame's drawing is done
+  }
+  // Publish the P&L as soon as it changes (the daily bar and the max-loss reminder react straight away), at most
+  // 10 times a second; an unchanged value is refreshed once a second so the page knows the position is still open.
+  let pnlQueued = false, pnlLastVal = null, pnlTrail = 0;
+  function publishPnl() {
+    pnlQueued = false;
+    const now = performance.now(), val = Math.round(pnlSum * 100) / 100, since = now - pnlLastWrite;
+    if (val === pnlLastVal ? since < 1000 : since < 100) {
+      if (val !== pnlLastVal && !pnlTrail) pnlTrail = setTimeout(() => { pnlTrail = 0; publishPnl(); }, 100 - since + 5);   // don't drop a change
+      return;
     }
+    pnlLastWrite = now; pnlLastVal = val;
+    htmlEl().setAttribute && htmlEl().setAttribute("data-ws-pnl", JSON.stringify({ v: val, unit: pnlUnit, ts: Date.now() }));
   }
 
   // ---------- bracket pills (the broker's TP / Stop / entry / P&L boxes TradingView draws on the chart) ----------

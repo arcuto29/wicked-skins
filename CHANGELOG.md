@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.49 (2026-11-04)
+- **Focus guard is now a reminder, and it's instant.** At your max loss, a calm "Done for today" card appears on the chart. Nothing on TradingView is blocked any more: Priism only changes how things look. "Got it" hides it for the rest of today in every tab, and it comes back the next day. The option is now called "Done for today" at max loss (Trading → Daily goal & limit).
+- **The P&L on your chart is read the moment it changes**, so the reminder, the daily goal bar and Live mood never lag. In a test, the card appeared about 0.01 seconds after the position's loss crossed the limit; before, it could take up to a second.
+- **Fixed on Lightweight Charts platforms (like nq.vision): Live mood "day's move" could stay off** on a quiet chart. The chart's price was only read after the first second, and a still chart may draw its price just once.
+- Zip installs: the update notice now offers the Chrome Web Store version, which updates itself.
+
 ## 0.1.48 (2026-11-04)
 - **Focus guard** (Trading → Daily goal & limit → Lock trading at max loss; off by default).
   - Once today's loss reaches your max loss, TradingView's order panel and the chart's Buy / Sell buttons dim and can't be clicked.

@@ -509,7 +509,13 @@
     const privText = (t) => { if (!lfx || !lfx.privacy || lfx.privacyPnl === "show") return t; if (lfx.privacyPnl === "hide") return mask(t);
       return /[$\u20ac\u00a3\u00a5]|\b(USD|EUR|GBP)\b/i.test(String(t)) ? mask(t) : t; };
     const sizeUp = (font, px) => String(font).replace(/(\d+(?:\.\d+)?)px/, (m, n) => (+n + px) + "px");
-    let pnlSum = 0, pnlFrame = -1, frameNo = 0, lastQuoteWrite = 0, pnlWrite = 0;
+    let pnlSum = 0, pnlFrame = -1, frameNo = 0, lastQuoteWrite = -1e9, lastQuoteVal = NaN, pnlWrite = -1e9, pnlU = "", pnlQueued = false, pnlLastVal = null, pnlTrail = 0;
+    function publishPnl() {
+      pnlQueued = false;
+      const now = performance.now(), val = Math.round(pnlSum * 100) / 100, since = now - pnlWrite;
+      if (val === pnlLastVal ? since < 1000 : since < 100) { if (val !== pnlLastVal && !pnlTrail) pnlTrail = setTimeout(() => { pnlTrail = 0; publishPnl(); }, 100 - since + 5); return; }
+      pnlWrite = now; pnlLastVal = val; htmlEl().setAttribute("data-ws-pnl", JSON.stringify({ v: val, unit: pnlU, ts: Date.now() }));
+    }
     (function tick() { frameNo++; requestAnimationFrame(tick); })();
     // a label box: 8–60 px tall; on the chart itself also wide (≥ 24 px, so candle and volume bars never count) and coloured
     const labelBox = (g, w, h) => { const c = g.canvas, t = g.getTransform(), H = Math.abs(h * (t.d || 1)), W = Math.abs(w * (t.a || 1));
@@ -524,8 +530,8 @@
         const m = typeof t === "string" && t.length < 40 && t.trim().match(PNL_RE);
         if (m && (m[1] || m[2] || m[3] || m[6] || /^p/i.test(t.trim()))) {
           const v = parseFloat((m[4] + m[5]).replace(/,/g, "")) * ((m[1] || m[3]) === "-" || (m[1] || m[3]) === "\u2212" ? -1 : 1);
-          if (frameNo !== pnlFrame) { pnlFrame = frameNo; pnlSum = 0; } pnlSum += v;
-          const now = performance.now(); if (now - pnlWrite > 400) { pnlWrite = now; htmlEl().setAttribute("data-ws-pnl", JSON.stringify({ v: Math.round(pnlSum * 100) / 100, unit: m[2] || (m[6] || "").toUpperCase(), ts: Date.now() })); }
+          if (frameNo !== pnlFrame) { pnlFrame = frameNo; pnlSum = 0; } pnlSum += v; pnlU = m[2] || (m[6] || "").toUpperCase();
+          if (!pnlQueued) { pnlQueued = true; queueMicrotask(publishPnl); }    // as soon as it changes (see hook.js)
           if (lfx && lfx.privacy) t = privText(t);
         }
         const pb = lastBox.get(this); lastBox.delete(this);
@@ -545,7 +551,8 @@
         fillDesc.set.call(this, L > 0.55 ? "#06110d" : "#ffffff");
       } else if (box && isCandleCol(box)) {                      // the last-price tag: remember the price (Live mood: day move)
         const n = parseFloat(String(t).replace(/[^\d.\-]/g, ""));
-        const now = performance.now(); if (isFinite(n) && now - lastQuoteWrite > 1000) { lastQuoteWrite = now; htmlEl().setAttribute("data-bd-lwquote", JSON.stringify({ p: n, ts: Date.now() })); }
+        // a new price straight away (the first one too: a quiet chart may draw its price tag only once), the same price once a second
+        const now = performance.now(); if (isFinite(n) && (n !== lastQuoteVal || now - lastQuoteWrite > 1000)) { lastQuoteWrite = now; lastQuoteVal = n; htmlEl().setAttribute("data-bd-lwquote", JSON.stringify({ p: n, ts: Date.now() })); }
       } else if (box && !greyish(box)) {                 // a coloured tag that isn't the price: an order / position label
         if (lfx && lfx.bracketOn) {
           const sign = /^\s*[+]/.test(t) ? 1 : /^\s*[-\u2212]/.test(t) ? -1 : 0;

@@ -1937,7 +1937,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Focus guard: lock trading for the day at your max loss (Trading › Daily goal & limit)",
+const WHATS_NEW = ["\u201cDone for today\u201d: a calm reminder the instant you reach your max loss (Trading › Daily goal & limit)",
   "Desktop app: TradingView in tabs, opens with your last layouts and keeps you signed in",
   "Smoother charts: wallpapers are now drawn in the background, leaving TradingView's thread free",
   "nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",
