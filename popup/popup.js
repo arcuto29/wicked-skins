@@ -331,6 +331,48 @@ function toast(msg, undo) {
   $("toastUndo").onclick = undo ? () => { undo(); $("toast").hidden = true; } : null;
   clearTimeout(undoTimer); undoTimer = setTimeout(() => ($("toast").hidden = true), undo ? 8000 : 3000);
 }
+// ---------- Match everything: the whole chart in your wallpaper's colours, in one tap ----------
+// The wallpaper's colours are read here in the panel (the same code the chart uses, skins.js PriismPalette), so it
+// works for every wallpaper, on the browser, desktop and Android, even before a chart is open.
+async function wallpaperPixels() {
+  const c = document.createElement("canvas"); c.width = 192; c.height = 108; const g = c.getContext("2d", { willReadFrequently: true });
+  if (cfg.skin === "media") {
+    const m = (cfg.media || []).find((x) => x.id === cfg.mediaId), src = m && (m.thumb || (m.type !== "video" && m.src));
+    if (!src) return null;
+    const img = new Image(); await new Promise((r) => { img.onload = img.onerror = r; img.src = src; });
+    if (!img.naturalWidth) return null;
+    g.drawImage(img, 0, 0, c.width, c.height); return g.getImageData(0, 0, c.width, c.height).data;
+  }
+  const def = WickedSkins[cfg.skin]; if (!def) return null;
+  const sk = def.create(g); sk.resize(c.width, c.height);
+  // let it run ~4 s (some wallpapers build up over time, like Code Rain) and sample three moments
+  const out = new Uint8ClampedArray(c.width * c.height * 4 * 3); let k = 0;
+  for (let i = 1; i <= 120; i++) {
+    try { sk.frame(i / 30, 1 / 30); } catch {}
+    if (i % 40 === 0) { out.set(g.getImageData(0, 0, c.width, c.height).data, k); k += c.width * c.height * 4; }
+  }
+  return out;
+}
+function mixHex(a, b, f) { const x = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16)), y = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * f).toString(16).padStart(2, "0")).join(""); }
+async function matchEverything() {
+  let pal = null, grey = false; try { const d = await wallpaperPixels(); pal = d && window.PriismPalette.fromData(d, true); } catch {}
+  if (!pal) { pal = { up: "#9fd8ff", down: "#ff6b8b", accent: "#c9d3e3" }; grey = true; }   // a grey wallpaper: a matching silver look
+  const accent = pal.accent, light = mixHex(accent, "#ffffff", 0.5), soft = mixHex(accent, "#ffffff", 0.25);
+  const name = cfg.skin === "media" ? "your wallpaper" : (WickedSkins[cfg.skin] || {}).name || "your wallpaper";
+  applyWithUndo({
+    enabled: true,
+    candleOn: true, candleUp: pal.up, candleDown: pal.down, candlePreset: "custom", lineGlow: Math.max(+cfg.lineGlow || 0, 0.25),
+    chOn: true, chColor: accent, chLabels: true, gridOn: true, gridColor: accent, gridAlpha: 0.18, gridStyle: cfg.gridOn ? cfg.gridStyle : "dotted",
+    plOn: true, plColor: "candle", scaleText: light, scaleGlow: Math.max(+cfg.scaleGlow || 0, 0.2),
+    tkOn: true, tkColor: light, tkGlow: true,
+    bracketOn: true, bracketProfit: pal.up, bracketLoss: pal.down, bracketQty: soft, bracketLineColor: accent,
+    pnlUp: pal.up, pnlDown: pal.down,
+    panelMode: "skin", dlgMode: "glass", uiAccent: soft,
+  }, grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : `Everything now matches ${name}.`);
+}
+if ($("matchAll")) $("matchAll").onclick = matchEverything;
+
 function applyWithUndo(changes, label) {
   const before = Object.fromEntries(Object.keys(changes).map((k) => [k, cfg[k]]));
   set(changes); refreshAll();
@@ -344,10 +386,16 @@ const LOOK_GROUP = {
   "ocean-calm": "Calm", nightfall: "Calm", daybreak: "Calm", sterling: "Calm", harbor: "Calm", dune: "Calm", "clean-focus": "Calm", blossom: "Calm",
   glowstick: "Glow", blacklight: "Glow", vaporwave: "Glow", molten: "Glow", warp: "Glow", spectrum: "Glow", "neon-night": "Glow", firefly: "Glow",
   horizon: "Wow", bloom: "Wow", ink: "Wow", kaleido: "Wow", slick: "Wow", hypercube: "Wow", helix: "Wow", synapse: "Wow",
+  "xmas-spirit": "Seasonal", "hallows-eve": "Seasonal",
 };
-const LOOK_GROUPS = ["All", "Wow", "Calm", "Glow", "Classic"];
+const LOOK_GROUPS = ["All", "Wow", "Seasonal", "Calm", "Glow", "Classic"];
 const groupOf = (q) => LOOK_GROUP[q.id] || "Classic";
 const QUICK_LOOKS = [
+  // ----- Seasonal drops: offered in their month (see SEASONS), available all year under Seasonal -----
+  { id: "xmas-spirit", name: "Christmas Spirit", sub: "Christmas Eve · Glass candles", skin: "christmas",
+    set: { candleOn: true, candleUp: "#4ee59a", candleDown: "#ff4d5e", candleLook: "glass", candleGlow: 0.35, candlePreset: "custom", lineGlow: 0.3, scaleText: "#ffe6b3", scaleGlow: 0.2, scaleBg: "auto", dim: 0.12 } },
+  { id: "hallows-eve", name: "Hallows Eve", sub: "Hallows Night · Lava candles", skin: "hallows",
+    set: { candleOn: true, candleUp: "#a77bff", candleDown: "#ff8a2a", candleLook: "lava", candleGlow: 0.35, candlePreset: "custom", lineGlow: 0.3, scaleText: "#ffd2a1", scaleGlow: 0.2, scaleBg: "auto", dim: 0.1 } },
   // ----- Wow: the showpiece wallpapers, each with one of the new candle looks (no wallpaper reused) -----
   { id: "horizon", name: "Event Horizon", sub: "Black hole · Glass candles", skin: "blackhole",
     set: { candleOn: true, candleUp: "#ffd27a", candleDown: "#8c6bff", candleLook: "glass", candleGlow: 0.3, candlePreset: "custom", lineGlow: 0.25, scaleText: "#ffe1a8", scaleGlow: 0.2, scaleBg: "auto", dim: 0.3 } },
@@ -438,15 +486,33 @@ const QUICK_LOOKS = [
 let lookGroup = localStorage.getItem("lookGroup") || "All";
 const skinQuery = () => ($("skinSearch") ? $("skinSearch").value.trim().toLowerCase() : "");
 const matchQ = (...parts) => { const q = skinQuery(); return !q || parts.join(" ").toLowerCase().includes(q); };
+// ---------- seasonal drops ----------
+// In a season's month, a small card at the top of Skins offers its look (one tap, Undo as always); in "All", the
+// seasonal look comes first. "Not now" hides the card until next year's season.
+const SEASONS = [
+  { id: "christmas", month: 11, look: "xmas-spirit", icon: "\u{1F384}", title: "Christmas is here", text: "Snow, twinkling lights and festive candles: the Christmas Spirit look." },
+  { id: "halloween", month: 9, look: "hallows-eve", icon: "\u{1F383}", title: "Happy Halloween", text: "A harvest moon, glowing pumpkins and lava candles: the Hallows Eve look." },
+];
+const currentSeason = () => SEASONS.find((x) => x.month === (window.__bdMonth ?? new Date().getMonth())) || null;
+function renderSeason() {
+  const bar = $("seasonBar"); if (!bar) return;
+  const se = currentSeason(), q = se && QUICK_LOOKS.find((x) => x.id === se.look), key = se && `seasonSeen:${se.id}:${new Date().getFullYear()}`;
+  if (!se || !q || localStorage.getItem(key) || cfg.skin === q.skin) { bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.innerHTML = `<span class="ic">${se.icon}</span><div><b>${esc(se.title)}</b><small>${esc(se.text)}</small></div><div class="acts"><button class="primary keep" data-a="go">Try it</button><button class="link" data-a="no">Not now</button></div>`;
+  bar.querySelector("[data-a=go]").onclick = () => { localStorage.setItem(key, "1"); applyWithUndo({ enabled: true, skin: q.skin, ...q.set }, `Applied ${q.name}. Happy holidays!`); };
+  bar.querySelector("[data-a=no]").onclick = () => { localStorage.setItem(key, "1"); bar.hidden = true; };
+}
 function renderQuick() {
   const box = $("quickLooks"); if (!box) return;
-  setTimeout(renderHero, 0);
+  setTimeout(renderHero, 0); renderSeason();
   if ($("lookChips")) { $("lookChips").innerHTML = "";
     for (const g of LOOK_GROUPS) { const b = document.createElement("button"); b.className = "chip" + (g === lookGroup ? " on" : ""); b.textContent = g;
       b.onclick = () => { lookGroup = g; localStorage.setItem("lookGroup", g); renderQuick(); }; $("lookChips").appendChild(b); } }
   box.innerHTML = ""; quickPreviews = [];
   let shown = 0;
-  for (const q of QUICK_LOOKS) {
+  const se = currentSeason(), list = se ? [...QUICK_LOOKS].sort((a, b) => (b.id === se.look) - (a.id === se.look)) : QUICK_LOOKS;   // in season: its look first
+  for (const q of list) {
     const grp = groupOf(q);
     if (lookGroup !== "All" && grp !== lookGroup) continue;
     const sk0 = WickedSkins[q.skin]; if (!sk0) continue;
@@ -1937,7 +2003,10 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["\u201cDone for today\u201d: a calm reminder the instant you reach your max loss (Trading › Daily goal & limit)",
+const WHATS_NEW = ["Seasonal drops: Christmas Eve and Hallows Night wallpapers, offered in their month (Skins › Seasonal)",
+  "Match everything: one tap sets your whole chart to your wallpaper's colours (top of Style)",
+  "Recordings are now MP4, and can include music playing on your computer (Capture › Clip › Sound)",
+  "\u201cDone for today\u201d: a calm reminder the instant you reach your max loss (Trading › Daily goal & limit)",
   "Desktop app: TradingView in tabs, opens with your last layouts and keeps you signed in",
   "Smoother charts: wallpapers are now drawn in the background, leaving TradingView's thread free",
   "nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",

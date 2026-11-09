@@ -381,3 +381,16 @@ select option:checked { background: #1f3b34; color: #ffffff; }
 .lw-note { display: none; }
 body.lw-page .lw-note { display: block; }
 body.lw-page [data-tvonly] { display: none !important; }
+
+/* Style tab: "Match everything" sits on top, above the sections */
+.matchall { margin: 2px 0 12px; }
+.matchall button { width: 100%; padding: 11px 12px; font-size: 13px; }
+.matchall .hint { margin-top: 6px; }
+
+/* Seasonal drop card (top of Skins, only in its month) */
+.seasonbar { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 10px; margin: 2px 0 10px; padding: 10px 12px; border-radius: 12px;
+  background: linear-gradient(120deg, rgba(255,120,80,.12), rgba(120,170,255,.12)); border: 1px solid rgba(255,255,255,.1); }
+.seasonbar .ic { font-size: 22px; line-height: 1; }
+.seasonbar > div:not(.acts) { flex: 1 1 0; min-width: 0; }
+.seasonbar .acts { flex: 1 0 100%; display: flex; align-items: center; gap: 10px; padding-left: 32px; margin-top: 6px; } .seasonbar b { display: block; font-size: 12.5px; } .seasonbar small { display: block; color: var(--dim, #9aa3b5); font-size: 11px; line-height: 1.35; }
+.seasonbar button.primary { padding: 7px 12px; white-space: nowrap; } .seasonbar .link { white-space: nowrap; }

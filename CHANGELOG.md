@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.50 (2026-11-04)
+- **Seasonal drops.** Two new wallpapers, each with a matching one-tap look:
+  - **Christmas Eve:** a deep blue night, slow snowfall, a string of softly twinkling lights, snowy pines. Its look is **Christmas Spirit** (green / red glass candles).
+  - **Hallows Night:** a harvest moon, low drifting mist, glowing jack-o'-lanterns, a bare tree and a few bats gliding past. Its look is **Hallows Eve** (purple / orange lava candles).
+  - In December (Christmas) and October (Halloween), a card at the top of Skins offers the season's look: one tap, Undo as always. "Not now" hides it until next year. Both are in the new **Seasonal** chip all year.
+- **Match everything** (top of the Style tab): one tap reads your wallpaper's colours and sets the candles, crosshair, grid, price line, price scale, ticker, trade brackets, P&L readout, TradingView's panels and windows, and the accent to match. Undo puts it all back.
+  - Works with every wallpaper, including your own uploads, and in the desktop and Android apps.
+  - Up candles always get the cooler colour (green, teal, blue, violet) and down the warmer one (red, orange, pink), the way traders read them.
+  - Grey wallpapers get a matching silver look.
+- **Recordings are now MP4** (H.264, with AAC sound where your browser supports it). They play everywhere: phones, Windows, Mac, editing apps and social sites. This covers clips, screen recordings, auto trade clips and edited clips. Browsers that can't record MP4 still save WebM.
+  - To include music or anything else playing on your computer, set Capture → Clip → Sound to **Computer** (or **Both** for your voice too). Chrome asks what to share: on Windows tick "Share system audio"; on a Mac pick the tab that's playing.
+
 ## 0.1.49 (2026-11-04)
 - **Focus guard is now a reminder, and it's instant.** At your max loss, a calm "Done for today" card appears on the chart. Nothing on TradingView is blocked any more: Priism only changes how things look. "Got it" hides it for the rest of today in every tab, and it comes back the next day. The option is now called "Done for today" at max loss (Trading → Daily goal & limit).
 - **The P&L on your chart is read the moment it changes**, so the reminder, the daily goal bar and Live mood never lag. In a test, the card appeared about 0.01 seconds after the position's loss crossed the limit; before, it could take up to a second.
