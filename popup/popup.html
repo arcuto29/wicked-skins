@@ -47,6 +47,7 @@
         <div class="seg" id="skinView"></div>
         <input type="search" id="skinSearch" placeholder="Search…" autocomplete="off" />
       </div>
+      <div id="seasonBar" class="seasonbar" hidden></div>
       <div id="viewLooks">
         <p class="hint" style="margin:2px 0 6px">One tap sets the wallpaper, candles, glow and price scale together. Undo is one tap too.</p>
         <label class="keepbg"><input type="checkbox" id="keepBg" /> Keep my wallpaper (only change candles &amp; styling)</label>
@@ -73,6 +74,10 @@
     </section>
 
     <section id="tab-candles" hidden>
+      <div class="matchall">
+        <button id="matchAll" class="primary keep" type="button">✨ Match everything to my wallpaper</button>
+        <p class="hint">One tap takes your wallpaper's colours and sets the candles, crosshair, grid, price line, price scale, ticker, trade brackets and TradingView's panels to match. Tap Undo to go back.</p>
+      </div>
 
       <details class="grp" data-grp="candles" open>
         <summary>Candles <label class="switch" title="Candle colours on/off"><input type="checkbox" id="candleOn" /><span></span></label></summary>

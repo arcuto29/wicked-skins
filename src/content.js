@@ -427,7 +427,7 @@
     if (!tc || !tc.starting) return;                                  // stopped while we were getting ready
     try { compositeFrame(g, box, dpr, wmImg); } catch { tc = null; return; }
     const fps = 24; let stream; try { stream = cap.captureStream(fps); } catch { tc = null; return; }
-    const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
+    const mime = clipMime(false);
     const N = Math.max(10, Math.min(120, +cfg.tradeClipLen || 30));
     tc = { cap, g, box, dpr, wmImg, stream, mime, N, recs: [], last: 0, rot: 0, raf: 0 };
     const draw = (t) => { if (!tc || !tc.cap) return; tc.raf = requestAnimationFrame(draw); if (t - tc.last < 1000 / fps - 2) return; tc.last = t; try { compositeFrame(tc.g, tc.box, tc.dpr, tc.wmImg); } catch {} };
@@ -457,7 +457,7 @@
     if (!r.chunks.length) return;
     const blob = new Blob(r.chunks, { type: t.mime || "video/webm" }), d = new Date();
     const pnl = hideMoney() ? "" : "-" + (v >= 0 ? "+" : "") + String(v).replace(/[^\d.+-]/g, "");
-    saveBlob(blob, `priism-trade-${String(trade.sym || "chart").replace(/[^\w-]+/g, "")}${pnl}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}.webm`);
+    saveBlob(blob, `priism-trade-${String(trade.sym || "chart").replace(/[^\w-]+/g, "")}${pnl}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}.${clipExt(t.mime)}`);
     flash("Trade clip saved to your downloads");
   }
   window.__bdTradeClip = () => (tc && tc.recs ? { recording: tc.recs.length, ages: tc.recs.map((r) => Math.round((Date.now() - r.t0) / 1000)) } : null);   // diagnostics
@@ -1293,70 +1293,8 @@
   // ---------- Auto-match: derive a colour palette from the wallpaper ----------
   // Pick the wallpaper's most-present vivid hue as the accent, then an up/down pair that stays readable and
   // clearly different from each other. Returns { up, down, accent } as #hex, or null if the art is too grey.
-  function paletteFromData(d) {
-    const bins = new Array(24).fill(null).map(() => ({ n: 0, r: 0, g: 0, b: 0, sat: 0 }));
-    let colourful = 0, total = 0;
-    for (let i = 0; i < d.length; i += 4) {
-      const a = d[i + 3] / 255; if (a < 0.4) continue;
-      const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
-      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
-      const sat = mx === mn ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1));
-      total++;
-      if (sat < 0.18 || l < 0.08 || l > 0.95) continue;        // skip greys / near-black / near-white
-      colourful++;
-      let hue = 0;
-      if (mx !== mn) { const dd = mx - mn;
-        hue = mx === r ? (g - b) / dd + (g < b ? 6 : 0) : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; hue *= 60; }
-      const bi = Math.floor(hue / 15) % 24, wt = sat * (0.4 + 0.6 * (1 - Math.abs(l - 0.5) * 2));
-      const bn = bins[bi]; bn.n += wt; bn.r += r * wt; bn.g += g * wt; bn.b += b * wt; bn.sat += sat * wt;
-    }
-    if (colourful < total * 0.04) return null;                 // mostly grey wallpaper: nothing to match
-    const avg = (bi) => { const bn = bins[bi]; return bn.n > 0 ? [bn.r / bn.n, bn.g / bn.n, bn.b / bn.n] : null; };
-    const ranked = bins.map((b, i) => ({ i, n: b.n })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n);
-    if (!ranked.length) return null;
-    const top = ranked[0].i, accent = punch(avg(top));
-    // Second colour = the strongest hue cluster that's clearly different from the first (>= ~90° away on the wheel).
-    const far = (a, b) => { const d = Math.abs(a - b) * 15; return Math.min(d, 360 - d) >= 90; };
-    let second = ranked.find((x) => far(x.i, top));
-    const c1 = avg(top), c2 = second ? avg(second.i) : null;
-    // Two distinct wallpaper colours → use both (greener one becomes "up"). One dominant colour → derive a
-    // complementary pair around it so up/down stay clearly different and readable.
-    let upRgb, downRgb;
-    if (c2) {
-      const greener = (c) => c[1] - (c[0] + c[2]) / 2;          // how green-leaning
-      [upRgb, downRgb] = greener(c1) >= greener(c2) ? [c1, c2] : [c2, c1];
-      upRgb = punch(upRgb); downRgb = punch(downRgb);
-    } else {
-      const accHue = top * 15;
-      upRgb = punch(hslRgb(nearestNice(accHue, true)));
-      downRgb = punch(hslRgb(nearestNice((accHue + 150) % 360, false)));
-    }
-    return { up: hex(upRgb), down: hex(downRgb), accent: hex(accent) };
-  }
-  const clampc = (v) => Math.max(0, Math.min(255, Math.round(v)));
-  // rgb channels are 0..1 floats
-  const hex = (rgb) => "#" + rgb.map((v) => clampc(v * 255).toString(16).padStart(2, "0")).join("");
-  // boost saturation + set a readable lightness so candles pop on any art
-  function punch(rgb) {
-    if (!rgb) return [0, 0.88, 0.64];
-    let [r, g, b] = rgb; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let l = (mx + mn) / 2;
-    let h = 0, s = 0;
-    if (mx !== mn) { const dd = mx - mn; s = l > 0.5 ? dd / (2 - mx - mn) : dd / (mx + mn);
-      h = mx === r ? (g - b) / dd + (g < b ? 6 : 0) : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; h /= 6; }
-    s = Math.min(1, s * 1.5 + 0.35); l = Math.min(0.72, Math.max(0.5, l));
-    return hslRgb([h * 360, s, l]);
-  }
-  // pick an "up" (green-leaning) or "down" (warm-leaning) hue near the accent but in a readable zone
-  function nearestNice(hue, up) {
-    const s = 0.85, l = 0.6;
-    if (up) { const h = hue > 60 && hue < 200 ? hue : 150; return [h, s, l]; }
-    const h = hue > 300 || hue < 60 ? hue : 340; return [h, s, l];
-  }
-  function hslRgb(hsl) {
-    let [h, s, l] = hsl; h = ((h % 360) + 360) % 360 / 360;
-    const f = (n) => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
-    return [f(0), f(8), f(4)];
-  }
+  // The wallpaper's colours (strongest hue + an up / down pair): shared with the panel's "Match everything", in skins.js
+  const paletteFromData = (d) => window.PriismPalette.fromData(d);
   // Brightness behind one chart's price scale (its right-hand ~64px), top to bottom in 18 steps.
   function scaleProfile(v, r) {
     const g = v.lum.grid;
@@ -1990,7 +1928,7 @@
         rec.stop();
         await Promise.race([done, new Promise((r) => setTimeout(r, 3000))]);   // never hang waiting for the recorder
         const out = new Blob(chunks, { type: mime || "video/webm" });
-        saveBlob(out, name.replace(/\.webm$/, "") + "-edited.webm");
+        saveBlob(out, name.replace(/\.(webm|mp4)$/, "") + "-edited." + clipExt(mime));
         flash("Edited clip saved to your downloads");
         close();
       } catch (e) {
@@ -2018,10 +1956,15 @@
   // computer's sound (Windows: tick "Share system audio"; Mac: Chrome can only take a tab's sound).
   const wantMic = () => cfg.clipAudio === "mic" || cfg.clipAudio === "both";
   const wantSys = () => cfg.clipAudio === "computer" || cfg.clipAudio === "both";
+  // MP4 first: it plays everywhere (phones, Windows, Mac, every editing app and social site). H.264 + AAC is the most
+  // compatible; then H.264 + Opus; WebM only on a browser that can't record MP4.
   function clipMime(withAudio) {
-    const list = withAudio ? ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"] : ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+    const list = withAudio
+      ? ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1,opus", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
+      : ["video/mp4;codecs=avc1", "video/mp4;codecs=avc1.640028", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
     return list.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
   }
+  const clipExt = (mime) => (/mp4/.test(mime || "") ? "mp4" : "webm");
   async function clipAudioTrack(display) {
     const srcs = [], stops = [];
     if (display) for (const t of display.getAudioTracks()) if (t.readyState === "live") srcs.push(new MediaStream([t]));
@@ -2123,7 +2066,7 @@
         if (!chunks.length) return resolve({ ok: false, reason: "The browser blocked recording (a cross-origin chart)." });
         const blob = new Blob(chunks, { type: mime || "video/webm" });
         if (autoSave) {
-          const q = parseTitle(), name = `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${Math.round((performance.now() - t0) / 1000)}s.webm`;
+          const q = parseTitle(), name = `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${Math.round((performance.now() - t0) / 1000)}s.${clipExt(mime)}`;
           if (cfg.clipEdit !== false) { openClipEditor(blob, name, cfg.clipFps, !!au); return resolve({ ok: true, saved: true, editing: true, name, mediaMissed, bytes: blob.size, w: W, h: H }); }
           saveBlob(blob, name);
           flash("Clip saved to your downloads");
@@ -2207,7 +2150,7 @@
       try { au && au.stop(); } catch {}
       if (!chunks.length) return;
       const secs = Math.round((performance.now() - t0) / 1000), q = parseTitle();
-      const blob = new Blob(chunks, { type: mime || "video/webm" }), name = `priism-screen-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${secs}s.webm`;
+      const blob = new Blob(chunks, { type: mime || "video/webm" }), name = `priism-screen-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${secs}s.${clipExt(mime)}`;
       if (cfg.clipEdit !== false) return void openClipEditor(blob, name, cfg.clipFps, !!au);
       saveBlob(blob, name);
       flash("Screen clip saved to your downloads");

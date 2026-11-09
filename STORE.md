@@ -19,16 +19,16 @@ Don't add lists of file formats, platforms, chart types or skin names.
 Your charts, in full spectrum. Priism Skins puts calm, animated wallpapers behind your TradingView candles and lets you restyle the chart to match. It is purely cosmetic: your data, orders and account are never touched.
 
 Live wallpapers
-Choose from dozens of animated scenes, from quiet night skies and glowing nebulas to ocean depths and city grids. You can also use your own pictures or videos, privately on your computer. The Workshop lets you try wallpapers and complete looks shared by other traders in one tap. Wallpapers are drawn in the background so your chart stays smooth.
+Choose from dozens of animated scenes, from quiet night skies and glowing nebulas to ocean depths and city grids, plus seasonal drops for Christmas and Halloween. You can also use your own pictures or videos, privately on your computer. The Workshop lets you try wallpapers and complete looks shared by other traders in one tap. Wallpapers are drawn in the background so your chart stays smooth.
 
 Candles, chart and ticker
-Recolour your candles and pick from sixteen candle looks, from glass and neon to soft outlines. Style the grid, crosshair, price line, price scale and the ticker at the top of your chart, and recolour TradingView's own panels and menus to match.
+Match everything to your wallpaper in one tap, or recolour your candles yourself and pick from sixteen candle looks, from glass and neon to soft outlines. Style the grid, crosshair, price line, price scale and the ticker at the top of your chart, and recolour TradingView's own panels and menus to match.
 
 For traders
 Make your take-profit, stop and P&L labels bigger and easier to read, and give each part its own colour. Set a daily goal and loss limit with an optional chime, get a soft heads-up before the session opens or closes, and let the edges of your chart glow with your P&L.
 
 For streamers
-Streamer mode hides your money on screen and in recordings, and you choose whether P&L shows as ticks, points or dollars. Save snapshots and clips of your chart, with your voice or your computer's sound, crop or trim them before saving, and let a clip of each trade save itself when it closes.
+Streamer mode hides your money on screen and in recordings, and you choose whether P&L shows as ticks, points or dollars. Save snapshots and MP4 clips of your chart, with your voice or your computer's sound (music included), crop or trim them before saving, and let a clip of each trade save itself when it closes.
 
 Other platforms
 Turn it on for other charting platforms you trade on, with one click and your permission.

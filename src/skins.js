@@ -1293,6 +1293,207 @@ function priismSkins(window, document) {
     };
   };
 
+
+  // ===================== Seasonal drops =====================
+  // Featured in their month by the panel (Christmas in December, Halloween in October), available all year under
+  // Seasonal. Calm like the rest: slow snow, softly twinkling lights, a moon and drifting mist.
+
+  // Christmas Eve: a deep blue night, snow falling in two depths, a string of warm lights in soft swags, snowy pines.
+  const christmas = (ctx) => {
+    let w = 0, h = 0, k = 1, st = [], flakes = [], lights = [], pines = null, bokeh = [];
+    const LC = ["255,92,92", "96,224,150", "255,206,112", "255,242,220", "130,185,255"];
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h); st = starsOf(w, h, 70, k, 0.55);
+        const n = Math.round(90 + 110 * Math.min(2, (w * h) / (1280 * 720)));
+        flakes = Array.from({ length: n }, () => { const z = Math.random(); return { x: rnd(0, w), y: rnd(0, h), z, r: (0.6 + z * 1.9) * k, s: (9 + z * 26) * k, p: rnd(0, T2) }; });
+        // a few big, soft out-of-focus lights drifting very slowly (like looking through a window)
+        bokeh = Array.from({ length: 9 }, (_, i) => ({ x: rnd(0, w), y: rnd(h * 0.2, h * 0.75), r: rnd(40, 90) * k, c: LC[i % LC.length], p: rnd(0, T2), s: rnd(2, 5) * k }));
+        // two soft swags of lights hanging across the top
+        lights = []; const m = Math.max(16, Math.round(w / (64 * k)));
+        for (let i = 0; i <= m; i++) { const u = i / m, f = (u * 2) % 1; lights.push({ x: u * w, y: h * 0.055 + h * 0.07 * Math.sin(Math.PI * f), c: LC[i % LC.length], p: rnd(0, T2) }); }
+        // pines: drawn once (they don't move), with snow on their branches
+        pines = offscreen(w, h); const g = pines.getContext("2d");
+        const tree = (x, ht, col, snow) => {
+          const base = h * 1.01, tiers = 4;
+          for (let i = 0; i < tiers; i++) {
+            const top = base - ht * (0.32 + i * 0.22), bot = base - ht * (i * 0.2), half = ht * (0.3 - i * 0.055);
+            g.fillStyle = col; g.beginPath(); g.moveTo(x, top); g.lineTo(x + half, bot); g.lineTo(x - half, bot); g.closePath(); g.fill();
+            g.fillStyle = snow; g.beginPath(); g.moveTo(x, top); g.lineTo(x + half * 0.42, top + (bot - top) * 0.42); g.quadraticCurveTo(x, top + (bot - top) * 0.32, x - half * 0.42, top + (bot - top) * 0.42); g.closePath(); g.fill();
+          }
+        };
+        const row = (n, hMin, hMax, col, snow) => { for (let i = 0; i < n; i++) tree((i + 0.5 + rnd(-0.3, 0.3)) * (w / n), h * rnd(hMin, hMax), col, snow); };
+        row(Math.max(6, Math.round(w / (120 * k))), 0.16, 0.26, "#0b1532", "rgba(200,220,255,0.18)");
+        row(Math.max(4, Math.round(w / (210 * k))), 0.22, 0.36, "#060b1d", "rgba(225,238,255,0.32)");
+        const gr = g.createLinearGradient(0, h * 0.9, 0, h); gr.addColorStop(0, "rgba(210,226,255,0)"); gr.addColorStop(1, "rgba(210,226,255,0.16)");
+        g.fillStyle = gr; g.fillRect(0, h * 0.9, w, h * 0.1);                       // snow on the ground
+      },
+      frame(t, dt) {
+        sky(ctx, w, h, [[0, "#050a1d"], [0.6, "#0b1636"], [1, "#16244f"]]);
+        drawStars(ctx, st, t, 0.42);
+        glowDot(ctx, w * 0.5, h * 1.08, h * 0.75, "255,170,95", 0.11);              // a warm glow from the village below
+        ctx.globalCompositeOperation = "lighter";
+        for (const b of bokeh) { b.x += b.s * dt; if (b.x > w + b.r) b.x = -b.r; glowDot(ctx, b.x, b.y + Math.sin(t * 0.2 + b.p) * 8 * k, b.r, b.c, 0.07 + 0.03 * Math.sin(t * 0.4 + b.p)); }
+        ctx.globalCompositeOperation = "source-over";
+        for (const f of flakes) if (f.z < 0.5) drawFlake(f, t, dt);                  // far snow behind the trees
+        ctx.drawImage(pines, 0, 0);
+        // the wire, then the bulbs (each twinkles slowly on its own)
+        ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = Math.max(1, 1.4 * k); ctx.beginPath();
+        lights.forEach((l, i) => (i ? ctx.lineTo(l.x, l.y) : ctx.moveTo(l.x, l.y))); ctx.stroke();
+        ctx.globalCompositeOperation = "lighter";
+        for (const l of lights) { const tw = 0.62 + 0.38 * Math.sin(t * 0.9 + l.p); glowDot(ctx, l.x, l.y + 3 * k, 24 * k, l.c, 0.55 * tw); }
+        ctx.globalCompositeOperation = "source-over";
+        for (const l of lights) { ctx.fillStyle = `rgba(${l.c},0.95)`; ctx.beginPath(); ctx.ellipse(l.x, l.y + 3 * k, 2.4 * k, 3.4 * k, 0, 0, T2); ctx.fill(); }
+        for (const f of flakes) if (f.z >= 0.5) drawFlake(f, t, dt);                 // near snow in front
+      },
+    };
+    function drawFlake(f, t, dt) {
+      f.y += f.s * dt; f.x += Math.sin(t * 0.5 + f.p) * (4 + f.z * 8) * k * dt;
+      if (f.y > h + 4) { f.y = -4; f.x = rnd(0, w); } if (f.x < -4) f.x = w + 4; else if (f.x > w + 4) f.x = -4;
+      ctx.fillStyle = `rgba(255,255,255,${0.35 + f.z * 0.55})`; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, T2); ctx.fill();
+    }
+  };
+
+  // Hallows Night: a big harvest moon in a violet sky, mist drifting low, jack-o'-lanterns glowing softly, a bare tree
+  // and a few bats gliding slowly past.
+  const hallows = (ctx) => {
+    let w = 0, h = 0, k = 1, st = [], bats = [], mist = [], lamps = [], land = null, mx = 0, my = 0, R = 0;
+    const newBat = (init) => ({ x: init ? rnd(0, w) : -40 * k, y: h * rnd(0.12, 0.5), s: rnd(26, 46) * k, p: rnd(0, T2), z: rnd(0.6, 1.2), wait: init ? 0 : rnd(2, 9) });
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h); st = starsOf(w, h, 90, k, 0.6);
+        mx = w * 0.72; my = h * 0.27; R = Math.min(w, h) * 0.13;
+        bats = Array.from({ length: 3 }, () => newBat(true));
+        mist = Array.from({ length: 7 }, (_, i) => ({ x: rnd(0, w), y: h * rnd(0.72, 0.92), r: Math.max(w, h) * rnd(0.18, 0.32), s: rnd(6, 14) * k * (i % 2 ? 1 : -1) }));
+        lamps = [[0.14, 1], [0.235, 0.78], [0.84, 0.9]].map(([u, z], i) => ({ x: w * u, y: h * 0.935, r: 26 * k * z, p: i * 2.1 }));
+        // hills + a bare tree, drawn once
+        land = offscreen(w, h); const g = land.getContext("2d");
+        g.fillStyle = "#07030c"; g.beginPath(); g.moveTo(0, h);
+        for (let x = 0; x <= w; x += 8 * k) g.lineTo(x, h * 0.86 - Math.sin(x / w * 5.2 + 0.6) * h * 0.035 - Math.sin(x / w * 13) * h * 0.012);
+        g.lineTo(w, h); g.closePath(); g.fill();
+        g.strokeStyle = "#07030c"; g.lineCap = "round";
+        const branch = (x, y, len, ang, wd, depth) => {
+          if (depth === 0 || len < 3 * k) return;
+          const x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;
+          g.lineWidth = wd; g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.stroke();
+          branch(x2, y2, len * 0.72, ang - rnd(0.25, 0.6), wd * 0.68, depth - 1);
+          branch(x2, y2, len * 0.66, ang + rnd(0.2, 0.55), wd * 0.66, depth - 1);
+        };
+        branch(w * 0.06, h * 0.88, h * 0.2, -Math.PI / 2 + 0.08, 9 * k, 7);
+      },
+      frame(t, dt) {
+        sky(ctx, w, h, [[0, "#0a0416"], [0.55, "#1b0b2c"], [1, "#2b1124"]]);
+        drawStars(ctx, st, t, 0.5);
+        // the moon: a warm glow, then the disc with a few soft craters
+        glowDot(ctx, mx, my, R * 3.4, "255,168,82", 0.2);
+        const mg = ctx.createRadialGradient(mx - R * 0.3, my - R * 0.3, R * 0.1, mx, my, R);
+        mg.addColorStop(0, "#ffe2b0"); mg.addColorStop(1, "#eea04a"); ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, R, 0, T2); ctx.fill();
+        for (const [a, b, c] of [[-0.28, -0.12, 0.22], [0.24, 0.22, 0.16], [0.02, 0.45, 0.1], [0.4, -0.3, 0.1]]) glowDot(ctx, mx + a * R, my + b * R, c * R, "170,92,40", 0.14);   // soft craters
+        // bats glide slowly across, one at a time now and then
+        ctx.fillStyle = "#0c0612";
+        for (let i = 0; i < bats.length; i++) {
+          const b = bats[i];
+          if (b.wait > 0) { b.wait -= dt; continue; }
+          b.x += b.s * dt; const y = b.y + Math.sin(t * 0.9 + b.p) * 10 * k, f = Math.sin(t * 6 + b.p), S = 15 * k * b.z;
+          ctx.beginPath(); ctx.moveTo(b.x - S * 1.6, y - S * f * 0.7); ctx.quadraticCurveTo(b.x - S * 0.7, y + S * 0.15, b.x, y);
+          ctx.quadraticCurveTo(b.x + S * 0.7, y + S * 0.15, b.x + S * 1.6, y - S * f * 0.7); ctx.quadraticCurveTo(b.x + S * 0.6, y - S * 0.1, b.x, y + S * 0.35);
+          ctx.quadraticCurveTo(b.x - S * 0.6, y - S * 0.1, b.x - S * 1.6, y - S * f * 0.7); ctx.fill();
+          if (b.x > w + 40 * k) bats[i] = newBat(false);
+        }
+        // low mist drifting
+        for (const m of mist) { m.x += m.s * dt; if (m.x > w + m.r) m.x = -m.r; else if (m.x < -m.r) m.x = w + m.r; glowDot(ctx, m.x, m.y, m.r, "150,118,190", 0.07); }
+        ctx.drawImage(land, 0, 0);
+        // jack-o'-lanterns: a gentle candle flicker
+        for (const l of lamps) {
+          const fl = 0.78 + 0.22 * Math.sin(t * 2.3 + l.p) * Math.sin(t * 1.3 + l.p * 1.7);
+          glowDot(ctx, l.x, l.y - l.r * 0.2, l.r * 3, "255,140,40", 0.22 * fl);
+          const pg = ctx.createRadialGradient(l.x, l.y - l.r * 0.5, l.r * 0.1, l.x, l.y - l.r * 0.45, l.r);   // a pumpkin lit from inside
+          pg.addColorStop(0, `rgba(${(200 + 40 * fl) | 0},96,24,1)`); pg.addColorStop(1, "#5a2408");
+          ctx.fillStyle = pg; ctx.beginPath(); ctx.ellipse(l.x, l.y - l.r * 0.45, l.r, l.r * 0.78, 0, 0, T2); ctx.fill();
+          ctx.strokeStyle = "rgba(60,22,4,0.55)"; ctx.lineWidth = Math.max(1, l.r * 0.05);
+          for (const q of [-0.45, 0.45]) { ctx.beginPath(); ctx.ellipse(l.x + q * l.r * 0.55, l.y - l.r * 0.45, l.r * 0.32, l.r * 0.76, 0, 0, T2); ctx.stroke(); }   // ribs
+          ctx.fillStyle = "#0d0603"; ctx.fillRect(l.x - l.r * 0.08, l.y - l.r * 1.38, l.r * 0.16, l.r * 0.3);
+          ctx.fillStyle = `rgba(255,${(214 + 30 * fl) | 0},${(120 + 60 * fl) | 0},${0.95 * fl})`;   // the carved face, bright from the candle
+          const e = l.r * 0.2, cy = l.y - l.r * 0.62;
+          for (const sx of [-1, 1]) { ctx.beginPath(); ctx.moveTo(l.x + sx * l.r * 0.42, cy + e); ctx.lineTo(l.x + sx * l.r * 0.2, cy + e); ctx.lineTo(l.x + sx * l.r * 0.31, cy - e * 0.7); ctx.closePath(); ctx.fill(); }
+          ctx.beginPath(); ctx.moveTo(l.x - l.r * 0.5, l.y - l.r * 0.32); ctx.quadraticCurveTo(l.x, l.y - l.r * 0.02, l.x + l.r * 0.5, l.y - l.r * 0.32); ctx.quadraticCurveTo(l.x, l.y - l.r * 0.18, l.x - l.r * 0.5, l.y - l.r * 0.32); ctx.fill();
+        }
+      },
+    };
+  };
+  // ---------- a wallpaper's colours ----------
+  // From RGBA pixel data: the strongest hue (accent) and a readable up / down candle pair. Used by the chart (auto
+  // contrast, Skin colour, Auto-match) and by the panel's "Match everything".
+  function paletteFromData(d, loose) {   // loose: also find sparse colour (the panel's Match everything)
+    const bins = new Array(24).fill(null).map(() => ({ n: 0, r: 0, g: 0, b: 0, sat: 0 }));
+    let colourful = 0, total = 0, lit = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3] / 255; if (a < 0.4) continue;
+      const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+      const sat = mx === mn ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1));
+      total++; if (l >= 0.08) lit++;
+      if (sat < 0.18 || l < 0.08 || l > 0.95) continue;        // skip greys / near-black / near-white
+      colourful++;
+      let hue = 0;
+      if (mx !== mn) { const dd = mx - mn;
+        hue = mx === r ? (g - b) / dd + (g < b ? 6 : 0) : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; hue *= 60; }
+      const bi = Math.floor(hue / 15) % 24, wt = sat * (0.4 + 0.6 * (1 - Math.abs(l - 0.5) * 2));
+      const bn = bins[bi]; bn.n += wt; bn.r += r * wt; bn.g += g * wt; bn.b += b * wt; bn.sat += sat * wt;
+    }
+    // mostly grey: nothing to match. Measured against the lit part, so sparse colour on black (Code Rain) still counts
+    if (colourful < (loose ? Math.max(total * 0.0012, 12) : Math.max(total * 0.004, lit * 0.12))) return null;
+    const avg = (bi) => { const bn = bins[bi]; return bn.n > 0 ? [bn.r / bn.n, bn.g / bn.n, bn.b / bn.n] : null; };
+    const ranked = bins.map((b, i) => ({ i, n: b.n })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n);
+    if (!ranked.length) return null;
+    const top = ranked[0].i, accent = punch(avg(top));
+    // Second colour = the strongest hue cluster that's clearly different from the first (>= ~90° away on the wheel).
+    const far = (a, b) => { const d = Math.abs(a - b) * 15; return Math.min(d, 360 - d) >= 90; };
+    let second = ranked.find((x) => far(x.i, top));
+    const c1 = avg(top), c2 = second ? avg(second.i) : null;
+    // Two distinct wallpaper colours → use both (greener one becomes "up"). One dominant colour → derive a
+    // complementary pair around it so up/down stay clearly different and readable.
+    let upRgb, downRgb;
+    if (c2) {
+      // "up" = the colour nearer green / teal / blue, "down" = the warmer one (red, orange, pink): traders read red as down
+      const hueOfRgb = (c) => { const [r, g, b] = c, mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx === mn) return 0; const d = mx - mn;
+        return ((mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60) % 360; };
+      const toCool = (c) => { const d = Math.abs(hueOfRgb(c) - 165); return Math.min(d, 360 - d); };
+      [upRgb, downRgb] = toCool(c1) <= toCool(c2) ? [c1, c2] : [c2, c1];
+      upRgb = punch(upRgb); downRgb = punch(downRgb);
+    } else {
+      const accHue = top * 15;
+      upRgb = punch(hslRgb(nearestNice(accHue, true)));
+      downRgb = punch(hslRgb(nearestNice((accHue + 150) % 360, false)));
+    }
+    return { up: hex(upRgb), down: hex(downRgb), accent: hex(accent) };
+  }
+  const clampc = (v) => Math.max(0, Math.min(255, Math.round(v)));
+  // rgb channels are 0..1 floats
+  const hex = (rgb) => "#" + rgb.map((v) => clampc(v * 255).toString(16).padStart(2, "0")).join("");
+  // boost saturation + set a readable lightness so candles pop on any art
+  function punch(rgb) {
+    if (!rgb) return [0, 0.88, 0.64];
+    let [r, g, b] = rgb; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let l = (mx + mn) / 2;
+    let h = 0, s = 0;
+    if (mx !== mn) { const dd = mx - mn; s = l > 0.5 ? dd / (2 - mx - mn) : dd / (mx + mn);
+      h = mx === r ? (g - b) / dd + (g < b ? 6 : 0) : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4; h /= 6; }
+    s = Math.min(1, s * 1.5 + 0.35); l = Math.min(0.72, Math.max(0.5, l));
+    return hslRgb([h * 360, s, l]);
+  }
+  // pick an "up" (green-leaning) or "down" (warm-leaning) hue near the accent but in a readable zone
+  function nearestNice(hue, up) {
+    const s = 0.85, l = 0.6;
+    if (up) { const h = hue > 60 && hue < 200 ? hue : 150; return [h, s, l]; }
+    const h = hue > 300 || hue < 60 ? hue : 340; return [h, s, l];
+  }
+  function hslRgb(hsl) {
+    let [h, s, l] = hsl; h = ((h % 360) + 360) % 360 / 360;
+    const f = (n) => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
+    return [f(0), f(8), f(4)];
+  }
+  window.PriismPalette = { fromData: paletteFromData, hex };
+
   window.WickedSkins = {
     aurora:    { name: "Polar Lights",    cat: "Wild", create: aurora },
     nebula:    { name: "Stardust",    cat: "Cosmos",  create: nebula },
@@ -1347,6 +1548,9 @@ function priismSkins(window, document) {
     helix:       { name: "Double Helix",   cat: "Wild",     create: helix, wow: true },
     synapse:     { name: "Synapse",        cat: "Electric", create: synapse, wow: true },
     nebulacore:  { name: "Nebula",         cat: "Cosmos",   create: nebulaCore, wow: true },
+    // seasonal drops (featured in their month by the panel)
+    christmas:   { name: "Christmas Eve",  cat: "Seasonal", create: christmas, season: "christmas" },
+    hallows:     { name: "Hallows Night",  cat: "Seasonal", create: hallows, season: "halloween" },
   };
   // Retired because they were too busy behind a chart. Not listed any more, but anyone who had one selected (or saved
   // in a look, session or symbol) gets the calm Fog Bank instead of a broken wallpaper. Non-enumerable = hidden from lists.
