@@ -2,7 +2,7 @@
 window.SITE = {
   name: "Priism Skins",
   contactEmail: "arcuto2978@gmail.com", // shown on Privacy/Terms for questions and copyright takedowns
-  chromeStoreUrl: "",               // fill in after the Chrome Web Store listing is live
+  chromeStoreUrl: "https://chromewebstore.google.com/detail/priism-skins-for-tradingv/ilmoloilbeblmgkanbiekhdegagfdloa",   // the live Chrome Web Store listing
   releasesUrl: "https://github.com/arcuto29/wicked-skins/releases/latest",
   // same values as src/workshop-config.js (the anon key is public by design)
   supabaseUrl: "https://tsazewpipzgfwgcepcsb.supabase.co",
