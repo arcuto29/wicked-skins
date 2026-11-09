@@ -1421,6 +1421,152 @@ function priismSkins(window, document) {
       },
     };
   };
+
+  // A soft, flat-ish disc with a slightly brighter rim: how a light looks when it's out of focus (camera bokeh).
+  const bokehDisc = (ctx, x, y, r, rgb, a) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${rgb},${a * 0.6})`); g.addColorStop(0.62, `rgba(${rgb},${a * 0.52})`);
+    g.addColorStop(0.86, `rgba(${rgb},${a * 0.62})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  };
+  const snowOf = (w, h, k, n) => Array.from({ length: n }, () => { const z = Math.random(); return { x: rnd(0, w), y: rnd(0, h), z, r: (0.6 + z * 1.8) * k, s: (8 + z * 24) * k, p: rnd(0, T2) }; });
+  function drawSnow(ctx, flakes, w, h, k, t, dt, front) {
+    for (const f of flakes) {
+      if (front !== undefined && (f.z >= 0.5) !== front) continue;
+      f.y += f.s * dt; f.x += Math.sin(t * 0.5 + f.p) * (4 + f.z * 8) * k * dt;
+      if (f.y > h + 4) { f.y = -4; f.x = rnd(0, w); } if (f.x < -4) f.x = w + 4; else if (f.x > w + 4) f.x = -4;
+      ctx.fillStyle = `rgba(255,255,255,${0.32 + f.z * 0.55})`; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, T2); ctx.fill();
+    }
+  }
+
+  // Tree Lights: Christmas-tree lights out of focus, glowing softly in the dark, with a few sharp twinkles.
+  const treeLights = (ctx) => {
+    let w = 0, h = 0, k = 1, orbs = [], sparks = [];
+    const C = ["255,196,92", "255,96,88", "112,226,150", "255,236,206", "255,150,70", "120,170,255"];
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h);
+        const n = Math.round(26 + 18 * Math.min(2, (w * h) / (1280 * 720)));
+        orbs = Array.from({ length: n }, (_, i) => ({ x: rnd(-0.05, 1.05) * w, y: rnd(-0.05, 1.05) * h, r: rnd(28, 92) * k, c: C[i % C.length], p: rnd(0, T2), vx: rnd(-3, 3) * k, vy: rnd(-4, -1) * k }));
+        sparks = Array.from({ length: 40 }, () => ({ x: rnd(0, w), y: rnd(0, h), p: rnd(0, T2), s: rnd(0.4, 1) }));
+      },
+      frame(t, dt) {
+        sky(ctx, w, h, [[0, "#050906"], [0.6, "#08110c"], [1, "#100b06"]]);
+        ctx.globalCompositeOperation = "lighter";
+        for (const o of orbs) {
+          o.x += o.vx * dt; o.y += o.vy * dt;
+          if (o.y < -o.r) { o.y = h + o.r; o.x = rnd(0, w); } if (o.x < -o.r) o.x = w + o.r; else if (o.x > w + o.r) o.x = -o.r;
+          bokehDisc(ctx, o.x, o.y, o.r * (0.96 + 0.04 * Math.sin(t * 0.5 + o.p)), o.c, 0.26 + 0.08 * Math.sin(t * 0.6 + o.p));
+        }
+        for (const s of sparks) { const a = Math.max(0, Math.sin(t * s.s + s.p)) ** 6; if (a > 0.02) glowDot(ctx, s.x, s.y, 6 * k, "255,240,210", 0.8 * a); }
+        ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
+
+  // Winter Village: snowy rooftops at night, warm windows, chimney smoke drifting up, snow and a crescent moon.
+  const winterVillage = (ctx) => {
+    let w = 0, h = 0, k = 1, st = [], flakes = [], town = null, glow = null, moon = null, windows = [], chimneys = [], puffs = [];
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h); st = starsOf(w, h, 80, k, 0.5); flakes = snowOf(w, h, k, Math.round(80 + 80 * Math.min(2, (w * h) / (1280 * 720))));
+        windows = []; chimneys = []; puffs = [];
+        town = offscreen(w, h); const g = town.getContext("2d");
+        const row = (baseY, hMin, hMax, col, roofSnow, lit) => {
+          let x = -20 * k;
+          while (x < w + 20 * k) {
+            const bw = rnd(70, 130) * k, bh = rnd(hMin, hMax) * h, top = baseY - bh, roof = bw * rnd(0.35, 0.5);
+            g.fillStyle = col; g.fillRect(x, top, bw, bh + h);
+            g.beginPath(); g.moveTo(x - 6 * k, top); g.lineTo(x + bw / 2, top - roof); g.lineTo(x + bw + 6 * k, top); g.closePath(); g.fill();
+            g.fillStyle = roofSnow; g.beginPath(); g.moveTo(x - 6 * k, top); g.lineTo(x + bw / 2, top - roof); g.lineTo(x + bw + 6 * k, top);
+            g.lineTo(x + bw + 2 * k, top + 4 * k); g.lineTo(x + bw / 2, top - roof + 6 * k); g.lineTo(x - 2 * k, top + 4 * k); g.closePath(); g.fill();
+            if (lit) {
+              if (Math.random() < 0.6) { const cx = x + bw * rnd(0.6, 0.8), cy = top - roof * 0.45; g.fillStyle = col; g.fillRect(cx, cy - 16 * k, 10 * k, 20 * k); chimneys.push({ x: cx + 5 * k, y: cy - 16 * k }); }
+              const cols = Math.max(1, Math.floor(bw / (34 * k))), rows = Math.max(1, Math.floor(bh / (38 * k)));
+              for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) if (Math.random() < 0.55)
+                windows.push({ x: x + (i + 0.5) * (bw / cols) - 6 * k, y: top + 16 * k + j * 36 * k, w: 12 * k, h: 15 * k, p: rnd(0, T2), c: Math.random() < 0.8 ? "255,196,110" : "255,150,90" });
+            }
+            x += bw + rnd(4, 18) * k;
+          }
+        };
+        row(h * 0.82, 0.12, 0.2, "#152044", "rgba(200,218,250,0.3)", false);
+        row(h * 0.97, 0.13, 0.24, "#070b1a", "rgba(230,240,255,0.55)", true);
+        const gr = g.createLinearGradient(0, h * 0.94, 0, h); gr.addColorStop(0, "rgba(220,232,255,0)"); gr.addColorStop(1, "rgba(220,232,255,0.22)"); g.fillStyle = gr; g.fillRect(0, h * 0.94, w, h * 0.06);
+        for (const c of chimneys) for (let i = 0; i < 4; i++) puffs.push({ c, a: i / 4 });
+        // the windows' warm glow is drawn once; each frame it's added on top (cheap), with one slow shared breathing
+        // a crescent moon: a disc with a second disc cut out of it (drawn once)
+        const R = Math.min(w, h) * 0.06; moon = offscreen(R * 2 + 4, R * 2 + 4); const mg = moon.getContext("2d");
+        mg.fillStyle = "#eef2ff"; mg.beginPath(); mg.arc(R + 2, R + 2, R, 0, T2); mg.fill();
+        mg.globalCompositeOperation = "destination-out"; mg.beginPath(); mg.arc(R + 2 + R * 0.42, R + 2 - R * 0.18, R * 0.92, 0, T2); mg.fill();
+        glow = offscreen(w, h); const gg = glow.getContext("2d");
+        for (const o of windows) glowDot(gg, o.x + o.w / 2, o.y + o.h / 2, o.w * 2.2, o.c, 0.2);
+      },
+      frame(t, dt) {
+        sky(ctx, w, h, [[0, "#040818"], [0.65, "#0b1533"], [1, "#16224a"]]);
+        drawStars(ctx, st, t, 0.45);
+        // crescent moon: a soft disc with a sky-coloured disc cut out of it
+        const mx = w * 0.18, my = h * 0.2, R = Math.min(w, h) * 0.06;
+        glowDot(ctx, mx, my, R * 4, "200,215,255", 0.14);
+        ctx.drawImage(moon, mx - moon.width / 2, my - moon.height / 2);
+        drawSnow(ctx, flakes, w, h, k, t, dt, false);
+        // chimney smoke: soft puffs rising and fading
+        for (const p of puffs) { p.a += dt * 0.08; if (p.a > 1) p.a -= 1;
+          glowDot(ctx, p.c.x + Math.sin(t * 0.4 + p.a * 6) * 8 * k + p.a * 26 * k, p.c.y - p.a * 70 * k, (6 + p.a * 18) * k, "170,180,205", 0.14 * (1 - p.a)); }
+        ctx.drawImage(town, 0, 0);
+        // warm windows, each with a soft glow and a gentle flicker
+        ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.85 + 0.15 * Math.sin(t * 0.5);
+        ctx.drawImage(glow, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+        for (const o of windows) { const f = 0.85 + 0.15 * Math.sin(t * 0.7 + o.p); ctx.fillStyle = `rgba(${o.c},${0.85 * f})`; ctx.fillRect(o.x, o.y, o.w, o.h);
+          ctx.fillStyle = "rgba(20,14,10,0.55)"; ctx.fillRect(o.x + o.w / 2 - 0.6 * k, o.y, 1.2 * k, o.h); ctx.fillRect(o.x, o.y + o.h / 2 - 0.6 * k, o.w, 1.2 * k); }
+        drawSnow(ctx, flakes, w, h, k, t, dt, true);
+      },
+    };
+  };
+
+  // Northern Noel: northern lights rippling over snowy hills, pines and a small cabin with a warm window.
+  const northernNoel = (ctx) => {
+    let w = 0, h = 0, k = 1, st = [], flakes = [], land = null, win = null, sky4 = null;
+    const BANDS = [{ y: 0.3, a: 0.09, sp: 0.05, c0: "60,255,170", c1: "60,200,255", hh: 0.26 }, { y: 0.4, a: 0.07, sp: -0.035, c0: "90,255,200", c1: "150,110,255", hh: 0.2 }, { y: 0.22, a: 0.06, sp: 0.025, c0: "150,255,210", c1: "60,160,255", hh: 0.16 }];
+    return {
+      resize(W, H) {
+        w = W; h = H; k = kOf(w, h); st = starsOf(w, h, 110, k, 0.7); flakes = snowOf(w, h, k, Math.round(40 + 40 * Math.min(2, (w * h) / (1280 * 720))));
+        land = offscreen(w, h); const g = land.getContext("2d");
+        const hill = (base, amp, f, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(0, h); for (let x = 0; x <= w; x += 6 * k) g.lineTo(x, h * base - Math.sin(x / w * f + base * 9) * h * amp - Math.sin(x / w * f * 2.7) * h * amp * 0.3); g.lineTo(w, h); g.closePath(); g.fill(); };
+        hill(0.8, 0.04, 4, "#cfdaf0"); hill(0.86, 0.035, 6, "#b4c3e0");
+        const pine = (x, y, ht) => { g.fillStyle = "#0a1428"; for (let i = 0; i < 3; i++) { const top = y - ht * (0.45 + i * 0.27), bot = y - ht * i * 0.25, half = ht * (0.26 - i * 0.06); g.beginPath(); g.moveTo(x, top); g.lineTo(x + half, bot); g.lineTo(x - half, bot); g.closePath(); g.fill(); } };
+        for (let i = 0; i < Math.max(8, Math.round(w / (80 * k))); i++) { const x = rnd(0, w); if (Math.abs(x - w * 0.62) < 60 * k) continue; pine(x, h * rnd(0.84, 0.9), h * rnd(0.08, 0.15)); }
+        // the cabin
+        const cx = w * 0.62, cy = h * 0.86, cw = 70 * k, ch = 42 * k;
+        g.fillStyle = "#1a1220"; g.fillRect(cx - cw / 2, cy - ch, cw, ch);
+        g.beginPath(); g.moveTo(cx - cw / 2 - 8 * k, cy - ch); g.lineTo(cx, cy - ch - 30 * k); g.lineTo(cx + cw / 2 + 8 * k, cy - ch); g.closePath(); g.fill();
+        g.fillStyle = "rgba(235,242,255,0.9)"; g.beginPath(); g.moveTo(cx - cw / 2 - 8 * k, cy - ch); g.lineTo(cx, cy - ch - 30 * k); g.lineTo(cx + cw / 2 + 8 * k, cy - ch); g.lineTo(cx + cw / 2 + 4 * k, cy - ch + 5 * k); g.lineTo(cx, cy - ch - 24 * k); g.lineTo(cx - cw / 2 - 4 * k, cy - ch + 5 * k); g.closePath(); g.fill();
+        win = { x: cx - 12 * k, y: cy - ch + 12 * k, w: 24 * k, h: 16 * k };
+        sky4 = offscreen(w / 4, h / 4);         // the aurora is soft, so it's drawn at a quarter size and scaled up
+      },
+      frame(t, dt) {
+        sky(ctx, w, h, [[0, "#02050f"], [0.6, "#061127"], [1, "#0c1d3a"]]);
+        drawStars(ctx, st, t, 0.55);
+        // aurora: each band is one soft ribbon (a filled wave with a vertical fade), slowly rippling
+        const a4 = sky4.getContext("2d"); a4.setTransform(1, 0, 0, 1, 0, 0); a4.clearRect(0, 0, sky4.width, sky4.height); a4.setTransform(sky4.width / w, 0, 0, sky4.height / h, 0, 0);
+        a4.globalCompositeOperation = "lighter"; a4.filter = "blur(3px)";      // soft edges, like a real aurora
+        for (const b of BANDS) {
+          const top = (x) => h * b.y + Math.sin(x / w * 5 + t * b.sp * 6) * h * b.a + Math.sin(x / w * 13 - t * b.sp * 9) * h * b.a * 0.35;
+          const gr = a4.createLinearGradient(0, h * (b.y - b.a - 0.05), 0, h * (b.y + b.hh));
+          gr.addColorStop(0, `rgba(${b.c1},0)`); gr.addColorStop(0.3, `rgba(${b.c1},0.16)`); gr.addColorStop(0.7, `rgba(${b.c0},0.22)`); gr.addColorStop(1, `rgba(${b.c0},0)`);
+          a4.fillStyle = gr; a4.beginPath(); a4.moveTo(-w * 0.08, top(-w * 0.08));    // a little past both edges: no seams
+          for (let x = -w * 0.08; x <= w * 1.08; x += 16 * k) a4.lineTo(x, top(x));
+          for (let x = w * 1.08; x >= -w * 0.08; x -= 16 * k) a4.lineTo(x, top(x) + h * b.hh * (0.75 + 0.25 * Math.sin(x / w * 7 + t * 0.3)));
+          a4.closePath(); a4.fill();
+        }
+        a4.filter = "none";
+        ctx.globalCompositeOperation = "lighter"; ctx.imageSmoothingEnabled = true; ctx.drawImage(sky4, 0, 0, w, h); ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(land, 0, 0);
+        if (win) { const f = 0.88 + 0.12 * Math.sin(t * 0.8); glowDot(ctx, win.x + win.w / 2, win.y + win.h / 2, 42 * k, "255,180,90", 0.3 * f);
+          ctx.fillStyle = `rgba(255,200,120,${0.92 * f})`; ctx.fillRect(win.x, win.y, win.w, win.h); ctx.fillStyle = "rgba(30,18,10,0.6)"; ctx.fillRect(win.x + win.w / 2 - k, win.y, 2 * k, win.h); }
+        drawSnow(ctx, flakes, w, h, k, t, dt);
+      },
+    };
+  };
   // ---------- a wallpaper's colours ----------
   // From RGBA pixel data: the strongest hue (accent) and a readable up / down candle pair. Used by the chart (auto
   // contrast, Skin colour, Auto-match) and by the panel's "Match everything".
@@ -1550,6 +1696,9 @@ function priismSkins(window, document) {
     nebulacore:  { name: "Nebula",         cat: "Cosmos",   create: nebulaCore, wow: true },
     // seasonal drops (featured in their month by the panel)
     christmas:   { name: "Christmas Eve",  cat: "Seasonal", create: christmas, season: "christmas" },
+    treelights:  { name: "Tree Lights",    cat: "Seasonal", create: treeLights, season: "christmas" },
+    village:     { name: "Winter Village", cat: "Seasonal", create: winterVillage, season: "christmas" },
+    noel:        { name: "Northern Noel",  cat: "Seasonal", create: northernNoel, season: "christmas" },
     hallows:     { name: "Hallows Night",  cat: "Seasonal", create: hallows, season: "halloween" },
   };
   // Retired because they were too busy behind a chart. Not listed any more, but anyone who had one selected (or saved

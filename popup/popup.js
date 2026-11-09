@@ -386,7 +386,7 @@ const LOOK_GROUP = {
   "ocean-calm": "Calm", nightfall: "Calm", daybreak: "Calm", sterling: "Calm", harbor: "Calm", dune: "Calm", "clean-focus": "Calm", blossom: "Calm",
   glowstick: "Glow", blacklight: "Glow", vaporwave: "Glow", molten: "Glow", warp: "Glow", spectrum: "Glow", "neon-night": "Glow", firefly: "Glow",
   horizon: "Wow", bloom: "Wow", ink: "Wow", kaleido: "Wow", slick: "Wow", hypercube: "Wow", helix: "Wow", synapse: "Wow",
-  "xmas-spirit": "Seasonal", "hallows-eve": "Seasonal",
+  "xmas-spirit": "Seasonal", "hallows-eve": "Seasonal", "cozy-lights": "Seasonal", "silent-night": "Seasonal", "northern-noel": "Seasonal",
 };
 const LOOK_GROUPS = ["All", "Wow", "Seasonal", "Calm", "Glow", "Classic"];
 const groupOf = (q) => LOOK_GROUP[q.id] || "Classic";
@@ -394,6 +394,12 @@ const QUICK_LOOKS = [
   // ----- Seasonal drops: offered in their month (see SEASONS), available all year under Seasonal -----
   { id: "xmas-spirit", name: "Christmas Spirit", sub: "Christmas Eve · Glass candles", skin: "christmas",
     set: { candleOn: true, candleUp: "#4ee59a", candleDown: "#ff4d5e", candleLook: "glass", candleGlow: 0.35, candlePreset: "custom", lineGlow: 0.3, scaleText: "#ffe6b3", scaleGlow: 0.2, scaleBg: "auto", dim: 0.12 } },
+  { id: "cozy-lights", name: "Cozy Lights", sub: "Tree Lights · Neon candles", skin: "treelights",
+    set: { candleOn: true, candleUp: "#6ff0b0", candleDown: "#ff5a6e", candleLook: "neon", candleGlow: 0.45, candlePreset: "custom", lineGlow: 0.3, scaleText: "#ffe2b8", scaleGlow: 0.25, scaleBg: "auto", dim: 0.1 } },
+  { id: "silent-night", name: "Silent Night", sub: "Winter Village · Ice candles", skin: "village",
+    set: { candleOn: true, candleUp: "#9fd8ff", candleDown: "#ff8f7a", candleLook: "ice", candleGlow: 0.25, candlePreset: "custom", lineGlow: 0.2, scaleText: "#dfe9ff", scaleGlow: 0.2, scaleBg: "auto", dim: 0.1 } },
+  { id: "northern-noel", name: "Northern Noel", sub: "Northern lights · Glass candles", skin: "noel",
+    set: { candleOn: true, candleUp: "#4dffc3", candleDown: "#ff6fa8", candleLook: "glass", candleGlow: 0.3, candlePreset: "custom", lineGlow: 0.3, scaleText: "#c9fff0", scaleGlow: 0.25, scaleBg: "auto", dim: 0.08 } },
   { id: "hallows-eve", name: "Hallows Eve", sub: "Hallows Night · Lava candles", skin: "hallows",
     set: { candleOn: true, candleUp: "#a77bff", candleDown: "#ff8a2a", candleLook: "lava", candleGlow: 0.35, candlePreset: "custom", lineGlow: 0.3, scaleText: "#ffd2a1", scaleGlow: 0.2, scaleBg: "auto", dim: 0.1 } },
   // ----- Wow: the showpiece wallpapers, each with one of the new candle looks (no wallpaper reused) -----
@@ -490,7 +496,7 @@ const matchQ = (...parts) => { const q = skinQuery(); return !q || parts.join(" 
 // In a season's month, a small card at the top of Skins offers its look (one tap, Undo as always); in "All", the
 // seasonal look comes first. "Not now" hides the card until next year's season.
 const SEASONS = [
-  { id: "christmas", month: 11, look: "xmas-spirit", icon: "\u{1F384}", title: "Christmas is here", text: "Snow, twinkling lights and festive candles: the Christmas Spirit look." },
+  { id: "christmas", month: 11, look: "xmas-spirit", icon: "\u{1F384}", title: "Christmas is here", text: "Snow, twinkling lights and festive candles: the Christmas Spirit look. Four more Christmas looks are in Seasonal." },
   { id: "halloween", month: 9, look: "hallows-eve", icon: "\u{1F383}", title: "Happy Halloween", text: "A harvest moon, glowing pumpkins and lava candles: the Hallows Eve look." },
 ];
 const currentSeason = () => SEASONS.find((x) => x.month === (window.__bdMonth ?? new Date().getMonth())) || null;
@@ -2003,7 +2009,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Seasonal drops: Christmas Eve and Hallows Night wallpapers, offered in their month (Skins › Seasonal)",
+const WHATS_NEW = ["Christmas pack: Christmas Eve, Tree Lights, Winter Village and Northern Noel, plus Hallows Night (Skins › Seasonal)",
   "Match everything: one tap sets your whole chart to your wallpaper's colours (top of Style)",
   "Recordings are now MP4, and can include music playing on your computer (Capture › Clip › Sound)",
   "\u201cDone for today\u201d: a calm reminder the instant you reach your max loss (Trading › Daily goal & limit)",

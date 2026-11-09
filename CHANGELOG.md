@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.51 (2026-11-04)
+- **Three more Christmas wallpapers**, each with its own one-tap look (Skins → Seasonal):
+  - **Tree Lights:** Christmas-tree lights out of focus, glowing softly in the dark, with an occasional sparkle. The calmest of the set. Look: **Cozy Lights** (neon candles).
+  - **Winter Village:** snowy rooftops at night, warm lit windows, chimney smoke drifting up, snowfall and a crescent moon. Look: **Silent Night** (ice candles).
+  - **Northern Noel:** northern lights rippling over snowy hills, pines and a little cabin with a warm window. Look: **Northern Noel** (glass candles).
+  - That's 4 Christmas wallpapers plus Hallows Night. In December the Skins card offers Christmas Spirit and points you to the others.
+
 ## 0.1.50 (2026-11-04)
 - **Seasonal drops.** Two new wallpapers, each with a matching one-tap look:
   - **Christmas Eve:** a deep blue night, slow snowfall, a string of softly twinkling lights, snowy pines. Its look is **Christmas Spirit** (green / red glass candles).
