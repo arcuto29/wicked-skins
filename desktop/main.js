@@ -219,16 +219,28 @@ ipcMain.handle("store:set", (_e, obj) => {
 // ---------- auto-updates (installed builds only) ----------
 // Releases are published to GitHub by .github/workflows/release.yml; electron-updater finds them there,
 // downloads in the background and installs on the next restart.
-let updater = null;
+// When one is ready, the panel shows the "Update ready" card (popup/update-card.js, shared with the extension).
+// It never pops up over the chart: if the panel is closed, the card waits for it, and the update installs anyway
+// when you quit. "Restart & update" reopens your chart tabs afterwards if they were open.
+let updater = null, pendingUpdate = null;
+const resumeFile = () => path.join(app.getPath("userData"), "resume-chart.json");
+ipcMain.on("app:version", (e) => { e.returnValue = app.getVersion(); });
+ipcMain.handle("upd:pending", () => pendingUpdate);
+ipcMain.handle("upd:install", () => {
+  if (!updater || !pendingUpdate) return false;
+  try { fs.writeFileSync(resumeFile(), JSON.stringify({ chart: tvOpen(), at: Date.now() })); } catch {}
+  saveDesk(); flushCookies();
+  setTimeout(() => updater.quitAndInstall(true, true), 500);     // let the tab list save first; silent install, relaunch
+  return true;
+});
 function setupUpdates() {
   if (!app.isPackaged) return;
   try { ({ autoUpdater: updater } = require("electron-updater")); } catch { return; }
   updater.autoDownload = true;
   updater.autoInstallOnAppQuit = true;
   updater.on("update-downloaded", (info) => {
-    dialog.showMessageBox({ type: "info", buttons: ["Restart now", "Later"], defaultId: 0,
-      message: `Priism Skins ${info.version} is ready`, detail: "It will be installed when you restart the app." })
-      .then(({ response }) => { if (response === 0) updater.quitAndInstall(); });
+    pendingUpdate = { version: info.version };
+    if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send("upd:ready", pendingUpdate);
   });
   updater.on("error", () => {}); // offline etc.: try again next time
   updater.checkForUpdates().catch(() => {});
@@ -236,11 +248,16 @@ function setupUpdates() {
 }
 async function checkNow() {
   if (!updater) return dialog.showMessageBox({ message: "Updates are checked automatically in the installed app." });
+  if (pendingUpdate) {                                   // already downloaded: show the card
+    openSettings();
+    const send = () => settingsWin && !settingsWin.isDestroyed() && settingsWin.webContents.send("upd:ready", pendingUpdate);
+    return settingsWin.webContents.isLoading() ? settingsWin.webContents.once("did-finish-load", send) : send();
+  }
   try {
     const r = await updater.checkForUpdates();
     const latest = r && r.updateInfo && r.updateInfo.version;
     if (!latest || latest === app.getVersion()) dialog.showMessageBox({ message: `You're on the latest version (${app.getVersion()}).` });
-    else dialog.showMessageBox({ message: `Downloading ${latest}…`, detail: "You'll be asked to restart when it's ready." });
+    else dialog.showMessageBox({ message: `Downloading ${latest}…`, detail: "The panel tells you when it's ready to install." });
   } catch { dialog.showMessageBox({ message: "Couldn't check for updates right now." }); }
 }
 
@@ -273,6 +290,8 @@ app.whenReady().then(() => {
     { role: "viewMenu" }, { role: "editMenu" },
   ]));
   openSettings();            // the app opens to its settings/gallery — it no longer pops a chart open by itself
+  // just restarted by "Restart & update" with the chart open: bring the chart tabs back
+  try { const r = JSON.parse(fs.readFileSync(resumeFile(), "utf8")); fs.unlinkSync(resumeFile()); if (r && r.chart && Date.now() - r.at < 10 * 60000) openTV(); } catch {}
   setupUpdates();
 });
 app.on("activate", () => { if (!settingsWin || settingsWin.isDestroyed()) openSettings(); });

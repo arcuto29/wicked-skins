@@ -1910,6 +1910,9 @@ async function siteBar() {
 const REPO = "arcuto29/wicked-skins";
 const RELEASES = `https://github.com/${REPO}/releases`;
 const STORE_URL = "https://chromewebstore.google.com/detail/priism-skins-for-tradingv/ilmoloilbeblmgkanbiekhdegagfdloa";
+// this copy's version: the extension's manifest, or the desktop app's (its preload passes it in)
+const APP_VER = (() => { try { const v = chrome.runtime.getManifest().version; if (v) return v; } catch {}
+  return (window.wickedStore && window.wickedStore.app && window.wickedStore.app.version) || ""; })();
 const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number);
   for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
 function notice(title, hintText, linkText, href, onClose) {
@@ -1917,6 +1920,19 @@ function notice(title, hintText, linkText, href, onClose) {
   $("noticeTitle").textContent = title; $("noticeHint").textContent = hintText;
   $("noticeLink").textContent = linkText; $("noticeLink").href = href;
   $("noticeClose").innerHTML = ICON_X; $("noticeClose").onclick = () => { n.hidden = true; onClose && onClose(); };
+}
+function deskUpdates() {
+  const a = window.wickedStore && window.wickedStore.app; if (!a || IS_TAB) return;
+  const offer = (p) => {
+    if (!p || !p.version || !newer(p.version, APP_VER) || PriismUpdateCard.isOpen()) return;
+    if (sessionStorage.getItem("updLater") === p.version) return;          // "Not now": not again until the app restarts
+    PriismUpdateCard.show({ mode: "ready", from: APP_VER, to: p.version, primary: "Restart & update",
+      lead: "Downloaded and ready. Priism restarts in a few seconds and reopens your chart tabs where you left them.",
+      foot: "Not now? It installs by itself next time you close Priism.",
+      onPrimary: () => a.install(), onLater: () => sessionStorage.setItem("updLater", p.version) });
+  };
+  a.pending().then(offer).catch(() => {});
+  a.onReady(offer);
 }
 async function updates() {
   if (!EXT_MODE || IS_TAB) return;
@@ -1930,13 +1946,30 @@ async function updates() {
     $("noticeLink").onclick = (e) => { e.preventDefault(); chrome.tabs.create({ url: "chrome://extensions" }); };
     return;
   }
+  // after an update the "Updated" card says what's new (onboarding below), so the old one-line notice just clears
   const { justUpdated } = await chrome.storage.local.get("justUpdated");
-  if (justUpdated && justUpdated.to === me) {
-    return notice(`Updated to ${me}`, "New features and fixes are live.", "What's new", `${RELEASES}/tag/v${me}`,
-      () => chrome.storage.local.remove("justUpdated"));
+  if (justUpdated) chrome.storage.local.remove("justUpdated");
+  // Store installs: Chrome downloads updates by itself. When one is waiting (bg.js hears onUpdateAvailable), offer
+  // to apply it now; bg.js then refreshes the open charts in place, so TradingView never reloads.
+  if ("update_url" in chrome.runtime.getManifest()) {
+    const { updateReady: u, updAsk } = await chrome.storage.local.get(["updateReady", "updAsk"]);
+    if (u && u.version && newer(u.version, me)) {
+      if (!(updAsk && updAsk.v === u.version && Date.now() - updAsk.at < 12 * 3600e3) && !PriismUpdateCard.isOpen())
+        PriismUpdateCard.show({ mode: "ready", from: me, to: u.version,
+          foot: "Your TradingView tabs stay open. No page refresh.",
+          onPrimary: () => { chrome.storage.local.remove("updateReady"); chrome.runtime.reload(); },
+          onLater: () => chrome.storage.local.set({ updAsk: { v: u.version, at: Date.now() } }) });
+      return;
+    }
+    // ask Chrome to look for an update now and then (it also checks by itself every few hours)
+    const { updPoke } = await chrome.storage.local.get("updPoke");
+    if (!updPoke || Date.now() - updPoke > 3 * 3600e3) {
+      chrome.storage.local.set({ updPoke: Date.now() });
+      try { const r = chrome.runtime.requestUpdateCheck && chrome.runtime.requestUpdateCheck(); if (r && r.catch) r.catch(() => {}); } catch {}
+    }
+    return;
   }
-  // The Chrome Web Store adds update_url to the manifest of store installs; zip/unpacked installs don't have it.
-  if ("update_url" in chrome.runtime.getManifest()) return;
+  // (the Chrome Web Store adds update_url to the manifest of store installs; zip/unpacked installs, below, don't have it)
   const { updCheck } = await chrome.storage.local.get("updCheck");
   let latest = updCheck && Date.now() - updCheck.at < 6 * 3600e3 ? updCheck.latest : null;
   if (!latest) {
@@ -1964,7 +1997,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
   siteBar();
   deskCard(); if (DESK && !IS_TAB) { setupDesk(); renderSkins(); renderQuick(); }
   detectCharts();
-  updates();
+  updates(); deskUpdates();
   const q = new URLSearchParams(location.search);
   if (q.get("page")) {
     document.body.classList.add("page");
@@ -2017,7 +2050,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["4 new Wow wallpapers: Koi Pond, Rain on Glass, Ringed Giant and Deep Blue, each with its own look (Skins › Wow)",
+const WHATS_NEW = ["An \u201cUpdate ready\u201d card: see what\u2019s new and update in one tap (your charts stay open)",
+  "4 new Wow wallpapers: Koi Pond, Rain on Glass, Ringed Giant and Deep Blue, each with its own look (Skins › Wow)",
   "Christmas pack: Christmas Eve, Tree Lights, Winter Village and Northern Noel, plus Hallows Night (Skins › Seasonal)",
   "Match everything: one tap sets your whole chart to your wallpaper's colours (top of Style)",
   "Recordings are now MP4, and can include music playing on your computer (Capture › Clip › Sound)",
@@ -2038,7 +2072,7 @@ const WHATS_NEW = ["4 new Wow wallpapers: Koi Pond, Rain on Glass, Ringed Giant 
   "Sound in clips: your voice, your computer's sound (music, videos), or both (Capture › Clip)",
   "Streamer mode hides your money on screen and in recordings (Capture, or Alt+Shift+P)"];
 (function onboarding() {
-  let ver = ""; try { ver = chrome.runtime.getManifest().version; } catch {}
+  const ver = APP_VER;
   const seen = localStorage.getItem("seenVer");
   if (!seen) {
     localStorage.setItem("seenVer", ver || "1");
@@ -2067,10 +2101,11 @@ const WHATS_NEW = ["4 new Wow wallpapers: Koi Pond, Rain on Glass, Ringed Giant 
     draw();
     return;
   }
-  if (ver && seen !== ver && $("news")) {
-    $("news").innerHTML = `<button class="x" title="Dismiss">\u2715</button><b>New in ${esc(ver)}</b><ul>${WHATS_NEW.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>`;
-    $("news").hidden = false;
-    $("news").querySelector(".x").onclick = () => { $("news").hidden = true; localStorage.setItem("seenVer", ver); };
+  if (ver && seen !== ver && !IS_TAB) {
+    // once after each update: the version you came from, the one you're on, and its headlines
+    const ok = () => localStorage.setItem("seenVer", ver);
+    const from = /^\d+\.\d+\.\d+$/.test(seen) && newer(ver, seen) ? seen : "";
+    setTimeout(() => { if (!PriismUpdateCard.isOpen()) PriismUpdateCard.show({ mode: "updated", from, to: ver, items: WHATS_NEW.slice(0, 4), onPrimary: ok, onLater: ok }); else ok(); }, 350);
   }
 })();
 
