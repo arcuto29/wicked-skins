@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.52 (2026-11-10)
+- **A proper "Update ready" card.** When a new version has downloaded, Priism's panel shows it: a prism splitting light into a spectrum, the version you're on and the new one, the update's headlines, and **Update now** / **Not now**.
+  - Chrome Web Store copies: Update now applies it in a second, and your open TradingView tabs keep their skins without a page refresh. Not now asks again in 12 hours; Chrome also applies it by itself when Priism is idle.
+  - Desktop app: **Restart & update** restarts Priism and reopens your chart tabs where you left them. Not now? It installs by itself next time you close the app. This replaces the plain system dialog.
+  - It only appears in Priism's own panel, never over your chart. Esc closes it.
+- **"Updated" card** once after each update, with what came in the new version (in the extension and the desktop app).
+
 ## 0.1.51 (2026-11-04)
 - **Three more Christmas wallpapers**, each with its own one-tap look (Skins → Seasonal):
   - **Tree Lights:** Christmas-tree lights out of focus, glowing softly in the dark, with an occasional sparkle. The calmest of the set. Look: **Cozy Lights** (neon candles).

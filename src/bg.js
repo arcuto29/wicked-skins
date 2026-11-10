@@ -6,6 +6,7 @@ importScripts("sites.js", "migrate.js");
 WickedMigrate.run();                                   // every worker start: cheap no-op unless the version changed
 chrome.runtime.onInstalled.addListener((d) => {
   WickedMigrate.run();
+  if (d.reason === "update") chrome.storage.local.remove("updateReady");
   WickedSites.sync().then(() => { if (d.reason === "install" || d.reason === "update") refreshOpenTabs(); });
   // First install (e.g. from the Chrome Web Store): open a TradingView chart, where a welcome card explains how to
   // pin Priism Skins and pick a look. The chart is already skinned, so you see what it does straight away.
@@ -36,6 +37,9 @@ async function refreshOpenTabs() {
   }
 }
 chrome.runtime.onStartup.addListener(() => WickedSites.sync());
+// A store update has downloaded and is waiting: the panel offers "Update now" (popup.js). If nobody takes it, Chrome
+// still applies it by itself when Priism is idle, and the panel shows "Updated" instead.
+chrome.runtime.onUpdateAvailable.addListener((d) => chrome.storage.local.set({ updateReady: { version: d.version, at: Date.now() } }));
 // "Turn on here": if Chrome's permission prompt closed the panel before it could finish, finish it here so a
 // single click is enough (register the site, then reload its tab so the chart is skinned straight away).
 chrome.permissions.onAdded.addListener(async (perm) => {

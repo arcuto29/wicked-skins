@@ -13,6 +13,13 @@ contextBridge.exposeInMainWorld("wickedStore", {
       remove: () => Promise.resolve(),
     },
   },
+  // Desktop-only: this app's version and its updates (the panel shows the "Update ready" card).
+  app: {
+    version: (() => { try { return ipcRenderer.sendSync("app:version"); } catch { return ""; } })(),
+    pending: () => ipcRenderer.invoke("upd:pending"),
+    install: () => ipcRenderer.invoke("upd:install"),
+    onReady: (cb) => ipcRenderer.on("upd:ready", (_e, p) => cb(p)),
+  },
   // Desktop-only: open / close the skinned TradingView window, and hear when it opens or closes.
   tv: {
     open: () => ipcRenderer.invoke("tv:open"),
