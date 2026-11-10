@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.53 (2026-11-10)
+- **Two new Wow wallpapers**, each with its own one-tap look (Skins → Wow, Looks → Wow):
+  - **Cozy Room:** a dark, warm room at night. Through a big window, a rainy city glows out of focus; rain runs down the glass, a lamp glows, a mug steams on the sill and a cat sleeps there, breathing slowly (its tail flicks now and then). Look: **Cozy Room** (soft fade candles, warm and lavender).
+  - **Tokyo Rooftop:** a rainy neon city from a rooftop. Towers full of lit windows, glowing signs (one flickers now and then), a red lattice tower with a blinking light, a train gliding along the elevated line every half-minute, and the wet roof reflecting it all. Look: **Tokyo Night** (neon candles, cyan and pink).
+  - Both are among the lightest wallpapers to draw, so they suit older computers too.
+
 ## 0.1.52 (2026-11-10)
 - **A proper "Update ready" card.** When a new version has downloaded, Priism's panel shows it: a prism splitting light into a spectrum, the version you're on and the new one, the update's headlines, and **Update now** / **Not now**.
   - Chrome Web Store copies: Update now applies it in a second, and your open TradingView tabs keep their skins without a page refresh. Not now asks again in 12 hours; Chrome also applies it by itself when Priism is idle.

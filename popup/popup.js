@@ -385,7 +385,7 @@ function refreshAll() { renderChartStyle(); syncPanels(); syncShortcuts(); syncT
 const LOOK_GROUP = {
   "ocean-calm": "Calm", nightfall: "Calm", daybreak: "Calm", sterling: "Calm", harbor: "Calm", dune: "Calm", "clean-focus": "Calm", blossom: "Calm",
   glowstick: "Glow", blacklight: "Glow", vaporwave: "Glow", molten: "Glow", warp: "Glow", spectrum: "Glow", "neon-night": "Glow", firefly: "Glow",
-  horizon: "Wow", bloom: "Wow", ink: "Wow", kaleido: "Wow", slick: "Wow", hypercube: "Wow", helix: "Wow", synapse: "Wow", "koi-pond": "Wow", "rainy-night": "Wow", "ringed-giant": "Wow", "deep-blue": "Wow",
+  horizon: "Wow", bloom: "Wow", ink: "Wow", kaleido: "Wow", slick: "Wow", hypercube: "Wow", helix: "Wow", synapse: "Wow", "koi-pond": "Wow", "rainy-night": "Wow", "ringed-giant": "Wow", "deep-blue": "Wow", "cozy-room": "Wow", "tokyo-night": "Wow",
   "xmas-spirit": "Seasonal", "hallows-eve": "Seasonal", "cozy-lights": "Seasonal", "silent-night": "Seasonal", "northern-noel": "Seasonal",
 };
 const LOOK_GROUPS = ["All", "Wow", "Seasonal", "Calm", "Glow", "Classic"];
@@ -427,6 +427,10 @@ const QUICK_LOOKS = [
     set: { candleOn: true, candleUp: "#ffe0a3", candleDown: "#a48dff", candleLook: "holo", candleGlow: 0.2, candlePreset: "custom", lineGlow: 0.2, scaleText: "#ffe9c4", scaleGlow: 0.15, scaleBg: "auto", dim: 0.3 } },
   { id: "deep-blue", name: "Deep Blue", sub: "Deep Blue · Ice", skin: "deepblue",
     set: { candleOn: true, candleUp: "#7ff3ff", candleDown: "#ff7f9e", candleLook: "ice", candleGlow: 0.3, candlePreset: "custom", lineGlow: 0.25, scaleText: "#cdf7ff", scaleGlow: 0.2, scaleBg: "auto", dim: 0.25 } },
+  { id: "cozy-room", name: "Cozy Room", sub: "Cozy Room · Soft", skin: "cozyroom",
+    set: { candleOn: true, candleUp: "#ffd29a", candleDown: "#b49cff", candleLook: "fade", candleGlow: 0.2, candlePreset: "custom", lineGlow: 0.15, scaleText: "#ffe6c8", scaleGlow: 0.1, scaleBg: "auto", dim: 0.2 } },
+  { id: "tokyo-night", name: "Tokyo Night", sub: "Tokyo Rooftop · Neon", skin: "tokyo",
+    set: { candleOn: true, candleUp: "#2ee6ff", candleDown: "#ff3fa4", candleLook: "neon", candleGlow: 0.45, candlePreset: "custom", lineGlow: 0.35, scaleText: "#9ff3ff", scaleGlow: 0.3, scaleBg: "auto", dim: 0.25 } },
   { id: "neon-night", name: "Neon Night", sub: "Cyber Grid · Tube", skin: "cybergrid",
     set: { candleOn: true, candleUp: "#fcee0a", candleDown: "#00f0ff", candleLook: "neon", candleGlow: 0.5, candlePreset: "cyberpunk", lineGlow: 0.5, scaleText: "#7df9ff", scaleGlow: 0.45, scaleBg: "auto", dim: 0.25 } },
   { id: "clean-focus", name: "Clean Focus", sub: "Slate · Mono", skin: "graphite",
@@ -2050,7 +2054,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["An \u201cUpdate ready\u201d card: see what\u2019s new and update in one tap (your charts stay open)",
+const WHATS_NEW = ["2 new Wow wallpapers: Cozy Room (a sleeping cat by a rainy window) and Tokyo Rooftop (neon, rain and a passing train)",
+  "An \u201cUpdate ready\u201d card: see what\u2019s new and update in one tap (your charts stay open)",
   "4 new Wow wallpapers: Koi Pond, Rain on Glass, Ringed Giant and Deep Blue, each with its own look (Skins › Wow)",
   "Christmas pack: Christmas Eve, Tree Lights, Winter Village and Northern Noel, plus Hallows Night (Skins › Seasonal)",
   "Match everything: one tap sets your whole chart to your wallpaper's colours (top of Style)",

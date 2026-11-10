@@ -1868,6 +1868,220 @@ function priismSkins(window, document) {
       ctx.restore();
     }
   };
+  // Cozy Room: a dark, warm room at night. A big window shows a rainy city, rain runs down the glass, a lamp glows,
+  // a mug steams on the sill and a cat sleeps there, breathing slowly (its tail flicks now and then).
+  const cozyRoom = (ctx) => {
+    let w = 0, h = 0, k = 1, back = null, front = null, W = null, drops = [], lights = [], steam = [], cat = null;
+    return {
+      resize(Wd, Hd) {
+        w = Wd; h = Hd; k = kOf(w, h);
+        W = { x0: w * 0.2, x1: w * 0.95, y0: h * 0.07, y1: h * 0.7 };
+        const vw = W.x1 - W.x0, vh = W.y1 - W.y0;
+        back = offscreen(w, h); const g = back.getContext("2d");
+        // the wall, faintly warm
+        const wall = g.createLinearGradient(0, 0, w, h); wall.addColorStop(0, "#1a1012"); wall.addColorStop(1, "#08070a"); g.fillStyle = wall; g.fillRect(0, 0, w, h);
+        // the city through the window: dusky sky, blurred buildings with lit windows, out-of-focus lights
+        g.save(); g.beginPath(); g.rect(W.x0, W.y0, vw, vh); g.clip();
+        const s = g.createLinearGradient(0, W.y0, 0, W.y1); s.addColorStop(0, "#0b1230"); s.addColorStop(0.6, "#1d1838"); s.addColorStop(1, "#33203a"); g.fillStyle = s; g.fillRect(W.x0, W.y0, vw, vh);
+        g.filter = `blur(${Math.max(1, Math.round(1.6 * k))}px)`;
+        for (let layer = 0; layer < 3; layer++) {
+          const base = W.y1 - vh * (0.18 + layer * 0.12), col = ["#1b1830", "#141226", "#0d0c1b"][layer];
+          for (let x = W.x0 - 20 * k; x < W.x1; ) {
+            const bw = rnd(30, 80) * k * (1 + layer * 0.3), bh = rnd(0.15, 0.5) * vh * (1 - layer * 0.18);
+            g.fillStyle = col; g.fillRect(x, base - bh + layer * vh * 0.12, bw, vh);
+            for (let wy = base - bh + layer * vh * 0.12 + 6 * k; wy < W.y1; wy += 9 * k) for (let wx = x + 5 * k; wx < x + bw - 5 * k; wx += 8 * k)
+              if (Math.random() < 0.22) { g.fillStyle = Math.random() < 0.7 ? "rgba(255,196,120,0.55)" : "rgba(150,200,255,0.5)"; g.fillRect(wx, wy, 3 * k, 4 * k); }
+            x += bw + rnd(2, 10) * k;
+          }
+        }
+        g.filter = `blur(${Math.round(5 * k)}px)`;
+        const C = ["255,170,90", "255,110,90", "120,190,255", "255,220,160", "200,140,255"];
+        for (let i = 0; i < 46; i++) bokehDisc(g, rnd(W.x0, W.x1), W.y0 + vh * rnd(0.45, 1), rnd(6, 20) * k, C[i % C.length], rnd(0.2, 0.45));
+        g.filter = "none";
+        // fine droplets beaded on the glass
+        for (let i = 0; i < Math.round(500 * Math.min(2, (w * h) / (1280 * 720))); i++) { const x = rnd(W.x0, W.x1), y = rnd(W.y0, W.y1), r = rnd(0.5, 1.8) * k;
+          g.fillStyle = "rgba(255,255,255,0.08)"; g.beginPath(); g.arc(x, y, r, 0, T2); g.fill(); g.fillStyle = "rgba(255,255,255,0.35)"; g.fillRect(x - r * 0.3, y - r * 0.4, Math.max(0.6, r * 0.3), Math.max(0.6, r * 0.3)); }
+        g.restore();
+        // a few city windows that switch on and off, slowly
+        lights = Array.from({ length: 14 }, () => ({ x: rnd(W.x0, W.x1), y: W.y0 + vh * rnd(0.55, 0.95), p: rnd(0, T2), s: rnd(0.05, 0.15) }));
+        // in front of the glass: the lamp's warm light, the frame, curtain, sill, a plant and a mug
+        front = offscreen(w, h); const f = front.getContext("2d");
+        glowDot(f, w * 0.05, h * 0.6, Math.max(w, h) * 0.55, "255,160,80", 0.22);
+        glowDot(f, W.x0 + vw * 0.08, W.y0 + vh * 0.6, vh * 0.45, "255,170,100", 0.08);        // the lamp reflected in the glass
+        const fc = "#1c1416", t = Math.max(6, 10 * k);
+        f.fillStyle = fc; f.fillRect(W.x0 - t, W.y0 - t, vw + t * 2, t); f.fillRect(W.x0 - t, W.y0, t, vh); f.fillRect(W.x1, W.y0, t, vh);
+        f.fillRect(W.x0 + vw / 2 - t / 2, W.y0, t, vh); f.fillRect(W.x0, W.y0 + vh * 0.42, vw, t * 0.8);
+        f.fillStyle = "rgba(255,180,120,0.12)"; f.fillRect(W.x0 - t, W.y0, 2 * k, vh); f.fillRect(W.x0 + vw / 2 - t / 2, W.y0, 1.5 * k, vh);   // lamp-lit edges
+        // curtain on the left, in soft folds
+        const cx0 = W.x0 - w * 0.09, cx1 = W.x0 + w * 0.035;
+        for (let x = cx0; x < cx1; x += 6 * k) { const u = (x - cx0) / (cx1 - cx0), v = 0.5 + 0.5 * Math.sin(u * 22);
+          f.fillStyle = `rgb(${(58 + 40 * v) | 0},${(30 + 20 * v) | 0},${(32 + 16 * v) | 0})`; f.fillRect(x, W.y0 - t * 2, 6.5 * k, h * 0.82); }
+        const cs = f.createLinearGradient(cx0, 0, cx1, 0); cs.addColorStop(0, "rgba(0,0,0,0.5)"); cs.addColorStop(1, "rgba(0,0,0,0)"); f.fillStyle = cs; f.fillRect(cx0, W.y0 - t * 2, cx1 - cx0, h * 0.82);
+        // the sill
+        const sy = W.y1, sh = h * 0.04, sg = f.createLinearGradient(0, sy, 0, sy + sh); sg.addColorStop(0, "#3a2820"); sg.addColorStop(1, "#1a110e");
+        f.fillStyle = sg; f.fillRect(W.x0 - t * 2.2, sy, vw + t * 4.4, sh); f.fillStyle = "rgba(255,200,150,0.18)"; f.fillRect(W.x0 - t * 2.2, sy, vw + t * 4.4, 1.5 * k);
+        f.fillStyle = "rgba(0,0,0,0.45)"; f.fillRect(W.x0 - t * 2.2, sy + sh, vw + t * 4.4, 6 * k);
+        // a plant on the right of the sill
+        const px = W.x1 - vw * 0.06, py = sy;
+        f.fillStyle = "#2a1a14"; f.beginPath(); f.moveTo(px - 18 * k, py); f.lineTo(px + 18 * k, py); f.lineTo(px + 14 * k, py - 30 * k); f.lineTo(px - 14 * k, py - 30 * k); f.closePath(); f.fill();
+        for (let i = 0; i < 9; i++) { const a = -Math.PI / 2 + (i - 4) * 0.28, L = rnd(55, 95) * k;
+          f.save(); f.translate(px, py - 30 * k); f.rotate(a); f.fillStyle = i % 2 ? "#0f1a12" : "#14231a"; f.beginPath(); f.ellipse(L * 0.5, 0, L * 0.5, L * 0.13, 0, 0, T2); f.fill(); f.restore(); }
+        // a mug
+        const mx = W.x0 + vw * 0.2, mw = 22 * k, mh = 26 * k;
+        f.fillStyle = "#c9b8a8"; f.fillRect(mx - mw / 2, sy - mh, mw, mh); f.fillStyle = "rgba(0,0,0,0.35)"; f.fillRect(mx, sy - mh, mw / 2, mh);
+        f.strokeStyle = "#c9b8a8"; f.lineWidth = 3 * k; f.beginPath(); f.arc(mx + mw / 2 + 3 * k, sy - mh / 2, 6 * k, -1.2, 1.2); f.stroke();
+        steam = Array.from({ length: 12 }, (_, i) => ({ p: i / 12, x: rnd(-4, 4) * k }));
+        // the cat: curled up asleep on the sill
+        cat = { x: W.x0 + vw * 0.64, y: sy, s: Math.min(w, h) * 0.105, flick: 6 };
+        drops = Array.from({ length: 12 }, () => ({ x: rnd(W.x0, W.x1), y: rnd(W.y0, W.y1), r: rnd(2.5, 5) * k, v: 0, wait: rnd(0, 6) }));
+      },
+      frame(t, dt) {
+        ctx.drawImage(back, 0, 0);
+        // city windows fading on and off
+        for (const l of lights) { const a = Math.max(0, Math.sin(t * l.s + l.p)) * 0.6; if (a > 0.02) { ctx.fillStyle = `rgba(255,200,130,${a})`; ctx.fillRect(l.x, l.y, 3 * k, 4 * k); } }
+        // rain running down the glass
+        ctx.save(); ctx.beginPath(); ctx.rect(W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0); ctx.clip();
+        for (const d of drops) {
+          if (d.v === 0) { d.wait -= dt; if (d.wait <= 0) d.v = rnd(40, 110) * k; }
+          else { d.y += d.v * dt; d.v *= 1 - 0.5 * dt; if (d.v < 10 * k) { d.v = 0; d.wait = rnd(1, 5); } }
+          if (d.y > W.y1 + 10) { d.y = W.y0 + rnd(0, 0.3) * (W.y1 - W.y0); d.x = rnd(W.x0, W.x1); }
+          if (d.v > 0) { const tr = ctx.createLinearGradient(0, d.y - d.r * 12, 0, d.y); tr.addColorStop(0, "rgba(255,255,255,0)"); tr.addColorStop(1, "rgba(255,255,255,0.12)");
+            ctx.fillStyle = tr; ctx.fillRect(d.x - d.r * 0.4, d.y - d.r * 12, d.r * 0.8, d.r * 12); }
+          ctx.fillStyle = "rgba(10,10,20,0.35)"; ctx.beginPath(); ctx.arc(d.x, d.y + d.r * 0.2, d.r, 0, T2); ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.beginPath(); ctx.arc(d.x - d.r * 0.3, d.y - d.r * 0.3, d.r * 0.35, 0, T2); ctx.fill();
+        }
+        ctx.restore();
+        ctx.drawImage(front, 0, 0);
+        // steam from the mug
+        const mx = W.x0 + (W.x1 - W.x0) * 0.2, sy = W.y1 - 26 * k;
+        for (const s of steam) { const u = (s.p + t * 0.08) % 1, y = sy - u * 70 * k, x = mx + s.x + Math.sin(t * 0.9 + u * 6) * 6 * k * u;
+          glowDot(ctx, x, y, (5 + u * 12) * k, "235,225,215", 0.12 * Math.sin(u * Math.PI)); }
+        drawCat(t, dt);
+      },
+    };
+    function drawCat(t, dt) {
+      const { x, y, s } = cat, br = 1 + 0.035 * Math.sin(t * 1.5);         // breathing
+      cat.flick -= dt; let fl = 0; if (cat.flick < 0) { fl = Math.sin(-cat.flick * 6) * 0.5; if (cat.flick < -1) cat.flick = rnd(6, 14); }
+      ctx.save(); ctx.translate(x, y);
+      ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.beginPath(); ctx.ellipse(0, 2 * k, s * 1.15, s * 0.12, 0, 0, T2); ctx.fill();
+      // tail curling round the front
+      ctx.strokeStyle = "#0e0a0c"; ctx.lineWidth = s * 0.16; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(s * 0.85, -s * 0.12);
+      ctx.quadraticCurveTo(s * 0.7, s * 0.02, 0, -s * 0.02); ctx.quadraticCurveTo(-s * 0.5, -s * 0.04, -s * (0.75 + fl * 0.1), -s * (0.12 + fl * 0.25)); ctx.stroke();
+      // body (a soft loaf) and head
+      ctx.fillStyle = "#0e0a0c"; ctx.beginPath(); ctx.ellipse(s * 0.1, -s * 0.36 * br, s, s * 0.38 * br, 0, Math.PI, T2); ctx.lineTo(s * 1.1, 0); ctx.lineTo(-s * 0.9, 0); ctx.closePath(); ctx.fill();
+      // the head resting on its paws, a little above the body line, ears up
+      const hx = -s * 0.8, hy = -s * 0.44 - s * 0.02 * Math.sin(t * 1.5);
+      const head = () => { ctx.beginPath(); ctx.ellipse(hx, hy, s * 0.32, s * 0.27, -0.15, 0, T2);
+        for (const [a, b, c] of [[-0.3, -0.1, -0.26], [0.04, 0.22, 0.06]]) { ctx.moveTo(hx + s * a, hy - s * 0.16); ctx.lineTo(hx + s * (a + b) / 2 - s * 0.02, hy - s * 0.48); ctx.lineTo(hx + s * b, hy - s * 0.2); }
+        ctx.moveTo(hx + s * 0.3, hy + s * 0.2); ctx.ellipse(hx + s * 0.05, hy + s * 0.24, s * 0.26, s * 0.08, 0, 0, T2); };   // paws
+      head(); ctx.fill();
+      ctx.fillStyle = "rgba(60,40,60,0.9)"; for (const a of [-0.24, 0.12]) { ctx.beginPath(); ctx.moveTo(hx + s * a, hy - s * 0.18); ctx.lineTo(hx + s * (a + 0.07), hy - s * 0.38); ctx.lineTo(hx + s * (a + 0.13), hy - s * 0.2); ctx.fill(); }   // inner ears
+      // closed eyes: two little curves catching the light
+      ctx.strokeStyle = "rgba(200,190,240,0.45)"; ctx.lineWidth = Math.max(1, 1.1 * k);
+      for (const a of [-0.16, 0.08]) { ctx.beginPath(); ctx.arc(hx + s * a, hy - s * 0.02, s * 0.05, 0.2, Math.PI - 0.2); ctx.stroke(); }
+      // rim light from the city behind
+      ctx.strokeStyle = "rgba(180,170,245,0.6)"; ctx.lineWidth = Math.max(1.2, 1.6 * k);
+      ctx.beginPath(); ctx.ellipse(s * 0.1, -s * 0.36 * br, s, s * 0.38 * br, 0, Math.PI * 1.15, Math.PI * 1.95); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(hx, hy, s * 0.32, s * 0.27, -0.15, Math.PI * 1.1, Math.PI * 1.8); ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  // Tokyo Rooftop: a rainy neon city at night from a rooftop. Layers of towers with lit windows, glowing signs (one
+  // flickers now and then), a red lattice tower with a blinking light, a train gliding along the elevated line, and
+  // the wet roof reflecting it all.
+  const tokyoRooftop = (ctx) => {
+    let w = 0, h = 0, k = 1, back = null, front = null, flick = null, fl = null, rain = [], trainT = 3, horizon = 0, trackY = 0, tower = null;
+    const NEON = ["255,63,164", "46,230,255", "255,179,71", "190,120,255", "120,255,170"];
+    const sign = (g, x, y, sw, sh, c) => {          // a glowing sign: lit panel, bright rim, a few abstract "letters"
+      g.save(); g.shadowColor = `rgba(${c},0.9)`; g.shadowBlur = 14 * k;
+      g.fillStyle = `rgba(${c},0.22)`; g.fillRect(x, y, sw, sh); g.strokeStyle = `rgba(${c},0.95)`; g.lineWidth = Math.max(1, 1.6 * k); g.strokeRect(x, y, sw, sh);
+      g.fillStyle = `rgba(${c},0.95)`; const vert = sh > sw;
+      for (let i = 0; i < 4; i++) { if (vert) { const yy = y + sh * (0.1 + i * 0.22); g.fillRect(x + sw * 0.25, yy, sw * 0.5, sh * 0.1); g.fillRect(x + sw * 0.45, yy - sh * 0.03, sw * 0.1, sh * 0.16); }
+        else { const xx = x + sw * (0.1 + i * 0.22); g.fillRect(xx, y + sh * 0.3, sw * 0.12, sh * 0.4); } }
+      g.restore();
+    };
+    return {
+      resize(Wd, Hd) {
+        w = Wd; h = Hd; k = kOf(w, h); horizon = h * 0.6; trackY = h * 0.6;
+        back = offscreen(w, h); const g = back.getContext("2d");
+        sky(g, w, h, [[0, "#07061a"], [0.35, "#170c2c"], [0.6, "#3a1440"], [1, "#12081c"]]);
+        glowDot(g, w * 0.5, horizon, Math.max(w, h) * 0.6, "255,80,160", 0.16);           // the city's glow in the low cloud
+        // the lattice tower, far away
+        const tx = w * 0.74, top = h * 0.16, base = horizon, tw = h * 0.07;
+        g.strokeStyle = "rgba(255,90,70,0.75)"; g.lineWidth = Math.max(1, 1.4 * k); g.beginPath();
+        g.moveTo(tx - tw, base); g.lineTo(tx, top); g.lineTo(tx + tw, base);
+        for (let i = 1; i < 12; i++) { const u = i / 12, yy = base - (base - top) * u, hw = tw * (1 - u); g.moveTo(tx - hw, yy); g.lineTo(tx + hw, yy); if (i % 2) { g.moveTo(tx - hw, yy); g.lineTo(tx + tw * (1 - (i + 1) / 12), yy - (base - top) / 12); } }
+        g.stroke(); g.fillStyle = "rgba(255,240,220,0.8)"; g.fillRect(tx - tw * 0.3, base - (base - top) * 0.62, tw * 0.6, 3 * k);   // the deck
+        glowDot(g, tx, base - (base - top) * 0.4, tw * 2.2, "255,90,70", 0.12);
+        tower = { x: tx, y: top };
+        // skylines, far to near; the elevated railway sits between the middle and near rows
+        const row = (gg, baseY, minH, maxH, col, winA, neon) => {
+          for (let x = -20 * k; x < w + 20 * k; ) {
+            const bw = rnd(40, 110) * k, bh = rnd(minH, maxH);
+            gg.fillStyle = col; gg.fillRect(x, baseY - bh, bw, h - baseY + bh);
+            for (let wy = baseY - bh + 7 * k; wy < baseY + h * 0.3; wy += 10 * k) for (let wx = x + 5 * k; wx < x + bw - 6 * k; wx += 9 * k)
+              if (Math.random() < winA) { gg.fillStyle = Math.random() < 0.6 ? "rgba(255,210,150,0.6)" : "rgba(160,220,255,0.55)"; gg.fillRect(wx, wy, 4 * k, 5 * k); }
+            if (neon && Math.random() < 0.55) { const c = NEON[(Math.random() * NEON.length) | 0], vert = Math.random() < 0.6;
+              const sw = vert ? rnd(14, 22) * k : rnd(50, 90) * k, sh = vert ? rnd(60, 110) * k : rnd(14, 22) * k;
+              sign(gg, x + rnd(4, Math.max(5, bw - sw - 4)), baseY - bh + rnd(8, 40) * k, sw, sh, c); }
+            x += bw + rnd(0, 8) * k;
+          }
+        };
+        row(g, horizon, h * 0.04, h * 0.16, "#1d1230", 0.12, false);
+        row(g, horizon + h * 0.05, h * 0.08, h * 0.26, "#140c24", 0.18, true);
+        // the elevated line
+        g.fillStyle = "#0b0715"; g.fillRect(0, trackY, w, 7 * k);
+        for (let x = 20 * k; x < w; x += 120 * k) g.fillRect(x, trackY, 8 * k, h - trackY);
+        g.fillStyle = "rgba(255,120,200,0.25)"; g.fillRect(0, trackY, w, 1.2 * k);
+        // the near row + the rooftop, drawn over the train
+        front = offscreen(w, h); const f = front.getContext("2d");
+        row(f, h * 0.83, h * 0.04, h * 0.17, "#0a0612", 0.22, true);
+        // the flickering sign gets its own layer
+        fl = { x: w * 0.12, y: h * 0.38, sw: 20 * k, sh: 110 * k, c: NEON[0] };
+        flick = offscreen(fl.sw + 60 * k, fl.sh + 60 * k); sign(flick.getContext("2d"), 30 * k, 30 * k, fl.sw, fl.sh, fl.c);
+        f.fillStyle = "#0a0612"; f.fillRect(fl.x - 20 * k, fl.y - 10 * k, 60 * k, h);         // the building it hangs on
+        // the roof: wet concrete reflecting the neon, a railing, a water tank
+        const ry = h * 0.86, rg = f.createLinearGradient(0, ry, 0, h); rg.addColorStop(0, "#120c1c"); rg.addColorStop(1, "#06040a"); f.fillStyle = rg; f.fillRect(0, ry, w, h - ry);
+        f.save(); f.globalCompositeOperation = "lighter"; f.filter = `blur(${Math.round(4 * k)}px)`;
+        for (let i = 0; i < 26; i++) { const c = NEON[i % NEON.length], x = rnd(0, w); f.fillStyle = `rgba(${c},${rnd(0.05, 0.14)})`; f.fillRect(x, ry + 4 * k, rnd(6, 30) * k, (h - ry) * rnd(0.4, 1)); }
+        f.restore();
+        f.fillStyle = "#05030a"; f.fillRect(0, ry - 4 * k, w, 6 * k); f.fillRect(0, ry - 46 * k, w, 3 * k); f.fillRect(0, ry - 24 * k, w, 2 * k);
+        for (let x = 10 * k; x < w; x += 70 * k) f.fillRect(x, ry - 46 * k, 4 * k, 44 * k);
+        const wx = w * 0.86, wtw = w * 0.07;
+        f.fillRect(wx - wtw * 0.4, ry - h * 0.1, 4 * k, h * 0.1); f.fillRect(wx + wtw * 0.4, ry - h * 0.1, 4 * k, h * 0.1);
+        f.beginPath(); f.ellipse(wx, ry - h * 0.1, wtw * 0.55, wtw * 0.12, 0, 0, T2); f.fill(); f.fillRect(wx - wtw * 0.55, ry - h * 0.24, wtw * 1.1, h * 0.14);
+        f.beginPath(); f.moveTo(wx - wtw * 0.6, ry - h * 0.24); f.lineTo(wx, ry - h * 0.29); f.lineTo(wx + wtw * 0.6, ry - h * 0.24); f.fill();
+        f.fillStyle = "rgba(255,90,170,0.25)"; f.fillRect(wx - wtw * 0.55, ry - h * 0.24, 1.5 * k, h * 0.14);   // neon catching its edge
+        rain = Array.from({ length: Math.round(150 * Math.min(2, (w * h) / (1280 * 720))) }, () => ({ x: rnd(0, w), y: rnd(0, h), s: rnd(0.7, 1.3) }));
+      },
+      frame(t, dt) {
+        ctx.drawImage(back, 0, 0);
+        // the train: every half-minute or so, gliding left to right
+        trainT -= dt;
+        if (trainT < 0) {
+          const dur = 16, u = -trainT / dur, L = w * 0.42, x = -L + u * (w + L * 2), ty = trackY - 16 * k;
+          ctx.fillStyle = "#0d0918"; ctx.fillRect(x, ty, L, 15 * k);
+          ctx.fillStyle = "rgba(255,226,170,0.85)"; for (let cx = x + 6 * k; cx < x + L - 8 * k; cx += 14 * k) ctx.fillRect(cx, ty + 4 * k, 8 * k, 5 * k);
+          ctx.fillStyle = "rgba(46,230,255,0.7)"; ctx.fillRect(x, ty + 12 * k, L, 1.5 * k);
+          glowDot(ctx, x + L, ty + 8 * k, 40 * k, "255,240,200", 0.35);
+          if (u > 1) trainT = rnd(20, 40);
+        }
+        ctx.drawImage(front, 0, 0);
+        // the sign that flickers: mostly on, with a stutter every so often
+        const ph = (t * 0.13) % 1, on = ph < 0.9 || (Math.sin(t * 40) > 0.3);
+        ctx.globalAlpha = on ? 0.85 + 0.15 * Math.sin(t * 2) : 0.15; ctx.drawImage(flick, fl.x - 30 * k, fl.y - 30 * k); ctx.globalAlpha = 1;
+        // the tower's light blinks
+        if (Math.sin(t * 2.2) > 0.6) glowDot(ctx, tower.x, tower.y, 9 * k, "255,60,60", 0.9);
+        // drizzle, slanting slightly
+        ctx.strokeStyle = "rgba(190,205,255,0.16)"; ctx.lineWidth = Math.max(1, 0.9 * k); ctx.beginPath();
+        for (const r of rain) { r.y += 520 * k * r.s * dt; r.x += 60 * k * r.s * dt; if (r.y > h) { r.y = -20; r.x = rnd(-0.1, 1) * w; } if (r.x > w) r.x -= w;
+          ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - 3 * k * r.s, r.y - 22 * k * r.s); }
+        ctx.stroke();
+      },
+    };
+  };
+
   // ---------- a wallpaper's colours ----------
   // From RGBA pixel data: the strongest hue (accent) and a readable up / down candle pair. Used by the chart (auto
   // contrast, Skin colour, Auto-match) and by the panel's "Match everything".
@@ -2000,6 +2214,8 @@ function priismSkins(window, document) {
     rainglass:   { name: "Rain on Glass",  cat: "Urban",    create: rainGlass, wow: true },
     ringed:      { name: "Ringed Giant",   cat: "Cosmos",   create: ringedGiant, wow: true },
     deepblue:    { name: "Deep Blue",      cat: "Chill",    create: deepBlue, wow: true },
+    cozyroom:    { name: "Cozy Room",      cat: "Chill",    create: cozyRoom, wow: true },
+    tokyo:       { name: "Tokyo Rooftop",  cat: "Urban",    create: tokyoRooftop, wow: true },
     // seasonal drops (featured in their month by the panel)
     christmas:   { name: "Christmas Eve",  cat: "Seasonal", create: christmas, season: "christmas" },
     treelights:  { name: "Tree Lights",    cat: "Seasonal", create: treeLights, season: "christmas" },
