@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 9;
+  const HOOK_VERSION = 10;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -81,7 +81,7 @@
     bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
-    chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chLabels: false,
+    chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
     plOn: false, plColor: "", plW: 0, plStyle: "dotted",
     sbOn: false, sbColor: "", sbW: 0, sbStyle: "dashed",          // session breaks (vertical lines between sessions)
     axOn: false, axColor: "", axW: 0, axStyle: "solid",           // the border lines of the price / time scales
@@ -120,7 +120,7 @@
         gridOn: !!f.gridOn, gridColor: colOpt(f.gridColor), gridAlpha: Math.max(0.03, Math.min(1, f.gridAlpha === undefined ? 0.35 : +f.gridAlpha || 0)),
         gridW: Math.max(0, Math.min(2, +f.gridW || 0)), gridStyle: ["solid", "dotted", "dashed", "none"].includes(f.gridStyle) ? f.gridStyle : "dotted",
         chOn: !!f.chOn, chColor: colOpt(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)),
-        chStyle: ["solid", "dotted", "dashed"].includes(f.chStyle) ? f.chStyle : "dashed", chGlow: !!f.chGlow, chLabels: !!f.chLabels,
+        chStyle: ["solid", "dotted", "dashed"].includes(f.chStyle) ? f.chStyle : "dashed", chGlow: !!f.chGlow, chGlowColor: colOpt(f.chGlowColor), chLabels: !!f.chLabels,
         plOn: !!f.plOn, plColor: colOpt(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)),
         plStyle: ["solid", "dotted", "dashed"].includes(f.plStyle) ? f.plStyle : "dotted",
         sbOn: !!f.sbOn, sbColor: colOpt(f.sbColor), sbW: Math.max(0, Math.min(2, +f.sbW || 0)), sbStyle: ["solid", "dotted", "dashed", "none"].includes(f.sbStyle) ? f.sbStyle : "dashed",
@@ -138,7 +138,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -417,7 +417,7 @@
         if (window.__bdGlowDebug) window.__bdGlowDebug.push([Math.round(m.x), Math.round(m.y), String(cur)]);   // tests
         const t = ctx.getTransform(), R = 34 * ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
         ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-        const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, R), rgb = rgbKey(col);
+        const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, R), rgb = rgbKey(fx.chGlowColor ? pick(fx.chGlowColor, cur) : col);   // its own colour, or the crosshair's
         const k3 = rgb ? rgb.key : "255,255,255";
         g.addColorStop(0, `rgba(${k3},0.45)`); g.addColorStop(0.35, `rgba(${k3},0.14)`); g.addColorStop(1, `rgba(${k3},0)`);
         origFillDesc.set.call(ctx, g); origFillRaw.call(ctx, m.x - R, m.y - R, R * 2, R * 2);
