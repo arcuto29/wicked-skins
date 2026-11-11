@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -22,7 +22,7 @@ const DEFAULTS = {
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
-  chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chLabels: false,
+  chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
   sbOn: false, sbColor: "", sbW: 0, sbStyle: "dashed", axOn: false, axColor: "", axW: 0, axStyle: "solid",
   lineGlow: 0, scaleText: "", scaleGlow: 0, scaleBold: false, scaleBg: "auto", scaleBgColor: "#0b1320", scaleLabels: true,
@@ -1313,7 +1313,8 @@ function renderChartStyle() {
       <div class="row"><span>Width</span><div class="seg" id="cs-${p.k}-w"></div></div>
       <div class="row"><span>Style</span><div class="seg" id="cs-${p.k}-st"></div></div>` +
       (p.k === "grid" ? `<div class="row"><span>Strength</span><input type="range" id="cs-grid-a" min="0.05" max="1" step="0.05" /><output id="cs-grid-ao"></output></div>` : "") +
-      (p.glow ? `<div class="row"><span>Glow at the pointer</span><div class="seg" id="cs-ch-glow"></div></div><div class="row"><span>Price &amp; time labels</span><div class="seg" id="cs-ch-lab"></div></div>` : "");
+      (p.glow ? `<div class="row"><span>Glow at the pointer</span><div class="seg" id="cs-ch-glow"></div></div>` +
+        (cfg.chGlow ? `<div class="row"><span>Glow colour</span><div class="seg" id="cs-ch-gc"></div><input type="color" id="cs-ch-gcol" ${/^#/.test(cfg.chGlowColor || "") ? "" : "hidden"} /></div>` : "") + `<div class="row"><span>Price &amp; time labels</span><div class="seg" id="cs-ch-lab"></div></div>` : "");
     card.appendChild(body);
     seg(`cs-${p.k}-cm`, [["", "Skin colour"], ["candle", "Candle"], ["custom", "Custom"]], () => (/^#/.test(cfg[colKey] || "") ? "custom" : cfg[colKey] || ""),
       (v) => { set({ [colKey]: v === "custom" ? ($(`cs-${p.k}-col`).value || "#7df9ff") : v }); renderChartStyle(); });
@@ -1322,7 +1323,13 @@ function renderChartStyle() {
     seg(`cs-${p.k}-st`, p.styles, () => cfg[p.k + "Style"], (v) => set({ [p.k + "Style"]: v }));
     if (p.k === "grid") { const r = $("cs-grid-a"); r.value = cfg.gridAlpha; $("cs-grid-ao").textContent = Math.round(cfg.gridAlpha * 100) + "%";
       r.oninput = (e) => { set({ gridAlpha: +e.target.value }); $("cs-grid-ao").textContent = Math.round(+e.target.value * 100) + "%"; }; }
-    if (p.glow) { seg("cs-ch-glow", [[false, "Off"], [true, "On"]], () => !!cfg.chGlow, (v) => set({ chGlow: v }));
+    if (p.glow) { seg("cs-ch-glow", [[false, "Off"], [true, "On"]], () => !!cfg.chGlow, (v) => { set({ chGlow: v }); renderChartStyle(); });
+      if (cfg.chGlow) {   // the glow's own colour: the crosshair's (default), your up-candle colour, or any colour
+        const gc = cfg.chGlowColor || "";
+        seg("cs-ch-gc", [["", "Crosshair"], ["candle", "Candle"], ["custom", "Custom"]], () => (/^#/.test(gc) ? "custom" : gc),
+          (v) => { set({ chGlowColor: v === "custom" ? ($("cs-ch-gcol").value || "#ffd166") : v }); renderChartStyle(); });
+        const gi = $("cs-ch-gcol"); gi.value = /^#/.test(gc) ? gc : "#ffd166"; gi.oninput = (e) => set({ chGlowColor: e.target.value });
+      }
       seg("cs-ch-lab", [[false, "Own"], [true, "Match crosshair"]], () => !!cfg.chLabels, (v) => set({ chLabels: v })); }
   }
   renderTicker(box);
@@ -2054,7 +2061,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["2 new Wow wallpapers: Cozy Room (a sleeping cat by a rainy window) and Tokyo Rooftop (neon, rain and a passing train)",
+const WHATS_NEW = ["Glow at the pointer in any colour (Style \u203a Crosshair \u203a Glow colour)",
+  "2 new Wow wallpapers: Cozy Room (a sleeping cat by a rainy window) and Tokyo Rooftop (neon, rain and a passing train)",
   "An \u201cUpdate ready\u201d card: see what\u2019s new and update in one tap (your charts stay open)",
   "4 new Wow wallpapers: Koi Pond, Rain on Glass, Ringed Giant and Deep Blue, each with its own look (Skins › Wow)",
   "Christmas pack: Christmas Eve, Tree Lights, Winter Village and Northern Noel, plus Hallows Night (Skins › Seasonal)",

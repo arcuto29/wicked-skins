@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 3;
+  const LW_VERSION = 4;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -122,7 +122,7 @@
         privacy: !!f.privacy, privacyPnl: ["hide", "ticks", "points", "show"].includes(f.privacyPnl) ? f.privacyPnl : "hide",
         gridOn: !!f.gridOn, gridColor: colOk(f.gridColor), gridAlpha: Math.max(0.03, Math.min(1, f.gridAlpha === undefined ? 0.35 : +f.gridAlpha || 0)),
         gridW: Math.max(0, Math.min(2, +f.gridW || 0)), gridStyle: styleOk(f.gridStyle, "dotted", ["none"]),
-        chOn: !!f.chOn, chColor: colOk(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)), chStyle: styleOk(f.chStyle, "dashed"), chGlow: !!f.chGlow, chLabels: !!f.chLabels,
+        chOn: !!f.chOn, chColor: colOk(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)), chStyle: styleOk(f.chStyle, "dashed"), chGlow: !!f.chGlow, chGlowColor: colOk(f.chGlowColor), chLabels: !!f.chLabels,
         plOn: !!f.plOn, plColor: colOk(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)), plStyle: styleOk(f.plStyle, "dotted"),
         lineGlow: Math.max(0, Math.min(1, +f.lineGlow || 0)),   // Style → Line glow: indicator lines and drawings
         accent: hex(f.accent) } : null;
@@ -482,7 +482,8 @@
         // horizontal line on the chart (a price or level line) must not light up a second glow
         if (m.x != null && m.y != null && Math.abs((m.xt || 0) - (m.yt || 0)) < 30 && Math.abs((m.vs || 0) - (m.hs || 0)) === 1) {
           if (window.__bdGlowDebug) window.__bdGlowDebug.push([Math.round(m.x), Math.round(m.y), String(cur)]);   // tests
-          const R = 34 * ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1), rgb = rgbKey(pickCol(lfx.chColor, cur)), k3 = rgb ? rgb.key : "255,255,255";
+          const R = 34 * ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1), rgb = rgbKey(pickCol(lfx.chGlowColor || lfx.chColor, cur)),   // its own colour, or the crosshair's
+            k3 = rgb ? rgb.key : "255,255,255";
           ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
           const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, R);
           g.addColorStop(0, `rgba(${k3},0.45)`); g.addColorStop(0.35, `rgba(${k3},0.14)`); g.addColorStop(1, `rgba(${k3},0)`);
