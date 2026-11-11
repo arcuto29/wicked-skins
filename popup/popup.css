@@ -437,3 +437,5 @@ body.lw-page [data-tvonly] { display: none !important; }
 .pu-go:focus-visible { box-shadow: 0 0 0 3px rgba(25,211,255,.35), 0 8px 26px rgba(46,242,176,.25); }
 .pu-foot { position: relative; margin-top: 12px; color: #666b7b; font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .02em; }
 @media (prefers-reduced-motion: reduce) { .pu-rays path, .pu-spark, .pu-eyebrow i, .pu-go::after { animation: none; } .pu-spark { display: none; } .pu-veil, .pu-card { transition: none; } }
+.card.wslook .oncount.review { background: rgba(255,196,80,.9); color: #1a1205; }
+.card.look .acts .pub { border-color: rgba(46,242,176,.45); color: #bff8e5; }

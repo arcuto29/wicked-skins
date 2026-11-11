@@ -848,9 +848,13 @@ async function wsLoadLooks(reset) {
   try {
     let rows;
     if (wsSort === "mine") {
-      const mine = myShared();
-      rows = mine.length ? (await W().listLooks("new", 0)).filter((r) => mine.some((m) => m.t === r.title && m.s === r.skin)) : [];
-      $("wsMsg").textContent = rows.length ? "" : mine.length ? `You've shared ${mine.length} look${mine.length === 1 ? "" : "s"}. They appear here once approved (moderators approve them on the website under Review).` : "Looks you share appear here once they're approved. Tap \u201cShare my current look\u201d to share one.";
+      // live = it's in the Workshop's approved list; otherwise it's still in review (or wasn't approved: the website
+      // shows which, under Your shares)
+      const mine = myShared().slice().reverse(), live = mine.length ? await W().listLooks("new", 0) : [];
+      rows = mine.map((m) => live.find((r) => r.title === m.t && r.skin === m.s) || { id: "", title: m.t, skin: m.s, data: m.l || {}, uses: 0, mine: "review" });
+      const nRev = rows.filter((r) => r.mine === "review").length;
+      $("wsMsg").innerHTML = !rows.length ? "Looks you publish show here straight away. Publish one from <b>Saved</b> (or tap \u201cShare my current look\u201d)."
+        : nRev ? `${nRev} still in review: everyone sees ${nRev === 1 ? "it" : "them"} once approved. <a href="${esc(WS_SITE() + "workshop.html#mine")}" target="_blank" rel="noopener">See status on the website</a>` : "";
     } else {
       rows = await W().listLooks(wsSort === "new" ? "new" : "top", wsPage);
       $("wsMsg").textContent = "";
@@ -875,28 +879,32 @@ function wsRenderLooks() {
     const sk = WickedSkins[it.skin].create(cv.getContext("2d")); sk.resize(160, 64); lookPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
     card.append(cv);
     const up = d.candleUp || "#26a69a", down = d.candleDown || "#ef5350";
-    card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(up, down)}</div><span class="oncount">${it.uses} ON</span>
-      <div class="label"><span>${esc(it.title)}<small>by ${esc(it.author || "trader")} · ${esc(WickedSkins[it.skin].name)}</small></span></div>`);
+    card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(up, down)}</div><span class="oncount${it.mine ? " review" : ""}">${it.mine ? "IN REVIEW" : it.uses + " ON"}</span>
+      <div class="label"><span>${esc(it.title)}<small>${it.mine ? "yours" : "by " + esc(it.author || "trader")} · ${esc(WickedSkins[it.skin].name)}</small></span></div>`);
     card.onclick = () => {
-      applyWithUndo({ ...d, enabled: true, skin: it.skin }, `Applied \u201c${it.title}\u201d by ${it.author || "trader"}.`);
+      applyWithUndo({ ...d, enabled: true, skin: it.skin }, it.mine ? `Applied your look \u201c${it.title}\u201d.` : `Applied \u201c${it.title}\u201d by ${it.author || "trader"}.`);
+      if (!it.id) return;
       const used = new Set(JSON.parse(localStorage.getItem("usedLooks") || "[]"));
       if (!used.has(it.id)) { used.add(it.id); localStorage.setItem("usedLooks", JSON.stringify([...used].slice(-500))); W().countLookUse(it.id); }   // count each person once
     };
     box.appendChild(card);
   }
 }
-// Share: the website (signed in there) receives your look as a code and posts it for review.
-function shareLook() {
-  const name = (($("loName") && $("loName").value.trim()) || (WickedSkins[cfg.skin] ? WickedSkins[cfg.skin].name : "My look")).slice(0, 40);
-  const code = makeLookCode(name);
-  const skin = cfg.skin === "media" ? "aurora" : cfg.skin, a = myShared();
-  if (!a.some((m) => m.t === name && m.s === skin)) localStorage.setItem("myLooks", JSON.stringify([...a, { t: name, s: skin }].slice(-100)));
+// Publish: the website (you sign in there once; it remembers you) receives the look as a code and puts it in the
+// Workshop: live straight away for the owner, after a check for everyone else. We keep a copy here, so
+// Workshop › Mine shows it (with "In review") from the moment you publish, not only once it's approved.
+function publishLook(name, src) {
+  name = (name || "My look").slice(0, 40);
+  const { skin, look } = lookPayload(src), code = makeLookCode(name, src);
+  const a = myShared().filter((m) => !(m.t === name && m.s === skin));
+  localStorage.setItem("myLooks", JSON.stringify([...a, { t: name, s: skin, l: look, at: Date.now() }].slice(-50)));
   const u = WS_SITE() + "workshop.html#look=" + encodeURIComponent(code);
   if (window.PriismNative && window.PriismNative.openUrl) window.PriismNative.openUrl(u);          // Android app
   else if (chrome.tabs && chrome.tabs.create) chrome.tabs.create({ url: u });                       // extension
   else window.open(u, "_blank");                                                                      // desktop app -> your browser
-  if (cfg.skin === "media") toast("Your own upload can't be shared in a look, so it uses a built-in wallpaper instead.");
+  if ((src ? src.skin : cfg.skin) === "media") toast("Your own upload can't travel in a look, so it's published with a built-in wallpaper (Polar Lights).");
 }
+const shareLook = () => publishLook(($("loName") && $("loName").value.trim()) || (WickedSkins[cfg.skin] ? WickedSkins[cfg.skin].name : "My look"));
 if ($("wsShareLook")) $("wsShareLook").onclick = shareLook;
 if ($("loShare")) $("loShare").onclick = shareLook;
 function wsRender() {
@@ -982,13 +990,16 @@ function b64urlDecode(s) {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new TextDecoder().decode(bytes);
 }
-function makeLookCode(name) {
-  // skip uploads; store the built-in skin (or aurora as a safe default) + only the keys that differ from defaults
-  const skin = cfg.skin === "media" ? "aurora" : cfg.skin;
-  const look = {};
-  for (const k of LOOK_KEYS) if (JSON.stringify(cfg[k]) !== JSON.stringify(DEFAULTS[k])) look[k] = cfg[k];
-  const payload = { v: 1, n: (name || "").slice(0, 40), s: skin, l: look };
-  return LOOK_CODE_PREFIX + b64urlEncode(JSON.stringify(payload));
+// the parts of a look worth sending: its built-in wallpaper (an upload becomes Polar Lights) + only the settings that
+// differ from the defaults. src = a saved look ({ skin, look }), or what's on your chart now.
+function lookPayload(src = { skin: cfg.skin, look: cfg }) {
+  const skin = src.skin === "media" || !WickedSkins[src.skin] ? "aurora" : src.skin, look = {};
+  for (const k of LOOK_KEYS) if (src.look && k in src.look && JSON.stringify(src.look[k]) !== JSON.stringify(DEFAULTS[k])) look[k] = src.look[k];
+  return { skin, look };
+}
+function makeLookCode(name, src) {
+  const { skin, look } = lookPayload(src);
+  return LOOK_CODE_PREFIX + b64urlEncode(JSON.stringify({ v: 1, n: (name || "").slice(0, 40), s: skin, l: look }));
 }
 const lookLink = (code) => WS_SITE() + "look.html#" + code;
 function parseLookCode(code) {
@@ -1026,7 +1037,7 @@ function renderLoadouts() {
       <div class="acts">
         <button data-a="update" title="Save your current setup into this look">Update</button>
         <button data-a="rename" title="Rename">Rename</button>
-        <button data-a="share" title="Save this look as a file to share">Share</button>
+        <button data-a="publish" class="pub" title="Publish this look to the Workshop, so everyone can use it">Publish</button>
         <button data-a="del" class="x" title="Delete">${ICON_X}</button>
       </div>`);
     card.onclick = (e) => {
@@ -1047,8 +1058,8 @@ function renderLoadouts() {
         const done = () => { const v = inp.value.trim(); if (v && v !== lo.name) set({ loadouts: cfg.loadouts.map((x) => (x.id === lo.id ? { ...x, name: v } : x)) }); renderLoadouts(); };
         inp.onkeydown = (k) => { if (k.key === "Enter") done(); if (k.key === "Escape") renderLoadouts(); };
         inp.onblur = done; inp.onclick = (k) => k.stopPropagation();
-      } else if (act === "share") {
-        download(`${lo.name.replace(/[^\w-]+/g, "-").toLowerCase() || "look"}.priism.json`, [exportable(lo)]);
+      } else if (act === "publish") {
+        publishLook(lo.name, { skin: lo.skin, look: lo.look });
       }
     };
     box.appendChild(card);
@@ -2061,7 +2072,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Glow at the pointer in any colour (Style \u203a Crosshair \u203a Glow colour)",
+const WHATS_NEW = ["Publish your saved looks to the Workshop, and see your shares with their status (Saved \u203a Publish, Workshop \u203a Mine)",
+  "Glow at the pointer in any colour (Style \u203a Crosshair \u203a Glow colour)",
   "2 new Wow wallpapers: Cozy Room (a sleeping cat by a rainy window) and Tokyo Rooftop (neon, rain and a passing train)",
   "An \u201cUpdate ready\u201d card: see what\u2019s new and update in one tap (your charts stay open)",
   "4 new Wow wallpapers: Koi Pond, Rain on Glass, Ringed Giant and Deep Blue, each with its own look (Skins › Wow)",

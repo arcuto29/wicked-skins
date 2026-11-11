@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.54 (2026-11-11)
+- **Publish your saved looks to the Workshop.** Every look in **Saved** has a **Publish** button that sends that look (not just what's on your chart) to the Workshop for everyone. You sign in once on the website; it remembers you.
+- **Your shares never seem to vanish.** Wallpapers and looks you share are listed under **Your shares** on the website, with their status (**Live**, **In review** or **Not approved** with the reason) and a Delete button. In Priism, **Workshop › Mine** shows a look the moment you publish it, marked *In review*, then *Live* once approved.
+- Signing in with Google no longer loses the look you were about to publish.
+- The owner's shares go live straight away; everyone else's are checked first.
+- Fixed: the "Forgot password?" email link pointed at the wrong address.
+
 ## 0.1.53 (2026-11-10)
 - **Two new Wow wallpapers**, each with its own one-tap look (Skins → Wow, Looks → Wow):
   - **Cozy Room:** a dark, warm room at night. Through a big window, a rainy city glows out of focus; rain runs down the glass, a lamp glows, a mug steams on the sill and a cat sleeps there, breathing slowly (its tail flicks now and then). Look: **Cozy Room** (soft fade candles, warm and lavender).

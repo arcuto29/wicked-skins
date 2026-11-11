@@ -357,3 +357,6 @@ create trigger look_reports_count after insert on public.look_reports
 insert into public.profiles (id, display_name, is_admin)
 select u.id, split_part(u.email, '@', 1), true from auth.users u where lower(u.email) = any (public.owner_emails())
 on conflict (id) do update set is_admin = true;
+-- ...and only they are: any other account marked admin (a test account, say) stops being one when you re-run this.
+update public.profiles p set is_admin = false
+ where p.is_admin and not exists (select 1 from auth.users u where u.id = p.id and lower(u.email) = any (public.owner_emails()));

@@ -9,7 +9,7 @@
 <body>
   <main class="wrap" style="padding:40px 20px 60px">
     <h1 style="margin:0 0 6px">Workshop</h1>
-    <p style="color:var(--muted);margin:0 0 22px">Wallpapers shared by the community. Browse them here, or in the extension open <b>Priism Skins › Workshop</b> and tap <b>Use</b> — no account needed. To <b>share your own</b>, sign in below; every upload is reviewed before it appears.</p>
+    <p style="color:var(--muted);margin:0 0 22px">Wallpapers shared by the community. Browse them here, or in the extension open <b>Priism Skins › Workshop</b> and tap <b>Use</b> — no account needed. To <b>share your own</b> wallpaper or look, sign in below. Shares are checked before everyone can see them, and you can always see yours, with their status, under <b>Your shares</b>.</p>
 
     <!-- Share panel -->
     <section id="submit" class="submit-box">
@@ -35,10 +35,10 @@
 
       <!-- a look sent from the extension ("Share my current look") -->
       <div id="lookShare" class="lookshare" hidden>
-        <b>Share this look</b>
+        <b>Publish this look to the Workshop</b>
         <p class="hint" id="lookSum"></p>
         <input id="lookTitle" class="field" maxlength="40" placeholder="Name your look">
-        <button id="lookGo" class="btn primary" type="button">Share look</button>
+        <div class="row2"><button id="lookGo" class="btn primary" type="button">Publish look</button><button id="lookCancel" class="btn" type="button">Cancel</button></div>
         <p class="hint" id="lookMsg"></p>
       </div>
 
@@ -54,8 +54,14 @@
         <label class="rights"><input id="rights" type="checkbox"> I made this, or I have the rights to share it, and it breaks none of the <a href="terms.html">rules</a>.</label>
         <button id="share" class="btn primary" type="button" disabled>Share to the Workshop</button>
         <p class="hint" id="shareMsg"></p>
-        <p class="hint" id="mine"></p>
+        <p class="hint" id="ownerNote"></p>
       </div>
+    </section>
+
+    <section id="myShares" hidden>
+      <h2 style="font-size:22px;margin:34px 0 6px">Your shares</h2>
+      <p class="hint" id="mySharesHint">Everything you've shared, and whether it's live yet. Delete anything any time.</p>
+      <div id="mineList" class="mine-list"></div>
     </section>
 
     <section id="review" hidden>
@@ -135,10 +141,16 @@
 
     // ---------- community looks: share (a code sent from the extension) ----------
     let pendingLook = null;
-    (function readLook() {
-      const m = location.hash.match(/look=([^&]+)/); if (!m) return;
+    function readLook() {
+      // the look comes in the address (#look=...); it's also kept here, so signing in (which reloads the page
+      // without it) doesn't lose it. Cleared once it's published, or after a day.
+      const KEY = "priismPendingLook", m = location.hash.match(/look=([^&]+)/);
+      let code = "";
+      if (m) { code = decodeURIComponent(m[1]); try { localStorage.setItem(KEY, JSON.stringify({ code, at: Date.now() })); } catch {} }
+      else { try { const st = JSON.parse(localStorage.getItem(KEY) || "null"); if (st && Date.now() - st.at < 86400e3) code = st.code; else localStorage.removeItem(KEY); } catch {} }
+      if (!code) return;
       try {
-        const code = decodeURIComponent(m[1]); if (!code.startsWith("PRIISM1-")) return;
+        if (!code.startsWith("PRIISM1-")) return;
         let b = code.slice(8).replace(/-/g, "+").replace(/_/g, "/"); while (b.length % 4) b += "=";
         const bin = atob(b), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         const p = JSON.parse(new TextDecoder().decode(bytes));
@@ -146,19 +158,24 @@
         pendingLook = { title: String(p.n || "").slice(0, 40), skin: p.s, data: p.l };
         $("lookShare").hidden = false; $("lookTitle").value = pendingLook.title;
         const d = p.l, parts = [`wallpaper: ${p.s}`, d.candleLook ? `candles: ${d.candleLook}` : "", d.gridOn || d.chOn || d.plOn ? "chart styling" : "", d.panelMode && d.panelMode !== "off" ? "panel colours" : ""].filter(Boolean);
-        say("lookSum", parts.join(" · ") + ". Sign in below to share it. Looks are reviewed before they appear.");
+        say("lookSum", parts.join(" · ") + ".");
+        $("lookCancel").onclick = () => { pendingLook = null; try { localStorage.removeItem("priismPendingLook"); } catch {} $("lookShare").hidden = true; history.replaceState(null, "", location.pathname); };
+        $("lookMsg").textContent = ""; $("lookGo").disabled = false;
         document.getElementById("submit").scrollIntoView();
       } catch {}
-    })();
+    }
+    readLook();
+    window.addEventListener("hashchange", readLook);     // another look sent to a Workshop tab that's already open
     $("lookGo").onclick = async () => {
       if (!pendingLook) return;
-      if (!user) return say("lookMsg", "Sign in first (just below), then tap Share look.");
+      if (!user) return say("lookMsg", "Sign in first (above), then tap Publish look.");
       const title = $("lookTitle").value.trim(); if (!title) return say("lookMsg", "Give your look a name.");
       $("lookGo").disabled = true; say("lookMsg", "Sharing…");
       const ins = await sb.from("looks").insert({ title, skin: pendingLook.skin, data: pendingLook.data }).select("status").single();
-      if (ins.error) { $("lookGo").disabled = false; return say("lookMsg", "Couldn't share: " + ins.error.message); }
-      say("lookMsg", ins.data.status === "approved" ? "Shared, it's live now." : "Thanks! It appears in the Workshop once a moderator approves it.");
-      pendingLook = null; history.replaceState(null, "", location.pathname); loadLooks();
+      if (ins.error) { $("lookGo").disabled = false; return say("lookMsg", /looks|schema cache|relation/i.test(ins.error.message)
+        ? "Looks aren't set up on the server yet (the site owner needs to re-run supabase/schema.sql). Your look is kept: try again later." : "Couldn't publish: " + ins.error.message); }
+      say("lookMsg", ins.data.status === "approved" ? "Published! It's live in the Workshop now." : "Published! It's in review: you'll see it under Your shares, and everyone sees it once it's approved.");
+      pendingLook = null; try { localStorage.removeItem("priismPendingLook"); } catch {} history.replaceState(null, "", location.pathname); loadLooks(); renderMine();
     };
 
     // ---------- admin review (wallpapers + looks) ----------
@@ -197,11 +214,13 @@
     function renderAccount() {
       $("auth").hidden = !!user; $("uploader").hidden = !user;
       $("whoami").innerHTML = user ? `${esc(user.email || "")}${profile && profile.is_admin ? ' <span class="adm">ADMIN</span>' : ""} · <a id="signout" href="#">Sign out</a>` : "";
+      $("myShares").hidden = !user;
       if (user) { $("signout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); await refresh(); say("shareMsg", ""); }; renderMine(); }
+      say("ownerNote", user && profile && profile.is_admin ? "You're the owner: what you share goes live straight away." : user ? "Shares are checked before everyone can see them (usually within a day). You'll see yours under Your shares." : "");
       renderReview();
     }
     sb.auth.onAuthStateChange(() => refresh());
-    refresh();
+    refresh().then(() => { if (location.hash === "#mine" && user) $("myShares").scrollIntoView(); });
 
     const creds = () => ({ email: $("email").value.trim(), password: $("pass").value });
     $("signin").onclick = async () => { const c = creds(); if (!c.email || !c.password) return say("authMsg", "Enter your email and password.");
@@ -211,7 +230,7 @@
       if (error) return say("authMsg", error.message); say("authMsg", data.session ? "" : "Check your email to confirm your account, then come back here."); if (data.session) await refresh(); };
     $("google").onclick = async () => { const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname } }); if (error) say("authMsg", error.message); };
     $("forgot").onclick = async () => { const email = $("email").value.trim(); if (!email) return say("authMsg", "Enter your email first.");
-      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + "/reset.html" }); say("authMsg", error ? error.message : "Check your email for a link to set a new password."); };
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname.replace(/[^/]*$/, "") + "reset.html" }); say("authMsg", error ? error.message : "Check your email for a link to set a new password."); };
 
     // ---------- upload ----------
     let chosen = null, thumbBlob = null;
@@ -257,7 +276,7 @@
         if (thumbBlob) { thumbPath = `${user.id}/${base}.thumb.jpg`; const tr = await sb.storage.from(BUCKET).upload(thumbPath, thumbBlob, { contentType: "image/jpeg" }); if (tr.error) thumbPath = null; }
         const ins = await sb.from("wallpapers").insert({ title: $("title").value.trim(), kind: chosen.kind, file_path: path, thumb_path: thumbPath, size_bytes: chosen.file.size }).select("status").single();
         if (ins.error) throw ins.error;
-        say("shareMsg", ins.data.status === "approved" ? "Shared — it's live now." : "Thanks! It'll appear once a moderator approves it.");
+        say("shareMsg", ins.data.status === "approved" ? "Shared! It's live in the Workshop now." : "Shared! It's in review: you'll see it under Your shares, and everyone sees it once it's approved.");
         await renderMine();
         chosen = null; thumbBlob = null; $("file").value = ""; $("title").value = ""; $("rights").checked = false;
         $("preview").hidden = true; $("preview").innerHTML = ""; $("dropTitle").textContent = "Choose an image or video"; update();
@@ -273,10 +292,34 @@
     };
     async function renderMine() {
       if (!user) return;
-      const { data } = await sb.from("wallpapers").select("id,title,status,reject_reason").eq("owner", user.id).order("created_at", { ascending: false }).range(0, 19);
-      if (!data || !data.length) { say("mine", ""); return; }
-      const line = (w) => `${esc(w.title)} — ${w.status === "approved" ? "live" : w.status === "pending" ? "in review" : "rejected" + (w.reject_reason ? " (" + esc(w.reject_reason) + ")" : "")}`;
-      $("mine").innerHTML = "<b>Your uploads:</b><br>" + data.map(line).join("<br>");
+      const box = $("mineList");
+      const [w, l] = await Promise.all([
+        sb.from("wallpapers").select("id,title,kind,status,reject_reason,file_path,thumb_path,likes,uses,created_at").eq("owner", user.id).order("created_at", { ascending: false }).range(0, 49),
+        sb.from("looks").select("id,title,skin,data,status,reject_reason,uses,created_at").eq("owner", user.id).order("created_at", { ascending: false }).range(0, 49)]);
+      const items = [...(w.data || []).map((x) => ({ ...x, t: "wallpaper" })), ...(l.data || []).map((x) => ({ ...x, t: "look" }))]
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      box.innerHTML = items.length ? "" : "<p class='hint'>Nothing yet. Share a wallpaper above, or publish a look from Priism (Saved › Publish).</p>";
+      const badge = (x) => x.status === "approved" ? `<span class="st live">Live</span>` : x.status === "pending" ? `<span class="st rev">In review</span>`
+        : `<span class="st rej">Not approved</span>`;
+      for (const x of items) {
+        const row = document.createElement("div"); row.className = "mine-row";
+        const d = x.data || {}, up = /^#[0-9a-f]{6}$/i.test(d.candleUp || "") ? d.candleUp : "#26a69a", dn = /^#[0-9a-f]{6}$/i.test(d.candleDown || "") ? d.candleDown : "#ef5350";
+        const media = x.t === "wallpaper" ? `<img src="${esc(url(x.thumb_path) || url(x.file_path))}" alt="">`
+          : `<span class="lookmini"><i style="background:${up}"></i><i style="background:${dn}"></i><i style="background:${up}"></i></span>`;
+        const sub = x.t === "wallpaper" ? `${x.kind} · ${x.likes} like${x.likes === 1 ? "" : "s"} · ${x.uses} use${x.uses === 1 ? "" : "s"}` : `look · ${esc(x.skin)} · ${x.uses} using it`;
+        row.innerHTML = `${media}<div class="mine-t"><b>${esc(x.title)}</b> ${badge(x)}<small>${sub}${x.status === "rejected" && x.reject_reason ? " · " + esc(x.reject_reason) : ""}</small></div>
+          <button class="btn" type="button">Delete</button>`;
+        row.querySelector("button").onclick = async (e) => {
+          if (!confirm(`Delete “${x.title}” from the Workshop? This can't be undone.`)) return;
+          e.target.disabled = true;
+          const r = await sb.from(x.t === "look" ? "looks" : "wallpapers").delete().eq("id", x.id);
+          if (r.error) { e.target.disabled = false; return alert("Couldn't delete: " + r.error.message); }
+          if (x.t === "wallpaper") await sb.storage.from(BUCKET).remove([x.file_path, x.thumb_path].filter(Boolean)).catch(() => {});
+          row.remove(); load(true); loadLooks();
+          if (!box.children.length) renderMine();
+        };
+        box.appendChild(row);
+      }
     }
   })();
   </script>
