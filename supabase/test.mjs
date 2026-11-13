@@ -30,8 +30,10 @@ const OWNER = "00000000-0000-0000-0000-0000000000ff";
 await db.query("insert into auth.users (id, email) values ($1, 'Arcuto2978@gmail.com')", [OWNER]);
 ok("the owner's email is an admin automatically (no SQL step)", (await db.query("select is_admin from public.profiles where id = $1", [OWNER])).rows[0].is_admin === true);
 ok("other sign-ups are not", (await db.query("select count(*)::int n from public.profiles where is_admin")).rows[0].n === 1);
+await db.exec(`update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com')`);   // e.g. a test account
 await db.exec(fs.readFileSync(new URL("./schema.sql", import.meta.url), "utf8"));   // re-running is safe and keeps it
 ok("re-running the schema keeps the owner admin", (await db.query("select is_admin from public.profiles where id = $1", [OWNER])).rows[0].is_admin === true);
+ok("...and takes admin away from accounts that aren't owners", (await db.query("select count(*)::int n from public.profiles where is_admin")).rows[0].n === 1);
 await db.exec(`update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com')`);
 const as = async (uid, sql, params) => {
   await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid || ""}', false);`);

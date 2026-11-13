@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.54 (2026-11-11)
+- **Publish your saved looks to the Workshop.** Every look in **Saved** has a **Publish** button that sends that look (not just what's on your chart) to the Workshop for everyone. You sign in once on the website; it remembers you.
+- **Your shares never seem to vanish.** Wallpapers and looks you share are listed under **Your shares** on the website, with their status (**Live**, **In review** or **Not approved** with the reason) and a Delete button. In Priism, **Workshop › Mine** shows a look the moment you publish it, marked *In review*, then *Live* once approved.
+- Signing in with Google no longer loses the look you were about to publish.
+- The owner's shares go live straight away; everyone else's are checked first.
+- Fixed: the "Forgot password?" email link pointed at the wrong address.
+- **nq.vision's multi-chart layouts work.** With 2 or 3 charts (side by side, stacked, one big + two small, three columns), every chart now gets its wallpaper, candle colours and your changes, at any window size. Before, only the single-chart layout worked reliably: with several charts the wallpaper ended up hidden behind the platform's own panels, and on a small window Priism sometimes didn't switch on at all.
+- **Smoother on every computer.** The heaviest wallpapers now take a fraction of the work to draw, with no visible change: Deep Blue 4.5x lighter, Koi Pond 3.5x, Ringed Giant 3x, Nebula and Northern Noel 2x, Fractal Bloom and Oil Slick 1.6-1.9x, and every wallpaper's background a little lighter.
+- **Auto quality is smarter.** It now also notices when the wallpaper itself can't keep up (before, it only watched the chart page), and computers with few cores or little memory start a step lower and climb to full quality only if there's room. No stutter while it finds its level.
+
 ## 0.1.53 (2026-11-10)
 - **Two new Wow wallpapers**, each with its own one-tap look (Skins → Wow, Looks → Wow):
   - **Cozy Room:** a dark, warm room at night. Through a big window, a rainy city glows out of focus; rain runs down the glass, a lamp glows, a mug steams on the sill and a cat sleeps there, breathing slowly (its tail flicks now and then). Look: **Cozy Room** (soft fade candles, warm and lavender).

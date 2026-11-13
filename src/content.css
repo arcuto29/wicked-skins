@@ -12,24 +12,28 @@
 /* Lightweight Charts apps: the layer lives inside the chart's own container, under the chart */
 #bd-layer.bd-embedded { position: absolute; inset: 0; z-index: 0; background: transparent; }
 /* One tile per wallpaper: the whole screen, or one per chart in a multi-chart layout */
-#bd-layer .bd-tile { position: absolute; overflow: hidden; }
+#bd-layer .bd-tile, .bd-emb .bd-tile { position: absolute; overflow: hidden; }
+/* Lightweight Charts apps with several charts (nq.vision's layouts): each chart's wallpaper lives inside that chart's
+   own container, under the chart, like the single-chart case */
+.bd-emb { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; background: transparent; transition: opacity .35s ease; }
+html.bd-focus .bd-emb { opacity: 0 !important; }
 #bd-layer.bd-tiled { background: var(--bd-page-bg, #131722); }
 #bd-layer.bd-tiled.bd-over { background: transparent; }
 #bd-layer.bd-tiled .bd-tile { background: #000; }
 #bd-layer.bd-tiled.bd-over .bd-tile { background: transparent; }
 #bd-layer.bd-over .bd-dim { display: none; }
-#bd-layer canvas,
-#bd-layer video,
-#bd-layer iframe,
-#bd-layer img {
+#bd-layer canvas, .bd-emb canvas,
+#bd-layer video, .bd-emb video,
+#bd-layer iframe, .bd-emb iframe,
+#bd-layer img, .bd-emb img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-#bd-layer .bd-dim { position: absolute; inset: 0; background: #000; transition: opacity .5s; }
-#bd-layer .bd-vignette { position: absolute; inset: 0; pointer-events: none; }
+#bd-layer .bd-dim, .bd-emb .bd-dim { position: absolute; inset: 0; background: #000; transition: opacity .5s; }
+#bd-layer .bd-vignette, .bd-emb .bd-vignette { position: absolute; inset: 0; pointer-events: none; }
 #bd-layer .bd-react { position: absolute; inset: 0; opacity: 0; transition: opacity .8s, box-shadow .8s, background .8s; pointer-events: none; }
 #bd-layer .bd-react.bd-pulse::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 90px 30px var(--bd-pulse); animation: bd-pulse .9s ease-out forwards; }
 @keyframes bd-pulse { from { opacity: .9; } to { opacity: 0; } }
@@ -79,7 +83,7 @@ html.bd-on:not(.bd-over-mode) [class*="legend-"] [class*="valueValue"],
 html.bd-on:not(.bd-over-mode) [class*="legend-"] [class*="valueTitle"] { text-shadow: 0 0 3px rgba(0,0,0,.75); }
 html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="valueValue"],
 html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="valueTitle"] { text-shadow: 0 0 3px rgba(255,255,255,.9); }
-#bd-layer iframe { border: 0; background: transparent; }
+#bd-layer iframe, .bd-emb iframe { border: 0; background: transparent; }
 
 /* Watermark: logo + name, over the chart, click-through */
 #bd-wm { position: fixed; z-index: 2147483001; pointer-events: none; display: flex; align-items: center; gap: 7px; opacity: .85;
