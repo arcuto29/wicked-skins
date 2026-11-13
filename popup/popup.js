@@ -2072,7 +2072,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Publish your saved looks to the Workshop, and see your shares with their status (Saved \u203a Publish, Workshop \u203a Mine)",
+const WHATS_NEW = ["nq.vision: every 2- and 3-chart layout gets your wallpaper and colours, at any window size",
+  "Publish your saved looks to the Workshop, and see your shares with their status (Saved \u203a Publish, Workshop \u203a Mine)",
   "Glow at the pointer in any colour (Style \u203a Crosshair \u203a Glow colour)",
   "2 new Wow wallpapers: Cozy Room (a sleeping cat by a rainy window) and Tokyo Rooftop (neon, rain and a passing train)",
   "An \u201cUpdate ready\u201d card: see what\u2019s new and update in one tap (your charts stay open)",

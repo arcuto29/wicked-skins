@@ -149,7 +149,7 @@
   }
   const LW_SEL = "[data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight']";
   let charts = [];
-  const tiled = () => cfg.multi !== "span" && charts.length > 1;
+  const tiled = () => charts.length > 1 && (cfg.multi !== "span" || lwMulti());
   // the area covered by all charts together (watermark, P&L pill, over-chart clipping)
   function chartsBox() {
     if (!charts.length) {
@@ -997,15 +997,26 @@
     const host = el.classList.contains("tv-lightweight-charts") || (el.hasAttribute("data-bd-lwroot") && el.tagName === "TABLE") ? el.parentElement : el;
     return host && host !== document.body && host !== document.documentElement ? host : null;
   }
+  // Several Lightweight charts (nq.vision's 2- and 3-chart layouts): the same idea per chart. Each chart's own container
+  // gets its wallpaper, under the chart. The page's own (solid) backgrounds would hide a layer behind the page.
+  let embHosts = [];
+  function lwHosts(list = charts) {
+    if (document.querySelector(".chart-markup-table") || list.length < 2) return null;
+    const hosts = list.map((c) => { const el = c.el;
+      const h = el.classList.contains("tv-lightweight-charts") || (el.hasAttribute("data-bd-lwroot") && el.tagName === "TABLE") ? el.parentElement : el;
+      return h && h !== document.body && h !== document.documentElement ? h : null; });
+    return hosts.every(Boolean) && new Set(hosts).size === hosts.length ? hosts : null;
+  }
+  const lwMulti = (list = charts) => cfg.layer !== "over" && !!lwHosts(list);
   function claimStack(host) {      // the chart wrapper must be positioned so it paints ABOVE the wallpaper (a positioned sibling)
     const mark = (el) => { if (el && getComputedStyle(el).position === "static") { el.style.position = "relative"; el.dataset.bdPos = "1"; } };
     mark(host); host.querySelectorAll(".tv-lightweight-charts").forEach(mark);
   }
   function releaseStack() {
-    if (!embeddedHost) return;
     const undo = (el) => { if (el && el.dataset && el.dataset.bdPos) { el.style.position = ""; delete el.dataset.bdPos; } };
-    undo(embeddedHost); embeddedHost.querySelectorAll("[data-bd-pos]").forEach(undo);
-    embeddedHost = null;
+    for (const h of [embeddedHost, ...embHosts.map((e) => e.host)]) if (h) { undo(h); h.querySelectorAll("[data-bd-pos]").forEach(undo); }
+    for (const e of embHosts) e.box.remove();
+    embeddedHost = null; embHosts = [];
   }
 
   function build() {
@@ -1047,6 +1058,13 @@
     layer.appendChild(pillEl);
     embeddedHost = cfg.layer !== "over" && !tiled() ? lwHost() : null;
     layer.classList.toggle("bd-embedded", !!embeddedHost);
+    // several Lightweight charts: move each chart's wallpaper into that chart (the layer keeps the glow / pill)
+    const hosts = cfg.layer !== "over" && tiled() ? lwHosts() : null;
+    if (hosts && hosts.length === views.length) {
+      embHosts = hosts.map((host, i) => { const box = document.createElement("div"); box.className = "bd-emb"; box.dataset.bdOwner = ME.token;
+        claimStack(host); box.appendChild(views[i].tile); host.insertBefore(box, host.firstChild); views[i].host = host; return { host, box }; });
+      layer.classList.add("bd-embmulti");
+    }
     if (embeddedHost) { claimStack(embeddedHost); embeddedHost.insertBefore(layer, embeddedHost.firstChild); }
     else document.documentElement.appendChild(layer);
     placeViews();
@@ -1062,8 +1080,9 @@
   function placeViews() {
     if (!layer) return;
     views.forEach((v, i) => {
-      const hr = embeddedHost && embeddedHost.isConnected ? embeddedHost.getBoundingClientRect() : null;
-      const r = hr ? { left: hr.left + embeddedHost.clientLeft, top: hr.top + embeddedHost.clientTop, width: embeddedHost.clientWidth, height: embeddedHost.clientHeight }
+      const H = v.host || embeddedHost;
+      const hr = H && H.isConnected ? H.getBoundingClientRect() : null;
+      const r = hr ? { left: hr.left + H.clientLeft, top: hr.top + H.clientTop, width: H.clientWidth, height: H.clientHeight }
         : tiled() && charts[i] ? charts[i].r : { left: 0, top: 0, width: innerWidth, height: innerHeight };
       Object.assign(v, { x: r.left, y: r.top, w: r.width, h: r.height });          // v.x/y stay in viewport coordinates (used for measuring + capture)
       Object.assign(v.tile.style, hr ? { left: "0px", top: "0px", width: r.width + "px", height: r.height + "px" }
@@ -1078,7 +1097,7 @@
   }
   function trackLayout() {
     if (!layer || standDown || document.querySelector(".chart-container[data-bd-repaint]")) return;   // mid-redraw: charts hidden for 2 frames
-    if (!layer.isConnected || (embeddedHost && !embeddedHost.isConnected)) {          // the app re-drew its page and took our layer with it
+    if (!layer.isConnected || (embeddedHost && !embeddedHost.isConnected) || embHosts.some((e) => !e.host.isConnected || !e.box.isConnected)) {   // the app re-drew its page and took our layer with it
       if (Date.now() - lastRebuild > 3000) { lastRebuild = Date.now(); charts = chartEls(); build(); }
       return;
     }
@@ -1087,6 +1106,10 @@
     if (cfg.layer !== "over" && !(cfg.multi !== "span" && next.length > 1)) {
       const want = lwHost(next);
       if (want && want !== embeddedHost && Date.now() - lastRebuild > 1500) { lastRebuild = Date.now(); charts = next; build(); return; }
+    }
+    if (cfg.layer !== "over" && next.length > 1) {      // several charts: each wallpaper must sit in its own chart's container
+      const want = lwHosts(next), have = embHosts.map((e) => e.host);
+      if (want && (want.length !== have.length || want.some((h, i) => h !== have[i])) && Date.now() - lastRebuild > 1500) { lastRebuild = Date.now(); charts = next; build(); return; }
     }
     if (sig === layoutSig) return;
     const before = charts.length, wasTiled = tiled();
@@ -2468,7 +2491,12 @@
   // Advanced Charts (.chart-container) OR Lightweight Charts (.tv-lightweight-charts) — the wallpaper layer and
   // activation work for both; the candle recolour engine for each lives in hook.js / lw.js respectively.
   const CHART_SEL = ".chart-markup-table, .chart-container, [data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight']";
-  const bigChart = () => [...document.querySelectorAll(CHART_SEL)].some((el) => { const r = el.getBoundingClientRect(); return r.width >= 400 && r.height >= 250; });
+  // a real chart: one at least 400 x 250, or several smaller ones that together fill that much (a 2- or 3-chart layout
+  // on a small window). Mini charts (sparklines, a watchlist's tiny previews) are below 200 x 140 and don't count.
+  const bigChart = () => { let area = 0;
+    for (const el of document.querySelectorAll(CHART_SEL)) { const r = el.getBoundingClientRect();
+      if (r.width >= 400 && r.height >= 250) return true; if (r.width >= 200 && r.height >= 140) area += r.width * r.height; }
+    return area >= 400 * 250 * 1.5; };
   function whenChart(start) {
     const go = () => { if (!claim()) return; sweep(); start(); setTimeout(announceFrame, 300); };
     if (bigChart()) return go();
