@@ -704,14 +704,16 @@
   function workerSkin(canvas, skinId) {
     const w = getWorker(); if (!w) return null;
     let off; try { off = canvas.transferControlToOffscreen(); } catch { return null; }
-    const id = ++workerSeq, p = { busy: false, dt: 0, lastT: 0 };
+    const id = ++workerSeq, p = { busy: false, dt: 0, lastT: 0, sent: 0, skipped: 0 };
     w.views.set(id, p);
     w.postMessage({ type: "add", id, skin: skinId, canvas: off }, [off]);
     return {
       offThread: true,
       resize(W, H) { p.w = W; p.h = H; w.postMessage({ type: "resize", id, w: W, h: H, t: p.lastT }); },
       // if the worker is still drawing the last frame, don't queue another: the time carries over to the next one
-      frame(t, dt) { p.lastT = t; if (p.busy) { p.dt += dt; return; } p.busy = true; w.postMessage({ type: "frame", id, t, dt: dt + p.dt }); p.dt = 0; },
+      frame(t, dt) { p.lastT = t; if (p.busy) { p.dt += dt; p.skipped++; return; } p.busy = true; p.sent++; w.postMessage({ type: "frame", id, t, dt: dt + p.dt }); p.dt = 0; },
+      // how many frames we had to skip since last asked, because the worker was still drawing (0 = keeping up, 1 = never)
+      load() { const n = p.sent + p.skipped, r = n ? p.skipped / n : 0; p.sent = p.skipped = 0; return r; },
       remove() { w.views.delete(id); w.postMessage({ type: "remove", id }); },
     };
   }
@@ -1139,8 +1141,14 @@
     return all.filter((l, i) => i === 0 || l.fps < all[i - 1].fps);
   }
   const qlv = () => { const L = qlevels(); return L[Math.min(qLevel, L.length - 1)]; };
-  let qLevel = 0, hAcc = 0, hCount = 0, hStart = 0, hLast = 0, smoothFor = 0, needSmooth = 4, lastUp = 0;
-  function resetQuality() { qLevel = 0; hAcc = hCount = hStart = hLast = smoothFor = 0; needSmooth = 4; lastUp = 0; }
+  // A computer with few cores or little memory starts a step or two lower (no stutter while it finds its level); it
+  // still climbs to full quality on its own if it turns out to have room.
+  const cores = +navigator.hardwareConcurrency || 8, memGB = +navigator.deviceMemory || 8;
+  const startLevel = cores <= 2 || memGB <= 2 ? 2 : cores <= 4 || memGB <= 4 ? 1 : 0;
+  let qLevel = startLevel, hAcc = 0, hCount = 0, hStart = 0, hLast = 0, smoothFor = 0, needSmooth = 4, lastUp = 0;
+  function resetQuality() { qLevel = startLevel; hAcc = hCount = hStart = hLast = smoothFor = 0; needSmooth = 4; lastUp = 0; }
+  // the background worker that draws wallpapers: how often it couldn't keep up (frames skipped) since last asked
+  const workerLoad = () => { let m = 0; for (const v of views) if (v.skin && v.skin.load) m = Math.max(m, v.skin.load()); return m; };
   const publishQ = () => document.documentElement.setAttribute("data-bd-q", `${qLevel + 1}/${qlevels().length}@${refreshHz}`);
 
   // While one of TradingView's big windows is open (Trade / broker login, Settings, Indicators, Alerts…) the wallpaper
@@ -1193,14 +1201,18 @@
     hLast = now;
     if (!hStart) { hStart = now; return; }
     if (now - hStart < 2000 || hCount < 10) return;
-    const health = 1000 / (hAcc / hCount), L = qlevels();
+    const health = 1000 / (hAcc / hCount), L = qlevels(), busy = workerLoad();
     hStart = now; hAcc = hCount = 0;
-    if (health < refreshHz * 0.8 && qLevel < L.length - 1) {
+    // struggling = the page drops frames, OR the wallpaper's worker can't keep up (the page itself can look fine then,
+    // but the wallpaper stutters and a CPU core sits at 100%)
+    const bad = health < refreshHz * 0.8 || busy > 0.25, good = health > refreshHz * 0.92 && busy < 0.08;
+    document.documentElement.setAttribute("data-bd-health", `${Math.round(health)}fps busy${Math.round(busy * 100)}%`);   // for Diagnose / tests
+    if (bad && qLevel < L.length - 1) {
       qLevel++; smoothFor = 0; if (now - lastUp < 25000) needSmooth = Math.min(32, needSmooth * 2);   // failed soon after climbing: wait longer next time
       views.forEach(sizeCanvas); publishQ();
-    } else if (health > refreshHz * 0.92 && qLevel > 0) {
+    } else if (good && qLevel > 0) {
       if (++smoothFor >= needSmooth) { qLevel--; smoothFor = 0; lastUp = now; views.forEach(sizeCanvas); publishQ(); }
-    } else if (health <= refreshHz * 0.92) smoothFor = 0;
+    } else if (!good) smoothFor = 0;
   }
 
   function teardown() {

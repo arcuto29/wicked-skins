@@ -579,7 +579,22 @@ function priismSkins(window, document) {
   // wallpaper canvas is rendered at a reduced resolution and stretched.
   const T2 = Math.PI * 2;
   const kOf = (w, h) => Math.max(0.3, Math.min(w, h) / 600);
-  const sky = (ctx, w, h, stops) => { const g = ctx.createLinearGradient(0, 0, 0, h); for (const [o, c] of stops) g.addColorStop(o, c); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); };
+  // A vertical gradient filling the canvas. Wallpapers call this every frame with the same colours, so it's drawn once
+  // into a cached copy and then copied 1:1 (several times cheaper than re-filling a gradient, with no GPU).
+  const skyCache = new WeakMap();
+  const sky = (ctx, w, h, stops) => {
+    const key = w + "x" + h + JSON.stringify(stops), tf = ctx.getTransform && ctx.getTransform();
+    const plain = !tf || (tf.a === 1 && tf.b === 0 && tf.c === 0 && tf.d === 1 && tf.e === 0 && tf.f === 0);
+    let c = plain && skyCache.get(ctx);
+    if (plain && (!c || c.key !== key)) {
+      const o = document.createElement("canvas"); o.width = Math.max(2, w | 0); o.height = Math.max(2, h | 0);
+      const g0 = o.getContext("2d"), g = g0.createLinearGradient(0, 0, 0, h); for (const [p, col] of stops) g.addColorStop(p, col);
+      g0.fillStyle = g; g0.fillRect(0, 0, w, h); c = { key, o }; skyCache.set(ctx, c);
+    }
+    if (c && c.o.width === Math.max(2, w | 0)) { const ga = ctx.globalAlpha, op = ctx.globalCompositeOperation; ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+      ctx.drawImage(c.o, 0, 0); ctx.globalAlpha = ga; ctx.globalCompositeOperation = op; return; }
+    const g = ctx.createLinearGradient(0, 0, 0, h); for (const [o, col] of stops) g.addColorStop(o, col); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  };
   const glowDot = (ctx, x, y, r, rgb, a) => { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); };
   const offscreen = (w, h) => { const c = document.createElement("canvas"); c.width = Math.max(2, w | 0); c.height = Math.max(2, h | 0); return c; };
   const starsOf = (w, h, n, k, maxY = 1) => Array.from({ length: n }, () => ({ x: rnd(0, w), y: rnd(0, h * maxY), r: rnd(0.5, 1.5) * k, p: rnd(0, T2) }));
@@ -1044,7 +1059,7 @@ function priismSkins(window, document) {
             px[i++] = 0xff000000 | ((PAL[p3 + 2] * f) << 16) | ((PAL[p3 + 1] * f) << 8) | (PAL[p3] * f);
           }
         }
-        og.putImageData(img, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high"; ctx.drawImage(off, 0, 0, w, h);
+        og.putImageData(img, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "low"; ctx.drawImage(off, 0, 0, w, h);
       },
     };
   };
@@ -1121,7 +1136,7 @@ function priismSkins(window, document) {
           }
           px[i++] = 0xff000000 | ((bb > 255 ? 255 : bb) << 16) | ((g > 255 ? 255 : g) << 8) | (r > 255 ? 255 : r);
         }
-        og.putImageData(img, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high"; ctx.drawImage(off, 0, 0, w, h);
+        og.putImageData(img, 0, 0); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "low"; ctx.drawImage(off, 0, 0, w, h);
       },
     };
   };
@@ -1275,7 +1290,7 @@ function priismSkins(window, document) {
       frame(t) {
         sky(ctx, w, h, [[0, "#03020a"], [1, "#07041a"]]);
         drawStars(ctx, st, t, 0.55);
-        const T = nebTextures(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+        const T = nebTextures(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "low";   // soft glow textures: "high" costs a lot (most of the frame without a GPU) and looks the same
         ctx.globalCompositeOperation = "lighter";
         // kept a little below full strength so price-scale numbers and candles stay readable on top
         draw(T.dust, t, 0.03, 0.05, 1.3, 0.03, 0.03, 0.68);
@@ -1541,14 +1556,14 @@ function priismSkins(window, document) {
         g.beginPath(); g.moveTo(cx - cw / 2 - 8 * k, cy - ch); g.lineTo(cx, cy - ch - 30 * k); g.lineTo(cx + cw / 2 + 8 * k, cy - ch); g.closePath(); g.fill();
         g.fillStyle = "rgba(235,242,255,0.9)"; g.beginPath(); g.moveTo(cx - cw / 2 - 8 * k, cy - ch); g.lineTo(cx, cy - ch - 30 * k); g.lineTo(cx + cw / 2 + 8 * k, cy - ch); g.lineTo(cx + cw / 2 + 4 * k, cy - ch + 5 * k); g.lineTo(cx, cy - ch - 24 * k); g.lineTo(cx - cw / 2 - 4 * k, cy - ch + 5 * k); g.closePath(); g.fill();
         win = { x: cx - 12 * k, y: cy - ch + 12 * k, w: 24 * k, h: 16 * k };
-        sky4 = offscreen(w / 4, h / 4);         // the aurora is soft, so it's drawn at a quarter size and scaled up
+        sky4 = offscreen(w / 12, h / 12);       // the aurora is soft: drawn very small and enlarged, which softens its edges (cheaper than a blur)
       },
       frame(t, dt) {
         sky(ctx, w, h, [[0, "#02050f"], [0.6, "#061127"], [1, "#0c1d3a"]]);
         drawStars(ctx, st, t, 0.55);
         // aurora: each band is one soft ribbon (a filled wave with a vertical fade), slowly rippling
         const a4 = sky4.getContext("2d"); a4.setTransform(1, 0, 0, 1, 0, 0); a4.clearRect(0, 0, sky4.width, sky4.height); a4.setTransform(sky4.width / w, 0, 0, sky4.height / h, 0, 0);
-        a4.globalCompositeOperation = "lighter"; a4.filter = "blur(3px)";      // soft edges, like a real aurora
+        a4.globalCompositeOperation = "lighter";   // soft edges come from drawing it small and enlarging (a blur filter here cost most of the frame without a GPU)
         for (const b of BANDS) {
           const top = (x) => h * b.y + Math.sin(x / w * 5 + t * b.sp * 6) * h * b.a + Math.sin(x / w * 13 - t * b.sp * 9) * h * b.a * 0.35;
           const gr = a4.createLinearGradient(0, h * (b.y - b.a - 0.05), 0, h * (b.y + b.hh));
@@ -1558,7 +1573,6 @@ function priismSkins(window, document) {
           for (let x = w * 1.08; x >= -w * 0.08; x -= 16 * k) a4.lineTo(x, top(x) + h * b.hh * (0.75 + 0.25 * Math.sin(x / w * 7 + t * 0.3)));
           a4.closePath(); a4.fill();
         }
-        a4.filter = "none";
         ctx.globalCompositeOperation = "lighter"; ctx.imageSmoothingEnabled = true; ctx.drawImage(sky4, 0, 0, w, h); ctx.globalCompositeOperation = "source-over";
         ctx.drawImage(land, 0, 0);
         if (win) { const f = 0.88 + 0.12 * Math.sin(t * 0.8); glowDot(ctx, win.x + win.w / 2, win.y + win.h / 2, 42 * k, "255,180,90", 0.3 * f);
@@ -1590,8 +1604,10 @@ function priismSkins(window, document) {
         // light on the water: soft bright patches, drawn small and blurred, then scrolled over the pond
         base = offscreen(w, h); const bgx = base.getContext("2d"), bg = bgx.createRadialGradient(w * 0.5, h * 0.45, 0, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
         bg.addColorStop(0, "#0d3c3f"); bg.addColorStop(1, "#03141a"); bgx.fillStyle = bg; bgx.fillRect(0, 0, w, h);
-        caust = offscreen(w / 4, h / 4); const cg = caust.getContext("2d");
-        for (let i = 0; i < 70; i++) glowDot(cg, rnd(0, caust.width), rnd(0, caust.height), rnd(4, 12), "160,240,220", rnd(0.12, 0.3));
+        const small = offscreen(w / 4, h / 4), cg = small.getContext("2d");
+        for (let i = 0; i < 70; i++) glowDot(cg, rnd(0, small.width), rnd(0, small.height), rnd(4, 12), "160,240,220", rnd(0.12, 0.3));
+        // drawn small (soft), stretched to full size once here, so each frame is a plain copy instead of a stretch
+        caust = offscreen(w, h); { const fg = caust.getContext("2d"); fg.imageSmoothingEnabled = true; fg.drawImage(small, 0, 0, w, h); }
         // lily pads + a few flowers (they don't move)
         pads = offscreen(w, h); const g = pads.getContext("2d");
         const pad = (x, y, r, rot) => {
@@ -1619,8 +1635,9 @@ function priismSkins(window, document) {
         ctx.drawImage(base, 0, 0);
         ctx.globalCompositeOperation = "lighter"; ctx.imageSmoothingEnabled = true;
         const o1 = (t * 5 * k) % w, o2 = (t * 3.5 * k) % h;
-        ctx.globalAlpha = 0.22; ctx.drawImage(caust, o1, 0, w, h); ctx.drawImage(caust, o1 - w, 0, w, h);
-        ctx.globalAlpha = 0.14; ctx.drawImage(caust, 0, -o2, w, h); ctx.drawImage(caust, 0, h - o2, w, h);
+        const r1 = Math.round(o1), r2 = Math.round(o2);
+        ctx.globalAlpha = 0.22; ctx.drawImage(caust, r1, 0); ctx.drawImage(caust, r1 - caust.width, 0);
+        ctx.globalAlpha = 0.14; ctx.drawImage(caust, 0, -r2); ctx.drawImage(caust, 0, caust.height - r2);
         ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
         // ripples now and then, where a fish nears the surface
         nextRipple -= dt;
@@ -1748,11 +1765,13 @@ function priismSkins(window, document) {
   // Ringed Giant: a huge ringed planet rising in the corner of deep space: banded clouds, the rings' shadow on the
   // planet, a soft atmosphere, stars, a faint nebula, and a small moon drifting across very slowly.
   const ringedGiant = (ctx) => {
-    let w = 0, h = 0, k = 1, st = [], planet = null, px = 0, py = 0, neb = [];
+    let w = 0, h = 0, k = 1, st = [], planet = null, px = 0, py = 0, neb = [], back = null;
     return {
       resize(W, H) {
         w = W; h = H; k = kOf(w, h); st = starsOf(w, h, 260, k);
         neb = Array.from({ length: 5 }, (_, i) => ({ x: rnd(0, 0.6) * w, y: rnd(0, 0.6) * h, r: rnd(0.2, 0.4) * Math.max(w, h), c: ["80,60,160", "40,90,170", "120,50,130"][i % 3] }));
+        // deep space + the faint nebula don't move: drawn once
+        back = offscreen(w, h); { const g = back.getContext("2d"); sky(g, w, h, [[0, "#02030a"], [1, "#070815"]]); for (const n of neb) glowDot(g, n.x, n.y, n.r, n.c, 0.07); }
         const R = Math.min(w, h) * 0.42, S = Math.ceil(R * 5.2);
         planet = offscreen(S, S); const g = planet.getContext("2d"), c = S / 2; px = w * 0.8 - c; py = h * 0.7 - c;
         const TILT = -0.3, RY = 0.3;
@@ -1786,8 +1805,7 @@ function priismSkins(window, document) {
         g.save(); g.beginPath(); g.arc(c, c, R * 1.01, 0, T2); g.clip(); g.translate(c, c); g.rotate(TILT); g.beginPath(); g.rect(-S, 0, S * 2, S); g.setTransform(1, 0, 0, 1, 0, 0); g.clip(); ringsAt(g); g.restore();
       },
       frame(t) {
-        sky(ctx, w, h, [[0, "#02030a"], [1, "#070815"]]);
-        for (const n of neb) glowDot(ctx, n.x, n.y, n.r, n.c, 0.07);
+        ctx.drawImage(back, 0, 0);
         drawStars(ctx, st, t, 0.7);
         // a small moon crossing very slowly (about four minutes)
         const mu = (t * 0.004) % 1, mx = w * (-0.05 + mu * 1.1), my = h * (0.18 + 0.08 * Math.sin(mu * Math.PI)), mr = Math.min(w, h) * 0.018;
@@ -1801,32 +1819,35 @@ function priismSkins(window, document) {
   // Deep Blue: a giant manta ray gliding slowly through the deep ocean, under shifting sunbeams, with marine snow
   // drifting down and the odd stream of bubbles.
   const deepBlue = (ctx) => {
-    let w = 0, h = 0, k = 1, snow = [], bubbles = [], beams = null;
+    let w = 0, h = 0, k = 1, snow = [], bubbles = [], beams = null, sea = null;
     return {
       resize(W, H) {
         w = W; h = H; k = kOf(w, h);
         snow = Array.from({ length: 160 }, () => ({ x: rnd(0, w), y: rnd(0, h), r: rnd(0.5, 1.8) * k, s: rnd(3, 10) * k, p: rnd(0, T2), a: rnd(0.15, 0.5) }));
         bubbles = [];
-        // sunbeams, drawn once at half size and blurred so their edges are soft; swayed each frame with a skew
+        // the sea itself (gradient + the shimmer of the surface) doesn't move: drawn once
+        sea = offscreen(w, h); { const g = sea.getContext("2d"); sky(g, w, h, [[0, "#0b5f8e"], [0.45, "#063758"], [1, "#010c1c"]]);
+          const sg = g.createLinearGradient(0, 0, 0, h * 0.08); sg.addColorStop(0, "rgba(200,245,255,0.18)"); sg.addColorStop(1, "rgba(200,245,255,0)"); g.fillStyle = sg; g.fillRect(0, 0, w, h * 0.08); }
+        // sunbeams, drawn once at half size and blurred so their edges are soft; they drift gently each frame
         beams = [0, 1].map((layer) => { const B = offscreen(Math.ceil(w * 0.75), Math.ceil(h / 2)), g = B.getContext("2d"), bw = B.width, bh = B.height;
           g.filter = `blur(${Math.round(10 * k)}px)`;
           for (let i = 0; i < 6; i++) { const x = rnd(0, bw), top = rnd(6, 20) * k, bot = rnd(30, 80) * k, a = rnd(0.12, 0.24) * (layer ? 0.7 : 1);
             const gr = g.createLinearGradient(0, 0, 0, bh); gr.addColorStop(0, `rgba(170,230,255,${a})`); gr.addColorStop(0.7, `rgba(170,230,255,${a * 0.25})`); gr.addColorStop(1, "rgba(170,230,255,0)");
             g.fillStyle = gr; g.beginPath(); g.moveTo(x - top, -10); g.lineTo(x + top, -10); g.lineTo(x + bot + bh * 0.15, bh); g.lineTo(x - bot + bh * 0.15, bh); g.closePath(); g.fill(); }
-          g.filter = "none"; return B; });
+          g.filter = "none";
+          // shown 1.3x wider than the screen: stretch it once here, so each frame is a plain (cheap) copy
+          const F = offscreen(Math.ceil(w * 1.3), Math.ceil(h)), fg = F.getContext("2d"); fg.imageSmoothingEnabled = true; fg.drawImage(B, 0, 0, F.width, F.height); return F; });
       },
       frame(t, dt) {
-        sky(ctx, w, h, [[0, "#0b5f8e"], [0.45, "#063758"], [1, "#010c1c"]]);
-        // sunbeams from the surface, swaying
+        ctx.drawImage(sea, 0, 0);
+        // sunbeams from the surface, drifting (a plain shift: a slanted transform was slow to draw without a GPU)
         ctx.globalCompositeOperation = "lighter";
         for (let i = 0; i < 2; i++) {
-          const sk = Math.sin(t * (0.09 + i * 0.05) + i * 2) * 0.12, x0 = -w * 0.15 + (i ? w * 0.12 : 0);
-          ctx.globalAlpha = 0.75 + 0.25 * Math.sin(t * (0.3 + i * 0.17) + i); ctx.save(); ctx.transform(1, 0, sk, 1, 0, 0);
-          ctx.drawImage(beams[i], x0, 0, w * 1.3, h); ctx.restore();
+          const sx = Math.sin(t * (0.09 + i * 0.05) + i * 2) * w * 0.05, x0 = -w * 0.15 + (i ? w * 0.12 : 0);
+          ctx.globalAlpha = 0.75 + 0.25 * Math.sin(t * (0.3 + i * 0.17) + i);
+          ctx.drawImage(beams[i], Math.round(x0 + sx), 0);
         }
         ctx.globalAlpha = 1;
-        // the shimmer of the surface at the top
-        const sg = ctx.createLinearGradient(0, 0, 0, h * 0.08); sg.addColorStop(0, "rgba(200,245,255,0.18)"); sg.addColorStop(1, "rgba(200,245,255,0)"); ctx.fillStyle = sg; ctx.fillRect(0, 0, w, h * 0.08);
         ctx.globalCompositeOperation = "source-over";
         // marine snow
         for (const s of snow) { s.y += s.s * dt; s.x += Math.sin(t * 0.3 + s.p) * 3 * k * dt; if (s.y > h) { s.y = -2; s.x = rnd(0, w); }
@@ -1850,10 +1871,11 @@ function priismSkins(window, document) {
         ctx.bezierCurveTo(-L * 0.12, -tipY * 0.7, -L * 0.3, -W * 0.16, -L * 0.36, 0);
         ctx.bezierCurveTo(-L * 0.3, W * 0.16, -L * 0.12, tipY * 0.7, tipX, tipY);
         ctx.bezierCurveTo(L * 0.1, tipY * 0.8, L * 0.38, W * 0.18, L * 0.42, 0); ctx.closePath(); };
-      // a soft dark halo, then the body: dark on top, lit along its leading edges
-      ctx.shadowColor = "rgba(0,8,20,0.6)"; ctx.shadowBlur = 24 * k;
+      // a soft dark halo (a plain radial gradient: a live blurred shadow cost most of the frame without a GPU), then
+      // the body: dark on top, lit along its leading edges
+      ctx.save(); ctx.scale(1, W / L * 0.62); glowDot(ctx, -L * 0.02, 0, L * 0.78, "0,8,20", 0.55); ctx.restore();
       const g = ctx.createLinearGradient(L * 0.4, 0, -L * 0.4, 0); g.addColorStop(0, "#1a3d5e"); g.addColorStop(0.5, "#0d243c"); g.addColorStop(1, "#08182a");
-      ctx.fillStyle = g; body(); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = g; body(); ctx.fill();
       ctx.strokeStyle = "rgba(150,210,240,0.22)"; ctx.lineWidth = Math.max(1, 1.4 * k); body(); ctx.stroke();
       // the raised body down the middle, lit from above
       const bg = ctx.createLinearGradient(0, -W * 0.12, 0, W * 0.12); bg.addColorStop(0, "rgba(120,180,220,0.10)"); bg.addColorStop(0.5, "rgba(40,80,120,0.18)"); bg.addColorStop(1, "rgba(0,0,0,0.25)");

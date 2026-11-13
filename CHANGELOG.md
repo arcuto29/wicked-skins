@@ -6,6 +6,8 @@
 - Signing in with Google no longer loses the look you were about to publish.
 - The owner's shares go live straight away; everyone else's are checked first.
 - Fixed: the "Forgot password?" email link pointed at the wrong address.
+- **Smoother on every computer.** The heaviest wallpapers now take a fraction of the work to draw, with no visible change: Deep Blue 4.5x lighter, Koi Pond 3.5x, Ringed Giant 3x, Nebula and Northern Noel 2x, Fractal Bloom and Oil Slick 1.6-1.9x, and every wallpaper's background a little lighter.
+- **Auto quality is smarter.** It now also notices when the wallpaper itself can't keep up (before, it only watched the chart page), and computers with few cores or little memory start a step lower and climb to full quality only if there's room. No stutter while it finds its level.
 
 ## 0.1.53 (2026-11-10)
 - **Two new Wow wallpapers**, each with its own one-tap look (Skins → Wow, Looks → Wow):
