@@ -34,7 +34,8 @@ const DEFAULTS = {
   goalOn: false, goalGuard: false, goalTarget: 500, goalLimit: 300, goalPos: "bl", journalOn: false, clipMode: "chart", clipFps: 30,
 };
 let cfg = { ...DEFAULTS };
-const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set(obj); };
+// lastPick: you used THIS copy's panel just now, so if two copies of Priism are installed, this one draws the page
+const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set({ ...obj, lastPick: Date.now() }); };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -2072,7 +2073,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["nq.vision: every 2- and 3-chart layout gets your wallpaper and colours, at any window size",
+const WHATS_NEW = ["Fixed: indicator Settings / Pine Editor sometimes not opening until a refresh",
+  "Two copies installed? The one you use now always shows your background",
+  "nq.vision: every 2- and 3-chart layout gets your wallpaper and colours, at any window size",
   "Publish your saved looks to the Workshop, and see your shares with their status (Saved \u203a Publish, Workshop \u203a Mine)",
   "Glow at the pointer in any colour (Style \u203a Crosshair \u203a Glow colour)",
   "2 new Wow wallpapers: Cozy Room (a sleeping cat by a rainy window) and Tokyo Rooftop (neon, rain and a passing train)",

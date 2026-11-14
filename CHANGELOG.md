@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.55 (2026-11-14)
+- **Fixed: indicator Settings or the Pine Editor sometimes wouldn't open until you refreshed TradingView.** When Priism updated itself in the background, the new version could stop partway while putting itself into a chart that was already open, leaving TradingView drawing through half-installed code. It now installs cleanly over a running chart.
+- **Two copies of Priism installed (for example the Chrome Web Store one and an old zip)?** The one whose panel you used last now always draws the page, so the background you pick is the one you see, on every platform, including after a reload. Before, the other copy could win and show its own default wallpaper (the green Polar Lights) while your changes did nothing. Removing the extra copy is still best: the panel tells you when there are two.
+
 ## 0.1.54 (2026-11-11)
 - **Publish your saved looks to the Workshop.** Every look in **Saved** has a **Publish** button that sends that look (not just what's on your chart) to the Workshop for everyone. You sign in once on the website; it remembers you.
 - **Your shares never seem to vanish.** Wallpapers and looks you share are listed under **Your shares** on the website, with their status (**Live**, **In review** or **Not approved** with the reason) and a Delete button. In Priism, **Workshop › Mine** shows a look the moment you publish it, marked *In review*, then *Live* once approved.

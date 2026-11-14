@@ -12,11 +12,18 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 10;
+  const HOOK_VERSION = 11;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
   window.__bdHookVer = HOOK_VERSION;
+  // Redraw state, declared first: when a newer copy goes into a chart that's already open (Priism updated in the
+  // background), the chart's colours are known at once and a redraw is asked for while this file is still setting
+  // up. Declared lower down, that threw ("softRaf before initialization"), stopped the setup halfway and left
+  // TradingView drawing through half-installed code until you reloaded (windows like indicator Settings or the Pine
+  // Editor could then fail to open).
+  let softRaf = 0, hardT = 0;
+  const stats = (window.__bdStats = window.__bdStats || { soft: 0, hard: 0 });
   // An older copy of the extension already wrapped the canvas API. Put the browser's own untouched functions back
   // (taken from a fresh hidden frame), so the old wrappers are cut out and only this version draws.
   if (olderHook) {
@@ -495,8 +502,6 @@
   // Redraws are made to feel instant: every change gets TradingView's own light redraw on the very next frame (no
   // blink). The heavier rebuild (hide the chart for two frames) is only needed for things TradingView caches, like
   // volume-bar colours, so it runs ONCE, after you stop changing things, instead of on every step of a colour drag.
-  let softRaf = 0, hardT = 0;
-  const stats = (window.__bdStats = window.__bdStats || { soft: 0, hard: 0 });
   function hardRebuild() {
     stats.hard++;
     document.querySelectorAll(".chart-container").forEach((el) => {

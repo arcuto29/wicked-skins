@@ -2442,8 +2442,13 @@
   const ME = { id: EXT || "desktop", ver: EXT ? chrome.runtime.getManifest().version : "desktop", token: Math.random().toString(36).slice(2) };
   const verCmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number);
     for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };
-  const readOwner = () => { const [id, ver, token, ts] = (document.documentElement.getAttribute("data-bd-owner") || "").split("|"); return id ? { id, ver, token, ts: +ts } : null; };
-  const writeOwner = () => document.documentElement.setAttribute("data-bd-owner", [ME.id, ME.ver, ME.token, Date.now()].join("|"));
+  // Two copies of Priism on one page (e.g. the Chrome Web Store one and an old zip): only one may draw. The one whose
+  // panel you used last wins ("pick" = when you last changed a setting in that copy), so the background you choose is
+  // always the one you see. Ties go to the newer version, then to whoever got there first.
+  let myPick = 0;
+  const readOwner = () => { const [id, ver, token, ts, pick] = (document.documentElement.getAttribute("data-bd-owner") || "").split("|"); return id ? { id, ver, token, ts: +ts, pick: +pick || 0 } : null; };
+  const writeOwner = () => document.documentElement.setAttribute("data-bd-owner", [ME.id, ME.ver, ME.token, Date.now(), myPick].join("|"));
+  const outranks = (a, b) => a.pick !== b.pick ? a.pick > b.pick : verCmp(a.ver, b.ver) > 0;   // does copy a win over copy b?
   let owner = false, standDown = false, dupReported = false;
   function reportDuplicate() {
     if (dupReported || !EXT) return; dupReported = true;
@@ -2454,7 +2459,7 @@
     const alive = cur && Date.now() - cur.ts < 6000;
     if (alive && cur.token !== ME.token && (cur.id !== ME.id || cur.ver !== ME.ver)) {
       if (cur.id !== ME.id) reportDuplicate();
-      if (verCmp(cur.ver, ME.ver) >= 0 && cur.id !== ME.id) return false;     // a same-or-newer copy already owns it
+      if (cur.id !== ME.id && !outranks({ pick: myPick, ver: ME.ver }, cur)) return false;   // the other copy was used more recently (or is newer)
     }
     if (cur && cur.id === ME.id && cur.token !== ME.token) handedFrom = cur.token;   // our own earlier copy (update / reload)
     writeOwner(); owner = true; return true;
@@ -2467,7 +2472,7 @@
   const ctxDead = () => !!EXT && !(chrome.runtime && chrome.runtime.id);
   const shouldYield = () => { const cur = readOwner();
     return !!cur && cur.token !== ME.token && Date.now() - cur.ts < 6000 &&
-      (verCmp(cur.ver, ME.ver) > 0 || (cur.id === ME.id && ctxDead())); };
+      (cur.id !== ME.id ? outranks(cur, { pick: myPick, ver: ME.ver }) : verCmp(cur.ver, ME.ver) > 0 || ctxDead()); };
   function yieldPage() {
     standDown = true; teardown(); if (wmEl) { wmEl.remove(); wmEl = null; }
     if (timerEl) { timerEl.remove(); timerEl = null; } clearInterval(timerIv); timerIv = 0;
@@ -2497,8 +2502,10 @@
     for (const el of document.querySelectorAll(CHART_SEL)) { const r = el.getBoundingClientRect();
       if (r.width >= 400 && r.height >= 250) return true; if (r.width >= 200 && r.height >= 140) area += r.width * r.height; }
     return area >= 400 * 250 * 1.5; };
+  let startFn = null, started = false;
   function whenChart(start) {
-    const go = () => { if (!claim()) return; sweep(); start(); setTimeout(announceFrame, 300); };
+    startFn = start;
+    const go = () => { if (!claim()) return; sweep(); started = true; start(); setTimeout(announceFrame, 300); };
     if (bigChart()) return go();
     // charts render late and small widgets (mini charts) never qualify; check for a while
     // keep checking (login-gated / single-page apps can show the chart much later), slower after the first 3 minutes
@@ -2506,13 +2513,31 @@
     setTimeout(() => { if (!bigChart()) { clearInterval(iv); iv = setInterval(() => { if (bigChart()) { clearInterval(iv); go(); } }, 2000); } }, 180000);
   }
 
+  // You changed something in THIS copy's panel: if another copy is drawing here, take the page back from it.
+  function retake() {
+    if (owner && !standDown) { writeOwner(); return; }
+    if (!startFn || !bigChart()) return;
+    const was = standDown; standDown = false;
+    if (!claim()) { standDown = was; return; }
+    sweep();
+    if (!started) { started = true; startFn(); setTimeout(announceFrame, 300); return; }
+    build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); setTimeout(announceFrame, 300);
+  }
+
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); }));
+    // when you last used this copy's panel is known BEFORE claiming the page, so after a reload the right copy wins
+    chrome.storage.local.get({ lastPick: 0 }, (s) => { myPick = +s.lastPick || 0;
+      whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); })); });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       // today's total is shared between tabs (and reset from the panel); the journal is just stored data
       if (changes.dayPnl) { const nv = changes.dayPnl.newValue; day = nv && nv.date ? { ...freshDay(), ...nv } : freshDay(); renderGoal(); }
-      const keys = Object.keys(changes).filter((k) => k !== "dayPnl" && k !== "journal");
+      const keys = Object.keys(changes).filter((k) => k !== "dayPnl" && k !== "journal" && k !== "lastPick");
+      if (changes.lastPick) {
+        myPick = +changes.lastPick.newValue || 0;
+        if (!(owner && !standDown)) { for (const k of keys) cfg[k] = changes[k].newValue; return retake(); }   // another copy had the page: take it back
+        writeOwner();                                                                                     // already ours: just note it, then apply as usual
+      }
       for (const k of keys) cfg[k] = changes[k].newValue;
       if (keys.length) apply(keys);
     });
