@@ -1069,7 +1069,7 @@
     }
     if (embeddedHost) { claimStack(embeddedHost); embeddedHost.insertBefore(layer, embeddedHost.firstChild); }
     else document.documentElement.appendChild(layer);
-    placeViews();
+    placeViews(); watchCharts();
     resetQuality(); lastMatch = "";
     if (views.some((v) => v.skin)) startLoop();
     applyLook();
@@ -1115,6 +1115,7 @@
     }
     if (sig === layoutSig) return;
     const before = charts.length, wasTiled = tiled();
+    if (next.length !== charts.length || next.some((c, i) => !charts[i] || charts[i].el !== c.el)) { charts = next; watchCharts(); }
     charts = next; layoutSig = sig;
     // number of tiles changed (chart added/removed, or 1 <-> many): rebuild; otherwise just move them
     if (before !== charts.length) setTimeout(announceFrame, 0);
@@ -1124,6 +1125,17 @@
   }
   setInterval(trackLayout, 600);
   addEventListener("resize", () => setTimeout(trackLayout, 50));
+  // Charts that change size without the window changing (dragging the divider between charts in a multi-chart
+  // layout, opening a side panel): follow them on the very next frame. Checking every 0.6 s left a wallpaper behind
+  // its chart while you dragged, and the platform's own background showed in the gap.
+  let chartRO = null, roRaf = 0;
+  function watchCharts() {
+    if (typeof ResizeObserver !== "function") return;
+    if (!chartRO) chartRO = new ResizeObserver(() => { if (!roRaf) roRaf = requestAnimationFrame(() => { roRaf = 0; trackLayout(); }); });
+    chartRO.disconnect();
+    for (const c of charts) chartRO.observe(c.el);
+    const area = document.querySelector(".layout__area--center"); if (area) chartRO.observe(area);   // charts added / removed
+  }
 
   function sizeCanvas(v) {
     if (!v.skin) return;
@@ -1241,6 +1253,7 @@
   }
 
   function teardown() {
+    if (chartRO) chartRO.disconnect();
     releaseStack();
     for (const v of views) if (v.skin && v.skin.remove) try { v.skin.remove(); } catch {}
     running = false;
