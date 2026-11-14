@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 12;
+  const HOOK_VERSION = 13;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -160,20 +160,21 @@
   readFx();
 
   const settingsObserver = new MutationObserver((muts) => {
-    let redraw = false, rebuild = false;
+    let redraw = false, rebuild = false, toneOnly = true;
     for (const m of muts) {
-      if (m.attributeName === "class") { const was = on; on = htmlEl().classList.contains("bd-on"); if (was !== on) rebuild = true; }
-      if (m.attributeName === "data-ws-candles") { const before = candles ? candles.upHex + candles.downHex : ""; readCandles(); redraw = true;
+      if (m.attributeName === "class") { const was = on; on = htmlEl().classList.contains("bd-on"); if (was !== on) { rebuild = true; toneOnly = false; } }
+      if (m.attributeName === "data-ws-candles") { const before = candles ? candles.upHex + candles.downHex : ""; readCandles(); redraw = true; toneOnly = false;
         if ((candles ? candles.upHex + candles.downHex : "") !== before) rebuild = true; }   // new colours: volume bars are cached by TradingView
       if (m.attributeName === "data-ws-fx") {
         // your settings changed -> redraw; the wallpaper's brightness drifted -> redraw ONLY if the scale text has to
         // flip between light and dark somewhere (an idle chart used to redraw every ~2s for nothing: a periodic hitch)
         const user = readFx(), ts = toneSig();
         if (user || ts !== lastToneSig) redraw = true;
+        if (user) toneOnly = false;
         lastToneSig = ts;
       }
     }
-    if (rebuild) forceRepaint(false); else if (redraw) forceRepaint(true);
+    if (rebuild) forceRepaint(false); else if (redraw) forceRepaint(true, toneOnly);
   });
   (function watchSettings() {
     const el = document.documentElement;
@@ -511,7 +512,21 @@
   // Redraws are made to feel instant: every change gets TradingView's own light redraw on the very next frame (no
   // blink). The heavier rebuild (hide the chart for two frames) is only needed for things TradingView caches, like
   // volume-bar colours, so it runs ONCE, after you stop changing things, instead of on every step of a colour drag.
+  // A rebuild hides the charts for two frames. Never while you're holding the mouse (dragging the divider between
+  // charts, a drawing, an order line) or right after the layout changed: hidden mid-resize, a chart measures itself as
+  // 0 px and can stay the wrong size, showing the page behind it. It waits until you let go and things settle.
+  let pointerDown = false, lastResize = 0;
+  addEventListener("pointerdown", () => { pointerDown = true; }, true);
+  addEventListener("pointerup", () => { pointerDown = false; lastResize = performance.now(); }, true);
+  addEventListener("pointercancel", () => { pointerDown = false; }, true);
+  addEventListener("resize", () => { lastResize = performance.now(); });
+  try { new ResizeObserver(() => { lastResize = performance.now(); }).observe(document.documentElement); } catch {}
+  (function watchCharts() {   // charts resizing inside the page (their own size, not the window's)
+    try { const ro = new ResizeObserver(() => { lastResize = performance.now(); }); let seen = new WeakSet();
+      setInterval(() => { for (const el of document.querySelectorAll(".chart-container")) if (!seen.has(el)) { seen.add(el); ro.observe(el); } }, 1000); } catch {}
+  })();
   function hardRebuild() {
+    if (pointerDown || performance.now() - lastResize < 500) { clearTimeout(hardT); hardT = setTimeout(hardRebuild, 300); return; }
     stats.hard++;
     document.querySelectorAll(".chart-container").forEach((el) => {
       if (el.dataset.bdRepaint) return;
@@ -520,10 +535,13 @@
       requestAnimationFrame(() => requestAnimationFrame(() => { el.style.display = ""; delete el.dataset.bdRepaint; }));
     });
   }
-  function forceRepaint(softOnly) {
+  // toneOnly: only the wallpaper's brightness behind the scale moved (e.g. while a chart is moved or resized). On
+  // platforms without TradingView's own redraw (prop firms, nq.vision) that never triggers a rebuild: they redraw
+  // themselves a moment later anyway, and rebuilding on every step of a divider drag hid the charts over and over.
+  function forceRepaint(softOnly, toneOnly) {
     if (!softRaf) softRaf = requestAnimationFrame(() => {
       softRaf = 0; stats.soft++;
-      if (!apiRepaint()) { clearTimeout(hardT); hardT = setTimeout(hardRebuild, 160); }   // no API here (some platforms): rebuild instead
+      if (!apiRepaint() && !toneOnly) { clearTimeout(hardT); hardT = setTimeout(hardRebuild, 160); }   // no API here (some platforms): rebuild instead
     });
     if (!softOnly) { clearTimeout(hardT); hardT = setTimeout(hardRebuild, 700); }
   }

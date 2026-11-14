@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.57 (2026-11-14)
+- **Fixed on nq.vision and other platforms using TradingView's charts: dragging the lines between charts could leave a chart too small, with the page's own background beside it.** On these platforms Priism refreshed the charts by hiding them for two frames, and it did that several times during a single drag. A chart hidden mid-resize measures itself wrongly. Priism now never hides charts while you're holding the mouse or while the layout is changing, and moving or resizing a chart no longer triggers a refresh at all.
+
 ## 0.1.56 (2026-11-14)
 - **Fixed: multi-chart layouts showing the platform's own background while you drag.** Dragging the divider between charts (or anything that resizes a chart without resizing the window) left each wallpaper up to a fraction of a second behind its chart, so the platform's own background (light grey on nq.vision) showed in the gap. Wallpapers now follow their charts on the very same frame, on TradingView, nq.vision and other platforms that use TradingView's charts.
 
