@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.1.57 (2026-11-14)
+- **Fixed on nq.vision: the text over the chart flickering** between dark and light. Priism lightens the platform's dark legend text so it reads over your wallpaper, but every time a price ticked it re-checked the already-lightened text, undid it, then did it again. It now decides from the text's own colour, so it stays put.
+- **New: "Check this page"** (top of the panel on platforms like nq.vision, under "On for …"). It tells you in plain words whether Priism is really drawing the chart there, whether another copy of Priism is drawing it instead (so your settings don't reach it), and whether the platform puts a colour filter on its charts (which tints your wallpaper and colours). One tap copies the details to send to support.
 - **Fixed on nq.vision and other platforms using TradingView's charts: dragging the lines between charts could leave a chart too small, with the page's own background beside it.** On these platforms Priism refreshed the charts by hiding them for two frames, and it did that several times during a single drag. A chart hidden mid-resize measures itself wrongly. Priism now never hides charts while you're holding the mouse or while the layout is changing, and moving or resizing a chart no longer triggers a refresh at all.
 
 ## 0.1.56 (2026-11-14)

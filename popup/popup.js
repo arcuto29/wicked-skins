@@ -1879,6 +1879,36 @@ $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map(
 // ---------- other sites (prop-firm platforms with TradingView charts, e.g. TopstepX) ----------
 // Looks at the page you're on; if it has a TradingView-style chart, offers to turn on there.
 const BUILT_IN = /(^|\.)tradingview\.com$/;
+// "Check this page": what Priism sees in every frame of the tab (is it on there, which copy, the charts, and anything on
+// the page that changes colours, like a CSS filter the platform puts on its charts). Plain words, plus a copyable report.
+async function checkPage(tab, host) {
+  const out = $("pageCheckOut"); out.hidden = false; out.textContent = "Checking\u2026";
+  let rs = [];
+  try { rs = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => {
+    const h = document.documentElement, owner = (h.getAttribute("data-bd-owner") || "").split("|");
+    const charts = [...document.querySelectorAll(".chart-container, .tv-lightweight-charts, [data-bd-lwroot]")].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 150 && r.height > 100; });
+    const filters = new Set();   // colour-changing CSS on the chart or anything around it
+    const look = (el) => { for (let e = el; e && e.nodeType === 1; e = e.parentElement) { const cs = getComputedStyle(e);
+      for (const p of ["filter", "backdropFilter", "mixBlendMode"]) { const v = cs[p]; if (v && v !== "none" && v !== "normal") filters.add(`${e.tagName.toLowerCase()}${e.id ? "#" + e.id : ""} ${p}: ${v}`.slice(0, 120)); } } };
+    charts.slice(0, 4).forEach(look); look(document.body);
+    let fx = null; try { fx = JSON.parse(h.getAttribute("data-ws-fx") || "null"); } catch {}
+    return { url: location.origin, top: window === window.top, on: h.classList.contains("bd-on"), owner: owner[0] || "", ver: owner[1] || "",
+      charts: charts.length, theme: (h.className.match(/theme-\w+/) || [""])[0], filters: [...filters].slice(0, 6), fx: !!fx, hz: h.getAttribute("data-bd-q") || "" };
+  } }); } catch (e) { out.textContent = "Couldn't check this page: " + (e.message || e); return; }
+  const frames = rs.map((r) => r.result).filter(Boolean), withCharts = frames.filter((f) => f.charts), me = chrome.runtime.id;
+  const lines = [];
+  if (!withCharts.length) lines.push("No chart found on this page yet. Open a chart, then check again.");
+  for (const f of withCharts) {
+    const where = f.top ? host : new URL(f.url).host;
+    if (!f.on) lines.push(`\u2716 Priism isn't running on the chart (${where}). Tap Turn off, then Turn on here again, and allow it.`);
+    else if (f.owner && f.owner !== me) lines.push(`\u2716 Another copy of Priism (v${f.ver}) is drawing this chart, so your settings here don't reach it. Remove the extra copy in chrome://extensions.`);
+    else lines.push(`\u2714 Priism is on the chart (${f.charts} chart${f.charts > 1 ? "s" : ""}, ${where}).`);
+    if (f.filters.length) lines.push(`\u26a0 The platform changes colours on its charts with a filter, which tints the wallpaper and your colours too: ${f.filters.join("; ")}`);
+  }
+  const report = "Priism " + chrome.runtime.getManifest().version + " on " + host + "\n" + JSON.stringify(frames);
+  out.innerHTML = `<b>This page</b><ul style="margin:6px 0;padding-left:16px">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><button class="link" id="pageCheckCopy">Copy the details (to send to support)</button>`;
+  $("pageCheckCopy").onclick = async () => { const ok = await copyText(report); $("pageCheckCopy").textContent = ok ? "Copied" : "Couldn't copy"; };
+}
 async function siteBar() {
   if (!EXT_MODE || IS_TAB || !chrome.tabs || !chrome.scripting) return;
   const bar = $("siteBar");
@@ -1893,6 +1923,7 @@ async function siteBar() {
   };
   const enabled = await WickedSites.find(origin);
   if (enabled) {
+    $("pageCheck").hidden = false; $("pageCheck").onclick = () => checkPage(tab, host);
     // a Lightweight Charts platform (lw.js marks it): hide the options that only style TradingView's own interface
     chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => document.documentElement.getAttribute("data-bd-lw") === "on" })
       .then((rs) => { if (rs.some((r) => r.result)) document.body.classList.add("lw-page"); }).catch(() => {});
@@ -2083,7 +2114,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["nq.vision: charts resize cleanly when you drag the lines between them",
+const WHATS_NEW = ["nq.vision: the text over the chart no longer flickers",
+  "\u201cCheck this page\u201d: see why something looks wrong on a platform (top of the panel)",
+  "nq.vision: charts resize cleanly when you drag the lines between them",
   "Multi-chart layouts: the wallpaper follows each chart instantly while you drag the dividers",
   "Indicator colours: Rainbow, your candle or wallpaper colours, or any colour, plus glow (Style \u203a Indicators)",
   "nq.vision: the wallpaper stays while you drag the chart",

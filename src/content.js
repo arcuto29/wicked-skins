@@ -819,7 +819,10 @@
       const t = (el.textContent || "").trim();
       const r = (t && t.length <= 80 && cr) ? el.getBoundingClientRect() : null;
       const over = !!r && r.width > 0 && r.left >= cr.left - 2 && r.right <= cr.right + 2 && r.top >= cr.top - 2 && r.bottom <= cr.bottom + 2;   // sits on the chart
-      if (over) { el.dataset.bdHalo = "1"; if (lumOf(getComputedStyle(el).color) < 0.45) el.dataset.bdLighten = "1"; else delete el.dataset.bdLighten; }
+      // decide from the text's OWN colour: read with our lightening switched off, or the next check sees the lightened
+      // colour, un-lightens it, then lightens it again (the legend text flickered between dark and light every ~2 s)
+      if (over) { el.dataset.bdHalo = "1"; const was = el.dataset.bdLighten; if (was) delete el.dataset.bdLighten;
+        if (lumOf(getComputedStyle(el).color) < 0.45) el.dataset.bdLighten = "1"; }
       else if (el.dataset.bdHalo) { delete el.dataset.bdHalo; delete el.dataset.bdLighten; }
       if (!t || t.length > 40) { if (el.dataset.bdTk) delete el.dataset.bdTk; continue; }
       const symStart = SYM_START.exec(t), sym = symStart && !NOT_SYM.has(symStart[1].replace(/!$/, "")) && symStart[1].length >= 2;
