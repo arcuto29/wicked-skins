@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["indMode","indColor","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["indMode","indColor","indCustom","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -21,7 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
-  indMode: "own", indColor: "",
+  indMode: "own", indColor: "", indCustom: {},
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -320,10 +320,45 @@ function syncIndicators() {
   if (!$("indMode")) return;
   seg("indMode", [["own", "Own"], ["rainbow", "Rainbow"], ["candles", "Candles"], ["wallpaper", "Wallpaper"], ["custom", "Custom"]], () => cfg.indMode || "own",
     (v) => { set(v === "custom" && !/^#/.test(cfg.indColor || "") ? { indMode: v, indColor: $("indColor").value || "#ffd166" } : { indMode: v }); syncIndicators(); });
-  $("indColRow").hidden = cfg.indMode !== "custom";
+  $("indColRow").hidden = cfg.indMode !== "custom"; renderEachInd();
   $("indColor").value = /^#[0-9a-f]{6}$/i.test(cfg.indColor || "") ? cfg.indColor : "#ffd166";
 }
 if ($("indColor")) $("indColor").oninput = (e) => set({ indColor: e.target.value });
+// Each indicator: the lines and zones Priism has seen on your chart (by their own colour), each with its own colour,
+// glow, thickness (lines) and a hide switch. Settings are by colour, so they follow that indicator on every chart.
+const colourName = (k) => { const [r, g, b] = k.split(",").map(Number), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx - mn < 24) return mx > 200 ? "white" : mx > 90 ? "grey" : "dark grey";
+  const h = ((mx === r ? (g - b) / (mx - mn) + (g < b ? 6 : 0) : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4) * 60) % 360;
+  return h < 15 || h >= 345 ? "red" : h < 40 ? "orange" : h < 65 ? "yellow" : h < 160 ? "green" : h < 195 ? "teal" : h < 250 ? "blue" : h < 290 ? "purple" : "pink"; };
+const toHex6 = (k) => "#" + k.split(",").map((n) => (+n).toString(16).padStart(2, "0")).join("");
+async function renderEachInd() {
+  const box = $("indEach"); if (!box) return;
+  let seen = null; try { seen = (await storeGet({ indSeen: null })).indSeen; } catch {}
+  const cust = cfg.indCustom || {}, items = (seen && Array.isArray(seen.items) ? seen.items : []);
+  // keep any you've set up even if not on this chart right now
+  for (const k of Object.keys(cust)) if (!items.some((i) => i.k === k)) items.push({ k, kind: "line", a: 1, name: "", off: true });
+  if (!items.length) { box.innerHTML = `<p class="hint">Open a chart with your indicators on it (with Priism on). They show up here within a few seconds.</p>`; return; }
+  box.innerHTML = (seen && seen.host ? `<p class="hint" style="margin:0 0 6px">On ${esc(seen.host)}:</p>` : "") + items.map((it) => {
+    const e = cust[it.k] || {}, col = /^#/.test(e.c || "") ? e.c : toHex6(it.k), set = !!cust[it.k];
+    const label = it.name || `${it.kind === "zone" ? "Zone" : "Line"} (${colourName(it.k)})`;
+    return `<div class="ind-row${set ? " set" : ""}${it.off ? " off" : ""}" data-k="${it.k}">
+      <div class="ind-h"><i class="sw" style="background:${toHex6(it.k)}${it.kind === "zone" ? ";border-radius:2px" : ""}"></i><b>${esc(label)}</b>${it.off ? "<small>not on this chart</small>" : ""}
+        <button class="link" data-a="reset" ${set ? "" : "hidden"}>Reset</button></div>
+      <div class="ind-c"><input type="color" data-a="c" value="${col}" title="Colour" /><button class="chip${e.c === "rainbow" ? " on" : ""}" data-a="rb">Rainbow</button>
+        <button class="chip${e.h ? " on" : ""}" data-a="h" title="Hide it on the chart" style="margin-left:auto">${e.h ? "Hidden" : "Hide"}</button></div>
+      <div class="ind-c"><span class="lbl">Glow</span><input type="range" data-a="g" min="0" max="1" step="0.05" value="${e.g === undefined || e.g === null ? 0 : e.g}" />
+        ${it.kind === "line" ? `<span class="lbl">Width</span><input type="range" data-a="w" min="0" max="3" step="0.5" value="${+e.w || 0}" />` : ""}</div></div>`; }).join("");
+  const upd = (k, patch) => { const next = { ...(cfg.indCustom || {}) }; next[k] = { ...(next[k] || {}), ...patch }; set({ indCustom: next }); };
+  box.querySelectorAll(".ind-row").forEach((row) => { const k = row.dataset.k;
+    row.querySelector('[data-a="c"]').oninput = (e) => upd(k, { c: e.target.value });
+    row.querySelector('[data-a="rb"]').onclick = () => { upd(k, { c: (cfg.indCustom[k] || {}).c === "rainbow" ? "" : "rainbow" }); renderEachInd(); };
+    row.querySelector('[data-a="g"]').oninput = (e) => upd(k, { g: +e.target.value });
+    const w = row.querySelector('[data-a="w"]'); if (w) w.oninput = (e) => upd(k, { w: +e.target.value });
+    row.querySelector('[data-a="h"]').onclick = () => { upd(k, { h: !(cfg.indCustom[k] || {}).h }); renderEachInd(); };
+    row.querySelector('[data-a="reset"]').onclick = () => { const next = { ...(cfg.indCustom || {}) }; delete next[k]; set({ indCustom: next }); renderEachInd(); };
+  });
+}
+try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.indSeen) renderEachInd(); }); } catch {}
 $("scaleGlow").oninput = (e) => { set({ scaleGlow: +e.target.value }); $("scaleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("scaleText").oninput = (e) => set({ scaleText: e.target.value });
 $("scaleBgColor").oninput = (e) => set({ scaleBgColor: e.target.value });
@@ -2114,7 +2149,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Live mood works on nq.vision and prop-firm platforms",
+const WHATS_NEW = ["Customise each indicator: its own colour, glow, width, or hide it, zones included (Style \u203a Indicators \u203a Each indicator)",
+  "Live mood works on nq.vision and prop-firm platforms",
   "nq.vision: the text over the chart no longer flickers",
   "\u201cCheck this page\u201d: see why something looks wrong on a platform (top of the panel)",
   "nq.vision: charts resize cleanly when you drag the lines between them",

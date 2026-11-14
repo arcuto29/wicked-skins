@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 14;
+  const HOOK_VERSION = 15;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -87,7 +87,7 @@
     privacyPnl: "hide", tickSize: 0,
     bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
-    indMode: "own", indColor: "",
+    indMode: "own", indColor: "", indCustom: {},
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -98,6 +98,17 @@
     bg: null, busy: false, prof: [], profs: [] };
   let fx = { ...FX0 };
   const colOpt = (v) => (v === "candle" || /^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
+  // Each indicator's own settings, by its colour: { "r,g,b": { c: "#hex" | "rainbow" | "", g: glow 0..1, w: width 0..3, h: hide } }
+  function cleanCustom(m) {
+    const out = {}; if (!m || typeof m !== "object") return out;
+    for (const [k, e] of Object.entries(m).slice(0, 40)) {
+      if (!/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) || !e || typeof e !== "object") continue;
+      const c = e.c === "rainbow" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "";
+      const g = e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0));
+      out[k] = { c, g, w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h };
+    }
+    return out;
+  }
   function readFx() {
     try {
       const raw = htmlEl().getAttribute("data-ws-fx"), f = raw ? JSON.parse(raw) : {};
@@ -135,6 +146,7 @@
         sbOn: !!f.sbOn, sbColor: colOpt(f.sbColor), sbW: Math.max(0, Math.min(2, +f.sbW || 0)), sbStyle: ["solid", "dotted", "dashed", "none"].includes(f.sbStyle) ? f.sbStyle : "dashed",
         axOn: !!f.axOn, axColor: colOpt(f.axColor), axW: Math.max(0, Math.min(2, +f.axW || 0)), axStyle: ["solid", "none"].includes(f.axStyle) ? f.axStyle : "solid",
         indMode: ["own", "rainbow", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
+        indCustom: cleanCustom(f.indCustom),
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
@@ -148,7 +160,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.indMode, fx.indColor, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -206,6 +218,26 @@
   const KIND = { upColor: "body", downColor: "body", borderUpColor: "border", borderDownColor: "border", wickUpColor: "wick", wickDownColor: "wick" };
   const STYLES = ["candleStyle", "hollowCandleStyle", "haStyle", "barStyle", "volCandlesStyle", "hlcBarsStyle"];
 
+  // Names for "Each indicator": where TradingView's internals are reachable (tradingview.com), each indicator's plot
+  // colours -> its title ("MA (20, close)"), so the panel can say which line is which. Elsewhere lines go by colour.
+  setInterval(() => {
+    const L = window.__bdCandleLooks; if (!L || !L.setNames || document.hidden) return;
+    const m = new Map();
+    try {
+      const api = window.TradingViewApi || {}, a = api._activeChartWidgetWV, cw = a && a.value() && a.value()._chartWidget, model = cw && cw.model().model();
+      const ac = api.activeChart && api.activeChart(), ids = ac && ac.getAllStudies ? ac.getAllStudies().map((x) => x.id) : [];
+      const srcs = ids.length && model && model.dataSourceForId ? ids.map((i) => model.dataSourceForId(i)).filter(Boolean) : (model && model.dataSources ? model.dataSources() : []);
+      for (const src of srcs) {
+        let title = ""; try { title = src.title ? src.title() : ""; } catch {}
+        if (!title || !src.properties) continue;
+        let st = null; try { st = src.properties().childs().styles; } catch {}
+        const ch = st && st.childs ? st.childs() : null; if (!ch) continue;
+        for (const k of Object.keys(ch)) { if (k[0] === "_") continue;
+          try { const col = ch[k].childs().color.value(), r = L.keyOf(col); if (r && !m.has(r.k)) m.set(r.k, title.slice(0, 28) + (Object.keys(ch).filter((x) => x[0] !== "_").length > 1 ? " \u00b7 " + k : "")); } catch {} }
+      }
+    } catch {}
+    if (m.size) L.setNames(m);
+  }, 3000);
   function chartWidgets() {
     const api = window.TradingViewApi || window.tradingViewApi, out = [];
     try { const a = api && api._activeChartWidgetWV && api._activeChartWidgetWV.value(); if (a) out.push(a); } catch {}
@@ -262,6 +294,21 @@
   // Fallback for platforms without TradingView's internal API: the two most-drawn small, opaque,
   // colourful fills in the chart are the candles. Greener one = up, the other = down.
   const tally = new Map();
+  // Is this fill an indicator's zone? (not a candle, not the background, at least a few px across). Notes it for the
+  // panel and returns your settings for it (Each indicator), or null to draw it as it is.
+  function zoneFor(ctx, w, h) {
+    const L = window.__bdCandleLooks; if (!L || !L.zone) return null;
+    const c = ctx.canvas; let W, H;
+    if (w === 1e4) { const b = pathBox.get(ctx); if (!b) return null; W = b.x1 - b.x0; H = b.y1 - b.y0; }   // a path: its drawn box
+    else { const t = ctx.getTransform(); W = Math.abs(w * (t.a || 1)); H = Math.abs(h * (t.d || 1)); }
+    if (W < 16 || H < 3 || W * H < 200 || (W >= c.width * 0.95 && H >= c.height * 0.95)) return null;   // too small, or the whole pane (background)
+    const orig = String(ctx.__bdFill !== undefined ? ctx.__bdFill : ctx.fillStyle), r = L.keyOf(orig); if (!r) return null;
+    const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
+    if (r.a >= 0.95 && H / dpr >= 8 && H / dpr <= 40 && W / dpr <= 460) return null;   // a solid label box (price tags, order pills, session labels), not a zone
+    if (sides.has(r.k) || (candles && (r.k === candles.up.join(",") || r.k === candles.down.join(",")))) return null;   // candles / volume
+    L.noteSeen(orig, "zone");
+    return fx.indCustom && fx.indCustom[r.k] ? L.zone(orig, { custom: fx.indCustom }) : null;
+  }
   function noteFill(col) { if (typeof col === "string" && tally.size < 300) tally.set(col, (tally.get(col) || 0) + 1); }
   function learnedFromDrawing() {
     const cands = [...tally].filter(([c, n]) => n >= 20 && glowable(c) && !/rgba\(.*,\s*0?\.\d+\)$/.test(c)).sort((a, b) => b[1] - a[1]).slice(0, 2);
@@ -338,13 +385,13 @@
   //  - any colourful, visible line can glow; grid (faint) and crosshair (grey) never do
   const segs = new WeakMap();
   const origBegin = proto.beginPath, origMove = proto.moveTo, origLine = proto.lineTo, origStroke = proto.stroke;
-  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && (fx.bracketOn || styling())) lastSeg.set(this, null); if (on && (fx.bracketOn || fx.privacy)) pathBox.delete(this); return origBegin.call(this); };
+  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && (fx.bracketOn || styling())) lastSeg.set(this, null); if (on) pathBox.delete(this); return origBegin.call(this); };
   proto.moveTo = function (x, y) { const k = segs.get(this); if (k) k[0]++;
-    if (on && (fx.bracketOn || fx.privacy)) growBox(this, x, y);
+    if (on) growBox(this, x, y);
     if (on && (fx.bracketOn || styling())) { const t = this.getTransform(); lastSeg.set(this, { x0: x * (t.a || 1) + t.e, y0: y * (t.d || 1) + t.f, x1: null, y1: null }); }
     return origMove.call(this, x, y); };
   proto.lineTo = function (x, y) { const k = segs.get(this); if (k) k[1]++;
-    if (on && (fx.bracketOn || fx.privacy)) growBox(this, x, y);
+    if (on) growBox(this, x, y);
     if (on && (fx.bracketOn || styling())) { const s = lastSeg.get(this), t = this.getTransform(); if (s) { s.x1 = x * (t.a || 1) + t.e; s.y1 = y * (t.d || 1) + t.f; } }
     return origLine.call(this, x, y); };
 
@@ -476,27 +523,35 @@
         return;
       }
     }
-    const indOn = fx.indMode !== "own";
-    if (!on || !c || !(candles || fx.lineGlow > 0 || indOn) || !isPane(c)) return origStroke.apply(this, arguments);
+    if (!on || !c || !isPane(c)) return origStroke.apply(this, arguments);
     const k = segs.get(this) || [0, 0];
     // only paths we SAW built from short segments (bars, last-price line) count as candle strokes;
     // Path2D or paths built some other way (indicators) keep their own colour
     const polyline = path !== undefined || k[0] < 1 || k[1] > k[0] * 2 + 1;
-    const cur = strokeDesc.get.call(this);
-    let col = candles && !polyline ? remap(cur) : cur, gcol = col;
-    // an indicator line (a Path2D, or a path of 3+ segments, in a colour that isn't grey): your indicator colours
-    if (indOn && polyline && typeof cur === "string" && glowable(cur) && (path !== undefined || (k[1] >= 3 && (!candles || remap(cur) === cur)))) {
-      const L = window.__bdCandleLooks, r = L && L.indicator && L.indicator(this, cur, { mode: fx.indMode, color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent });
-      if (r) { col = r.s; gcol = r.g; }
+    const cur = strokeDesc.get.call(this), L = window.__bdCandleLooks;
+    // an indicator line: a Path2D, or a path of 3+ segments, not in a candle colour
+    // (candle wicks / borders can be Path2D in TradingView's own candle colours: those aren't indicators)
+    const candleCol = typeof cur === "string" && ((candles && remap(cur) !== cur) || (() => { const r = rgbKey(cur); return !!r && sides.has(r.key); })());
+    const indLine = polyline && typeof cur === "string" && !candleCol && (path !== undefined || k[1] >= 3);
+    if (indLine && L && L.noteSeen) L.noteSeen(cur, "line");                     // for the panel's "Each indicator" list
+    const custom = fx.indCustom && Object.keys(fx.indCustom).length > 0, indOn = fx.indMode !== "own" || custom;
+    if (!(candles || fx.lineGlow > 0 || indOn)) return origStroke.apply(this, arguments);
+    let col = candles && !polyline ? remap(cur) : cur, gcol = col, glowAmt = fx.lineGlow, extraW = 0;
+    if (indOn && indLine && (custom || glowable(cur))) {
+      const r = L && L.indicator && L.indicator(this, cur, { mode: glowable(cur) ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom });
+      if (r && r.hide) return;                                                    // hidden in "Each indicator"
+      if (r) { col = r.s; gcol = r.g; if (r.glow !== undefined) glowAmt = r.glow; if (r.w) extraW = r.w; }
     }
-    const glow = fx.lineGlow > 0 && glowable(gcol);
-    if (col === cur && !glow) return origStroke.apply(this, arguments);
-    const pSB = this.shadowBlur, pSC = this.shadowColor;
+    const glow = glowAmt > 0 && (glowable(gcol) || (custom && indLine));
+    if (col === cur && !glow && !extraW) return origStroke.apply(this, arguments);
+    const pSB = this.shadowBlur, pSC = this.shadowColor, pLW = this.lineWidth;
     if (col !== cur) strokeDesc.set.call(this, col);
-    if (glow) { this.shadowColor = gcol; this.shadowBlur = 2 + fx.lineGlow * 16; }
+    if (glow) { this.shadowColor = gcol; this.shadowBlur = 2 + glowAmt * 16; }
+    if (extraW) this.lineWidth = pLW * (1 + extraW * 0.75);
     origStroke.apply(this, arguments);
     if (col !== cur) strokeDesc.set.call(this, cur);
     if (glow) { this.shadowBlur = pSB; this.shadowColor = pSC; }
+    if (extraW) this.lineWidth = pLW;
   };
 
   // Same redraw trick as content.js: TradingView only rebuilds canvases when the chart is re-shown.
@@ -708,10 +763,10 @@
   }
   for (const name of ["rect", "roundRect"]) {
     const o = proto[name]; if (typeof o !== "function") continue;
-    proto[name] = function (x, y, w, h) { if (on && (fx.bracketOn || fx.privacy)) { growBox(this, x, y); growBox(this, x + w, y + h); } return o.apply(this, arguments); };
+    proto[name] = function (x, y, w, h) { if (on) { growBox(this, x, y); growBox(this, x + w, y + h); } return o.apply(this, arguments); };
   }
-  { const o = proto.arcTo; proto.arcTo = function (x1, y1, x2, y2) { if (on && (fx.bracketOn || fx.privacy)) { growBox(this, x1, y1); growBox(this, x2, y2); } return o.apply(this, arguments); }; }
-  { const o = proto.quadraticCurveTo; proto.quadraticCurveTo = function (cx, cy, x, y) { if (on && (fx.bracketOn || fx.privacy)) { growBox(this, cx, cy); growBox(this, x, y); } return o.apply(this, arguments); }; }
+  { const o = proto.arcTo; proto.arcTo = function (x1, y1, x2, y2) { if (on) { growBox(this, x1, y1); growBox(this, x2, y2); } return o.apply(this, arguments); }; }
+  { const o = proto.quadraticCurveTo; proto.quadraticCurveTo = function (cx, cy, x, y) { if (on) { growBox(this, cx, cy); growBox(this, x, y); } return o.apply(this, arguments); }; }
   // Font-independent pill test: this text sits inside the pill box drawn a moment ago (so a font change on
   // TradingView's side can't leave a restyled box with unstyled, invisible text on it).
   function textInPill(ctx, x, y) {
@@ -1038,6 +1093,12 @@
       const r = origFillPath.apply(this, a); origFillDesc.set.call(this, pF); return r;
     }
     if (on && c && isAxis(c)) lastTag.set(this, { col: this.fillStyle, left: 2 });
+    // a filled shape on the chart that isn't a candle (a band between two lines, a box): an indicator zone
+    if (on && c && isPane(c)) { const z = zoneFor(this, 1e4, 1e4); if (z) {
+      if (z.hide) return;
+      const pF = this.fillStyle, pSB = this.shadowBlur, pSC = this.shadowColor;
+      origFillDesc.set.call(this, z.f); if (z.glow > 0) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
+      const r = origFillPath.apply(this, a); origFillDesc.set.call(this, pF); this.shadowBlur = pSB; this.shadowColor = pSC; return r; } }
     if (on && c && fx.scaleGlow > 0 && isAxis(c)) {
       const col = this.fillStyle;
       if (typeof col === "string" && glowable(col)) {
@@ -1083,6 +1144,12 @@
       const fill = notePillBox(this, { x: x * sx + t.e, y: y * sy + t.f, w: Math.abs(w * sx), h: Math.abs(h * sy) });
       if (fill) { const pF = this.fillStyle; origFillDesc.set.call(this, fill); origFill.call(this, x, y, w, h); origFillDesc.set.call(this, pF); return; }
     }
+    // an indicator's zone (a filled box / band on the chart that isn't a candle): Each indicator's colour / glow / hide
+    if (on && c && isPane(c)) { const z = zoneFor(this, w, h); if (z) {
+      if (z.hide) return;
+      const pF = this.fillStyle, pSB = this.shadowBlur, pSC = this.shadowColor;
+      origFillDesc.set.call(this, z.f); if (z.glow > 0) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
+      origFill.call(this, x, y, w, h); origFillDesc.set.call(this, pF); this.shadowBlur = pSB; this.shadowColor = pSC; return; } }
     if (on && c && c.width > 20 && c.height > 20) {
       const s = this.getTransform().a || 1;
       // covers (nearly) the whole canvas => it's the pane background

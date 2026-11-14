@@ -54,7 +54,7 @@
     clipQuality: "balanced",  // high | balanced | small (small keeps a clip under ~20 MB, e.g. for Discord)           // after a recording: open the crop / trim editor (false = download right away)
     // Chart styling — each part off = TradingView's own. Colour "" = skin colour, "candle" = your up-candle colour.
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
-    indMode: "own", indColor: "",
+    indMode: "own", indColor: "", indCustom: {},
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
     plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -1324,7 +1324,7 @@
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
-    "indMode", "indColor", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
+    "indMode", "indColor", "indCustom", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
@@ -1463,6 +1463,16 @@
     const root = String(q.sym).toUpperCase().replace(/^.*:/, "").replace(/\d+!$/, "").replace(/[FGHJKMNQUVXZ]\d{1,4}$/, "");
     return TICKS[root] || 0;
   }
+  // The indicators drawn on this chart (by colour, with a name where the platform gives one), for the panel's
+  // "Each indicator" list. Only the copy drawing the page reports, and only when the list changed.
+  let indSeenSig = "";
+  setInterval(() => {
+    if (!EXT || !owner || standDown || document.hidden || !cfg.enabled) return;
+    const v = document.documentElement.getAttribute("data-bd-indseen") || "";
+    if (!v || v === indSeenSig) return;
+    indSeenSig = v;
+    try { chrome.storage.local.set({ indSeen: { host: (IN_FRAME ? (document.referrer ? new URL(document.referrer).hostname : "") : "") || location.hostname, t: Date.now(), items: JSON.parse(v) } }); } catch {}
+  }, 3000);
   function pushFx() {
     const h = document.documentElement;
     if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent() }));

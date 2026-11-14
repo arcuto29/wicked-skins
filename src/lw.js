@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 5;
+  const LW_VERSION = 6;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -111,7 +111,7 @@
     try {
       const f = JSON.parse(htmlEl().getAttribute("data-ws-fx") || "null");
       const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
-      const any = f && (f.lineGlow > 0 || (f.indMode && f.indMode !== "own") || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
+      const any = f && (f.lineGlow > 0 || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
       lfx = any ? {
         // price scale text + backing
         scaleText: hex(f.scaleText), scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)), scaleBold: !!f.scaleBold, scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
@@ -126,6 +126,9 @@
         plOn: !!f.plOn, plColor: colOk(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)), plStyle: styleOk(f.plStyle, "dotted"),
         lineGlow: Math.max(0, Math.min(1, +f.lineGlow || 0)),   // Style → Line glow: indicator lines and drawings
         indMode: ["own", "rainbow", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
+        indCustom: (() => { const o = {}; for (const [k, e] of Object.entries(f.indCustom && typeof f.indCustom === "object" ? f.indCustom : {}).slice(0, 40))
+          if (/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) && e && typeof e === "object") o[k] = { c: e.c === "rainbow" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "",
+            g: e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0)), w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h }; return o; })(),
         accent: hex(f.accent) } : null;
     } catch { lfx = null; }
   }
@@ -346,6 +349,16 @@
           const prev = this.fillStyle; fillDesc.set.call(this, tint); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, prev); return;
         }
       }
+      if (on && c && isChart(c) && c.width > 200 && c.height > 120 && typeof this.__bdLwOrig === "string" && !isCandleCol(this.__bdLwOrig) && !isCandleCol(remap(this.__bdLwOrig))) {
+        const L = window.__bdCandleLooks, t = this.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
+        if (L && L.zone && W >= 12 && H >= 2 && W * H >= 150) {
+          L.noteSeen(this.__bdLwOrig, "zone");
+          const z = lfx && lfx.indCustom && L.keyOf(this.__bdLwOrig) && lfx.indCustom[L.keyOf(this.__bdLwOrig).k] ? L.zone(this.__bdLwOrig, { custom: lfx.indCustom }) : null;
+          if (z) { if (z.hide) return; const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
+            fillDesc.set.call(this, z.f); if (z.glow > 0) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
+            origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, pF); this.shadowBlur = pB; this.shadowColor = pC; return; }
+        }
+      }
       drawCalls.fillRect++;
       if (on && c && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle) && labelBox(this, w, h)) {
         const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p);
@@ -406,14 +419,20 @@
       if (on && lfx && lineHook && !a.length && lineHook(this)) return;
       // Line glow: indicator lines and drawings are long paths that aren't straight across the chart (grid, crosshair,
       // price lines are), in a colour that isn't grey and isn't a candle
-      if (on && lfx && (lfx.lineGlow > 0 || lfx.indMode !== "own") && !inLook && c && c.width > 200 && c.height > 120 && isChart(c) && lineIsCurve(this)) {
-        // your indicator colours (Style > Indicator colours), then the glow in that colour
+      const curve = on && !inLook && c && c.width > 200 && c.height > 120 && isChart(c) && lineIsCurve(this);
+      if (curve && window.__bdCandleLooks && window.__bdCandleLooks.noteSeen) window.__bdCandleLooks.noteSeen(strokeDesc.get.call(this), "line");   // "Each indicator" list
+      const custom = lfx && lfx.indCustom && Object.keys(lfx.indCustom).length > 0;
+      if (curve && lfx && (lfx.lineGlow > 0 || lfx.indMode !== "own" || custom)) {
+        // your indicator colours (Style > Indicators, and Each indicator), then the glow in that colour
         const cur = strokeDesc.get.call(this), L = window.__bdCandleLooks;
-        const ind = lfx.indMode !== "own" && L && L.indicator ? L.indicator(this, cur, { mode: lfx.indMode, color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent }) : null;
-        const pB = this.shadowBlur, pC = this.shadowColor;
+        const ind = (lfx.indMode !== "own" || custom) && L && L.indicator ? L.indicator(this, cur, { mode: lfx.indMode, color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom }) : null;
+        if (ind && ind.hide) return;
+        const glowAmt = ind && ind.glow !== undefined ? ind.glow : lfx.lineGlow;
+        const pB = this.shadowBlur, pC = this.shadowColor, pW = this.lineWidth;
         if (ind) strokeDesc.set.call(this, ind.s);
-        if (lfx.lineGlow > 0) { this.shadowColor = ind ? ind.g : cur; this.shadowBlur = 2 + lfx.lineGlow * 14; }
-        const r = origStrokeP.apply(this, a); this.shadowBlur = pB; this.shadowColor = pC; if (ind) strokeDesc.set.call(this, cur); return r;
+        if (ind && ind.w) this.lineWidth = pW * (1 + ind.w * 0.75);
+        if (glowAmt > 0) { this.shadowColor = ind ? ind.g : cur; this.shadowBlur = 2 + glowAmt * 14; }
+        const r = origStrokeP.apply(this, a); this.shadowBlur = pB; this.shadowColor = pC; this.lineWidth = pW; if (ind) strokeDesc.set.call(this, cur); return r;
       }
       if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.strokeStyle)) {
         drawCalls.stroke++;
@@ -429,7 +448,7 @@
     // horizontal line in the candle colour. We record the path's segments and restyle at stroke time.
     const seg = new WeakMap();   // ctx -> { n, ok, x0, y0, last:[x,y] }
     const oBegin = proto.beginPath, oMove = proto.moveTo, oLine = proto.lineTo;
-    const lineFx = () => on && lfx;
+    const lineFx = () => on;   // (always: the "Each indicator" list needs to see the lines even with no styling on)
     proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null }); pbox.delete(this); return oBegin.call(this); };
     proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) k.p = [x, y]; if (on) pbox.set(this, null); return oMove.call(this, x, y); };
     proto.lineTo = function (x, y) {

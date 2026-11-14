@@ -439,3 +439,17 @@ body.lw-page [data-tvonly] { display: none !important; }
 @media (prefers-reduced-motion: reduce) { .pu-rays path, .pu-spark, .pu-eyebrow i, .pu-go::after { animation: none; } .pu-spark { display: none; } .pu-veil, .pu-card { transition: none; } }
 .card.wslook .oncount.review { background: rgba(255,196,80,.9); color: #1a1205; }
 .card.look .acts .pub { border-color: rgba(46,242,176,.45); color: #bff8e5; }
+/* Each indicator */
+.ind-row { padding: 8px 0; border-top: 1px solid #1f2230; }
+.ind-row.off { opacity: .6; }
+.ind-h { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ind-h b { font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ind-h small { color: #8b8e9c; font-size: 10px; }
+.ind-h .sw { width: 14px; height: 14px; border-radius: 99px; flex: none; box-shadow: 0 0 0 1px rgba(255,255,255,.15); }
+.ind-row.set .ind-h .sw { box-shadow: 0 0 0 2px #2ef2b0; }
+.ind-c { display: flex; align-items: center; gap: 6px; } .ind-c + .ind-c { margin-top: 6px; }
+.ind-c input[type=color] { width: 30px; height: 24px; padding: 0; border: 0; background: none; }
+.ind-c input[type=range] { flex: 1; min-width: 60px; }
+.ind-c .lbl { font-size: 11px; color: #8b8e9c; }
+.ind-c .chip { padding: 3px 9px; font-size: 11px; }
+#indMode { flex-wrap: wrap; } #indMode button { flex: 1 0 30%; }

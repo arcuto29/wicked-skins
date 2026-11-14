@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks && window.__bdCandleLooks.indicator) return;   // an older copy (before an update) is replaced
+  if (window.__bdCandleLooks && window.__bdCandleLooks.zone) return;   // an older copy (before an update) is replaced
 
   const LOOKS = [
     // id, label, hint, minGlow (some looks are made of light, so they always glow a little)
@@ -195,12 +195,65 @@
   }
   const hsl = (h) => `hsl(${Math.round(((h % 360) + 360) % 360)},95%,62%)`;
   const grads = new WeakMap();   // ctx -> Map(key -> rainbow gradient), so a gradient is made once per canvas size
-  // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour },
-  // or null to leave the line as it is.
+  // ---------- each indicator on its own (Style > Indicators > Each indicator) ----------
+  // Indicators are told apart by their own colour on the chart (a line's stroke, a zone's fill). We note every colour
+  // drawn as an indicator line or zone, publish the list for the panel, and apply your settings for that colour.
+  const keyCache = new Map();
+  function keyOf(v) {          // any canvas colour -> { k: "r,g,b", a: alpha } or null
+    if (typeof v !== "string") return null;
+    let r = keyCache.get(v); if (r !== undefined) return r; r = null;
+    let m = /^#([0-9a-f]{6})$/i.exec(v);
+    if (m) r = { k: [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)).join(","), a: 1 };
+    else if ((m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/i.exec(v))) r = { k: [m[1], m[2], m[3]].map(Number).join(","), a: m[4] === undefined ? 1 : m[4].endsWith("%") ? parseFloat(m[4]) / 100 : +m[4] };
+    if (keyCache.size > 500) keyCache.clear(); keyCache.set(v, r); return r;
+  }
+  const seen = new Map();      // "r,g,b" -> { kind: "line" | "zone", n, a }
+  let names = new Map(), seenSig = "";
+  function noteSeen(orig, kind) {
+    const r = keyOf(orig); if (!r) return null;
+    let e = seen.get(r.k);
+    if (!e) { if (seen.size > 40) return r; e = { kind, n: 0, a: r.a }; seen.set(r.k, e); }
+    e.n++; if (kind === "zone") e.kind = "zone";   // filled at least once = a zone (its edges may be stroked in the same colour)
+    return r;
+  }
+  // names for the colours, where the platform tells us (tradingview.com: each indicator's plot colours)
+  function setNames(m) { names = m; }
+  setInterval(() => {      // publish what's on the chart (named indicators first, then by how often they're drawn)
+    try {
+      const list = [...seen].sort((a, b) => (names.has(b[0]) - names.has(a[0])) || b[1].n - a[1].n).slice(0, 24)
+        .map(([k, e]) => ({ k, kind: e.kind, a: +e.a.toFixed(2), name: names.get(k) || "" }));
+      const sig = JSON.stringify(list);
+      if (sig !== seenSig) { seenSig = sig; document.documentElement.setAttribute("data-bd-indseen", sig); }
+      for (const e of seen.values()) e.n = Math.min(e.n, 50);
+    } catch {}
+  }, 2000);
+  const custOf = (o, orig) => { if (!o || !o.custom) return null; const r = keyOf(orig); return r ? { r, e: o.custom[r.k] || null } : null; };
+  const withAlpha = (hex, a) => (a >= 0.99 ? hex : `rgba(${rgbOf(hex).join(",")},${+a.toFixed(3)})`);
+  // A zone (an indicator's filled box / band): { hide } | { f: fill, g: glow colour, glow: 0..1 } | null = as it is
+  function zone(orig, o) {
+    const c = custOf(o, orig); if (!c || !c.e) return null;
+    const e = c.e; if (e.h) return { hide: true };
+    const hex = /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : null;
+    return { f: hex ? withAlpha(hex, c.r.a) : orig, g: hex || `rgb(${c.r.k})`, glow: +e.g || 0 };
+  }
+
+  // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour,
+  // glow: its own glow (or undefined = the Glow slider), w: extra width, hide }, or null to leave the line as it is.
   function indicator(ctx, orig, o) {
-    if (!o || !o.mode || o.mode === "own") return null;
+    const c = custOf(o, orig), e = c && c.e;
+    if (e && e.h) return { hide: true };
+    const base = indicatorAll(ctx, orig, o, e && e.c === "rainbow");
+    if (!e) return base;
+    const hex = /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : null;
+    const r = hex ? { s: withAlpha(hex, c.r.a), g: hex } : base || { s: orig, g: `rgb(${c.r.k})` };
+    if (e.g !== undefined && e.g !== null && e.g !== "") r.glow = +e.g;
+    if (+e.w > 0) r.w = +e.w;
+    return r;
+  }
+  function indicatorAll(ctx, orig, o, forceRainbow) {
+    if (!o || ((!o.mode || o.mode === "own") && !forceRainbow)) return null;
     const i = slotOf(String(orig));
-    if (o.mode === "rainbow") {   // the whole spectrum across the chart, left to right; each indicator starts at its own hue
+    if (forceRainbow || o.mode === "rainbow") {   // the whole spectrum across the chart, left to right; each indicator starts at its own hue
       const t = ctx.getTransform(), a = t.a || 1, w = ctx.canvas.width, off = (i * 67) % 360, key = w + "|" + t.e + "|" + a + "|" + off;
       let m = grads.get(ctx); if (!m) { m = new Map(); grads.set(ctx, m); }
       let gr = m.get(key);
@@ -212,5 +265,5 @@
     return P ? { s: P[i % P.length], g: P[i % P.length] } : null;
   }
 
-  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf, indicator };
+  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf };
 })();
