@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 4;
+  const LW_VERSION = 5;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -111,7 +111,7 @@
     try {
       const f = JSON.parse(htmlEl().getAttribute("data-ws-fx") || "null");
       const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
-      const any = f && (f.lineGlow > 0 || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
+      const any = f && (f.lineGlow > 0 || (f.indMode && f.indMode !== "own") || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
       lfx = any ? {
         // price scale text + backing
         scaleText: hex(f.scaleText), scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)), scaleBold: !!f.scaleBold, scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
@@ -125,6 +125,7 @@
         chOn: !!f.chOn, chColor: colOk(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)), chStyle: styleOk(f.chStyle, "dashed"), chGlow: !!f.chGlow, chGlowColor: colOk(f.chGlowColor), chLabels: !!f.chLabels,
         plOn: !!f.plOn, plColor: colOk(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)), plStyle: styleOk(f.plStyle, "dotted"),
         lineGlow: Math.max(0, Math.min(1, +f.lineGlow || 0)),   // Style → Line glow: indicator lines and drawings
+        indMode: ["own", "rainbow", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         accent: hex(f.accent) } : null;
     } catch { lfx = null; }
   }
@@ -405,10 +406,14 @@
       if (on && lfx && lineHook && !a.length && lineHook(this)) return;
       // Line glow: indicator lines and drawings are long paths that aren't straight across the chart (grid, crosshair,
       // price lines are), in a colour that isn't grey and isn't a candle
-      if (on && lfx && lfx.lineGlow > 0 && !inLook && c && c.width > 200 && c.height > 120 && isChart(c) && lineIsCurve(this)) {
+      if (on && lfx && (lfx.lineGlow > 0 || lfx.indMode !== "own") && !inLook && c && c.width > 200 && c.height > 120 && isChart(c) && lineIsCurve(this)) {
+        // your indicator colours (Style > Indicator colours), then the glow in that colour
+        const cur = strokeDesc.get.call(this), L = window.__bdCandleLooks;
+        const ind = lfx.indMode !== "own" && L && L.indicator ? L.indicator(this, cur, { mode: lfx.indMode, color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent }) : null;
         const pB = this.shadowBlur, pC = this.shadowColor;
-        this.shadowColor = this.strokeStyle; this.shadowBlur = 2 + lfx.lineGlow * 14;
-        const r = origStrokeP.apply(this, a); this.shadowBlur = pB; this.shadowColor = pC; return r;
+        if (ind) strokeDesc.set.call(this, ind.s);
+        if (lfx.lineGlow > 0) { this.shadowColor = ind ? ind.g : cur; this.shadowBlur = 2 + lfx.lineGlow * 14; }
+        const r = origStrokeP.apply(this, a); this.shadowBlur = pB; this.shadowColor = pC; if (ind) strokeDesc.set.call(this, cur); return r;
       }
       if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.strokeStyle)) {
         drawCalls.stroke++;

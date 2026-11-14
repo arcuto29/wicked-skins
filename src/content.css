@@ -306,3 +306,12 @@ html.bd-priv-money #bd-goal .bd-g-fill { opacity: 0 !important; }   /* the fill 
 #bd-guard button { all: unset; position: relative; overflow: hidden; display: block; width: 100%; box-sizing: border-box; padding: 9px 0; border-radius: 10px; cursor: pointer;
   background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: #e9ebf2; font: 700 12.5px system-ui, sans-serif; user-select: none; touch-action: none; }
 #bd-guard button:hover { background: rgba(255,255,255,.1); }
+
+/* Lightweight Charts platforms (nq.vision...): the chart's own wrappers always stay see-through. Some apps give them a
+   solid background while you hold the chart to drag it (left / right / up / down), which covered the wallpaper with
+   grey until you let go. The chart's canvases still paint everything they draw. */
+html.bd-on:not(.bd-over-mode) .tv-lightweight-charts, html.bd-on:not(.bd-over-mode) .tv-lightweight-charts *:not(canvas),
+html.bd-on:not(.bd-over-mode) table[data-bd-lwroot], html.bd-on:not(.bd-over-mode) table[data-bd-lwroot] *:not(canvas),
+html.bd-on:not(.bd-over-mode) [data-bd-lwroot] > table, html.bd-on:not(.bd-over-mode) [data-bd-lwroot] > table *:not(canvas) {
+  background-color: transparent !important; background-image: none !important;
+}

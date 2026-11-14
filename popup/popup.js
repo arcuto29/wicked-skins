@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["indMode","indColor","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -21,6 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
+  indMode: "own", indColor: "",
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -274,7 +275,7 @@ function renderCandles() {
   $("shiftSpeed").value = cfg.shiftSpeed; $("shiftSpeedOut").textContent = cfg.shiftSpeed + "s";
   { const CL = window.__bdCandleLooks, m = CL && CL.META[cfg.candleLook];
     $("lookHint").textContent = m ? m.name + ": " + m.hint : (LOOK_HINT[cfg.candleLook] || ""); }
-  $("lineGlow").value = cfg.lineGlow; $("lineGlowOut").textContent = Math.round(cfg.lineGlow * 100) + "%";
+  $("lineGlow").value = cfg.lineGlow; $("lineGlowOut").textContent = Math.round(cfg.lineGlow * 100) + "%"; syncIndicators();
   seg("scaleTextMode", [["auto", "Auto"], ["custom", "Custom"]], () => (cfg.scaleText ? "custom" : "auto"),
     (v) => { set({ scaleText: v === "custom" ? $("scaleText").value : "" }); renderCandles(); });
   $("scaleText").value = cfg.scaleText || "#e9ebf2"; $("scaleText").hidden = !cfg.scaleText;
@@ -314,6 +315,15 @@ function renderCandles() {
 $("candleOn").onchange = (e) => set({ candleOn: e.target.checked });
 $("shiftSpeed").oninput = (e) => { set({ shiftSpeed: +e.target.value }); $("shiftSpeedOut").textContent = e.target.value + "s"; };
 $("lineGlow").oninput = (e) => { set({ lineGlow: +e.target.value }); $("lineGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+// Indicators: their colours (own / rainbow / your candle colours / your wallpaper's / any colour) + the glow above
+function syncIndicators() {
+  if (!$("indMode")) return;
+  seg("indMode", [["own", "Own"], ["rainbow", "Rainbow"], ["candles", "Candles"], ["wallpaper", "Wallpaper"], ["custom", "Custom"]], () => cfg.indMode || "own",
+    (v) => { set(v === "custom" && !/^#/.test(cfg.indColor || "") ? { indMode: v, indColor: $("indColor").value || "#ffd166" } : { indMode: v }); syncIndicators(); });
+  $("indColRow").hidden = cfg.indMode !== "custom";
+  $("indColor").value = /^#[0-9a-f]{6}$/i.test(cfg.indColor || "") ? cfg.indColor : "#ffd166";
+}
+if ($("indColor")) $("indColor").oninput = (e) => set({ indColor: e.target.value });
 $("scaleGlow").oninput = (e) => { set({ scaleGlow: +e.target.value }); $("scaleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("scaleText").oninput = (e) => set({ scaleText: e.target.value });
 $("scaleBgColor").oninput = (e) => set({ scaleBgColor: e.target.value });
@@ -2073,7 +2083,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Fixed: indicator Settings / Pine Editor sometimes not opening until a refresh",
+const WHATS_NEW = ["Indicator colours: Rainbow, your candle or wallpaper colours, or any colour, plus glow (Style \u203a Indicators)",
+  "nq.vision: the wallpaper stays while you drag the chart",
+  "Fixed: indicator Settings / Pine Editor sometimes not opening until a refresh",
   "Two copies installed? The one you use now always shows your background",
   "nq.vision: every 2- and 3-chart layout gets your wallpaper and colours, at any window size",
   "Publish your saved looks to the Workshop, and see your shares with their status (Saved \u203a Publish, Workshop \u203a Mine)",

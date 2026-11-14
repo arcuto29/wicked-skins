@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.1.55 (2026-11-14)
+- **Indicator colours and glow** (Style → Chart lines & ticker → Indicators): colour your indicator lines (moving averages, VWAP, RSI…) **Rainbow** (the spectrum along each line), in your **Candle** colours, your **Wallpaper**'s colours or any **Custom** colour, and make them **Glow**. Each indicator keeps its own shade, so they stay easy to tell apart. Candles, grid, crosshair and the price line keep their own styling. Works on TradingView and on Lightweight Charts platforms like nq.vision, and it's saved in your looks.
+- **Fixed on nq.vision: grey background while dragging the chart** left, right, up or down. The platform gives its chart a solid background while you hold it, which covered the wallpaper until you let go. The wallpaper now stays the whole time.
 - **Fixed: indicator Settings or the Pine Editor sometimes wouldn't open until you refreshed TradingView.** When Priism updated itself in the background, the new version could stop partway while putting itself into a chart that was already open, leaving TradingView drawing through half-installed code. It now installs cleanly over a running chart.
 - **Two copies of Priism installed (for example the Chrome Web Store one and an old zip)?** The one whose panel you used last now always draws the page, so the background you pick is the one you see, on every platform, including after a reload. Before, the other copy could win and show its own default wallpaper (the green Polar Lights) while your changes did nothing. Removing the extra copy is still best: the panel tells you when there are two.
 
