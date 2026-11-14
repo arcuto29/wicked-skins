@@ -2083,7 +2083,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Indicator colours: Rainbow, your candle or wallpaper colours, or any colour, plus glow (Style \u203a Indicators)",
+const WHATS_NEW = ["Multi-chart layouts: the wallpaper follows each chart instantly while you drag the dividers",
+  "Indicator colours: Rainbow, your candle or wallpaper colours, or any colour, plus glow (Style \u203a Indicators)",
   "nq.vision: the wallpaper stays while you drag the chart",
   "Fixed: indicator Settings / Pine Editor sometimes not opening until a refresh",
   "Two copies installed? The one you use now always shows your background",

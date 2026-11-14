@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.56 (2026-11-14)
+- **Fixed: multi-chart layouts showing the platform's own background while you drag.** Dragging the divider between charts (or anything that resizes a chart without resizing the window) left each wallpaper up to a fraction of a second behind its chart, so the platform's own background (light grey on nq.vision) showed in the gap. Wallpapers now follow their charts on the very same frame, on TradingView, nq.vision and other platforms that use TradingView's charts.
+
 ## 0.1.55 (2026-11-14)
 - **Indicator colours and glow** (Style → Chart lines & ticker → Indicators): colour your indicator lines (moving averages, VWAP, RSI…) **Rainbow** (the spectrum along each line), in your **Candle** colours, your **Wallpaper**'s colours or any **Custom** colour, and make them **Glow**. Each indicator keeps its own shade, so they stay easy to tell apart. Candles, grid, crosshair and the price line keep their own styling. Works on TradingView and on Lightweight Charts platforms like nq.vision, and it's saved in your looks.
 - **Fixed on nq.vision: grey background while dragging the chart** left, right, up or down. The platform gives its chart a solid background while you hold it, which covered the wallpaper until you let go. The wallpaper now stays the whole time.
