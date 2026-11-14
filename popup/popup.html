@@ -101,7 +101,14 @@
         <summary>Chart lines &amp; ticker</summary>
         <p class="hint">Every line on the chart: keep TradingView's own, or style it. Skin colour follows your wallpaper; Candle uses your up-candle colour.</p>
         <div id="chartStyle"></div>
-        <div class="row"><span>Line glow</span><input type="range" id="lineGlow" min="0" max="1" step="0.05" /><output id="lineGlowOut"></output></div>
+        <div class="cpart" id="indCard">
+          <div class="cpart-h"><div><b>Indicators</b><small>Colour your indicator lines (moving averages, VWAP, RSI&hellip;) and make them glow. Each one keeps its own shade, so they stay easy to tell apart.</small></div></div>
+          <div class="cpart-b">
+            <div class="seg" id="indMode" style="margin-bottom:8px"></div>
+            <div class="row" id="indColRow" hidden><span>Colour</span><input type="color" id="indColor" /></div>
+            <div class="row"><span>Glow</span><input type="range" id="lineGlow" min="0" max="1" step="0.05" /><output id="lineGlowOut"></output></div>
+          </div>
+        </div>
         <p class="hint">Line glow: indicators, drawings, the price line, position lines and the P&amp;L readout. Grid and crosshair never glow.</p>
       </details>
 

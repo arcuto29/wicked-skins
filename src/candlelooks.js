@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks) return;
+  if (window.__bdCandleLooks && window.__bdCandleLooks.indicator) return;   // an older copy (before an update) is replaced
 
   const LOOKS = [
     // id, label, hint, minGlow (some looks are made of light, so they always glow a little)
@@ -180,5 +180,37 @@
     });
   }
 
-  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf };
+  // ---------- indicator colours (Style > Chart lines & ticker > Indicator colours) ----------
+  // Shared by hook.js (TradingView) and lw.js (Lightweight Charts platforms like nq.vision). Each indicator keeps its
+  // own slot (by its original colour, in the order first drawn), so two moving averages stay told apart: they get
+  // neighbouring shades of the chosen colours. o = { mode, color, up, down, accent }.
+  const slots = new Map();
+  const slotOf = (orig) => { let i = slots.get(orig); if (i === undefined) { if (slots.size > 24) slots.clear(); i = slots.size; slots.set(orig, i); } return i; };
+  const isHex = (h) => /^#[0-9a-f]{6}$/i.test(h || "");
+  const shade = (hex, deg) => toHex(hueRotate(rgbOf(hex), deg));
+  function indPalette(o) {
+    if (o.mode === "candles") return isHex(o.up) && isHex(o.down) ? [o.up, o.down, shade(o.up, 38), shade(o.down, -38), shade(o.up, -38), shade(o.down, 38)] : null;
+    const base = o.mode === "custom" ? o.color : o.mode === "wallpaper" ? o.accent : null;
+    return isHex(base) ? [base, shade(base, 42), shade(base, -42), shade(base, 90), shade(base, -90), shade(base, 180)] : null;
+  }
+  const hsl = (h) => `hsl(${Math.round(((h % 360) + 360) % 360)},95%,62%)`;
+  const grads = new WeakMap();   // ctx -> Map(key -> rainbow gradient), so a gradient is made once per canvas size
+  // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour },
+  // or null to leave the line as it is.
+  function indicator(ctx, orig, o) {
+    if (!o || !o.mode || o.mode === "own") return null;
+    const i = slotOf(String(orig));
+    if (o.mode === "rainbow") {   // the whole spectrum across the chart, left to right; each indicator starts at its own hue
+      const t = ctx.getTransform(), a = t.a || 1, w = ctx.canvas.width, off = (i * 67) % 360, key = w + "|" + t.e + "|" + a + "|" + off;
+      let m = grads.get(ctx); if (!m) { m = new Map(); grads.set(ctx, m); }
+      let gr = m.get(key);
+      if (!gr) { if (m.size > 30) m.clear(); gr = ctx.createLinearGradient((0 - t.e) / a, 0, (w - t.e) / a, 0);
+        for (let j = 0; j <= 6; j++) gr.addColorStop(j / 6, hsl(off + j * 60)); m.set(key, gr); }
+      return { s: gr, g: hsl(off + 180) };
+    }
+    const P = memo("ind|" + o.mode + o.color + o.up + o.down + o.accent, () => indPalette(o));
+    return P ? { s: P[i % P.length], g: P[i % P.length] } : null;
+  }
+
+  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf, indicator };
 })();

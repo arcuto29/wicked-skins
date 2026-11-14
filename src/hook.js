@@ -12,11 +12,18 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 10;
+  const HOOK_VERSION = 12;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
   window.__bdHookVer = HOOK_VERSION;
+  // Redraw state, declared first: when a newer copy goes into a chart that's already open (Priism updated in the
+  // background), the chart's colours are known at once and a redraw is asked for while this file is still setting
+  // up. Declared lower down, that threw ("softRaf before initialization"), stopped the setup halfway and left
+  // TradingView drawing through half-installed code until you reloaded (windows like indicator Settings or the Pine
+  // Editor could then fail to open).
+  let softRaf = 0, hardT = 0;
+  const stats = (window.__bdStats = window.__bdStats || { soft: 0, hard: 0 });
   // An older copy of the extension already wrapped the canvas API. Put the browser's own untouched functions back
   // (taken from a fresh hidden frame), so the old wrappers are cut out and only this version draws.
   if (olderHook) {
@@ -79,6 +86,8 @@
     // show = labels untouched (only the panels are blurred)
     privacyPnl: "hide", tickSize: 0,
     bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
+    // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
+    indMode: "own", indColor: "",
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -125,6 +134,7 @@
         plStyle: ["solid", "dotted", "dashed"].includes(f.plStyle) ? f.plStyle : "dotted",
         sbOn: !!f.sbOn, sbColor: colOpt(f.sbColor), sbW: Math.max(0, Math.min(2, +f.sbW || 0)), sbStyle: ["solid", "dotted", "dashed", "none"].includes(f.sbStyle) ? f.sbStyle : "dashed",
         axOn: !!f.axOn, axColor: colOpt(f.axColor), axW: Math.max(0, Math.min(2, +f.axW || 0)), axStyle: ["solid", "none"].includes(f.axStyle) ? f.axStyle : "solid",
+        indMode: ["own", "rainbow", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
@@ -138,7 +148,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.indMode, fx.indColor, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -465,18 +475,24 @@
         return;
       }
     }
-    if (!on || !c || !(candles || fx.lineGlow > 0) || !isPane(c)) return origStroke.apply(this, arguments);
+    const indOn = fx.indMode !== "own";
+    if (!on || !c || !(candles || fx.lineGlow > 0 || indOn) || !isPane(c)) return origStroke.apply(this, arguments);
     const k = segs.get(this) || [0, 0];
     // only paths we SAW built from short segments (bars, last-price line) count as candle strokes;
     // Path2D or paths built some other way (indicators) keep their own colour
     const polyline = path !== undefined || k[0] < 1 || k[1] > k[0] * 2 + 1;
     const cur = strokeDesc.get.call(this);
-    const col = candles && !polyline ? remap(cur) : cur;
-    const glow = fx.lineGlow > 0 && glowable(col);
+    let col = candles && !polyline ? remap(cur) : cur, gcol = col;
+    // an indicator line (a Path2D, or a path of 3+ segments, in a colour that isn't grey): your indicator colours
+    if (indOn && polyline && typeof cur === "string" && glowable(cur) && (path !== undefined || (k[1] >= 3 && (!candles || remap(cur) === cur)))) {
+      const L = window.__bdCandleLooks, r = L && L.indicator && L.indicator(this, cur, { mode: fx.indMode, color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent });
+      if (r) { col = r.s; gcol = r.g; }
+    }
+    const glow = fx.lineGlow > 0 && glowable(gcol);
     if (col === cur && !glow) return origStroke.apply(this, arguments);
     const pSB = this.shadowBlur, pSC = this.shadowColor;
     if (col !== cur) strokeDesc.set.call(this, col);
-    if (glow) { this.shadowColor = col; this.shadowBlur = 2 + fx.lineGlow * 16; }
+    if (glow) { this.shadowColor = gcol; this.shadowBlur = 2 + fx.lineGlow * 16; }
     origStroke.apply(this, arguments);
     if (col !== cur) strokeDesc.set.call(this, cur);
     if (glow) { this.shadowBlur = pSB; this.shadowColor = pSC; }
@@ -495,8 +511,6 @@
   // Redraws are made to feel instant: every change gets TradingView's own light redraw on the very next frame (no
   // blink). The heavier rebuild (hide the chart for two frames) is only needed for things TradingView caches, like
   // volume-bar colours, so it runs ONCE, after you stop changing things, instead of on every step of a colour drag.
-  let softRaf = 0, hardT = 0;
-  const stats = (window.__bdStats = window.__bdStats || { soft: 0, hard: 0 });
   function hardRebuild() {
     stats.hard++;
     document.querySelectorAll(".chart-container").forEach((el) => {
