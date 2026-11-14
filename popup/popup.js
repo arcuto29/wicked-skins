@@ -2114,7 +2114,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["nq.vision: the text over the chart no longer flickers",
+const WHATS_NEW = ["Live mood works on nq.vision and prop-firm platforms",
+  "nq.vision: the text over the chart no longer flickers",
   "\u201cCheck this page\u201d: see why something looks wrong on a platform (top of the panel)",
   "nq.vision: charts resize cleanly when you drag the lines between them",
   "Multi-chart layouts: the wallpaper follows each chart instantly while you drag the dividers",

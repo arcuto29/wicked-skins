@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 13;
+  const HOOK_VERSION = 14;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -926,6 +926,7 @@
         return;
       }
     }
+    if (on && c && isAxis(c)) noteQuote(lastTag.get(this), a[0]);   // Live mood: the price, on platforms without it in the title
     // Live-price tags (and other price boxes): same font/weight/size as the scale, text kept inside its box.
     const tagsRecoloured = candles && fx.scaleLabels;
     if (on && c && isAxis(c) && !isScaleLabel(this.fillStyle) && (tagsRecoloured || fx.scaleFont !== "default" || fx.scaleSize > 0 || fx.scaleBold)) {
@@ -1003,6 +1004,20 @@
   const origFillPath = proto.fill;
   const chLabel = new WeakMap();      // axis top canvas -> colour we gave the crosshair label box
   const lastTag = new WeakMap();   // colour of the last price box drawn on each scale canvas
+  // Live mood ("Day's move") needs the price. tradingview.com puts it in the tab title; platforms that embed
+  // TradingView's charts (nq.vision, prop firms) don't. There, read it from the chart's own last-price tag: the number
+  // drawn on the price scale inside a box in the candle colour. Shared with lw.js's reader via data-bd-lwquote.
+  let quoteAt = -1e9, quoteVal = NaN, titleHasPrice = false;
+  setInterval(() => { titleHasPrice = /[\d.,]+\s*[\u25b2\u25bc]?\s*[+\-\u2212]?[\d.]+%/.test(document.title || ""); }, 2000);
+  function noteQuote(lt, text) {
+    if (!lt || titleHasPrice) return;   // tradingview.com: the title has it
+    const r = rgbKey(lt.col); if (!r) return;
+    const candleTag = sides.has(r.key) || (candles && (r.key === candles.up.join(",") || r.key === candles.down.join(",")));
+    if (!candleTag) return;
+    const n = parseFloat(String(text).replace(/[,\s\u2009\u202f']/g, "").replace("\u2212", "-"));
+    const now = performance.now();
+    if (isFinite(n) && n > 0 && (n !== quoteVal || now - quoteAt > 1000)) { quoteAt = now; quoteVal = n; htmlEl().setAttribute("data-bd-lwquote", JSON.stringify({ p: n, ts: Date.now() })); }
+  }
   proto.fill = function (...a) {
     const c = this.canvas;
     // rounded pill box (TradingView's newer trading labels draw their box as a path, not a rect)
