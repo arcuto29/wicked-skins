@@ -166,3 +166,11 @@ footer { background: linear-gradient(180deg, transparent, rgba(46,242,176,.04));
 .mine-t { flex: 1; min-width: 0; } .mine-t b { margin-right: 6px; } .mine-t small { display: block; color: var(--muted); margin-top: 2px; }
 .st { display: inline-block; padding: 2px 8px; border-radius: 99px; font: 700 11px system-ui, sans-serif; vertical-align: 1px; }
 .st.live { background: rgba(46,242,176,.14); color: #6ff5c6; } .st.rev { background: rgba(255,196,80,.14); color: #ffd27a; } .st.rej { background: rgba(255,90,110,.14); color: #ff8a9a; }
+/* Invites (admin) */
+.inv-new { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0 4px; }
+.inv-new #invNote { flex: 1; min-width: 200px; margin: 0; }
+.inv-dev { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.inv-dev .field { width: 70px; margin: 0; }
+.inv-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .04em; }
+.inv-row small a { color: inherit; }
+.inv-row .btn { padding: 7px 11px; font-size: 12.5px; }

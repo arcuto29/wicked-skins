@@ -97,5 +97,24 @@ ok("look uses counted without an account", (await as(null, "select uses from pub
 for (const u of [U2, U3, U4]) await as(u, "insert into public.look_reports (look_id, reason) values ($1, 'spam')", [l1.id]);
 ok("3 reports hide a look until re-review", (await as(null, "select count(*)::int n from public.looks where id = $1", [l1.id])).rows[0].n === 0);
 ok("owner can delete own look", (await as(U1, "delete from public.looks where id = $1 returning id", [l1.id])).rows.length === 1);
+// ---------- invites ----------
+await db.exec("grant update on public.invites to authenticated");
+ok("non-admin can't make invites", (await tryAs(U1, "insert into public.invites (code) values ('PRIISM-AAAA-BBBB')")).startsWith("denied"));
+await as(ADMIN, "insert into public.invites (code, max_devices) values ('PRIISM-AAAA-BBBB', 2)");
+ok("nobody else can read the codes", (await as(U1, "select count(*)::int n from public.invites")).rows[0].n === 0 && (await as(null, "select count(*)::int n from public.invites")).rows[0].n === 0);
+const red = async (code, dev) => (await as(null, "select public.redeem_invite($1, $2, 'ext') r", [code, dev])).rows[0].r;
+ok("a wrong code -> invalid", (await red("PRIISM-NOPE-NOPE", "dev-00000001")) === "invalid");
+ok("first device -> ok (any case / spaces)", (await red(" priism-aaaa-bbbb ", "dev-00000001")) === "ok");
+ok("same device again -> still ok", (await red("PRIISM-AAAA-BBBB", "dev-00000001")) === "ok");
+ok("second device -> ok", (await red("PRIISM-AAAA-BBBB", "dev-00000002")) === "ok");
+ok("third device -> full", (await red("PRIISM-AAAA-BBBB", "dev-00000003")) === "full");
+ok("admin sees the devices on a code", (await as(ADMIN, "select count(*)::int n from public.invite_devices")).rows[0].n === 2);
+ok("others can't see devices", (await as(U1, "select count(*)::int n from public.invite_devices")).rows[0].n === 0);
+await as(ADMIN, "delete from public.invite_devices where device = 'dev-00000002'");
+ok("admin frees a slot -> a new device fits", (await red("PRIISM-AAAA-BBBB", "dev-00000003")) === "ok");
+ok("non-admin can't revoke", (await tryAs(U1, "update public.invites set revoked = true")).startsWith("ok") && (await red("PRIISM-AAAA-BBBB", "dev-00000001")) === "ok");
+await as(ADMIN, "update public.invites set revoked = true where code = 'PRIISM-AAAA-BBBB'");
+ok("revoked -> every device locks", (await red("PRIISM-AAAA-BBBB", "dev-00000001")) === "revoked");
+ok("bad device ids are refused", (await red("PRIISM-AAAA-BBBB", "x';drop")) === "invalid");
 const passed = Object.values(R).filter(Boolean).length, total = Object.keys(R).length;
 console.log("SUMMARY:", passed + "/" + total); if (passed !== total) process.exit(1);
