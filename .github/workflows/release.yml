@@ -20,6 +20,9 @@ jobs:
       PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
       EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
     steps:
+      - name: Releases go to the public repo (needs the PUBLIC_REPO_TOKEN secret)
+        env: { T: "${{ secrets.PUBLIC_REPO_TOKEN }}" }
+        run: '[ -n "$T" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (see RELEASING.md). Releases are published to the public arcuto29/wicked-skins repo."; exit 1; }'
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
@@ -36,6 +39,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          repository: arcuto29/wicked-skins          # the public releases + website repo (this code repo is private)
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
           name: Priism Skins ${{ github.ref_name }}
           body_path: notes.md
           files: dist/priism-skins-*.zip
@@ -90,6 +95,8 @@ jobs:
       - name: Attach installers + update manifests to the release
         uses: softprops/action-gh-release@v2
         with:
+          repository: arcuto29/wicked-skins          # the public releases + website repo (this code repo is private)
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
           files: |
             desktop/dist/*.exe
             desktop/dist/*.exe.blockmap
