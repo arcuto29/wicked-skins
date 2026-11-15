@@ -8,7 +8,9 @@ let failed = 0; const ok = (name, cond, detail) => { console.log(`${cond ? "PASS
 
 (async () => {
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), "wicked-"));
-  fs.writeFileSync(path.join(userData, "settings.json"), JSON.stringify({ skin: "galaxy", candleOn: true, candleUp: "#00ffa3", candleDown: "#ff2e97", wmOn: true }));
+  fs.writeFileSync(path.join(userData, "settings.json"), JSON.stringify({ skin: "galaxy", candleOn: true, candleUp: "#00ffa3", candleDown: "#ff2e97", wmOn: true,
+    // Priism is invite only: run as an invited copy (checked far ahead, so the test never asks the server)
+    invite: { code: "PRIISM-TEST-SMOK", ok: true, status: "ok", checked: 4e12, since: 0 } }));
   const app = await _electron.launch({ args: [DESK, "--no-sandbox", `--user-data-dir=${userData}`], timeout: 60000 });
   // The app opens to its settings window (it no longer pops a chart open by itself).
   const settingsEarly = await app.waitForEvent("window", { predicate: (w) => w.url().includes("popup.html"), timeout: 60000 }).catch(() => app.windows().find((w) => w.url().includes("popup.html")));
