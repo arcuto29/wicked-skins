@@ -84,6 +84,10 @@
     goalGuard: false,      // max-loss reminder: a calm "Done for today" card the moment today's loss reaches your max loss
     // the ticker in the chart's top-left legend (symbol name, timeframe, exchange)
     tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false,
+    // the legend: indicator names / values and O H L C at the top left. lgColor "" = readable white/black for the
+    // wallpaper, "candle" or "#hex"; lgVals own = coloured values keep their colour, all = everything takes lgColor;
+    // lgBack none | shade | glass = a backing behind each legend row (an outline on platforms with their own legend)
+    lgOn: false, lgColor: "", lgVals: "own", lgBack: "none",
     welcomePending: 0,     // set on first install: show the welcome card on the chart once
     goalSound: "off",      // off | soft | loud: a chime at your goal, a warning at 80% of the loss limit, a low tone at the limit
     sessionSound: "off",   // off | soft | loud: a ping 5 minutes before the session opens / closes, two pings when it does
@@ -811,6 +815,8 @@
   // and text that's too dark is lightened (coloured indicator values keep their colour).
   const SYM_START = /^([A-Z][A-Z0-9.\-]{0,9}!?)(?=$|[\s\u00b7\u2022|,:])/;
   const lumOf = (css) => { const m = String(css).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/); return m ? (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255 : 1; };
+  const satOf = (css) => { const m = String(css).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/); if (!m) return 0;
+    const v = [+m[1], +m[2], +m[3]]; return (Math.max(...v) - Math.min(...v)) / 255; };   // chroma: dark blue-greys count as neutral
   function markTickers() {
     const root = document.querySelector("[data-bd-lwroot], .tv-lightweight-charts"), cr = root ? root.getBoundingClientRect() : null;
     let main = null, best = Infinity, n = 0;
@@ -822,9 +828,11 @@
       const over = !!r && r.width > 0 && r.left >= cr.left - 2 && r.right <= cr.right + 2 && r.top >= cr.top - 2 && r.bottom <= cr.bottom + 2;   // sits on the chart
       // decide from the text's OWN colour: read with our lightening switched off, or the next check sees the lightened
       // colour, un-lightens it, then lightens it again (the legend text flickered between dark and light every ~2 s)
-      if (over) { el.dataset.bdHalo = "1"; const was = el.dataset.bdLighten; if (was) delete el.dataset.bdLighten;
-        if (lumOf(getComputedStyle(el).color) < 0.45) el.dataset.bdLighten = "1"; }
-      else if (el.dataset.bdHalo) { delete el.dataset.bdHalo; delete el.dataset.bdLighten; }
+      if (over) { el.dataset.bdHalo = "1"; if (el.dataset.bdLighten) delete el.dataset.bdLighten; if (el.dataset.bdLg) delete el.dataset.bdLg;
+        const own = getComputedStyle(el).color;
+        if (lumOf(own) < 0.45) el.dataset.bdLighten = "1";
+        el.dataset.bdLg = satOf(own) < 0.2 ? "n" : "c"; }               // n = neutral text (names), c = coloured (indicator values)
+      else if (el.dataset.bdHalo) { delete el.dataset.bdHalo; delete el.dataset.bdLighten; delete el.dataset.bdLg; }
       if (!t || t.length > 40) { if (el.dataset.bdTk) delete el.dataset.bdTk; continue; }
       const symStart = SYM_START.exec(t), sym = symStart && !NOT_SYM.has(symStart[1].replace(/!$/, "")) && symStart[1].length >= 2;
       // a symbol-like start in the legend ("NQ1! · 1 · CME", but also "EMA 20 …") can only be the ticker, never "list"
@@ -968,11 +976,43 @@
       side = `${P} [class*="intervalTitle-"] > [class*="title-"], ${P} [class*="exchangeTitle-"] > [class*="title-"]`;
     if (isLwPage()) { markTickers(); watchApp(); }
     // stronger than the legend readability rule in content.css (which would otherwise win)
-    const LWM = 'html.bd-on.bd-lwpage:not(.bd-x) [data-bd-tk="main"][data-bd-tk]', LWT = 'html.bd-on.bd-lwpage:not(.bd-x) [data-bd-tk="tf"][data-bd-tk]';
+    const LWM = 'html.bd-on.bd-lwpage:not(.bd-x):not(.bd-x) [data-bd-tk="main"][data-bd-tk]', LWT = 'html.bd-on.bd-lwpage:not(.bd-x):not(.bd-x) [data-bd-tk="tf"][data-bd-tk]';
     st.textContent = `${M}, ${LWM}{color:${col}!important;font-size:${px}px!important;line-height:1.25!important;font-weight:700!important;${ff}${glow}}` +
       `${LWT}{color:${col}!important;${ff}${cfg.tkGlow ? `text-shadow:0 0 8px ${col}88!important;` : ""}}` +
       (cfg.tkOnly ? `${P} [class*="intervalTitle-"], ${P} [class*="exchangeTitle-"]{display:none!important}`
         : `${side}{color:${col}!important;opacity:.78;font-size:${Math.round(px * 0.85)}px!important;line-height:1.25!important;font-weight:600!important;${ff}}`);
+  }
+  // ---------- the legend (indicator names and values, O H L C) ----------
+  // TradingView / the charting library: its legend rows ([class*="item-"] in [class*="legend-"]), never the Buy / Sell
+  // buttons that sit in the legend too. Platforms with their own legend (nq.vision): the text markTickers() found on
+  // the chart. The ticker's own styling (applyTicker) stays stronger. One <style>, no per-frame work.
+  let lgApplied = "";
+  function applyLegend() {
+    const on = cfg.enabled && cfg.lgOn;
+    const custom = cfg.lgColor === "candle" ? upColor() : /^#[0-9a-f]{6}$/i.test(cfg.lgColor || "") ? cfg.lgColor : "";
+    const back = ["shade", "glass"].includes(cfg.lgBack) ? cfg.lgBack : "none", all = cfg.lgVals === "all";
+    const sig = on ? [custom, back, all].join("|") : "";
+    if (sig === lgApplied) return; lgApplied = sig;
+    let st = document.getElementById("bd-legend-css");
+    if (!on) { if (st) st.textContent = ""; return; }
+    if (!st) { st = document.createElement("style"); st.id = "bd-legend-css"; (document.head || document.documentElement).appendChild(st); }
+    if (isLwPage()) { markTickers(); watchApp(); }
+    // light text gets a dark backing / outline, dark text a light one
+    const lightText = custom ? lumOf(`rgb(${[1, 3, 5].map((i) => parseInt(custom.slice(i, i + 2), 16)).join(",")})`) >= 0.5 : null;
+    const vars = (light) => `--bd-lg-text:${custom || (light ? "#e9ebf2" : "#14161f")};--bd-lg-back:${light ? "8,10,16" : "250,251,253"}`;
+    const H = "html.bd-on:not(.bd-over-mode)";
+    let css = custom ? `${H}{${vars(lightText)}}` : `${H}.bd-bg-dark{${vars(true)}}${H}.bd-bg-light{${vars(false)}}${H}:not(.bd-bg-dark):not(.bd-bg-light){${vars(true)}}`;
+    const L = 'html:root:root:root.bd-on [class*="legend-"] [class*="item-"]';
+    const names = `${L} [class*="title"], ${L} [class*="title"] *, ${L} [class*="valueTitle"]`;
+    css += `${names}${all ? `, ${L} [class*="valueValue"]` : ""}{color:var(--bd-lg-text)!important}`;
+    const LW = 'html.bd-on.bd-lwpage:not(.bd-x) [data-bd-halo]';
+    css += `${all ? `${LW}[data-bd-lg]` : `${LW}[data-bd-lg="n"]`}{color:var(--bd-lg-text)!important}`;
+    if (back !== "none") {
+      const a = back === "glass" ? 0.4 : 0.66, blur = back === "glass" ? "-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);" : "";
+      css += `${L}[class*="series-"], ${L}[class*="study-"]{background:rgba(var(--bd-lg-back),${a})!important;${blur}border-radius:6px!important;box-shadow:0 0 0 3px rgba(var(--bd-lg-back),${a})!important}`;
+      css += `${LW}{text-shadow:0 0 2px rgba(var(--bd-lg-back),1),0 0 5px rgba(var(--bd-lg-back),.95),0 0 9px rgba(var(--bd-lg-back),.8)!important}`;
+    }
+    st.textContent = css;
   }
   function applyUiStyle() {
     const h = document.documentElement;
@@ -989,7 +1029,7 @@
     if (isLwPage() && (accent || cfg.tkOn)) { markTickers(); watchApp(); }
   }
   // lw.js marks the page once it finds a Lightweight Charts chart (can be after we start): apply the app styling then
-  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelApplied) applyAppPanels(panelApplied); tkApplied = ""; applyTicker(); markTickers(); watchApp(); } })
+  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelApplied) applyAppPanels(panelApplied); tkApplied = ""; applyTicker(); lgApplied = ""; applyLegend(); markTickers(); watchApp(); } })
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-bd-lw"] });
 
   // Pages built on Lightweight Charts (not TradingView's own charts), like nq.vision: the app around the chart has solid
@@ -1034,7 +1074,7 @@
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
     document.documentElement.classList.toggle("bd-on", cfg.enabled && !focusAll());
-    applySides(); applyUiStyle(); applyPanels(); applyDialogs(); applyTicker();
+    applySides(); applyUiStyle(); applyPanels(); applyDialogs(); applyTicker(); applyLegend();
     if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
@@ -1583,6 +1623,7 @@
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
     if (keys.some((k) => k === "panelMode" || k === "panelColor" || k === "candleUp")) applyPanels();
     if (keys.some((k) => k.startsWith("tk") || k === "candleUp" || k === "enabled")) applyTicker();
+    if (keys.some((k) => k.startsWith("lg") || k === "candleUp" || k === "enabled")) applyLegend();
     if (keys.some((k) => k.startsWith("dlg") || k === "panelMode" || k === "panelColor")) applyDialogs();
     if (keys.includes("sides") || keys.includes("leftBar") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();

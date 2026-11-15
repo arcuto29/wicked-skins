@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.58 (2026-11-04)
+- **New: style the legend** (Style → Chart lines, ticker & legend → Legend). The indicator names and values and the O H L C row at the top left of the chart were made for the platform's own background, so on some wallpapers they were hard to read. Pick the text colour (**Readable** picks white or black for your wallpaper, **Candle** or any **Custom** colour), whether indicator values keep their own colours or take yours, and a **Shade** or **Glass** backing behind each row. On tradingview.com and platforms built on TradingView's charts each legend row gets the backing; on platforms with their own legend over the chart (like nq.vision's Lightweight Charts) the text gets a strong outline instead. The Ticker setting still decides the symbol name's own style. Saved in your looks.
+- **Fixed: the O H L C letters in the legend were nearly black on dark wallpapers** (TradingView's light theme and the charting library nq.vision uses). They now get the same readable colour as the indicator names.
+
 ## 0.1.57 (2026-11-14)
 - **New: customise each indicator on its own** (Style → Chart lines & ticker → Indicators → Each indicator). Priism lists the lines and zones on your chart (on tradingview.com by name, like "MA (20, close)"; on other platforms by colour, like "Zone (purple)"), and you can give any one of them its own **colour** (or Rainbow), **glow** and **width**, or **hide** it. Zones (an indicator's filled boxes and bands, like single prints or Bollinger fills) can glow too. Your settings follow that indicator by its colour, and win over the all-indicators setting.
 - **Fixed: Live mood (Day's move) did nothing on nq.vision and other platforms that use TradingView's charts.** It needs the price, and those platforms don't put it in the tab title the way tradingview.com does. Priism now reads it from the chart's own last-price tag on the price scale.
