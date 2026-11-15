@@ -51,6 +51,7 @@
     bracketQty: "",        // colour of the lot-size pill on your brackets
     // Auto trade clips: while a trade is open, keep the last tradeClipLen seconds ready; save a clip when it closes.
     tradeClipOn: false, tradeClipLen: 30,
+    invite: null,             // invite only: { code, ok, status, checked } (see src/invite.js)
     clipQuality: "balanced",  // high | balanced | small (small keeps a clip under ~20 MB, e.g. for Discord)           // after a recording: open the crop / trim editor (false = download right away)
     // Chart styling — each part off = TradingView's own. Colour "" = skin colour, "candle" = your up-candle colour.
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
@@ -2301,9 +2302,9 @@
     }
   }
   setTimeout(() => { setInterval(chartTips, 4000); chartTips(); }, 6000);   // after TradingView has settled
-  function flash(msg) {
-    const t = document.createElement("div"); t.className = "bd-flash"; t.textContent = msg;
-    document.documentElement.appendChild(t); setTimeout(() => t.remove(), 1400);
+  function flash(msg, ms) {
+    const t = document.createElement("div"); t.className = "bd-flash"; t.textContent = msg; if (ms) t.style.animationDuration = ms + "ms";
+    document.documentElement.appendChild(t); setTimeout(() => t.remove(), ms || 1400);
   }
   // ---------- shortcuts (changeable) ----------
   function keyMatch(e, spec) {
@@ -2321,7 +2322,8 @@
     const tag = (e.target && e.target.tagName) || "";
     if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
     e.preventDefault(); e.stopPropagation();
-    if (isToggle) { const next = !cfg.enabled; save({ enabled: next }); flash(next ? "Priism Skins on" : "Priism Skins off"); return; }
+    if (isToggle) { if (!inviteOk()) { flash("Priism needs an invite code: open the Priism panel to enter it", 3500); return; }
+      const next = !cfg.enabled; save({ enabled: next }); flash(next ? "Priism Skins on" : "Priism Skins off"); return; }
     if (isPriv) { const next = !cfg.privacy; save({ privacy: next }); flash(next ? "Streamer mode on \u00B7 your numbers are hidden" : "Streamer mode off"); return; }
     if (EXT && !owner) return;                      // only the frame that owns the chart records / snaps
     if (isRec) { doRecord(); return; }
@@ -2593,10 +2595,20 @@
     build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); setTimeout(announceFrame, 300);
   }
 
+  // Invite only: nothing is drawn until this copy of Priism has a working invite code (the panel asks for it).
+  // cfg.enabled = your on/off switch AND a working code; wantOn remembers the switch itself.
+  let wantOn = true;
+  const inviteOk = () => !!(cfg.invite && cfg.invite.ok && cfg.invite.code);
+  function gate(keys) {
+    if (!keys || keys.includes("enabled")) wantOn = cfg.enabled !== false;
+    cfg.enabled = wantOn && inviteOk();
+    if (keys && keys.includes("invite") && !keys.includes("enabled")) keys.push("enabled");
+    return keys;
+  }
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
     // when you last used this copy's panel is known BEFORE claiming the page, so after a reload the right copy wins
     chrome.storage.local.get({ lastPick: 0 }, (s) => { myPick = +s.lastPick || 0;
-      whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); })); });
+      whenChart(() => chrome.storage.local.get(DEFAULTS, (stored) => { cfg = { ...DEFAULTS, ...stored }; gate(); build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); })); });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       // today's total is shared between tabs (and reset from the panel); the journal is just stored data
@@ -2604,22 +2616,25 @@
       const keys = Object.keys(changes).filter((k) => k !== "dayPnl" && k !== "journal" && k !== "lastPick");
       if (changes.lastPick) {
         myPick = +changes.lastPick.newValue || 0;
-        if (!(owner && !standDown)) { for (const k of keys) cfg[k] = changes[k].newValue; return retake(); }   // another copy had the page: take it back
+        if (!(owner && !standDown)) { for (const k of keys) cfg[k] = changes[k].newValue; gate(keys); return retake(); }   // another copy had the page: take it back
         writeOwner();                                                                                     // already ours: just note it, then apply as usual
       }
       for (const k of keys) cfg[k] = changes[k].newValue;
+      gate(keys);
       if (keys.length) apply(keys);
     });
   } else {
     // Desktop app: host injects window.__BD_CFG and calls window.__bdUpdate on change.
     cfg = { ...DEFAULTS, ...(window.__BD_CFG || {}) };
+    gate();
     build();
     pushCandles();
     pushFx();
     renderWatermark(); applyFocus(); renderTimer(); applyPrivacy();
     window.__bdUpdate = (next) => {
-      const keys = Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(cfg[k]));
+      const keys = Object.keys(next).filter((k) => JSON.stringify(next[k]) !== JSON.stringify(k === "enabled" ? wantOn : cfg[k]));
       cfg = { ...cfg, ...next };
+      gate(keys);
       if (keys.length) apply(keys);
     };
   }

@@ -2106,6 +2106,38 @@ async function updates() {
   }
 }
 
+// ---------- invite only ----------
+// Until this copy has a working invite code, the gate covers the panel (and content.js draws nothing on charts).
+// The saved code is re-checked now and then (bg.js daily; here when the panel opens, if it's been a day).
+async function inviteGate() {
+  if (!window.PriismInvite) return;
+  const show = (inv) => {
+    const gate = $("inviteGate"), ok = PriismInvite.isOk(inv);
+    gate.hidden = ok; if (ok) return;
+    const why = inv && inv.status === "revoked" ? "This invite code has been turned off. Ask for a new one to keep using Priism."
+      : inv && inv.status === "invalid" ? "Your invite code isn't valid any more. Enter a new one." : "Enter the invite code you were given to start skinning your charts.";
+    $("igLead").textContent = why;
+    setTimeout(() => $("igCode").focus(), 50);
+  };
+  let { invite } = await new Promise((r) => chrome.storage.local.get({ invite: null }, r));
+  show(invite);
+  if (invite && invite.code) PriismInvite.recheck(false).then(show).catch(() => {});
+  const go = async () => {
+    const code = PriismInvite.tidy($("igCode").value); const msg = $("igMsg");
+    if (code.length < 8) { msg.className = "hint bad"; msg.textContent = "That doesn't look like an invite code."; return; }
+    $("igGo").disabled = true; msg.className = "hint"; msg.textContent = "Checking\u2026";
+    const r = await PriismInvite.redeem(code);
+    $("igGo").disabled = false;
+    if (r.ok) { msg.textContent = ""; show(r); toast("Welcome to Priism! Your charts are being skinned."); return; }
+    msg.className = "hint bad";
+    msg.textContent = r.status === "invalid" ? "That code isn't right. Check it and try again." : r.status === "revoked" ? "That code has been turned off."
+      : r.status === "full" ? "That code is already used on its maximum number of devices." : "Couldn't reach the server. Check your internet and try again.";
+  };
+  $("igGo").onclick = go; $("igCode").onkeydown = (e) => { if (e.key === "Enter") go(); };
+  try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.invite) show(ch.invite.newValue); }); } catch {}
+}
+inviteGate();
+
 // ---------- master switch + boot ----------
 $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status").textContent = e.target.checked ? "On" : "Off"; };
 chrome.storage.local.get(DEFAULTS, (stored) => {
@@ -2170,7 +2202,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Style the legend: colour and a backing for indicator names and values, so they read on any wallpaper (Style \u203a Legend)",
+const WHATS_NEW = ["Priism is invite only now: enter your invite code once in the panel",
+  "Style the legend: colour and a backing for indicator names and values, so they read on any wallpaper (Style \u203a Legend)",
   "O H L C letters are readable on dark wallpapers",
   "Customise each indicator: its own colour, glow, width, or hide it, zones included (Style \u203a Indicators \u203a Each indicator)",
   "Live mood works on nq.vision and prop-firm platforms",

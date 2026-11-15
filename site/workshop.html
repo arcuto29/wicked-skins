@@ -64,6 +64,18 @@
       <div id="mineList" class="mine-list"></div>
     </section>
 
+    <section id="invites" hidden>
+      <h2 style="font-size:22px;margin:34px 0 6px">Invites <span class="adm">ADMIN</span></h2>
+      <p class="hint">Priism is invite only. Make a code, send it to someone, and they enter it in the Priism panel. Each code works on the number of devices you choose. Turn a code off and those devices lock again within a day.</p>
+      <div class="inv-new">
+        <input id="invNote" class="field" maxlength="80" placeholder="Who is it for? (only you see this)">
+        <label class="inv-dev">Devices <input id="invMax" class="field" type="number" min="1" max="50" value="2"></label>
+        <button id="invMake" class="btn primary" type="button">Make a code</button>
+      </div>
+      <p class="hint" id="invMsg"></p>
+      <div id="invList" class="mine-list"></div>
+    </section>
+
     <section id="review" hidden>
       <h2 style="font-size:22px;margin:34px 0 12px">Review <span class="adm">ADMIN</span></h2>
       <p class="hint">Shares waiting for you. Approve to make them public, or reject with a reason the sharer sees.</p>
@@ -178,6 +190,40 @@
       pendingLook = null; try { localStorage.removeItem("priismPendingLook"); } catch {} history.replaceState(null, "", location.pathname); loadLooks(); renderMine();
     };
 
+    // ---------- invites (admins): make, copy, turn off / on, free a device, delete ----------
+    const CODE_ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    const newCode = () => { const r = crypto.getRandomValues(new Uint32Array(8)); let s = ""; for (let i = 0; i < 8; i++) s += CODE_ABC[r[i] % CODE_ABC.length]; return "PRIISM-" + s.slice(0, 4) + "-" + s.slice(4); };
+    async function renderInvites() {
+      const box = $("invites"); if (!profile || !profile.is_admin) { box.hidden = true; return; }
+      box.hidden = false; const list = $("invList");
+      const [iv, dv] = await Promise.all([sb.from("invites").select("code,note,max_devices,revoked,created_at").order("created_at", { ascending: false }).range(0, 199),
+        sb.from("invite_devices").select("code,device,app,first_seen,last_seen").order("last_seen", { ascending: false }).range(0, 999)]);
+      if (iv.error) { list.innerHTML = /invites|schema cache/i.test(iv.error.message) ? "<p class='hint'>Invites aren't set up on the server yet: re-run supabase/schema.sql in Supabase (SQL Editor).</p>" : "<p class='hint'>Couldn't load invites: " + esc(iv.error.message) + "</p>"; return; }
+      const devs = dv.data || [], ago = (t) => { const d = (Date.now() - new Date(t)) / 864e5; return d < 1 ? "today" : Math.round(d) + "d ago"; };
+      list.innerHTML = iv.data.length ? "" : "<p class='hint'>No codes yet. Make one above.</p>";
+      for (const v of iv.data) {
+        const mine = devs.filter((d) => d.code === v.code), row = document.createElement("div"); row.className = "mine-row inv-row";
+        row.innerHTML = `<div class="mine-t"><b class="inv-code">${esc(v.code)}</b> ${v.revoked ? '<span class="st rej">Off</span>' : mine.length >= v.max_devices ? '<span class="st rev">Full</span>' : '<span class="st live">Active</span>'}
+            <small>${esc(v.note || "no note")} · ${mine.length}/${v.max_devices} device${v.max_devices === 1 ? "" : "s"}${mine.length ? " · last used " + ago(mine[0].last_seen) : ""}</small>
+            <small>${mine.map((d) => `${esc(d.app || "?")} (${ago(d.last_seen)}) <a href="#" data-free="${esc(d.device)}">free</a>`).join(" · ")}</small></div>
+          <button class="btn" data-a="copy" type="button">Copy</button><button class="btn" data-a="toggle" type="button">${v.revoked ? "Turn on" : "Turn off"}</button><button class="btn" data-a="del" type="button">Delete</button>`;
+        row.querySelector('[data-a="copy"]').onclick = async (e) => { try { await navigator.clipboard.writeText(v.code); e.target.textContent = "Copied"; } catch { prompt("Copy the code:", v.code); } };
+        row.querySelector('[data-a="toggle"]').onclick = async () => { const r = await sb.from("invites").update({ revoked: !v.revoked }).eq("code", v.code); if (r.error) return alert(r.error.message); renderInvites(); };
+        row.querySelector('[data-a="del"]').onclick = async () => { if (!confirm(`Delete ${v.code}? Devices using it lock within a day.`)) return; const r = await sb.from("invites").delete().eq("code", v.code); if (r.error) return alert(r.error.message); renderInvites(); };
+        row.querySelectorAll("[data-free]").forEach((a) => (a.onclick = async (e) => { e.preventDefault(); if (!confirm("Free this device's slot? It locks within a day unless the code has room.")) return;
+          const r = await sb.from("invite_devices").delete().eq("code", v.code).eq("device", a.dataset.free); if (r.error) return alert(r.error.message); renderInvites(); }));
+        list.appendChild(row);
+      }
+    }
+    $("invMake").onclick = async () => {
+      const max = Math.max(1, Math.min(50, +$("invMax").value || 2)), code = newCode();
+      $("invMake").disabled = true;
+      const r = await sb.from("invites").insert({ code, note: $("invNote").value.trim() || null, max_devices: max });
+      $("invMake").disabled = false;
+      if (r.error) return say("invMsg", "Couldn't make a code: " + r.error.message);
+      say("invMsg", `Made ${code}. Copy it and send it to them.`); $("invNote").value = ""; renderInvites();
+    };
+
     // ---------- admin review (wallpapers + looks) ----------
     async function renderReview() {
       const box = $("review"); if (!profile || !profile.is_admin) { box.hidden = true; return; }
@@ -217,7 +263,7 @@
       $("myShares").hidden = !user;
       if (user) { $("signout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); await refresh(); say("shareMsg", ""); }; renderMine(); }
       say("ownerNote", user && profile && profile.is_admin ? "You're the owner: what you share goes live straight away." : user ? "Shares are checked before everyone can see them (usually within a day). You'll see yours under Your shares." : "");
-      renderReview();
+      renderReview(); renderInvites();
     }
     sb.auth.onAuthStateChange(() => refresh());
     refresh().then(() => { if (location.hash === "#mine" && user) $("myShares").scrollIntoView(); });

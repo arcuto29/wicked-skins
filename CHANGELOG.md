@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.59 (2026-11-04)
+- **Priism is now invite only.** The extension, the desktop app and the Android app ask for an invite code before they skin anything. Enter it once in the Priism panel. Each code works on a set number of devices (2 unless the person who made it chose otherwise), and it's checked again about once a day, so a code that's been turned off stops working within a day. Without internet, a code you've already entered keeps working. Charts are never blocked: without a code you simply see the platform's own look.
+- **Workshop page → Invites (admins only):** make codes, see how many devices use each one, turn a code off or on again, or delete it.
+- Privacy: the invite check sends only the code, a random ID for this copy of Priism and which app it is. Chart pages never send it. See the privacy page.
+
 ## 0.1.58 (2026-11-04)
 - **New: style the legend** (Style → Chart lines, ticker & legend → Legend). The indicator names and values and the O H L C row at the top left of the chart were made for the platform's own background, so on some wallpapers they were hard to read. Pick the text colour (**Readable** picks white or black for your wallpaper, **Candle** or any **Custom** colour), whether indicator values keep their own colours or take yours, and a **Shade** or **Glass** backing behind each row. On tradingview.com and platforms built on TradingView's charts each legend row gets the backing; on platforms with their own legend over the chart (like nq.vision's Lightweight Charts) the text gets a strong outline instead. The Ticker setting still decides the symbol name's own style. Saved in your looks.
 - **Fixed: the O H L C letters in the legend were nearly black on dark wallpapers** (TradingView's light theme and the charting library nq.vision uses). They now get the same readable colour as the indicator names.

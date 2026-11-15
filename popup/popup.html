@@ -7,6 +7,18 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
+  <!-- Invite only: until this copy has a working invite code, this covers the panel -->
+  <div id="inviteGate" class="invite-gate" hidden>
+    <div class="ig-card">
+      <img src="../icons/icon-48.png" alt="" class="ig-logo" />
+      <h2>Priism is invite only</h2>
+      <p id="igLead">Enter the invite code you were given to start skinning your charts.</p>
+      <input id="igCode" class="field" placeholder="PRIISM-XXXX-XXXX" maxlength="40" autocomplete="off" spellcheck="false" />
+      <button id="igGo" class="primary">Unlock Priism</button>
+      <p class="hint" id="igMsg"></p>
+      <p class="hint ig-foot">No code? Ask the person who invited you. Your code works on a set number of devices.</p>
+    </div>
+  </div>
   <nav id="nav">
     <div class="brand" title="Priism Skins"><img src="../icons/icon-48.png" alt="" /><span>Priism<br>Skins</span></div>
     <button data-tab="skins" class="on"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="16" cy="8.5" r="1.6"/></svg><span>Skins</span></button>
@@ -417,6 +429,7 @@
 
   <script src="../vendor/supabase/supabase.js"></script>
   <script src="../src/workshop-config.js"></script>
+  <script src="../src/invite.js"></script>
   <script src="../src/workshop.js"></script>
   <script src="../src/sites.js"></script>
   <script src="../src/migrate.js"></script>

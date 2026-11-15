@@ -360,3 +360,64 @@ on conflict (id) do update set is_admin = true;
 -- ...and only they are: any other account marked admin (a test account, say) stops being one when you re-run this.
 update public.profiles p set is_admin = false
  where p.is_admin and not exists (select 1 from auth.users u where u.id = p.id and lower(u.email) = any (public.owner_emails()));
+
+-- ---------- invites: Priism is invite only ----------
+-- Every copy of Priism (extension, desktop, Android) needs an invite code before it draws anything. You (an admin)
+-- make codes on the website's Workshop page under Invites; each code works on up to max_devices devices. Revoke a
+-- code and those devices lock again at their next check. Nobody can read the codes except admins: Priism only asks
+-- redeem_invite("is this code good for this device?") and gets back ok / invalid / revoked / full.
+create table if not exists public.invites (
+  code text primary key check (code ~ '^[A-Z0-9-]{8,40}$'),
+  note text check (char_length(note) <= 80),
+  max_devices int not null default 2 check (max_devices between 1 and 50),
+  revoked boolean not null default false,
+  created_at timestamptz not null default now(),
+  created_by uuid default auth.uid()
+);
+alter table public.invites enable row level security;
+drop policy if exists "invites: admins read" on public.invites;
+create policy "invites: admins read" on public.invites for select to authenticated using (public.is_admin((select auth.uid())));
+drop policy if exists "invites: admins create" on public.invites;
+create policy "invites: admins create" on public.invites for insert to authenticated with check (public.is_admin((select auth.uid())));
+drop policy if exists "invites: admins change" on public.invites;
+create policy "invites: admins change" on public.invites for update to authenticated using (public.is_admin((select auth.uid()))) with check (public.is_admin((select auth.uid())));
+drop policy if exists "invites: admins delete" on public.invites;
+create policy "invites: admins delete" on public.invites for delete to authenticated using (public.is_admin((select auth.uid())));
+
+create table if not exists public.invite_devices (
+  code text not null references public.invites (code) on delete cascade,
+  device text not null check (device ~ '^[A-Za-z0-9-]{8,64}$'),
+  app text check (char_length(app) <= 20),
+  first_seen timestamptz not null default now(),
+  last_seen timestamptz not null default now(),
+  primary key (code, device)
+);
+alter table public.invite_devices enable row level security;
+drop policy if exists "invite devices: admins read" on public.invite_devices;
+create policy "invite devices: admins read" on public.invite_devices for select to authenticated using (public.is_admin((select auth.uid())));
+drop policy if exists "invite devices: admins remove" on public.invite_devices;
+create policy "invite devices: admins remove" on public.invite_devices for delete to authenticated using (public.is_admin((select auth.uid())));
+
+-- is this code good for this device? 'ok' | 'invalid' | 'revoked' | 'full'  (a device already on the code stays ok)
+create or replace function public.redeem_invite(p_code text, p_device text, p_app text default null)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare inv public.invites; n int; c text := upper(trim(coalesce(p_code, '')));
+begin
+  if p_device is null or p_device !~ '^[A-Za-z0-9-]{8,64}$' then return 'invalid'; end if;
+  select * into inv from public.invites where code = c;
+  if not found then return 'invalid'; end if;
+  if inv.revoked then return 'revoked'; end if;
+  update public.invite_devices set last_seen = now() where code = c and device = p_device;
+  if found then return 'ok'; end if;
+  select count(*) into n from public.invite_devices where code = c;
+  if n >= inv.max_devices then return 'full'; end if;
+  insert into public.invite_devices (code, device, app) values (c, p_device, left(p_app, 20));
+  return 'ok';
+end;
+$$;
+revoke execute on function public.redeem_invite(text, text, text) from public;
+grant execute on function public.redeem_invite(text, text, text) to anon, authenticated;

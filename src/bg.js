@@ -1,7 +1,10 @@
 /* Background service worker:
    - keeps per-site registrations (sites.js) in sync with the permissions you've granted
    - upgrades saved settings after any update (migrate.js) so they keep working */
-importScripts("sites.js", "migrate.js");
+importScripts("sites.js", "migrate.js", "workshop-config.js", "invite.js");
+// Invite only: re-check the saved invite code now and then (at most once a day), so a revoked code locks this copy.
+const inviteCheck = () => { try { PriismInvite.recheck(false); } catch {} };
+inviteCheck(); setInterval(inviteCheck, 6 * 3600e3);
 
 WickedMigrate.run();                                   // every worker start: cheap no-op unless the version changed
 chrome.runtime.onInstalled.addListener((d) => {
