@@ -69,13 +69,16 @@ html.bd-on .layout__area--center .tv-chart-view {
   background: transparent !important;
 }
 
-/* Light TradingView theme: make dark legend text readable on dark skins. */
+/* Light TradingView theme: make dark legend text readable on dark skins (names and the O H L C letters;
+   valueTitle has a capital T, so [class*="title"] alone misses it). */
 html.bd-on.bd-bg-dark:not(.bd-over-mode) [class*="legend-"] [class*="title"],
-html.bd-on.bd-bg-dark:not(.bd-over-mode) [class*="legend-"] [class*="title"] * {
+html.bd-on.bd-bg-dark:not(.bd-over-mode) [class*="legend-"] [class*="title"] *,
+html.bd-on.bd-bg-dark:not(.bd-over-mode) [class*="legend-"] [class*="valueTitle"] {
   color: #e9ebf2 !important; text-shadow: 0 0 3px rgba(0,0,0,.85);
 }
 html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="title"],
-html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="title"] * {
+html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="title"] *,
+html.bd-on.bd-bg-light:not(.bd-over-mode) [class*="legend-"] [class*="valueTitle"] {
   color: #14161f !important; text-shadow: 0 0 3px rgba(255,255,255,.9);
 }
 /* coloured legend values (OHLC, indicator values) keep their colour but get a halo */

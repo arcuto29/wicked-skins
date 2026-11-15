@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["indMode","indColor","indCustom","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["indMode","indColor","indCustom","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -17,7 +17,7 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
@@ -1390,6 +1390,27 @@ function renderChartStyle() {
       seg("cs-ch-lab", [[false, "Own"], [true, "Match crosshair"]], () => !!cfg.chLabels, (v) => set({ chLabels: v })); }
   }
   renderTicker(box);
+  renderLegend(box);
+}
+// The legend: indicator names and values, and O H L C, at the top left of the chart. Made for the platform's own
+// background, so on some wallpapers it's hard to read: give it your colour and / or a backing.
+function renderLegend(box) {
+  const card = document.createElement("div"); card.className = "cpart";
+  card.innerHTML = `<div class="cpart-h"><div><b>Legend</b><small>Indicator names and values, and O H L C, at the top left.</small></div><div class="seg cpart-mode" id="lg-on"></div></div>`;
+  box.appendChild(card);
+  seg("lg-on", [[false, "Own"], [true, "Styled"]], () => !!cfg.lgOn, (v) => { set({ lgOn: v }); renderChartStyle(); });
+  if (!cfg.lgOn) return;
+  const cur = cfg.lgColor || "", body = document.createElement("div"); body.className = "cpart-b";
+  body.innerHTML = `<div class="row"><span>Text</span><div class="seg" id="lg-cm"></div><input type="color" id="lg-col" ${/^#/.test(cur) ? "" : "hidden"} /></div>
+    <div class="row"><span>Values</span><div class="seg" id="lg-vals"></div></div>
+    <div class="row"><span>Backing</span><div class="seg" id="lg-back"></div></div>
+    <p class="hint">Readable picks white or black text for your wallpaper. The ticker's own style (above) still wins for the symbol name.</p>`;
+  card.appendChild(body);
+  seg("lg-cm", [["", "Readable"], ["candle", "Candle"], ["custom", "Custom"]], () => (/^#/.test(cfg.lgColor || "") ? "custom" : cfg.lgColor || ""),
+    (v) => { set({ lgColor: v === "custom" ? ($("lg-col").value || "#ffffff") : v }); renderChartStyle(); });
+  const ci = $("lg-col"); ci.value = /^#/.test(cur) ? cur : "#ffffff"; ci.oninput = (e) => set({ lgColor: e.target.value });
+  seg("lg-vals", [["own", "Keep their colours"], ["all", "Same colour"]], () => cfg.lgVals === "all" ? "all" : "own", (v) => set({ lgVals: v }));
+  seg("lg-back", [["none", "None"], ["shade", "Shade"], ["glass", "Glass"]], () => ["shade", "glass"].includes(cfg.lgBack) ? cfg.lgBack : "none", (v) => set({ lgBack: v }));
 }
 // The ticker: the symbol name at the top left of the chart (plus timeframe and exchange). Not a line, but it lives
 // with the other parts of the chart you can style.
@@ -2149,7 +2170,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Customise each indicator: its own colour, glow, width, or hide it, zones included (Style \u203a Indicators \u203a Each indicator)",
+const WHATS_NEW = ["Style the legend: colour and a backing for indicator names and values, so they read on any wallpaper (Style \u203a Legend)",
+  "O H L C letters are readable on dark wallpapers",
+  "Customise each indicator: its own colour, glow, width, or hide it, zones included (Style \u203a Indicators \u203a Each indicator)",
   "Live mood works on nq.vision and prop-firm platforms",
   "nq.vision: the text over the chart no longer flickers",
   "\u201cCheck this page\u201d: see why something looks wrong on a platform (top of the panel)",
@@ -2174,7 +2197,7 @@ const WHATS_NEW = ["Customise each indicator: its own colour, glow, width, or hi
   "nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",
   "TradingView's light theme is readable over your wallpaper, and one tap switches to dark",
   "Candle looks now work on more Lightweight Charts platforms (like nq.vision)",
-  "Style your ticker: colour, size, font and glow for the symbol name (Style › Chart lines & ticker)",
+  "Style your ticker: colour, size, font and glow for the symbol name (Style › Chart lines, ticker & legend)",
   "Trading sounds: a chime at your goal, a warning near your max loss, a ping before the session opens or closes",
   "New Nebula wallpaper: glowing gas clouds and bright stars (Skins › Cosmos)",
   "Streamer mode: show P&L as ticks, points or dollars, and the order panel stays usable",
