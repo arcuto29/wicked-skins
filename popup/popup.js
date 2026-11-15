@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["indMode","indColor","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["indMode","indColor","indCustom","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -21,7 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
-  indMode: "own", indColor: "",
+  indMode: "own", indColor: "", indCustom: {},
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -320,10 +320,45 @@ function syncIndicators() {
   if (!$("indMode")) return;
   seg("indMode", [["own", "Own"], ["rainbow", "Rainbow"], ["candles", "Candles"], ["wallpaper", "Wallpaper"], ["custom", "Custom"]], () => cfg.indMode || "own",
     (v) => { set(v === "custom" && !/^#/.test(cfg.indColor || "") ? { indMode: v, indColor: $("indColor").value || "#ffd166" } : { indMode: v }); syncIndicators(); });
-  $("indColRow").hidden = cfg.indMode !== "custom";
+  $("indColRow").hidden = cfg.indMode !== "custom"; renderEachInd();
   $("indColor").value = /^#[0-9a-f]{6}$/i.test(cfg.indColor || "") ? cfg.indColor : "#ffd166";
 }
 if ($("indColor")) $("indColor").oninput = (e) => set({ indColor: e.target.value });
+// Each indicator: the lines and zones Priism has seen on your chart (by their own colour), each with its own colour,
+// glow, thickness (lines) and a hide switch. Settings are by colour, so they follow that indicator on every chart.
+const colourName = (k) => { const [r, g, b] = k.split(",").map(Number), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx - mn < 24) return mx > 200 ? "white" : mx > 90 ? "grey" : "dark grey";
+  const h = ((mx === r ? (g - b) / (mx - mn) + (g < b ? 6 : 0) : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4) * 60) % 360;
+  return h < 15 || h >= 345 ? "red" : h < 40 ? "orange" : h < 65 ? "yellow" : h < 160 ? "green" : h < 195 ? "teal" : h < 250 ? "blue" : h < 290 ? "purple" : "pink"; };
+const toHex6 = (k) => "#" + k.split(",").map((n) => (+n).toString(16).padStart(2, "0")).join("");
+async function renderEachInd() {
+  const box = $("indEach"); if (!box) return;
+  let seen = null; try { seen = (await storeGet({ indSeen: null })).indSeen; } catch {}
+  const cust = cfg.indCustom || {}, items = (seen && Array.isArray(seen.items) ? seen.items : []);
+  // keep any you've set up even if not on this chart right now
+  for (const k of Object.keys(cust)) if (!items.some((i) => i.k === k)) items.push({ k, kind: "line", a: 1, name: "", off: true });
+  if (!items.length) { box.innerHTML = `<p class="hint">Open a chart with your indicators on it (with Priism on). They show up here within a few seconds.</p>`; return; }
+  box.innerHTML = (seen && seen.host ? `<p class="hint" style="margin:0 0 6px">On ${esc(seen.host)}:</p>` : "") + items.map((it) => {
+    const e = cust[it.k] || {}, col = /^#/.test(e.c || "") ? e.c : toHex6(it.k), set = !!cust[it.k];
+    const label = it.name || `${it.kind === "zone" ? "Zone" : "Line"} (${colourName(it.k)})`;
+    return `<div class="ind-row${set ? " set" : ""}${it.off ? " off" : ""}" data-k="${it.k}">
+      <div class="ind-h"><i class="sw" style="background:${toHex6(it.k)}${it.kind === "zone" ? ";border-radius:2px" : ""}"></i><b>${esc(label)}</b>${it.off ? "<small>not on this chart</small>" : ""}
+        <button class="link" data-a="reset" ${set ? "" : "hidden"}>Reset</button></div>
+      <div class="ind-c"><input type="color" data-a="c" value="${col}" title="Colour" /><button class="chip${e.c === "rainbow" ? " on" : ""}" data-a="rb">Rainbow</button>
+        <button class="chip${e.h ? " on" : ""}" data-a="h" title="Hide it on the chart" style="margin-left:auto">${e.h ? "Hidden" : "Hide"}</button></div>
+      <div class="ind-c"><span class="lbl">Glow</span><input type="range" data-a="g" min="0" max="1" step="0.05" value="${e.g === undefined || e.g === null ? 0 : e.g}" />
+        ${it.kind === "line" ? `<span class="lbl">Width</span><input type="range" data-a="w" min="0" max="3" step="0.5" value="${+e.w || 0}" />` : ""}</div></div>`; }).join("");
+  const upd = (k, patch) => { const next = { ...(cfg.indCustom || {}) }; next[k] = { ...(next[k] || {}), ...patch }; set({ indCustom: next }); };
+  box.querySelectorAll(".ind-row").forEach((row) => { const k = row.dataset.k;
+    row.querySelector('[data-a="c"]').oninput = (e) => upd(k, { c: e.target.value });
+    row.querySelector('[data-a="rb"]').onclick = () => { upd(k, { c: (cfg.indCustom[k] || {}).c === "rainbow" ? "" : "rainbow" }); renderEachInd(); };
+    row.querySelector('[data-a="g"]').oninput = (e) => upd(k, { g: +e.target.value });
+    const w = row.querySelector('[data-a="w"]'); if (w) w.oninput = (e) => upd(k, { w: +e.target.value });
+    row.querySelector('[data-a="h"]').onclick = () => { upd(k, { h: !(cfg.indCustom[k] || {}).h }); renderEachInd(); };
+    row.querySelector('[data-a="reset"]').onclick = () => { const next = { ...(cfg.indCustom || {}) }; delete next[k]; set({ indCustom: next }); renderEachInd(); };
+  });
+}
+try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.indSeen) renderEachInd(); }); } catch {}
 $("scaleGlow").oninput = (e) => { set({ scaleGlow: +e.target.value }); $("scaleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("scaleText").oninput = (e) => set({ scaleText: e.target.value });
 $("scaleBgColor").oninput = (e) => set({ scaleBgColor: e.target.value });
@@ -1879,6 +1914,36 @@ $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map(
 // ---------- other sites (prop-firm platforms with TradingView charts, e.g. TopstepX) ----------
 // Looks at the page you're on; if it has a TradingView-style chart, offers to turn on there.
 const BUILT_IN = /(^|\.)tradingview\.com$/;
+// "Check this page": what Priism sees in every frame of the tab (is it on there, which copy, the charts, and anything on
+// the page that changes colours, like a CSS filter the platform puts on its charts). Plain words, plus a copyable report.
+async function checkPage(tab, host) {
+  const out = $("pageCheckOut"); out.hidden = false; out.textContent = "Checking\u2026";
+  let rs = [];
+  try { rs = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => {
+    const h = document.documentElement, owner = (h.getAttribute("data-bd-owner") || "").split("|");
+    const charts = [...document.querySelectorAll(".chart-container, .tv-lightweight-charts, [data-bd-lwroot]")].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 150 && r.height > 100; });
+    const filters = new Set();   // colour-changing CSS on the chart or anything around it
+    const look = (el) => { for (let e = el; e && e.nodeType === 1; e = e.parentElement) { const cs = getComputedStyle(e);
+      for (const p of ["filter", "backdropFilter", "mixBlendMode"]) { const v = cs[p]; if (v && v !== "none" && v !== "normal") filters.add(`${e.tagName.toLowerCase()}${e.id ? "#" + e.id : ""} ${p}: ${v}`.slice(0, 120)); } } };
+    charts.slice(0, 4).forEach(look); look(document.body);
+    let fx = null; try { fx = JSON.parse(h.getAttribute("data-ws-fx") || "null"); } catch {}
+    return { url: location.origin, top: window === window.top, on: h.classList.contains("bd-on"), owner: owner[0] || "", ver: owner[1] || "",
+      charts: charts.length, theme: (h.className.match(/theme-\w+/) || [""])[0], filters: [...filters].slice(0, 6), fx: !!fx, hz: h.getAttribute("data-bd-q") || "" };
+  } }); } catch (e) { out.textContent = "Couldn't check this page: " + (e.message || e); return; }
+  const frames = rs.map((r) => r.result).filter(Boolean), withCharts = frames.filter((f) => f.charts), me = chrome.runtime.id;
+  const lines = [];
+  if (!withCharts.length) lines.push("No chart found on this page yet. Open a chart, then check again.");
+  for (const f of withCharts) {
+    const where = f.top ? host : new URL(f.url).host;
+    if (!f.on) lines.push(`\u2716 Priism isn't running on the chart (${where}). Tap Turn off, then Turn on here again, and allow it.`);
+    else if (f.owner && f.owner !== me) lines.push(`\u2716 Another copy of Priism (v${f.ver}) is drawing this chart, so your settings here don't reach it. Remove the extra copy in chrome://extensions.`);
+    else lines.push(`\u2714 Priism is on the chart (${f.charts} chart${f.charts > 1 ? "s" : ""}, ${where}).`);
+    if (f.filters.length) lines.push(`\u26a0 The platform changes colours on its charts with a filter, which tints the wallpaper and your colours too: ${f.filters.join("; ")}`);
+  }
+  const report = "Priism " + chrome.runtime.getManifest().version + " on " + host + "\n" + JSON.stringify(frames);
+  out.innerHTML = `<b>This page</b><ul style="margin:6px 0;padding-left:16px">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><button class="link" id="pageCheckCopy">Copy the details (to send to support)</button>`;
+  $("pageCheckCopy").onclick = async () => { const ok = await copyText(report); $("pageCheckCopy").textContent = ok ? "Copied" : "Couldn't copy"; };
+}
 async function siteBar() {
   if (!EXT_MODE || IS_TAB || !chrome.tabs || !chrome.scripting) return;
   const bar = $("siteBar");
@@ -1893,6 +1958,7 @@ async function siteBar() {
   };
   const enabled = await WickedSites.find(origin);
   if (enabled) {
+    $("pageCheck").hidden = false; $("pageCheck").onclick = () => checkPage(tab, host);
     // a Lightweight Charts platform (lw.js marks it): hide the options that only style TradingView's own interface
     chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => document.documentElement.getAttribute("data-bd-lw") === "on" })
       .then((rs) => { if (rs.some((r) => r.result)) document.body.classList.add("lw-page"); }).catch(() => {});
@@ -2083,7 +2149,12 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Multi-chart layouts: the wallpaper follows each chart instantly while you drag the dividers",
+const WHATS_NEW = ["Customise each indicator: its own colour, glow, width, or hide it, zones included (Style \u203a Indicators \u203a Each indicator)",
+  "Live mood works on nq.vision and prop-firm platforms",
+  "nq.vision: the text over the chart no longer flickers",
+  "\u201cCheck this page\u201d: see why something looks wrong on a platform (top of the panel)",
+  "nq.vision: charts resize cleanly when you drag the lines between them",
+  "Multi-chart layouts: the wallpaper follows each chart instantly while you drag the dividers",
   "Indicator colours: Rainbow, your candle or wallpaper colours, or any colour, plus glow (Style \u203a Indicators)",
   "nq.vision: the wallpaper stays while you drag the chart",
   "Fixed: indicator Settings / Pine Editor sometimes not opening until a refresh",

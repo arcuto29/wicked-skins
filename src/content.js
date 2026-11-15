@@ -54,7 +54,7 @@
     clipQuality: "balanced",  // high | balanced | small (small keeps a clip under ~20 MB, e.g. for Discord)           // after a recording: open the crop / trim editor (false = download right away)
     // Chart styling — each part off = TradingView's own. Colour "" = skin colour, "candle" = your up-candle colour.
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
-    indMode: "own", indColor: "",
+    indMode: "own", indColor: "", indCustom: {},
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
     plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -819,7 +819,10 @@
       const t = (el.textContent || "").trim();
       const r = (t && t.length <= 80 && cr) ? el.getBoundingClientRect() : null;
       const over = !!r && r.width > 0 && r.left >= cr.left - 2 && r.right <= cr.right + 2 && r.top >= cr.top - 2 && r.bottom <= cr.bottom + 2;   // sits on the chart
-      if (over) { el.dataset.bdHalo = "1"; if (lumOf(getComputedStyle(el).color) < 0.45) el.dataset.bdLighten = "1"; else delete el.dataset.bdLighten; }
+      // decide from the text's OWN colour: read with our lightening switched off, or the next check sees the lightened
+      // colour, un-lightens it, then lightens it again (the legend text flickered between dark and light every ~2 s)
+      if (over) { el.dataset.bdHalo = "1"; const was = el.dataset.bdLighten; if (was) delete el.dataset.bdLighten;
+        if (lumOf(getComputedStyle(el).color) < 0.45) el.dataset.bdLighten = "1"; }
       else if (el.dataset.bdHalo) { delete el.dataset.bdHalo; delete el.dataset.bdLighten; }
       if (!t || t.length > 40) { if (el.dataset.bdTk) delete el.dataset.bdTk; continue; }
       const symStart = SYM_START.exec(t), sym = symStart && !NOT_SYM.has(symStart[1].replace(/!$/, "")) && symStart[1].length >= 2;
@@ -1321,7 +1324,7 @@
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
-    "indMode", "indColor", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
+    "indMode", "indColor", "indCustom", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
@@ -1460,6 +1463,16 @@
     const root = String(q.sym).toUpperCase().replace(/^.*:/, "").replace(/\d+!$/, "").replace(/[FGHJKMNQUVXZ]\d{1,4}$/, "");
     return TICKS[root] || 0;
   }
+  // The indicators drawn on this chart (by colour, with a name where the platform gives one), for the panel's
+  // "Each indicator" list. Only the copy drawing the page reports, and only when the list changed.
+  let indSeenSig = "";
+  setInterval(() => {
+    if (!EXT || !owner || standDown || document.hidden || !cfg.enabled) return;
+    const v = document.documentElement.getAttribute("data-bd-indseen") || "";
+    if (!v || v === indSeenSig) return;
+    indSeenSig = v;
+    try { chrome.storage.local.set({ indSeen: { host: (IN_FRAME ? (document.referrer ? new URL(document.referrer).hostname : "") : "") || location.hostname, t: Date.now(), items: JSON.parse(v) } }); } catch {}
+  }, 3000);
   function pushFx() {
     const h = document.documentElement;
     if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent() }));

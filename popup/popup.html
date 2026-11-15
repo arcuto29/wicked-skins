@@ -30,9 +30,10 @@
       <button id="noticeClose" class="x" title="Dismiss"></button>
     </div>
     <div id="siteBar" class="sitebar" hidden>
-      <div><b id="siteTitle"></b><p class="hint" id="siteHint"></p></div>
+      <div><b id="siteTitle"></b><p class="hint" id="siteHint"></p><button id="pageCheck" class="link" hidden>Something look wrong here? Check this page</button></div>
       <button id="siteBtn" class="primary"></button>
     </div>
+    <div id="pageCheckOut" class="box" hidden></div>
     <div id="lookOffer" class="news" hidden></div>
     <div id="focusBar" class="news focusbar" hidden></div>
     <div id="news" class="news" hidden></div>
@@ -107,6 +108,9 @@
             <div class="seg" id="indMode" style="margin-bottom:8px"></div>
             <div class="row" id="indColRow" hidden><span>Colour</span><input type="color" id="indColor" /></div>
             <div class="row"><span>Glow</span><input type="range" id="lineGlow" min="0" max="1" step="0.05" /><output id="lineGlowOut"></output></div>
+            <h4 style="margin:12px 0 4px">Each indicator</h4>
+            <p class="hint" style="margin:0 0 6px">Give any line or zone on your chart its own colour, glow and width, or hide it. These win over the setting above.</p>
+            <div id="indEach"></div>
           </div>
         </div>
         <p class="hint">Line glow: indicators, drawings, the price line, position lines and the P&amp;L readout. Grid and crosshair never glow.</p>
