@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.1.59 (2026-11-04)
+- **Fixed on nq.vision: zoomed in, candle bodies went back to the platform's white and black** while the wicks kept your colours. nq.vision's candles are found by their shape, and wide bodies (zoomed in) stopped counting as candles. They keep your candle colours at any zoom now.
 - **New: Chart text** (Style → Chart lines, ticker, legend & text → Chart text). The text your indicators write on the chart (labels, level names, values, print text) can take a **Readable** colour, your **Candle** colour or any **Custom** colour, a soft or strong **outline** so it's crisp on any wallpaper, and a bigger **size**. Text inside an indicator's own label box keeps its colours, and faint watermarks stay faint. Works on tradingview.com, nq.vision and other platforms, including indicator labels TradingView draws once and reuses (like Pivot Points' R1 / P / S1).
 - **Fixed: black indicator text was unreadable on dark wallpapers** (nq.vision and others). Even with Chart text on Own, black or near-black text on a dark wallpaper is now lightened automatically.
 - **Fixed: indicator and zone colours jumping around every second** with Rainbow, Gradient and the other indicator colours (thanks SimDoes). On charts with many zones, like prints and zone indicators, Priism kept re-dealing which colour each zone gets, especially while price moved through a zone, so every zone kept changing colour. Each indicator now keeps its colour for good.
