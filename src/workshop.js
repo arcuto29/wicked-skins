@@ -22,7 +22,7 @@
         q = sort === "new" ? q.order("created_at", { ascending: false }) : q.order("likes", { ascending: false }).order("uses", { ascending: false });
         return q.range(page * PAGE, page * PAGE + PAGE - 1); };
       const base = "id, title, kind, file_path, thumb_path, size_bytes, likes, uses, created_at";
-      let res = await query(base + ", width, height, oled"); if (res.error && /column|width|oled/i.test(res.error.message || "")) res = await query(base);
+      let res = await query(base + ", width, height, oled, credit"); if (res.error && /column|width|oled/i.test(res.error.message || "")) res = await query(base);
       const rows = err(res);
       return rows.map((r) => ({ ...r, fileUrl: publicUrl(r.file_path), thumbUrl: publicUrl(r.thumb_path) || publicUrl(r.file_path) }));
     },

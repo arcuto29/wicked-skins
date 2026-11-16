@@ -105,6 +105,13 @@ ok("owner can delete own look", (await as(U1, "delete from public.looks where id
   await as(ADMIN, "select public.label_wallpaper($1, 1920, 1080, false)", [w.id]);
   const r = (await as(ADMIN, "select width, oled from public.wallpapers where id = $1", [w.id])).rows[0];
   ok("admin can (re-)measure a wallpaper", r.width === 1920 && r.oled === false); }
+// the owner's tools (service key: no signed-in user) add credited wallpapers for an admin, approved straight away
+{ await db.exec("reset role; select set_config('request.jwt.claim.sub', '', false);");   // like the service key: no user
+  const w = (await db.query("insert into public.wallpapers (owner, title, kind, file_path, size_bytes, credit) values ($1, 'Cosmic Cliffs', 'image', 'o/c.jpg', 10, 'NASA, ESA, CSA, and STScI') returning status, owner, credit", [OWNER])).rows[0];
+  ok("service upload for the owner: approved, owner kept, credit stored", w.status === "approved" && w.owner === OWNER && w.credit === "NASA, ESA, CSA, and STScI");
+  let bad = "ok"; try { await db.query("insert into public.wallpapers (owner, title, kind, file_path, size_bytes) values ($1, 'x', 'image', 'o/x.jpg', 10)", [U1]); } catch { bad = "refused"; }
+  ok("service uploads for a non-admin are refused", bad === "refused");
+  ok("signed-in users still can't choose another owner", (await as(U1, "insert into public.wallpapers (owner, title, kind, file_path, size_bytes) values ($1, 'y', 'image', 'u/y.jpg', 10) returning owner", [OWNER])).rows[0].owner === U1); }
 // ---------- invites ----------
 await db.exec("grant update on public.invites to authenticated");
 ok("non-admin can't make invites", (await tryAs(U1, "insert into public.invites (code) values ('PRIISM-AAAA-BBBB')")).startsWith("denied"));

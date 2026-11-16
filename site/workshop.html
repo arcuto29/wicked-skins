@@ -116,7 +116,7 @@
         if (oledOnly) q = q.eq("oled", true);
         q = sort === "new" ? q.order("created_at", { ascending: false }) : q.order("likes", { ascending: false }).order("uses", { ascending: false });
         return q.range(page * 24, page * 24 + 23); };
-      let { data, error } = await query("id,title,kind,file_path,thumb_path,likes,uses,created_at,width,height,oled");
+      let { data, error } = await query("id,title,kind,file_path,thumb_path,likes,uses,created_at,width,height,oled,credit");
       if (error && /column|width|oled/i.test(error.message || "")) {   // labels not set up on the server yet: no OLED filter either
         oledOnly = false; $("oledOnly").hidden = true; $("oledOnly").classList.remove("on");
         ({ data, error } = await query("id,title,kind,file_path,thumb_path,likes,uses,created_at")); }
@@ -126,7 +126,7 @@
         const el = document.createElement("div"); el.className = "ws-card";
         const ql = window.PriismWallInfo && w.width && w.height ? PriismWallInfo.qualityOf(w.width, w.height) : "";
         el.innerHTML = `<div class="media"><img loading="lazy" alt="" src="${esc(thumb)}"><span class="tag">${w.kind === "video" ? "VIDEO" : "IMAGE"}</span>${ql ? `<span class="tag q" title="${w.width}\u00D7${w.height}">${ql}</span>` : ""}${w.oled ? '<span class="tag oled" title="Mostly true black and no bright part that stays still: easy on OLED screens">OLED</span>' : ""}</div>
-          <div class="info"><b>${esc(w.title)}</b><small>${w.likes} like${w.likes === 1 ? "" : "s"} · ${w.uses} use${w.uses === 1 ? "" : "s"}</small>
+          <div class="info"><b>${esc(w.title)}</b><small>${w.likes} like${w.likes === 1 ? "" : "s"} · ${w.uses} use${w.uses === 1 ? "" : "s"}</small>${w.credit ? `<small class="credit">Credit: ${esc(w.credit)}</small>` : ""}
           <div class="row"><a class="btn" href="${esc(file)}" download>Download</a></div></div>`;
         el.querySelector(".media").onclick = () => {
           const lb = document.createElement("div"); lb.className = "lightbox";

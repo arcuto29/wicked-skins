@@ -982,7 +982,7 @@ function wsRender() {
   const box = $("wsCards"); box.innerHTML = "";
   for (const it of wsItems) {
     const card = document.createElement("div"); card.className = "card ws";
-    const sub = `${it.likes} like${it.likes === 1 ? "" : "s"} · ${it.uses} use${it.uses === 1 ? "" : "s"}`;
+    const sub = `${it.likes} like${it.likes === 1 ? "" : "s"} · ${it.uses} use${it.uses === 1 ? "" : "s"}` + (it.credit ? ` · Credit: ${it.credit}` : "");
     card.innerHTML = `<img alt="" loading="lazy" src="${esc(it.thumbUrl || "")}"><span class="live">${it.kind === "video" ? "● VIDEO" : "IMAGE"}</span>${wallTags(it.width, it.height, it.oled)}
       <div class="label"><span>${esc(it.title)}<small>${esc(sub)}</small></span></div><div class="acts"></div>`;
     const acts = card.querySelector(".acts");

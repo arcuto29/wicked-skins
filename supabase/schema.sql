@@ -97,9 +97,16 @@ security definer
 set search_path = ''
 as $$
 begin
-  new.owner := auth.uid();
   new.likes := 0; new.uses := 0; new.reports := 0;
   new.reject_reason := null;
+  -- no signed-in user: only the project's service key can get here (visitors can't insert at all). That's the owner
+  -- adding wallpapers with Priism's own tools (like the credited space pack): it keeps the owner it was given, and only
+  -- if that owner is an admin, and it's approved straight away.
+  if auth.uid() is null then
+    if new.owner is null or not public.is_admin(new.owner) then raise exception 'service uploads must belong to an admin'; end if;
+    new.status := 'approved'; new.reviewed_at := now(); return new;
+  end if;
+  new.owner := auth.uid();
   if public.is_admin(auth.uid()) then
     new.status := 'approved'; new.reviewed_at := now();
   else
@@ -128,6 +135,8 @@ create policy "wallpapers: delete own or admin" on public.wallpapers for delete 
 alter table public.wallpapers add column if not exists width int check (width between 1 and 20000);
 alter table public.wallpapers add column if not exists height int check (height between 1 and 20000);
 alter table public.wallpapers add column if not exists oled boolean;
+-- who to credit: shown on the card (required by some licences, like ESA/Webb's CC BY 4.0)
+alter table public.wallpapers add column if not exists credit text check (char_length(credit) <= 300);
 create or replace function public.label_wallpaper(wallpaper uuid, w int, h int, is_oled boolean)
 returns void
 language plpgsql
