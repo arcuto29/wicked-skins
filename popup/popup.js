@@ -1550,6 +1550,8 @@ function syncTune() {
     $("sliders").appendChild(row);
   });
   document.querySelectorAll("[data-only=media]").forEach((el) => (el.hidden = cfg.skin !== "media"));
+  // the wallpaper in black & white (candles, indicators and the rest of the chart keep their colours)
+  seg("bwSeg", [[false, "Colour"], [true, "Black & white"]], () => !!cfg.bw, (v) => set({ bw: v }));
   seg("smooth", [["eco", "Eco"], ["balanced", "Balanced"], ["smooth", "Smooth"], ["max", "Max"]],
     () => (cfg.powerSaver ? "eco" : cfg.fps === "max" ? "max" : cfg.fps === "auto" || String(cfg.fps) === "60" ? "smooth" : "balanced"),
     (v) => set(v === "eco" ? { powerSaver: true, fps: 30 } : v === "balanced" ? { powerSaver: false, fps: 30 } : v === "max" ? { powerSaver: false, fps: "max" } : { powerSaver: false, fps: "auto" }));

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.60 (unreleased)
+- **New: black & white wallpapers.** Adjust → Picture → Colour: **Black & white** turns any wallpaper (built-in or your own) grey, while your candles, indicators and the rest of the chart keep their colours.
+
 ## 0.1.59 (2026-11-04)
 - **Your indicators and zones match your wallpaper.** Style → Indicators → **Wallpaper** now uses the wallpaper's own colours (up to five, read once per wallpaper) instead of shades of one colour: each indicator and zone takes one of them, so they still stay told apart. **✨ Match everything to my wallpaper** now sets your indicators and zones to it too, and makes the legend and the text your indicators write on the chart readable, all with one Undo.
 - **Fixed: clips and snapshots left out an uploaded wallpaper.** Uploaded images and videos play in a protected frame the chart page can't read, so Chart only clips (also when you picked a screen to share its sound) and snapshots showed the chart without it. While you record, that frame now sends its picture to Priism over a private channel the chart page can't use, so the wallpaper is in the clip.
