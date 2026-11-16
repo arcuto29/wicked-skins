@@ -131,5 +131,14 @@ ok("non-admin can't revoke", (await tryAs(U1, "update public.invites set revoked
 await as(ADMIN, "update public.invites set revoked = true where code = 'PRIISM-AAAA-BBBB'");
 ok("revoked -> every device locks", (await red("PRIISM-AAAA-BBBB", "dev-00000001")) === "revoked");
 ok("bad device ids are refused", (await red("PRIISM-AAAA-BBBB", "x';drop")) === "invalid");
+// group codes (one code for a whole community) and bulk codes
+await as(ADMIN, "insert into public.invites (code, max_devices, note) values ('PRIISM-GRUP-0001', 500, 'discord')");
+for (let i = 0; i < 120; i++) await red("PRIISM-GRUP-0001", "grp-" + String(i).padStart(8, "0"));
+ok("a group code lets many devices in (120 of 500)", (await as(ADMIN, "select count(*)::int n from public.invite_devices where code = 'PRIISM-GRUP-0001'")).rows[0].n === 120);
+ok("up to 10000 devices allowed, more refused", (await tryAs(ADMIN, "insert into public.invites (code, max_devices) values ('PRIISM-BIGG-0001', 10000)")).startsWith("ok")
+  && (await tryAs(ADMIN, "insert into public.invites (code, max_devices) values ('PRIISM-HUGE-0001', 10001)")) !== "ok");
+const bulk = Array.from({ length: 50 }, (_, i) => `('PRIISM-BULK-${String(i).padStart(4, "0")}', 1)`).join(",");
+await as(ADMIN, "insert into public.invites (code, max_devices) values " + bulk);
+ok("50 codes made at once", (await as(ADMIN, "select count(*)::int n from public.invites where code like 'PRIISM-BULK-%'")).rows[0].n === 50);
 const passed = Object.values(R).filter(Boolean).length, total = Object.keys(R).length;
 console.log("SUMMARY:", passed + "/" + total); if (passed !== total) process.exit(1);

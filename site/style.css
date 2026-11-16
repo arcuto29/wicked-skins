@@ -175,6 +175,12 @@ footer { background: linear-gradient(180deg, transparent, rgba(46,242,176,.04));
 .inv-row small a { color: inherit; }
 .inv-row .btn { padding: 7px 11px; font-size: 12.5px; }
 
+/* invites: what to make (one / several / a group code) + the list of a batch */
+.inv-kind{display:inline-flex;gap:4px;margin:4px 0 10px;padding:4px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+.inv-kind button{all:unset;cursor:pointer;padding:7px 12px;border-radius:9px;font:600 13px system-ui,sans-serif;color:#aab1c2}
+.inv-kind button.on{background:rgba(255,255,255,.1);color:#fff}
+.inv-batch{display:flex;gap:8px;align-items:flex-start;margin:6px 0 14px}
+.inv-batch textarea{flex:1;font:600 13px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.04em;resize:vertical}
 /* Workshop wallpaper labels: quality (4K, 1080p…) and OLED, under the kind tag */
 .ws-card .media .tag.q { right: auto; left: 8px; }
 .ws-card .media .tag.oled { top: auto; bottom: 8px; right: auto; left: 8px; background: #000; color: #fff; border: 1px solid rgba(255,255,255,.35); }
