@@ -2185,35 +2185,68 @@ function priismSkins(window, document) {
   }
   window.PriismPalette = { fromData: paletteFromData, hex };
 
+  // ---------- wallpaper labels: quality (resolution) and OLED ----------
+  // OLED screens turn true-black pixels off: a wallpaper suits them when most of it is true black, it's dark overall,
+  // and no bright part stays in one place (that can burn in). Built-in wallpapers carry oled: true (measured with the
+  // same rule, pwtest/oledscan.js); uploads and Workshop wallpapers are measured with measure().
+  const qualityOf = (w, h) => { if (!w || !h) return ""; const sh = Math.min(w, h); return sh >= 2000 ? "4K" : sh >= 1400 ? "1440p" : sh >= 1000 ? "1080p" : sh >= 700 ? "720p" : "Low res"; };
+  function oledFrom(frames) {   // frames: RGBA byte arrays of the same small size (one for a picture, a few for a video)
+    if (!frames.length) return false; const n = frames[0].length / 4; let black = 0, lum = 0, stat = 0;
+    for (let p = 0; p < n; p++) { let allBright = true;
+      for (const d of frames) { const i = p * 4, mx = Math.max(d[i], d[i + 1], d[i + 2]), L = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+        if (mx <= 14) black++; lum += L; if (L < 0.45) allBright = false; }
+      if (allBright) stat++; }
+    const S = frames.length; return black / n / S >= 0.6 && lum / n / S <= 0.09 && stat / n <= 0.01;
+  }
+  // measure a picture / video (a Blob or a URL): { w, h, quality, oled }
+  async function measureWall(src, type) {
+    const url = typeof src === "string" ? src : URL.createObjectURL(src), c = document.createElement("canvas"); c.width = 192; c.height = 108;
+    const g = c.getContext("2d", { willReadFrequently: true }), grab = (el) => { g.clearRect(0, 0, 192, 108); g.drawImage(el, 0, 0, 192, 108); return g.getImageData(0, 0, 192, 108).data.slice(); };
+    try {
+      if (type === "video" || (src && src.type && src.type.startsWith("video/"))) {
+        const v = document.createElement("video"); v.muted = true; v.preload = "auto"; v.crossOrigin = "anonymous"; v.src = url;
+        await new Promise((r, j) => { v.onloadeddata = r; v.onerror = () => j(new Error("can't read the video")); setTimeout(r, 8000); });
+        const frames = [];
+        for (const f of [0.15, 0.5, 0.85]) { if (!v.duration || !isFinite(v.duration)) break; v.currentTime = v.duration * f; await new Promise((r) => { v.onseeked = r; setTimeout(r, 2500); }); try { frames.push(grab(v)); } catch {} }
+        if (!frames.length) try { frames.push(grab(v)); } catch {}
+        return { w: v.videoWidth, h: v.videoHeight, quality: qualityOf(v.videoWidth, v.videoHeight), oled: oledFrom(frames) };
+      }
+      const im = new Image(); im.crossOrigin = "anonymous"; im.src = url; await im.decode();
+      let fr = []; try { fr = [grab(im)]; } catch {}
+      return { w: im.naturalWidth, h: im.naturalHeight, quality: qualityOf(im.naturalWidth, im.naturalHeight), oled: oledFrom(fr) };
+    } finally { if (typeof src !== "string") URL.revokeObjectURL(url); }
+  }
+  window.PriismWallInfo = { qualityOf, oledFrom, measure: measureWall };
+
   window.WickedSkins = {
     aurora:    { name: "Polar Lights",    cat: "Wild", create: aurora },
     nebula:    { name: "Stardust",    cat: "Cosmos",  create: nebula },
-    starfield: { name: "Deep Field", cat: "Cosmos",  create: starfield },
+    starfield: { name: "Deep Field", cat: "Cosmos",  create: starfield, oled: true },
     embers:    { name: "Cinders",    cat: "Fire",   create: embers },
-    matrix:    { name: "Code Rain",    cat: "Electric",   create: matrix },
+    matrix:    { name: "Code Rain",    cat: "Electric",   create: matrix, oled: true },
     synthwave: { name: "Retro Sun", cat: "Electric",   create: synthwave },
     rain:      { name: "Night Drizzle", cat: "Urban",   create: rain },
     graphite:  { name: "Slate",  cat: "Chill",   create: graphite },
     ocean:     { name: "Tide",     cat: "Chill",   create: ocean },
     deepsea:   { name: "Abyssal Glow",  cat: "Chill",   create: deepsea },
-    bokeh:     { name: "Soft Focus",     cat: "Chill",   create: bokeh },
+    bokeh:     { name: "Soft Focus",     cat: "Chill",   create: bokeh, oled: true },
     fireflies: { name: "Glowbugs", cat: "Wild", create: fireflies },
     sakura:    { name: "Petal Drift",    cat: "Wild", create: sakura },
     snow:      { name: "Snowfall",  cat: "Elements", create: snow },
     storm:     { name: "Thunderstorm", cat: "Elements", create: storm },
     sunset:    { name: "Dusk Clouds", cat: "Elements", create: sunsetclouds },
-    galaxy:    { name: "Spiral Galaxy",    cat: "Cosmos",  create: galaxy },
-    hyperspace:{ name: "Lightspeed", cat: "Cosmos", create: hyperspace },
+    galaxy:    { name: "Spiral Galaxy",    cat: "Cosmos",  create: galaxy, oled: true },
+    hyperspace:{ name: "Lightspeed", cat: "Cosmos", create: hyperspace, oled: true },
     lavalamp:  { name: "Lava Lamp", cat: "Fire",   create: lavalamp },
     plasma:    { name: "Plasma",    cat: "Electric",   create: plasma },
     cybergrid: { name: "Cyber Grid", cat: "Electric",  create: cybergrid },
-    circuit:   { name: "Circuit",   cat: "Electric",   create: circuit },
+    circuit:   { name: "Circuit",   cat: "Electric",   create: circuit, oled: true },
     neoncity:  { name: "Skyline", cat: "Urban",   create: neoncity },
-    tickertape:   { name: "Ticker Tape",   cat: "Markets", create: tickertape },
+    tickertape:   { name: "Ticker Tape",   cat: "Markets", create: tickertape, oled: true },
     // pack 2
     eclipse:     { name: "Totality",       cat: "Cosmos",   create: eclipse },
     comets:      { name: "Meteor Shower",  cat: "Cosmos",   create: comets },
-    wormhole:    { name: "Wormhole",       cat: "Cosmos",   create: wormhole },
+    wormhole:    { name: "Wormhole",       cat: "Cosmos",   create: wormhole, oled: true },
     pulsar:      { name: "Pulsar",         cat: "Cosmos",   create: pulsar },
     wildfire:    { name: "Wildfire",       cat: "Fire",     create: wildfire },
     volcano:     { name: "Caldera",        cat: "Fire",     create: volcano },
@@ -2233,7 +2266,7 @@ function priismSkins(window, document) {
     blackhole:   { name: "Event Horizon",  cat: "Cosmos",   create: blackhole, wow: true },
     julia:       { name: "Fractal Bloom",  cat: "Abstract", create: julia, wow: true },
     inkflow:     { name: "Ink Flow",       cat: "Abstract", create: inkflow, wow: true },
-    kaleido:     { name: "Kaleidoscope",   cat: "Abstract", create: kaleido, wow: true },
+    kaleido:     { name: "Kaleidoscope",   cat: "Abstract", create: kaleido, wow: true, oled: true },
     oilslick:    { name: "Oil Slick",      cat: "Abstract", create: oilslick, wow: true },
     tesseract:   { name: "Tesseract",      cat: "Abstract", create: tesseract, wow: true },
     helix:       { name: "Double Helix",   cat: "Wild",     create: helix, wow: true },

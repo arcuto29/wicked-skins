@@ -67,12 +67,21 @@
     <section id="invites" hidden>
       <h2 style="font-size:22px;margin:34px 0 6px">Invites <span class="adm">ADMIN</span></h2>
       <p class="hint">Priism is invite only. Make a code, send it to someone, and they enter it in the Priism panel. Each code works on the number of devices you choose. Turn a code off and those devices lock again within a day.</p>
+      <div class="inv-kind seg" id="invKind">
+        <button type="button" data-k="one" class="on">For one person</button>
+        <button type="button" data-k="many">Several codes</button>
+        <button type="button" data-k="group">One code for a group</button>
+      </div>
       <div class="inv-new">
         <input id="invNote" class="field" maxlength="80" placeholder="Who is it for? (only you see this)">
-        <label class="inv-dev">Devices <input id="invMax" class="field" type="number" min="1" max="50" value="2"></label>
+        <label class="inv-dev" id="invCountL" hidden>Codes <input id="invCount" class="field" type="number" min="2" max="100" value="10"></label>
+        <label class="inv-dev">Devices <input id="invMax" class="field" type="number" min="1" max="10000" value="2"></label>
         <button id="invMake" class="btn primary" type="button">Make a code</button>
       </div>
+      <p class="hint" id="invKindHint">One code for one person, on up to this many of their devices.</p>
       <p class="hint" id="invMsg"></p>
+      <div id="invBatch" class="inv-batch" hidden><textarea id="invBatchText" class="field" rows="6" readonly></textarea><button id="invBatchCopy" class="btn" type="button">Copy all</button></div>
+      <p class="hint"><button id="labelOld" class="btn" type="button">Label older wallpapers</button> Measures quality (4K, 1080p…) and OLED for wallpapers shared before labels existed.</p>
       <div id="invList" class="mine-list"></div>
     </section>
 
@@ -88,14 +97,14 @@
     <p class="empty" id="lookEmpty" hidden>No community looks yet. Share yours from the extension: <b>Workshop › Share my current look</b>.</p>
 
     <h2 style="font-size:22px;margin:34px 0 12px">Wallpapers</h2>
-    <div class="ws-bar"><button class="chip on" data-sort="popular">Popular</button><button class="chip" data-sort="new">New</button></div>
+    <div class="ws-bar"><button class="chip on" data-sort="popular">Popular</button><button class="chip" data-sort="new">New</button><button class="chip" id="oledOnly" title="Mostly true black, no bright part that stays still">OLED</button></div>
     <div class="ws-grid" id="grid"></div>
     <p class="empty" id="empty" hidden></p>
     <p style="text-align:center"><button class="chip" id="more" hidden>Load more</button></p>
     <p style="color:var(--muted);font-size:13px;margin-top:30px">Each wallpaper belongs to its uploader or the original rights holder. We review uploads before they appear and remove anything that breaks the <a href="terms.html">rules</a>. If something here is yours and was posted without permission, email <span data-contact></span>.</p>
   </main>
 
-  <script src="site-config.js"></script><script src="common.js"></script><script src="supabase.js"></script>
+  <script src="site-config.js"></script><script src="common.js"></script><script src="supabase.js"></script><script src="lib/skins.js"></script>
   <script>
   (function () {
     const S = window.SITE, $ = (id) => document.getElementById(id);
@@ -108,18 +117,24 @@
     const say = (el, t) => ($(el).textContent = t);
 
     // ---------- browse (public, no login) ----------
-    let sort = "popular", page = 0;
+    let sort = "popular", page = 0, oledOnly = false;
     async function load(reset) {
       if (reset) { page = 0; grid.innerHTML = ""; }
-      let q = sb.from("wallpapers").select("id,title,kind,file_path,thumb_path,likes,uses,created_at").eq("status", "approved");
-      q = sort === "new" ? q.order("created_at", { ascending: false }) : q.order("likes", { ascending: false }).order("uses", { ascending: false });
-      const { data, error } = await q.range(page * 24, page * 24 + 23);
+      const query = (cols) => { let q = sb.from("wallpapers").select(cols).eq("status", "approved");
+        if (oledOnly) q = q.eq("oled", true);
+        q = sort === "new" ? q.order("created_at", { ascending: false }) : q.order("likes", { ascending: false }).order("uses", { ascending: false });
+        return q.range(page * 24, page * 24 + 23); };
+      let { data, error } = await query("id,title,kind,file_path,thumb_path,likes,uses,created_at,width,height,oled,credit");
+      if (error && /column|width|oled/i.test(error.message || "")) {   // labels not set up on the server yet: no OLED filter either
+        oledOnly = false; $("oledOnly").hidden = true; $("oledOnly").classList.remove("on");
+        ({ data, error } = await query("id,title,kind,file_path,thumb_path,likes,uses,created_at")); }
       if (error) { empty.hidden = false; empty.textContent = "Couldn't load the Workshop right now."; return; }
       for (const w of data) {
         const file = url(w.file_path), thumb = url(w.thumb_path) || file;
         const el = document.createElement("div"); el.className = "ws-card";
-        el.innerHTML = `<div class="media"><img loading="lazy" alt="" src="${esc(thumb)}"><span class="tag">${w.kind === "video" ? "VIDEO" : "IMAGE"}</span></div>
-          <div class="info"><b>${esc(w.title)}</b><small>${w.likes} like${w.likes === 1 ? "" : "s"} · ${w.uses} use${w.uses === 1 ? "" : "s"}</small>
+        const ql = window.PriismWallInfo && w.width && w.height ? PriismWallInfo.qualityOf(w.width, w.height) : "";
+        el.innerHTML = `<div class="media"><img loading="lazy" alt="" src="${esc(thumb)}"><span class="tag">${w.kind === "video" ? "VIDEO" : "IMAGE"}</span>${ql ? `<span class="tag q" title="${w.width}\u00D7${w.height}">${ql}</span>` : ""}${w.oled ? '<span class="tag oled" title="Mostly true black and no bright part that stays still: easy on OLED screens">OLED</span>' : ""}</div>
+          <div class="info"><b>${esc(w.title)}</b><small>${w.likes} like${w.likes === 1 ? "" : "s"} · ${w.uses} use${w.uses === 1 ? "" : "s"}</small>${w.credit ? `<small class="credit">Credit: ${esc(w.credit)}</small>` : ""}
           <div class="row"><a class="btn" href="${esc(file)}" download>Download</a></div></div>`;
         el.querySelector(".media").onclick = () => {
           const lb = document.createElement("div"); lb.className = "lightbox";
@@ -133,6 +148,7 @@
     }
     document.querySelectorAll("[data-sort]").forEach((b) => (b.onclick = () => { document.querySelectorAll("[data-sort]").forEach((x) => x.classList.toggle("on", x === b)); sort = b.dataset.sort; load(true); }));
     more.onclick = () => { page++; load(false); };
+    $("oledOnly").onclick = () => { oledOnly = !oledOnly; $("oledOnly").classList.toggle("on", oledOnly); load(true); };
     load(true);
 
     // ---------- community looks: browse ----------
@@ -215,13 +231,38 @@
         list.appendChild(row);
       }
     }
+    // what to make: one code for one person, several personal codes at once, or ONE code a whole group shares
+    // (a Discord, say: you set how many devices it lets in, and can turn it off any time)
+    let invKind = "one";
+    const KIND = { one: { dev: 2, btn: "Make a code", hint: "One code for one person, on up to this many of their devices." },
+      many: { dev: 2, btn: "Make the codes", hint: "A list of personal codes, one per person. Copy them all and hand them out." },
+      group: { dev: 100, btn: "Make a group code", hint: "One code you can post for a whole group. It lets in up to this many devices; turn it off any time." } };
+    document.querySelectorAll("#invKind [data-k]").forEach((b) => (b.onclick = () => {
+      invKind = b.dataset.k; document.querySelectorAll("#invKind [data-k]").forEach((x) => x.classList.toggle("on", x === b));
+      $("invCountL").hidden = invKind !== "many"; $("invMax").value = KIND[invKind].dev; $("invMake").textContent = KIND[invKind].btn; $("invKindHint").textContent = KIND[invKind].hint;
+      $("invBatch").hidden = true;
+    }));
+    $("invBatchCopy").onclick = async (e) => { try { await navigator.clipboard.writeText($("invBatchText").value); e.target.textContent = "Copied"; } catch { $("invBatchText").select(); } };
+    $("labelOld").onclick = async () => {
+      const b = $("labelOld"); b.disabled = true; say("invMsg", "Looking for wallpapers without labels…");
+      const { data, error } = await sb.from("wallpapers").select("id,kind,file_path,width").is("width", null).range(0, 199);
+      if (error) { b.disabled = false; return say("invMsg", /column|width/i.test(error.message) ? "Re-run supabase/schema.sql first (it adds the label columns)." : "Couldn't load: " + error.message); }
+      let done = 0, failed = 0;
+      for (const w of data) { say("invMsg", `Measuring ${done + failed + 1} of ${data.length}…`);
+        try { const q = await PriismWallInfo.measure(url(w.file_path), w.kind); if (!q.w) throw 0; const r = await sb.rpc("label_wallpaper", { wallpaper: w.id, w: q.w, h: q.h, is_oled: !!q.oled }); if (r.error) throw r.error; done++; } catch { failed++; } }
+      b.disabled = false; say("invMsg", data.length ? `Labelled ${done} wallpaper${done === 1 ? "" : "s"}${failed ? `, ${failed} couldn't be read` : ""}.` : "Every wallpaper already has its labels."); load(true);
+    };
     $("invMake").onclick = async () => {
-      const max = Math.max(1, Math.min(50, +$("invMax").value || 2)), code = newCode();
+      const max = Math.max(1, Math.min(10000, Math.round(+$("invMax").value || 2))), note = $("invNote").value.trim() || null;
+      const n = invKind === "many" ? Math.max(2, Math.min(100, Math.round(+$("invCount").value || 10))) : 1;
+      const codes = []; while (codes.length < n) { const c = newCode(); if (!codes.includes(c)) codes.push(c); }
       $("invMake").disabled = true;
-      const r = await sb.from("invites").insert({ code, note: $("invNote").value.trim() || null, max_devices: max });
+      const r = await sb.from("invites").insert(codes.map((code, i) => ({ code, note: note ? (n > 1 ? `${note} #${i + 1}` : note) : (invKind === "group" ? "group" : null), max_devices: max })));
       $("invMake").disabled = false;
-      if (r.error) return say("invMsg", "Couldn't make a code: " + r.error.message);
-      say("invMsg", `Made ${code}. Copy it and send it to them.`); $("invNote").value = ""; renderInvites();
+      if (r.error) return say("invMsg", "Couldn't make " + (n > 1 ? "the codes" : "a code") + ": " + (/check constraint/i.test(r.error.message) ? "devices must be 1 to 10000 (re-run supabase/schema.sql if it stops at 50)." : r.error.message));
+      if (n > 1) { $("invBatchText").value = codes.join("\n"); $("invBatch").hidden = false; $("invBatchCopy").textContent = "Copy all"; say("invMsg", `Made ${n} codes. Copy them all below.`); }
+      else say("invMsg", invKind === "group" ? `Made ${codes[0]} for up to ${max} devices. Post it for your group.` : `Made ${codes[0]}. Copy it and send it to them.`);
+      $("invNote").value = ""; renderInvites();
     };
 
     // ---------- admin review (wallpapers + looks) ----------
@@ -320,7 +361,10 @@
         if (r.error) throw r.error;
         let thumbPath = null;
         if (thumbBlob) { thumbPath = `${user.id}/${base}.thumb.jpg`; const tr = await sb.storage.from(BUCKET).upload(thumbPath, thumbBlob, { contentType: "image/jpeg" }); if (tr.error) thumbPath = null; }
-        const ins = await sb.from("wallpapers").insert({ title: $("title").value.trim(), kind: chosen.kind, file_path: path, thumb_path: thumbPath, size_bytes: chosen.file.size }).select("status").single();
+        let lab = null; try { lab = await window.PriismWallInfo.measure(chosen.file, chosen.kind); } catch {}   // quality + OLED labels
+        const row = { title: $("title").value.trim(), kind: chosen.kind, file_path: path, thumb_path: thumbPath, size_bytes: chosen.file.size };
+        let ins = await sb.from("wallpapers").insert(lab && lab.w ? { ...row, width: lab.w, height: lab.h, oled: !!lab.oled } : row).select("status").single();
+        if (ins.error && lab && /column|width|oled/i.test(ins.error.message || "")) ins = await sb.from("wallpapers").insert(row).select("status").single();
         if (ins.error) throw ins.error;
         say("shareMsg", ins.data.status === "approved" ? "Shared! It's live in the Workshop now." : "Shared! It's in review: you'll see it under Your shares, and everyone sees it once it's approved.");
         await renderMine();

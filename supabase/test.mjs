@@ -97,6 +97,21 @@ ok("look uses counted without an account", (await as(null, "select uses from pub
 for (const u of [U2, U3, U4]) await as(u, "insert into public.look_reports (look_id, reason) values ($1, 'spam')", [l1.id]);
 ok("3 reports hide a look until re-review", (await as(null, "select count(*)::int n from public.looks where id = $1", [l1.id])).rows[0].n === 0);
 ok("owner can delete own look", (await as(U1, "delete from public.looks where id = $1 returning id", [l1.id])).rows.length === 1);
+// ---------- wallpaper labels (quality + OLED) ----------
+{ const w = (await as(U1, "insert into public.wallpapers (title, kind, file_path, size_bytes, width, height, oled) values ('dark', 'image', 'u/x.png', 10, 3840, 2160, true) returning id, width, oled")).rows[0];
+  ok("a shared wallpaper keeps its size and OLED label", w.width === 3840 && w.oled === true);
+  ok("silly sizes are refused", (await tryAs(U1, "insert into public.wallpapers (title, kind, file_path, size_bytes, width, height) values ('x', 'image', 'u/y.png', 10, 0, 99999)")) !== "ok");
+  ok("non-admins can't relabel", (await tryAs(U2, "select public.label_wallpaper($1, 640, 360, false)", [w.id])).startsWith("denied"));
+  await as(ADMIN, "select public.label_wallpaper($1, 1920, 1080, false)", [w.id]);
+  const r = (await as(ADMIN, "select width, oled from public.wallpapers where id = $1", [w.id])).rows[0];
+  ok("admin can (re-)measure a wallpaper", r.width === 1920 && r.oled === false); }
+// the owner's tools (service key: no signed-in user) add credited wallpapers for an admin, approved straight away
+{ await db.exec("reset role; select set_config('request.jwt.claim.sub', '', false);");   // like the service key: no user
+  const w = (await db.query("insert into public.wallpapers (owner, title, kind, file_path, size_bytes, credit) values ($1, 'Cosmic Cliffs', 'image', 'o/c.jpg', 10, 'NASA, ESA, CSA, and STScI') returning status, owner, credit", [OWNER])).rows[0];
+  ok("service upload for the owner: approved, owner kept, credit stored", w.status === "approved" && w.owner === OWNER && w.credit === "NASA, ESA, CSA, and STScI");
+  let bad = "ok"; try { await db.query("insert into public.wallpapers (owner, title, kind, file_path, size_bytes) values ($1, 'x', 'image', 'o/x.jpg', 10)", [U1]); } catch { bad = "refused"; }
+  ok("service uploads for a non-admin are refused", bad === "refused");
+  ok("signed-in users still can't choose another owner", (await as(U1, "insert into public.wallpapers (owner, title, kind, file_path, size_bytes) values ($1, 'y', 'image', 'u/y.jpg', 10) returning owner", [OWNER])).rows[0].owner === U1); }
 // ---------- invites ----------
 await db.exec("grant update on public.invites to authenticated");
 ok("non-admin can't make invites", (await tryAs(U1, "insert into public.invites (code) values ('PRIISM-AAAA-BBBB')")).startsWith("denied"));
@@ -116,5 +131,14 @@ ok("non-admin can't revoke", (await tryAs(U1, "update public.invites set revoked
 await as(ADMIN, "update public.invites set revoked = true where code = 'PRIISM-AAAA-BBBB'");
 ok("revoked -> every device locks", (await red("PRIISM-AAAA-BBBB", "dev-00000001")) === "revoked");
 ok("bad device ids are refused", (await red("PRIISM-AAAA-BBBB", "x';drop")) === "invalid");
+// group codes (one code for a whole community) and bulk codes
+await as(ADMIN, "insert into public.invites (code, max_devices, note) values ('PRIISM-GRUP-0001', 500, 'discord')");
+for (let i = 0; i < 120; i++) await red("PRIISM-GRUP-0001", "grp-" + String(i).padStart(8, "0"));
+ok("a group code lets many devices in (120 of 500)", (await as(ADMIN, "select count(*)::int n from public.invite_devices where code = 'PRIISM-GRUP-0001'")).rows[0].n === 120);
+ok("up to 10000 devices allowed, more refused", (await tryAs(ADMIN, "insert into public.invites (code, max_devices) values ('PRIISM-BIGG-0001', 10000)")).startsWith("ok")
+  && (await tryAs(ADMIN, "insert into public.invites (code, max_devices) values ('PRIISM-HUGE-0001', 10001)")) !== "ok");
+const bulk = Array.from({ length: 50 }, (_, i) => `('PRIISM-BULK-${String(i).padStart(4, "0")}', 1)`).join(",");
+await as(ADMIN, "insert into public.invites (code, max_devices) values " + bulk);
+ok("50 codes made at once", (await as(ADMIN, "select count(*)::int n from public.invites where code like 'PRIISM-BULK-%'")).rows[0].n === 50);
 const passed = Object.values(R).filter(Boolean).length, total = Object.keys(R).length;
 console.log("SUMMARY:", passed + "/" + total); if (passed !== total) process.exit(1);

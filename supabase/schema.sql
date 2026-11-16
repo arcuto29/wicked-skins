@@ -97,9 +97,16 @@ security definer
 set search_path = ''
 as $$
 begin
-  new.owner := auth.uid();
   new.likes := 0; new.uses := 0; new.reports := 0;
   new.reject_reason := null;
+  -- no signed-in user: only the project's service key can get here (visitors can't insert at all). That's the owner
+  -- adding wallpapers with Priism's own tools (like the credited space pack): it keeps the owner it was given, and only
+  -- if that owner is an admin, and it's approved straight away.
+  if auth.uid() is null then
+    if new.owner is null or not public.is_admin(new.owner) then raise exception 'service uploads must belong to an admin'; end if;
+    new.status := 'approved'; new.reviewed_at := now(); return new;
+  end if;
+  new.owner := auth.uid();
   if public.is_admin(auth.uid()) then
     new.status := 'approved'; new.reviewed_at := now();
   else
@@ -122,6 +129,27 @@ drop policy if exists "wallpapers: delete own or admin" on public.wallpapers;
 create policy "wallpapers: delete own or admin" on public.wallpapers for delete to authenticated
   using (owner = (select auth.uid()) or public.is_admin((select auth.uid())));
 -- no UPDATE policy: changes go through the functions below
+
+-- Labels: the wallpaper's size (shown as 4K / 1440p / 1080p…) and whether it suits OLED screens (mostly true black,
+-- no bright part that stays still). Measured in the browser when it's shared; admins can (re-)measure older ones.
+alter table public.wallpapers add column if not exists width int check (width between 1 and 20000);
+alter table public.wallpapers add column if not exists height int check (height between 1 and 20000);
+alter table public.wallpapers add column if not exists oled boolean;
+-- who to credit: shown on the card (required by some licences, like ESA/Webb's CC BY 4.0)
+alter table public.wallpapers add column if not exists credit text check (char_length(credit) <= 300);
+create or replace function public.label_wallpaper(wallpaper uuid, w int, h int, is_oled boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin(auth.uid()) then raise exception 'admins only'; end if;
+  update public.wallpapers set width = w, height = h, oled = is_oled where id = wallpaper;
+end;
+$$;
+revoke execute on function public.label_wallpaper(uuid, int, int, boolean) from public, anon;
+grant execute on function public.label_wallpaper(uuid, int, int, boolean) to authenticated;
 
 -- Admin review: approve or reject.
 create or replace function public.moderate_wallpaper(wallpaper uuid, new_status text, reason text default null)
@@ -369,11 +397,15 @@ update public.profiles p set is_admin = false
 create table if not exists public.invites (
   code text primary key check (code ~ '^[A-Z0-9-]{8,40}$'),
   note text check (char_length(note) <= 80),
-  max_devices int not null default 2 check (max_devices between 1 and 50),
+  max_devices int not null default 2 check (max_devices between 1 and 10000),
   revoked boolean not null default false,
   created_at timestamptz not null default now(),
   created_by uuid default auth.uid()
 );
+-- a group code (one code for a whole Discord, say) can have up to 10000 devices; databases set up before kept the old
+-- limit of 50, so it's replaced here (safe to re-run)
+alter table public.invites drop constraint if exists invites_max_devices_check;
+alter table public.invites add constraint invites_max_devices_check check (max_devices between 1 and 10000);
 alter table public.invites enable row level security;
 drop policy if exists "invites: admins read" on public.invites;
 create policy "invites: admins read" on public.invites for select to authenticated using (public.is_admin((select auth.uid())));
