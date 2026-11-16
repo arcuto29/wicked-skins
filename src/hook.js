@@ -103,7 +103,7 @@
     const out = {}; if (!m || typeof m !== "object") return out;
     for (const [k, e] of Object.entries(m).slice(0, 40)) {
       if (!/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) || !e || typeof e !== "object") continue;
-      const c = e.c === "rainbow" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "";
+      const c = e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "";
       const g = e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0));
       out[k] = { c, g, w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h };
     }
@@ -145,7 +145,7 @@
         plStyle: ["solid", "dotted", "dashed"].includes(f.plStyle) ? f.plStyle : "dotted",
         sbOn: !!f.sbOn, sbColor: colOpt(f.sbColor), sbW: Math.max(0, Math.min(2, +f.sbW || 0)), sbStyle: ["solid", "dotted", "dashed", "none"].includes(f.sbStyle) ? f.sbStyle : "dashed",
         axOn: !!f.axOn, axColor: colOpt(f.axColor), axW: Math.max(0, Math.min(2, +f.axW || 0)), axStyle: ["solid", "none"].includes(f.axStyle) ? f.axStyle : "solid",
-        indMode: ["own", "rainbow", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
+        indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: cleanCustom(f.indCustom), drawOn: !!f.drawOn,
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
@@ -331,7 +331,24 @@
     // tool) only with "Your drawings: Style them too"; greys stay grey like grey lines do
     const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && (fx.drawOn || !drawCols.has(r.k)) && glowable(`rgb(${r.k})`);
     if (!own && !all) return null;
-    return L.zone(orig, { mode: all ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom }, ctx);
+    const z = L.zone(orig, { mode: all ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom, glow: fx.lineGlow }, ctx);
+    // the neon edge only on boxes / bands, not full-height shading (a session background, bgcolor) or slivers
+    if (z && z.e && !(H < c.height * 0.9 && W >= 6 && H >= 3)) z.e = null;
+    return z;
+  }
+  // draw a zone: its fill (glowing only if it has no edge), then its neon edge with the glow. stroke = draws the edge.
+  function drawZone(ctx, z, fill, stroke) {
+    const pF = ctx.fillStyle, pSB = ctx.shadowBlur, pSC = ctx.shadowColor;
+    origFillDesc.set.call(ctx, z.f); if (z.glow > 0 && !z.e) { ctx.shadowColor = z.g; ctx.shadowBlur = 3 + z.glow * 22; }
+    const r = fill(); origFillDesc.set.call(ctx, pF); ctx.shadowBlur = pSB; ctx.shadowColor = pSC;
+    if (z.e) {
+      const pS = strokeDesc.get.call(ctx), pW = ctx.lineWidth, pD = ctx.getLineDash(), sx = ctx.getTransform().a || 1;
+      strokeDesc.set.call(ctx, z.e); ctx.lineWidth = Math.max(1, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1) / sx; ctx.setLineDash([]);
+      if (z.glow > 0) { ctx.shadowColor = z.g; ctx.shadowBlur = 3 + z.glow * 18; }
+      stroke();
+      strokeDesc.set.call(ctx, pS); ctx.lineWidth = pW; ctx.setLineDash(pD); ctx.shadowBlur = pSB; ctx.shadowColor = pSC;
+    }
+    return r;
   }
   function noteFill(col) { if (typeof col === "string" && tally.size < 300) tally.set(col, (tally.get(col) || 0) + 1); }
   function learnedFromDrawing() {
@@ -1128,9 +1145,7 @@
     // a filled shape on the chart that isn't a candle (a band between two lines, a box): an indicator zone
     if (on && c && isPane(c)) { const z = zoneFor(this, 1e4, 1e4); if (z) {
       if (z.hide) return;
-      const pF = this.fillStyle, pSB = this.shadowBlur, pSC = this.shadowColor;
-      origFillDesc.set.call(this, z.f); if (z.glow > 0) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
-      const r = origFillPath.apply(this, a); origFillDesc.set.call(this, pF); this.shadowBlur = pSB; this.shadowColor = pSC; return r; } }
+      return drawZone(this, z, () => origFillPath.apply(this, a), () => (a[0] && typeof a[0] === "object" ? origStroke.call(this, a[0]) : origStroke.call(this))); } }
     if (on && c && fx.scaleGlow > 0 && isAxis(c)) {
       const col = this.fillStyle;
       if (typeof col === "string" && glowable(col)) {
@@ -1179,9 +1194,7 @@
     // an indicator's zone (a filled box / band on the chart that isn't a candle): Each indicator's colour / glow / hide
     if (on && c && isPane(c)) { const z = zoneFor(this, w, h); if (z) {
       if (z.hide) return;
-      const pF = this.fillStyle, pSB = this.shadowBlur, pSC = this.shadowColor;
-      origFillDesc.set.call(this, z.f); if (z.glow > 0) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
-      origFill.call(this, x, y, w, h); origFillDesc.set.call(this, pF); this.shadowBlur = pSB; this.shadowColor = pSC; return; } }
+      drawZone(this, z, () => origFill.call(this, x, y, w, h), () => origStrokeRectRaw.call(this, x, y, w, h)); return; } }
     if (on && c && c.width > 20 && c.height > 20) {
       const s = this.getTransform().a || 1;
       // covers (nearly) the whole canvas => it's the pane background

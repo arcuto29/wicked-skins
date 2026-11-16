@@ -194,6 +194,17 @@
     return isHex(base) ? [base, shade(base, 42), shade(base, -42), shade(base, 90), shade(base, -90), shade(base, 180)] : null;
   }
   const hsl = (h, a) => `hsl(${Math.round(((h % 360) + 360) % 360)} 95% 62%${a !== undefined && a < 1 ? " / " + +a.toFixed(3) : ""})`;
+  // "Gradient": calmer than Rainbow (the whole spectrum): a few gradients that each stay in one colour family, left to
+  // right across the chart. Each indicator gets its own, so they stay easy to tell apart.
+  const GRADS = [
+    ["#2fe6c8", "#3a9bff", "#8a6cff"],   // aurora: teal, blue, violet
+    ["#ff9a62", "#ff5c9a", "#a46bff"],   // sunset: coral, pink, purple
+    ["#5ee7ff", "#4f7dff", "#c86bff"],   // ice: cyan, blue, orchid
+    ["#ffd36e", "#ff8f5a", "#ff5f7e"],   // ember: gold, orange, rose
+    ["#7cf5a0", "#2fd6d0", "#3a86ff"],   // lagoon: mint, teal, blue
+    ["#f8a5ff", "#a78bff", "#5bc8ff"],   // lilac: pink, lavender, sky
+  ];
+  const rgba = (hex, a) => (a >= 0.99 ? hex : `rgba(${rgbOf(hex).join(",")},${+a.toFixed(3)})`);
   const grads = new WeakMap();   // ctx -> Map(key -> rainbow gradient), so a gradient is made once per canvas size
   // ---------- each indicator on its own (Style > Indicators > Each indicator) ----------
   // Indicators are told apart by their own colour on the chart (a line's stroke, a zone's fill). We note every colour
@@ -232,15 +243,22 @@
   // A zone (an indicator's filled box / band): { hide } | { f: fill, g: glow colour, glow: 0..1 } | null = as it is
   // Its own settings (Each indicator) win; otherwise the all-indicators colour (o.mode) applies, at the zone's own
   // see-through-ness, so a band stays a soft band. Rainbow works on zones too (ctx: the gradient is per canvas).
+  // A see-through zone (alpha < 0.9) also gets e: a crisp edge in the same colours, nearly solid, so the zone reads
+  // as a neon box while its inside stays see-through (you still see the price and candles in it). The glow goes on
+  // that edge (the Glow slider, or the zone's own glow), never on the whole fill. Solid fills (volume bars) get none.
   function zone(orig, o, ctx) {
     const c = custOf(o, orig), e = c && c.e;
     if (e && e.h) return { hide: true };
     const r = keyOf(orig); if (!r) return null;
-    const all = ctx ? indicatorAll(ctx, orig, o, !!(e && e.c === "rainbow"), r.a) : null;
-    if (!e) return all ? { f: all.s, g: all.g, glow: 0 } : null;
-    const hex = /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : null;
-    if (hex) return { f: withAlpha(hex, r.a), g: hex, glow: +e.g || 0 };
-    return { f: all ? all.s : orig, g: all ? all.g : `rgb(${r.k})`, glow: +e.g || 0 };
+    const force = e && (e.c === "rainbow" || e.c === "gradient") ? e.c : false;
+    const all = ctx ? indicatorAll(ctx, orig, o, force, r.a) : null;
+    const see = r.a < 0.9, glowAll = o && o.glow > 0 ? +o.glow : 0;
+    const edgeOf = (fill) => (see && ctx ? fill : null);
+    if (!e) return all ? { f: all.s, g: all.g, glow: glowAll, e: edgeOf(indicatorAll(ctx, orig, o, force, 0.9).s) } : null;
+    const hex = /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : null, gl = e.g !== undefined && e.g !== null && e.g !== "" ? +e.g || 0 : glowAll;
+    if (hex) return { f: withAlpha(hex, r.a), g: hex, glow: gl, e: edgeOf(withAlpha(hex, 0.9)) };
+    if (all) return { f: all.s, g: all.g, glow: gl, e: edgeOf(indicatorAll(ctx, orig, o, force, 0.9).s) };
+    return { f: orig, g: `rgb(${r.k})`, glow: gl, e: edgeOf(`rgba(${r.k},0.9)`) };
   }
 
   // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour,
@@ -248,7 +266,7 @@
   function indicator(ctx, orig, o) {
     const c = custOf(o, orig), e = c && c.e;
     if (e && e.h) return { hide: true };
-    const base = indicatorAll(ctx, orig, o, e && e.c === "rainbow");
+    const base = indicatorAll(ctx, orig, o, e && (e.c === "rainbow" || e.c === "gradient") ? e.c : false);
     if (!e) return base;
     const hex = /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : null;
     const r = hex ? { s: withAlpha(hex, c.r.a), g: hex } : base || { s: orig, g: `rgb(${c.r.k})` };
@@ -258,19 +276,24 @@
   }
   // alpha: a zone's own see-through-ness (lines: undefined = as drawn). A line and the zone in its colour (RSI and its
   // band) share a slot, so they get the same shade.
-  function indicatorAll(ctx, orig, o, forceRainbow, alpha) {
-    if (!o || ((!o.mode || o.mode === "own") && !forceRainbow)) return null;
+  function indicatorAll(ctx, orig, o, force, alpha) {
+    if (!o || ((!o.mode || o.mode === "own") && !force)) return null;
     const kk = keyOf(String(orig)), i = slotOf(kk ? kk.k : String(orig));
     // very faint zones (TradingView draws Bollinger's band at 5%) would hide the new colour: lift them to a visible but
     // still soft strength (3x, at most 22%); stronger zones keep their own
     const al = alpha === undefined || alpha >= 0.99 ? 1 : Math.max(+alpha, Math.min(0.22, +alpha * 3));
-    if (forceRainbow || o.mode === "rainbow") {   // the whole spectrum across the chart, left to right; each indicator starts at its own hue
-      const t = ctx.getTransform(), a = t.a || 1, w = ctx.canvas.width, off = (i * 67) % 360, key = w + "|" + t.e + "|" + a + "|" + off + "|" + al.toFixed(2);
+    // force: "rainbow" | "gradient" = this indicator's own choice (Each indicator), else the all-indicators mode
+    const kind = force === "rainbow" || force === "gradient" ? force : o.mode;
+    if (kind === "rainbow" || kind === "gradient") {   // left to right across the chart
+      const rb = kind === "rainbow", G = GRADS[i % GRADS.length], off = (i * 67) % 360;
+      const t = ctx.getTransform(), a = t.a || 1, w = ctx.canvas.width, key = kind + "|" + w + "|" + t.e + "|" + a + "|" + (rb ? off : i % GRADS.length) + "|" + al.toFixed(2);
       let m = grads.get(ctx); if (!m) { m = new Map(); grads.set(ctx, m); }
       let gr = m.get(key);
       if (!gr) { if (m.size > 30) m.clear(); gr = ctx.createLinearGradient((0 - t.e) / a, 0, (w - t.e) / a, 0);
-        for (let j = 0; j <= 6; j++) gr.addColorStop(j / 6, hsl(off + j * 60, al)); m.set(key, gr); }
-      return { s: gr, g: hsl(off + 180) };
+        if (rb) for (let j = 0; j <= 6; j++) gr.addColorStop(j / 6, hsl(off + j * 60, al));   // the whole spectrum; each indicator starts at its own hue
+        else G.forEach((c, j) => gr.addColorStop(j / (G.length - 1), rgba(c, al)));
+        m.set(key, gr); }
+      return { s: gr, g: rb ? hsl(off + 180) : G[1] };
     }
     const P = memo("ind|" + o.mode + o.color + o.up + o.down + o.accent, () => indPalette(o));
     return P ? { s: withAlpha(P[i % P.length], al), g: P[i % P.length] } : null;

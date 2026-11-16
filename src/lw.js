@@ -125,9 +125,9 @@
         chOn: !!f.chOn, chColor: colOk(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)), chStyle: styleOk(f.chStyle, "dashed"), chGlow: !!f.chGlow, chGlowColor: colOk(f.chGlowColor), chLabels: !!f.chLabels,
         plOn: !!f.plOn, plColor: colOk(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)), plStyle: styleOk(f.plStyle, "dotted"),
         lineGlow: Math.max(0, Math.min(1, +f.lineGlow || 0)),   // Style → Line glow: indicator lines and drawings
-        indMode: ["own", "rainbow", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
+        indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: (() => { const o = {}; for (const [k, e] of Object.entries(f.indCustom && typeof f.indCustom === "object" ? f.indCustom : {}).slice(0, 40))
-          if (/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) && e && typeof e === "object") o[k] = { c: e.c === "rainbow" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "",
+          if (/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) && e && typeof e === "object") o[k] = { c: e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "",
             g: e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0)), w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h }; return o; })(),
         accent: hex(f.accent) } : null;
     } catch { lfx = null; }
@@ -334,6 +334,7 @@
     const oRect = proto.rect, oRound = proto.roundRect;
     proto.rect = function (x, y, w, h) { if (on) { const b = pbox.get(this); pbox.set(this, b === undefined ? { x, y, w, h } : null); } return oRect.call(this, x, y, w, h); };
     if (oRound) proto.roundRect = function (x, y, w, h, ...r) { if (on) { const b = pbox.get(this); pbox.set(this, b === undefined ? { x, y, w, h } : null); } return oRound.call(this, x, y, w, h, ...r); };
+    const origStrokeRectLw = proto.strokeRect;
     const toHexCol = (v) => { const r = rgbKey(v); return r ? "#" + r.key.split(",").map((n) => (+n).toString(16).padStart(2, "0")).join("") : v; };
     proto.fillRect = function (x, y, w, h) {
       const c = this.canvas;
@@ -360,11 +361,19 @@
           // its own settings (Each indicator), or the all-indicators colour (greys stay grey, like grey lines)
           const zk = L.keyOf(this.__bdLwOrig), own = zk && lfx && lfx.indCustom && lfx.indCustom[zk.k];
           const all = zk && lfx && lfx.indMode && lfx.indMode !== "own" && !greyish(`rgb(${zk.k})`) && candlesKnown() && !ownCandle(zk.k);
-          const z = own || all ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom }, this) : null;
+          const z = own || all ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow }, this) : null;
           if (z && W <= 60 && H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
           if (z) { if (z.hide) return; const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
-            fillDesc.set.call(this, z.f); if (z.glow > 0) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
-            origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, pF); this.shadowBlur = pB; this.shadowColor = pC; return; }
+            // the neon edge (see candlelooks zone()): boxes and bands only, not full-height shading or slivers
+            const edge = z.e && H < c.height * 0.9 && W >= 6 && H >= 3 ? z.e : null;
+            fillDesc.set.call(this, z.f); if (z.glow > 0 && !edge) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
+            origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, pF); this.shadowBlur = pB; this.shadowColor = pC;
+            if (edge) { const pS = strokeDesc.get.call(this), pW = this.lineWidth, pD = this.getLineDash();
+              strokeDesc.set.call(this, edge); this.lineWidth = Math.max(1, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1) / (t.a || 1); this.setLineDash([]);
+              if (z.glow > 0) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 18; }
+              origStrokeRectLw.call(this, x, y, w, h);
+              strokeDesc.set.call(this, pS); this.lineWidth = pW; this.setLineDash(pD); this.shadowBlur = pB; this.shadowColor = pC; }
+            return; }
         }
       }
       drawCalls.fillRect++;
