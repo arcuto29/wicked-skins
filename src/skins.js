@@ -2149,7 +2149,15 @@ function priismSkins(window, document) {
       upRgb = punch(hslRgb(nearestNice(accHue, true)));
       downRgb = punch(hslRgb(nearestNice((accHue + 150) % 360, false)));
     }
-    return { up: hex(upRgb), down: hex(downRgb), accent: hex(accent) };
+    // colors: up to 5 of the wallpaper's own colours, strongest first, each at least ~40 deg apart on the colour wheel
+    // and a real part of the picture (>= 6% of the strongest). Indicators and zones take these (Indicators: Wallpaper).
+    const colors = [], pickedHues = [];
+    for (const x of ranked) {
+      if (colors.length >= 5 || x.n < ranked[0].n * 0.06) break;
+      if (pickedHues.some((h) => { const d = Math.abs(h - x.i) * 15; return Math.min(d, 360 - d) < 40; })) continue;
+      pickedHues.push(x.i); colors.push(hex(punch(avg(x.i))));
+    }
+    return { up: hex(upRgb), down: hex(downRgb), accent: hex(accent), colors };
   }
   const clampc = (v) => Math.max(0, Math.min(255, Math.round(v)));
   // rgb channels are 0..1 floats

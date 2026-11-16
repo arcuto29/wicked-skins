@@ -57,6 +57,9 @@
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
     indMode: "own", indColor: "", indCustom: {},
     drawOn: false,            // your own drawings (rectangles, zones you draw) follow the indicator colours too
+    // Chart text: text indicators draw ON the chart (labels, levels, values, prints). own | readable | custom | candle,
+    // outline 0 off / 1 soft / 2 strong, size 0 normal / 1 large / 2 XL
+    txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
     plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -1366,7 +1369,7 @@
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
-    "indMode", "indColor", "indCustom", "drawOn", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
+    "indMode", "indColor", "indCustom", "drawOn", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
@@ -1428,6 +1431,9 @@
   // accent when the hue really changes (or it appears/disappears), so nothing restyles or repaints for no reason.
   let lastAccent = "";
   function rawAccent() { const v = views[0], p = v && v.lum && v.lum.palette; return (p && p.accent) || ""; }
+  // the wallpaper's own colours (up to 5), taken once per wallpaper like the accent: indicators / zones use them
+  let lastColors = [];
+  function rawColors() { const v = views[0], p = v && v.lum && v.lum.palette; return (p && Array.isArray(p.colors) && p.colors.length ? p.colors : []).slice(0, 5); }
   function hueOfHex(x) { const [r, g, b] = [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16) / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
     if (mx === mn) return 0; const d = mx - mn; let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return h * 60; }
   function skinAccent() { return lastAccent; }
@@ -1436,7 +1442,7 @@
     // the skin colour is taken ONCE per wallpaper (animated wallpapers shift colour all the time; following that
     // re-coloured lines and panels again and again)
     const srcSig = String(cfg.skin) + "|" + String(cfg.mediaId || "");
-    if (srcSig !== accentFor && rawAccent()) { accentFor = srcSig; lastAccent = rawAccent(); pushFx(); applyPanels(); applyDialogs(); applyTicker(); }
+    if (srcSig !== accentFor && rawAccent()) { accentFor = srcSig; lastAccent = rawAccent(); lastColors = rawColors(); pushFx(); applyPanels(); applyDialogs(); applyTicker(); }
     const lit = views.filter((v) => v.lum);
     if (!lit.length) return;
     applyAutoMatch();
@@ -1517,7 +1523,7 @@
   }, 3000);
   function pushFx() {
     const h = document.documentElement;
-    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent() }));
+    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent(), wallColors: lastColors }));
     else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     // Scale backing = real frosted glass behind the price + time scales
@@ -1693,6 +1699,7 @@
       try {
         const t = v.content && v.content.tagName;
         if (t === "CANVAS" || t === "VIDEO" || t === "IMG") { g.filter = filt; drawFit(g, v.content, dx, dy, dw, dh); g.filter = "none"; }
+        else if (v.recFrame) { g.filter = filt; drawFit(g, v.recFrame, dx, dy, dw, dh); g.filter = "none"; }   // an uploaded wallpaper's frame (wallFeed)
         else mediaMissed = true;
       } catch { mediaMissed = true; }
       if (!over && dim > 0) { g.fillStyle = `rgba(0,0,0,${dim})`; g.fillRect(dx, dy, dw, dh); }
@@ -1820,7 +1827,8 @@
     const out = document.createElement("canvas"); out.width = W; out.height = H;
     const g = out.getContext("2d");
     const wmImg = await watermarkImage();
-    const { mediaMissed } = compositeFrame(g, box, dpr, wmImg);
+    const stopWallFeed = await startWallFeed(10, Math.max(W, 1280));   // an uploaded wallpaper's current frame
+    let mediaMissed; try { ({ mediaMissed } = compositeFrame(g, box, dpr, wmImg)); } finally { stopWallFeed(); }
     // export
     return await new Promise((res) => {
       try { out.toBlob((blob) => { if (!blob) return res({ ok: false, reason: "The browser blocked reading the chart pixels (a cross-origin chart)." });
@@ -2118,6 +2126,27 @@
     setTimeout(() => { if (screenAsk === card) cancelScreenAsk(); }, 90000);
     return { ok: true, awaiting: true };
   }
+  // Uploaded wallpapers play in a protected frame (player.html) whose pixels the page can't read. For a chart-only
+  // clip, that frame sends its picture to us over a private channel (MessageChannel, posted straight to the frame, so
+  // the chart page never sees it), unlocked with a secret kept in the extension's storage.
+  async function recToken() {
+    try { const s = await chrome.storage.local.get("recToken"); if (s.recToken) return s.recToken;
+      const t = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)); await chrome.storage.local.set({ recToken: t }); return t; } catch { return ""; }
+  }
+  async function startWallFeed(fps, maxW) {
+    const players = views.filter((v) => v.content && v.content.tagName === "IFRAME" && v.content.contentWindow);
+    if (!players.length || typeof MessageChannel === "undefined" || !(typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL)) return () => {};
+    const token = await recToken(); if (!token) return () => {};
+    const origin = new URL(chrome.runtime.getURL("/")).origin, ports = [];
+    for (const v of players) {
+      const ch = new MessageChannel(); ports.push([v, ch.port1]);
+      ch.port1.onmessage = (e) => { const b = e.data && e.data.bmp; if (!b) return; if (v.recFrame && v.recFrame.close) try { v.recFrame.close(); } catch {} v.recFrame = b; };
+      try { v.content.contentWindow.postMessage({ __wicked: "rec-start", token, fps, maxW }, origin, [ch.port2]); } catch {}
+    }
+    // give the first frame a moment to arrive, so the clip doesn't start without the wallpaper
+    for (let i = 0; i < 20 && players.some((v) => !v.recFrame); i++) await new Promise((r) => setTimeout(r, 50));
+    return () => { for (const [v, port] of ports) { try { port.postMessage({ stop: true }); port.close(); } catch {} if (v.recFrame && v.recFrame.close) try { v.recFrame.close(); } catch {} v.recFrame = null; } };
+  }
   async function captureClip(seconds, fpsWanted, display, soundAsked) {
     if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
     if (clipRec) return { ok: false, reason: "Already recording a clip." };
@@ -2130,11 +2159,12 @@
     const cap = document.createElement("canvas"); cap.width = W; cap.height = H;
     const g = cap.getContext("2d");
     const wmImg = await watermarkImage();
+    const capFps = Math.max(10, Math.min(60, +fpsWanted || 30));
+    const stopWallFeed = await startWallFeed(capFps, Math.max(W, 640));
     // first frame to check we can actually read the pixels (a tainted/cross-origin chart will throw on record)
     const { mediaMissed } = compositeFrame(g, box, dpr, wmImg);
     let stream;
-    const capFps = Math.max(10, Math.min(60, +fpsWanted || 30));
-    try { stream = cap.captureStream(capFps); } catch { return { ok: false, reason: "Your browser can't record this chart." }; }
+    try { stream = cap.captureStream(capFps); } catch { stopWallFeed(); return { ok: false, reason: "Your browser can't record this chart." }; }
     let au = null; try { au = await clipAudioTrack(display || null); } catch {}
     if (au && au.track) stream.addTrack(au.track);
     const mime = clipMime(!!au);
@@ -2144,7 +2174,7 @@
     const dur = Math.max(2, Math.min(MAX_CLIP_SECONDS, +seconds || 5));
     const bps = clipBps(cap.width, cap.height, capFps, dur, cfg.clipQuality);
     try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: bps } : undefined); }
-    catch { stopAudio(); return { ok: false, reason: "Your browser can't record clips." }; }
+    catch { stopAudio(); stopWallFeed(); return { ok: false, reason: "Your browser can't record clips." }; }
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
     clipRec = rec;
@@ -2163,7 +2193,7 @@
       let rafId = 0, done = false, stopTimer = 0;
       const stop = () => { clearTimeout(stopTimer); try { rec.state !== "inactive" && rec.stop(); } catch {} };
       badge.onclick = stop; stopClip = stop;
-      const cleanup = () => { done = true; cancelAnimationFrame(rafId); clearTimeout(stopTimer); clearInterval(badgeTimer); badge.remove(); clipRec = null; };
+      const cleanup = () => { done = true; cancelAnimationFrame(rafId); clearTimeout(stopTimer); clearInterval(badgeTimer); badge.remove(); clipRec = null; stopWallFeed(); };
       const draw = () => { if (done) return; try { compositeFrame(g, box, dpr, wmImg); } catch {} rafId = requestAnimationFrame(draw); };
       rec.onstop = async () => {
         cleanup();

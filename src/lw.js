@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 7;
+  const LW_VERSION = 8;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -107,11 +107,15 @@
   let lfx = null;
   const colOk = (v) => (v === "candle" || /^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
   const styleOk = (v, d, extra = []) => (["solid", "dotted", "dashed", ...extra].includes(v) ? v : d);
+  let ltx = null;
   function readFx() {
     try {
       const f = JSON.parse(htmlEl().getAttribute("data-ws-fx") || "null");
       const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
       const any = f && (f.lineGlow > 0 || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
+      // Chart text: read whenever Priism is on (its "Own" setting still lightens black text on a dark wallpaper)
+      ltx = f ? { mode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", color: hex(f.txtColor), outline: Math.max(0, Math.min(2, +f.txtOutline || 0)),
+        size: Math.max(0, Math.min(2, +f.txtSize || 0)), bg: f.bg === "light" ? "light" : "dark" } : null;
       lfx = any ? {
         // price scale text + backing
         scaleText: hex(f.scaleText), scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)), scaleBold: !!f.scaleBold, scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
@@ -129,14 +133,15 @@
         indCustom: (() => { const o = {}; for (const [k, e] of Object.entries(f.indCustom && typeof f.indCustom === "object" ? f.indCustom : {}).slice(0, 40))
           if (/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) && e && typeof e === "object") o[k] = { c: e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "",
             g: e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0)), w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h }; return o; })(),
-        accent: hex(f.accent) } : null;
-    } catch { lfx = null; }
+        accent: hex(f.accent), wallColors: Array.isArray(f.wallColors) ? f.wallColors.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 5) : [] } : null;
+      if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(lfx ? lfx.wallColors : []);
+    } catch { lfx = null; ltx = null; }
   }
   let lfxSig = "null", candSig = null, onWas = null;
   // data-ws-fx also carries the wallpaper brightness, refreshed every few seconds: only redraw when something we use changed
   const settingsObserver = new MutationObserver(() => {
     on = htmlEl().classList.contains("bd-on");
-    const cs = htmlEl().getAttribute("data-ws-candles"); readFx(); const ls = JSON.stringify(lfx);
+    const cs = htmlEl().getAttribute("data-ws-candles"); readFx(); const ls = JSON.stringify(lfx) + JSON.stringify(ltx);
     if (cs === candSig && ls === lfxSig && on === onWas) return;
     candSig = cs; lfxSig = ls; onWas = on; readCandles(); remapCache.clear(); repaint();
   });
@@ -234,6 +239,9 @@
     const lum = (k) => k.split(",").reduce((s, v) => s + +v, 0);
     return lum(a) >= lum(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]];
   }
+  // the widest bar that can be a candle body: zoomed in, bodies get wide (they used to stop being recognised past
+  // 60 px and fell back to the platform's own white / black, while the thin wicks kept your colours)
+  const candleMaxW = (c) => Math.max(60, c.width * 0.2);
   let lastShape = [], apiSides = 0;
   // the platform's OWN candle colours are known (from its chart API, or found by their shape): only then can a filled
   // bar safely be called an indicator zone for the all-indicators colours, and never a candle
@@ -294,7 +302,7 @@
   function inLwTable(c) { let v = lwTableCache.get(c); if (v === undefined) { try { v = !!(c.closest && c.closest(ROOT_SEL)); } catch { v = false; } lwTableCache.set(c, v); } return v; }
 
   // ---------- install the canvas hooks (once, when this is a LW page) ----------
-  let active = false, lineHook = null, lineIsCurve = () => false;
+  let active = false, lineHook = null, lineIsCurve = () => false, noteSolidHook = () => {};
   function install() {
     if (active) return;
     active = true;
@@ -362,7 +370,7 @@
           const zk = L.keyOf(this.__bdLwOrig), own = zk && lfx && lfx.indCustom && lfx.indCustom[zk.k];
           const all = zk && lfx && lfx.indMode && lfx.indMode !== "own" && !greyish(`rgb(${zk.k})`) && candlesKnown() && !ownCandle(zk.k);
           const z = own || all ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow }, this) : null;
-          if (z && W <= 60 && H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
+          if (z && W <= candleMaxW(c) && H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
           if (z) { if (z.hide) return; const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
             // the neon edge (see candlelooks zone()): boxes and bands only, not full-height shading or slivers
             const edge = z.e && H < c.height * 0.9 && W >= 6 && H >= 3 ? z.e : null;
@@ -377,19 +385,20 @@
         }
       }
       drawCalls.fillRect++;
+      if (on && c) noteSolidHook(this, x, y, w, h);
       if (on && c && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle) && labelBox(this, w, h)) {
         const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p);
         lastBox.set(this, "xh:" + col); return;
       }
       if (on && c && (isAxis(c) || isPaneC(c))) {
-        noteBox(this, w, h);
+        noteBox(this, w, h); if (labelBox(this, w, h)) noteTagRow(this, y, h);
         if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) {
           if (labelBox(this, w, h)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p); return; }
         }
       }
       if (on && isPaneC(c) && !inLook) {
         const t = this.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
-        if (W > 0 && W <= 60 && H < c.height * 0.8) {
+        if (W > 0 && W <= candleMaxW(c) && H < c.height * 0.8) {
           noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);
           const side = candles && shapeSides.size ? shapeSides.get((rgbKey(this.__bdLwOrig) || {}).key) : null;
           if (side) {                                          // a grey / black candle: paint it in your candle colour
@@ -408,14 +417,15 @@
     proto.fill = function (...a) {
       const c = this.canvas;
       if (on && c && typeof this.__bdLwOrig === "string" && isChart(c)) { noteFill(this.__bdLwOrig); drawCalls.fill++; }
+      if (on && c && !a.length) { const b = pbox.get(this); if (b) noteSolidHook(this, b.x, b.y, b.w, b.h); }
       if (on && c && !inLook && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle)) { const b = pbox.get(this);
         if (b && labelBox(this, b.w, b.h)) { const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); lastBox.set(this, "xh:" + col); return r; } }
-      if (on && c && !inLook && (isAxis(c) || isPaneC(c))) { const b = pbox.get(this); if (b && labelBox(this, b.w, b.h)) { noteBox(this, b.w, b.h);
+      if (on && c && !inLook && (isAxis(c) || isPaneC(c))) { const b = pbox.get(this); if (b && labelBox(this, b.w, b.h)) { noteBox(this, b.w, b.h); noteTagRow(this, b.y, b.h);
         if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); return r; } } }
       if (on && c && !a.length && !inLook && isPaneC(c)) { const b = pbox.get(this);
         if (b) {                                             // candles drawn as one-rectangle shapes
           const t = this.getTransform(), W = Math.abs(b.w * (t.a || 1)), H = Math.abs(b.h * (t.d || 1));
-          if (W > 0 && W <= 60 && H < c.height * 0.8) { noteShape(this.__bdLwOrig, b.x * (t.a || 1) + t.e, Math.max(b.y, b.y + b.h) * (t.d || 1) + t.f);
+          if (W > 0 && W <= candleMaxW(c) && H < c.height * 0.8) { noteShape(this.__bdLwOrig, b.x * (t.a || 1) + t.e, Math.max(b.y, b.y + b.h) * (t.d || 1) + t.f);
             const side = candles && shapeSides.size ? shapeSides.get((rgbKey(this.__bdLwOrig) || {}).key) : null;
             if (side) { const p = this.fillStyle; fillDesc.set.call(this, side === "up" ? candles.upHex : candles.downHex);
               if (!candleLook(this, c, b.x, b.y, b.w, b.h)) origFillP.apply(this, a); fillDesc.set.call(this, p); return; } }
@@ -466,10 +476,12 @@
     const seg = new WeakMap();   // ctx -> { n, ok, x0, y0, last:[x,y] }
     const oBegin = proto.beginPath, oMove = proto.moveTo, oLine = proto.lineTo;
     const lineFx = () => on;   // (always: the "Each indicator" list needs to see the lines even with no styling on)
-    proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null }); pbox.delete(this); return oBegin.call(this); };
-    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) k.p = [x, y]; if (on) pbox.set(this, null); return oMove.call(this, x, y); };
+    // hz / hy / hp: the path is only horizontal straight lines (an indicator's levels, like prints); y in device px
+    proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null, hz: true, hy: null, hp: null }); pbox.delete(this); return oBegin.call(this); };
+    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) { k.p = [x, y]; if (k.hz) { const t = this.getTransform(); k.hp = y * (t.d || 1) + t.f; if (k.hy === null) k.hy = k.hp; } } if (on) pbox.set(this, null); return oMove.call(this, x, y); };
     proto.lineTo = function (x, y) {
       const k = lineFx() && seg.get(this);
+      if (k && k.hz) { const t = this.getTransform(), Y = y * (t.d || 1) + t.f; if (k.hp === null || Math.abs(Y - k.hp) > 1.5) k.hz = false; else k.hp = Y; }
       if (k && !k.ok) k.n++;                    // a curve (indicator line): just count its points, for Line glow
       else if (k && k.ok) {
         const c = this.canvas, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, p = k.p;
@@ -483,7 +495,7 @@
       if (on) pbox.set(this, null);
       return oLine.call(this, x, y);
     };
-    for (const nm of ["arc", "arcTo", "quadraticCurveTo", "bezierCurveTo", "ellipse"]) { const o = proto[nm]; if (o) proto[nm] = function (...a) { if (on) pbox.set(this, null); return o.apply(this, a); }; }
+    for (const nm of ["arc", "arcTo", "quadraticCurveTo", "bezierCurveTo", "ellipse", "rect", "roundRect"]) { const o = proto[nm]; if (o) proto[nm] = function (...a) { if (on) { if (nm !== "rect" && nm !== "roundRect") pbox.set(this, null); const k = seg.get(this); if (k) k.hz = false; } return o.apply(this, a); }; }
     const DASH = { solid: [], dotted: [1, 3], dashed: [5, 5] };
     // grid colours are muted: little colour in them (dark navy greys count), or mostly transparent
     const greyish = (col) => { const r = rgbKey(col); if (!r) return false; const [R, G, B] = r.key.split(",").map(Number);
@@ -537,7 +549,20 @@
     }
     const xhair = new WeakMap();   // canvas ctx -> where this frame's crosshair lines are
     let strokeNo = 0;              // counts restyled lines, to know which two were drawn back to back
-    lineIsCurve = (ctx) => { const k = seg.get(ctx), col = strokeDesc.get.call(ctx); return !!k && !k.ok && k.n >= 3 && typeof col === "string" && !greyish(col) && !isCandleCol(col); };
+    // an indicator line: a curve (3+ points, not straight across), or an indicator's LEVEL line (prints, pivots):
+    // straight horizontal, solid, not a candle colour, not the grid (that's several lines in one stroke), and not an
+    // order / position line (those have a coloured price tag on the scale at the same height)
+    lineIsCurve = (ctx) => { const k = seg.get(ctx), col = strokeDesc.get.call(ctx); if (!k || typeof col !== "string" || isCandleCol(col)) return false;
+      if (!k.ok && k.n >= 3 && !greyish(col)) return true;
+      return k.hz && k.n >= 1 && k.hy !== null && !ctx.getLineDash().length && !(greyish(col) && k.n >= 2) && !(shapeSides.has((rgbKey(col) || {}).key)) && !onTagRow(k.hy) && settled(col, k.hy); };
+    // a new level line counts only after ~1 s: by then an order line's price tag on the same row is known
+    const levelFirst = new Map();
+    // by colour: once settled it stays (no flashing back as lines move); the price-tag check still runs on every draw
+    const settled = (col) => { const key = col, now = performance.now(), f = levelFirst.get(key);
+      if (f === undefined) { if (levelFirst.size > 300) levelFirst.delete(levelFirst.keys().next().value); levelFirst.set(key, now);
+        if (!levelT) levelT = setTimeout(() => { levelT = 0; if (on) repaint(); }, 1100);   // a still chart may not repaint by itself
+        return false; } return now - f > 1000; };
+    let levelT = 0;
     lineHook = styleLines;
 
     // ---------- price scale text, bracket labels, P&L and last price ----------
@@ -566,7 +591,23 @@
       if (H < 8 || H > 60 || W < 12 || W > c.width * 1.01) return false;
       return isAxis(c) || (isPaneC(c) && W >= 24 && W < c.width * 0.5 && !greyish(g.fillStyle) && !isCandleCol(g.fillStyle)); };
     function noteBox(g, w, h) { if (labelBox(g, w, h)) lastBox.set(g, String(g.fillStyle)); }
-    const oText = proto.fillText;
+    // rows (device y) of the coloured price tags on the price scale lately: order / position / price lines have one
+    const tagRows = [];
+    function noteTagRow(g, y, h) { const c = g.canvas; if (!c || !isAxis(c) || greyish(g.fillStyle)) return;   // grey = the crosshair's tag
+      const t = g.getTransform(), Y = (y + h / 2) * (t.d || 1) + t.f, now = performance.now(), i = tagRows.findIndex((e) => Math.abs(e.y - Y) <= 3);
+      if (i >= 0) tagRows[i] = { y: Y, t: now }; else { tagRows.push({ y: Y, t: now }); if (tagRows.length > 60) tagRows.shift(); } }
+    const onTagRow = (Y) => { const now = performance.now(); for (const e of tagRows) if (now - e.t < 20000 && Math.abs(e.y - Y) <= 6) return true; return false; };
+    const oText = proto.fillText, oStrokeText = proto.strokeText;
+    // solid boxes drawn on the chart lately (an indicator's label box): the text inside keeps its own colours
+    const solidLw = new WeakMap();
+    function noteSolidLw(g, x, y, w, h) { const c = g.canvas; if (!c || !isPaneC(c) || !ltx) return;
+      const r = rgbKey(String(g.fillStyle)); if (!r || (r.a !== null && +r.a < 0.6)) return;
+      const t = g.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1)); if (W >= c.width * 0.6 || H >= c.height * 0.5) return;
+      const x0 = x * (t.a || 1) + t.e, y0 = y * (t.d || 1) + t.f; let a = solidLw.get(g); if (!a) { a = []; solidLw.set(g, a); }
+      a.push({ x0: Math.min(x0, x0 + w * (t.a || 1)), y0: Math.min(y0, y0 + h * (t.d || 1)), x1: Math.max(x0, x0 + w * (t.a || 1)), y1: Math.max(y0, y0 + h * (t.d || 1)), t: performance.now() }); if (a.length > 40) a.shift(); }
+    function inSolidLw(g, x, y) { const a = solidLw.get(g); if (!a || !a.length) return false; const t = g.getTransform(), X = x * (t.a || 1) + t.e, Y = y * (t.d || 1) + t.f, now = performance.now();
+      for (let i = a.length - 1; i >= 0; i--) { const b = a[i]; if (now - b.t > 150) break; if (X >= b.x0 - 2 && X <= b.x1 + 2 && Y >= b.y0 - 2 && Y <= b.y1 + 2) return true; } return false; }
+    noteSolidHook = noteSolidLw;
     proto.fillText = function (t, x, y, ...rest) {
       const c = this.canvas;
       if (!on || !c || inLook) return oText.call(this, t, x, y, ...rest);
@@ -584,6 +625,12 @@
           if (lfx.bracketOn) { const col = sign > 0 && lfx.bracketProfit ? lfx.bracketProfit : sign < 0 && lfx.bracketLoss ? lfx.bracketLoss : lfx.bracketText;
             if (col) fillDesc.set.call(this, col); if (lfx.bracketSize) this.font = sizeUp(pF, lfx.bracketSize); }
           const r = oText.call(this, privText(t), x, y, ...rest); this.font = pF; fillDesc.set.call(this, pS); return r;
+        }
+        // Chart text (Style > Chart text): the platform's / an indicator's text on the chart, not inside its own box
+        if (ltx && !inSolidLw(this, x, y)) {   // (even on Own: black text on a dark wallpaper is lightened)
+          const L = window.__bdCandleLooks;
+          if (L && L.chartText && L.chartText(this, { fill: (v) => fillDesc.set.call(this, v), stroke: (v) => strokeDesc.set.call(this, v), text: (...q) => oText.apply(this, q), strokeText: (...q) => oStrokeText.apply(this, q) },
+            [t, x, y, ...rest], { ...ltx, up: candles && candles.upHex })) return;
         }
         return oText.call(this, t, x, y, ...rest);
       }
