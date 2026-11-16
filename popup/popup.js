@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["indMode","indColor","indCustom","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -21,7 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
-  indMode: "own", indColor: "", indCustom: {},
+  indMode: "own", indColor: "", indCustom: {}, drawOn: false,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -318,9 +318,11 @@ $("lineGlow").oninput = (e) => { set({ lineGlow: +e.target.value }); $("lineGlow
 // Indicators: their colours (own / rainbow / your candle colours / your wallpaper's / any colour) + the glow above
 function syncIndicators() {
   if (!$("indMode")) return;
-  seg("indMode", [["own", "Own"], ["rainbow", "Rainbow"], ["candles", "Candles"], ["wallpaper", "Wallpaper"], ["custom", "Custom"]], () => cfg.indMode || "own",
+  seg("indMode", [["own", "Own"], ["rainbow", "Rainbow"], ["gradient", "Gradient"], ["candles", "Candles"], ["wallpaper", "Wallpaper"], ["custom", "Custom"]], () => cfg.indMode || "own",
     (v) => { set(v === "custom" && !/^#/.test(cfg.indColor || "") ? { indMode: v, indColor: $("indColor").value || "#ffd166" } : { indMode: v }); syncIndicators(); });
-  $("indColRow").hidden = cfg.indMode !== "custom"; renderEachInd();
+  $("indColRow").hidden = cfg.indMode !== "custom";
+  if ($("drawOn")) seg("drawOn", [[false, "Leave as they are"], [true, "Style them too"]], () => !!cfg.drawOn, (v) => set({ drawOn: v }));
+  renderEachInd();
   $("indColor").value = /^#[0-9a-f]{6}$/i.test(cfg.indColor || "") ? cfg.indColor : "#ffd166";
 }
 if ($("indColor")) $("indColor").oninput = (e) => set({ indColor: e.target.value });
@@ -344,7 +346,7 @@ async function renderEachInd() {
     return `<div class="ind-row${set ? " set" : ""}${it.off ? " off" : ""}" data-k="${it.k}">
       <div class="ind-h"><i class="sw" style="background:${toHex6(it.k)}${it.kind === "zone" ? ";border-radius:2px" : ""}"></i><b>${esc(label)}</b>${it.off ? "<small>not on this chart</small>" : ""}
         <button class="link" data-a="reset" ${set ? "" : "hidden"}>Reset</button></div>
-      <div class="ind-c"><input type="color" data-a="c" value="${col}" title="Colour" /><button class="chip${e.c === "rainbow" ? " on" : ""}" data-a="rb">Rainbow</button>
+      <div class="ind-c"><input type="color" data-a="c" value="${col}" title="Colour" /><button class="chip${e.c === "rainbow" ? " on" : ""}" data-a="rb">Rainbow</button><button class="chip${e.c === "gradient" ? " on" : ""}" data-a="gr">Gradient</button>
         <button class="chip${e.h ? " on" : ""}" data-a="h" title="Hide it on the chart" style="margin-left:auto">${e.h ? "Hidden" : "Hide"}</button></div>
       <div class="ind-c"><span class="lbl">Glow</span><input type="range" data-a="g" min="0" max="1" step="0.05" value="${e.g === undefined || e.g === null ? 0 : e.g}" />
         ${it.kind === "line" ? `<span class="lbl">Width</span><input type="range" data-a="w" min="0" max="3" step="0.5" value="${+e.w || 0}" />` : ""}</div></div>`; }).join("");
@@ -352,6 +354,7 @@ async function renderEachInd() {
   box.querySelectorAll(".ind-row").forEach((row) => { const k = row.dataset.k;
     row.querySelector('[data-a="c"]').oninput = (e) => upd(k, { c: e.target.value });
     row.querySelector('[data-a="rb"]').onclick = () => { upd(k, { c: (cfg.indCustom[k] || {}).c === "rainbow" ? "" : "rainbow" }); renderEachInd(); };
+    row.querySelector('[data-a="gr"]').onclick = () => { upd(k, { c: (cfg.indCustom[k] || {}).c === "gradient" ? "" : "gradient" }); renderEachInd(); };
     row.querySelector('[data-a="g"]').oninput = (e) => upd(k, { g: +e.target.value });
     const w = row.querySelector('[data-a="w"]'); if (w) w.oninput = (e) => upd(k, { w: +e.target.value });
     row.querySelector('[data-a="h"]').onclick = () => { upd(k, { h: !(cfg.indCustom[k] || {}).h }); renderEachInd(); };
@@ -2202,7 +2205,10 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Priism is invite only now: enter your invite code once in the panel",
+const WHATS_NEW = ["Zones look like neon boxes: a glowing edge, price still visible inside. Plus a calmer Gradient next to Rainbow (Style \u203a Indicators)",
+  "Priism is invite only now: enter your invite code once in the panel",
+  "Rainbow and the other indicator colours now reach your zones too (bands, boxes, prints)",
+  "Style your own drawings too: colour, rainbow and glow for rectangles and lines you draw (Style \u203a Indicators)",
   "Style the legend: colour and a backing for indicator names and values, so they read on any wallpaper (Style \u203a Legend)",
   "O H L C letters are readable on dark wallpapers",
   "Customise each indicator: its own colour, glow, width, or hide it, zones included (Style \u203a Indicators \u203a Each indicator)",
