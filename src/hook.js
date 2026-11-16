@@ -87,7 +87,7 @@
     privacyPnl: "hide", tickSize: 0,
     bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
-    indMode: "own", indColor: "", indCustom: {},
+    indMode: "own", indColor: "", indCustom: {}, drawOn: false,
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -146,7 +146,7 @@
         sbOn: !!f.sbOn, sbColor: colOpt(f.sbColor), sbW: Math.max(0, Math.min(2, +f.sbW || 0)), sbStyle: ["solid", "dotted", "dashed", "none"].includes(f.sbStyle) ? f.sbStyle : "dashed",
         axOn: !!f.axOn, axColor: colOpt(f.axColor), axW: Math.max(0, Math.min(2, +f.axW || 0)), axStyle: ["solid", "none"].includes(f.axStyle) ? f.axStyle : "solid",
         indMode: ["own", "rainbow", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
-        indCustom: cleanCustom(f.indCustom),
+        indCustom: cleanCustom(f.indCustom), drawOn: !!f.drawOn,
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
@@ -160,7 +160,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.drawOn, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -220,9 +220,14 @@
 
   // The colours of your drawings (rectangles, the Long / Short position tool, fib fills…), so "all indicators" colours
   // never repaint them: they're yours, not an indicator's.
-  let drawCols = new Set();
+  let drawCols = new Map();   // colour key -> drawing name ("Rectangle"), for drawings on this chart
+  // The chart's API: tradingview.com (TradingViewApi), TradingView's charting library inside its frame (tradingViewApi)
+  // or the page that embeds it (tvWidget, like nq.vision).
+  const chartApi = () => { for (const w of [window.TradingViewApi, window.tradingViewApi]) if (w && typeof w.activeChart === "function") return w;
+    try { if (parent !== window && parent.tvWidget && typeof parent.tvWidget.activeChart === "function") return parent.tvWidget; } catch {} return null; };
   // Names for "Each indicator": where TradingView's internals are reachable (tradingview.com), each indicator's plot
-  // colours -> its title ("MA (20, close)"), so the panel can say which line is which. Elsewhere lines go by colour.
+  // colours -> its title ("MA (20, close)"), so the panel can say which line is which. Your drawings are named too
+  // ("Rectangle (your drawing)"). Elsewhere lines go by colour.
   setInterval(() => {
     const L = window.__bdCandleLooks; if (!L || !L.setNames || document.hidden) return;
     const m = new Map();
@@ -239,15 +244,19 @@
           try { const col = ch[k].childs().color.value(), r = L.keyOf(col); if (r && !m.has(r.k)) m.set(r.k, title.slice(0, 28) + (Object.keys(ch).filter((x) => x[0] !== "_").length > 1 ? " \u00b7 " + k : "")); } catch {} }
       }
     } catch {}
-    if (m.size) L.setNames(m);
+    // your drawings: the line / fill colours of each one (not its text colour, which isn't drawn as a shape)
     try {
-      const ac = window.TradingViewApi && window.TradingViewApi.activeChart && window.TradingViewApi.activeChart(), d = new Set();
-      const walk = (o, n) => { if (!o || n > 4) return; for (const k in o) { const v = o[k];
-        if (typeof v === "string") { const r = L.keyOf(v); if (r) d.add(r.k); } else if (v && typeof v === "object") walk(v, n + 1); } };
+      const api = chartApi(), ac = api && api.activeChart && api.activeChart(), d = new Map();
+      const walk = (o, n, name) => { if (!o || n > 4) return; for (const k in o) { if (/text|font/i.test(k)) continue; const v = o[k];
+        if (typeof v === "string") { const r = L.keyOf(v); if (r && !d.has(r.k)) d.set(r.k, name); } else if (v && typeof v === "object") walk(v, n + 1, name); } };
       const shapes = ac && ac.getAllShapes ? ac.getAllShapes().slice(0, 300) : [];
-      for (const sh of shapes) { try { walk(ac.getShapeById(sh.id).getProperties(), 0); } catch {} }
-      drawCols = d;
+      for (const sh of shapes) { const name = String(sh.name || "drawing").replace(/^LineTool/, "").replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/^./, (c) => c.toUpperCase());
+        try { walk(ac.getShapeById(sh.id).getProperties(), 0, name); } catch {} }
+      const was = [...drawCols.keys()].join("|"); drawCols = d;
+      if ([...d.keys()].join("|") !== was && on) forceRepaint(true);   // a new / changed drawing: redraw once so it's styled and listed
+      for (const [k, name] of d) if (!m.has(k)) m.set(k, name.slice(0, 24) + " (your drawing)");
     } catch {}
+    if (m.size) L.setNames(m);
   }, 3000);
   function chartWidgets() {
     const api = window.TradingViewApi || window.tradingViewApi, out = [];
@@ -318,9 +327,9 @@
     if (r.a >= 0.95 && H / dpr >= 8 && H / dpr <= 40 && W / dpr <= 460) return null;   // a solid label box (price tags, order pills, session labels), not a zone
     if (sides.has(r.k) || (candles && (r.k === candles.up.join(",") || r.k === candles.down.join(",")))) return null;   // candles / volume
     L.noteSeen(orig, "zone");
-    // its own settings (Each indicator), or the all-indicators colour: never your drawings (a rectangle, the Long /
-    // Short position tool), and greys stay grey like grey lines do
-    const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && !drawCols.has(r.k) && glowable(`rgb(${r.k})`);
+    // its own settings (Each indicator), or the all-indicators colour: your drawings (a rectangle, the Long / Short
+    // tool) only with "Your drawings: Style them too"; greys stay grey like grey lines do
+    const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && (fx.drawOn || !drawCols.has(r.k)) && glowable(`rgb(${r.k})`);
     if (!own && !all) return null;
     return L.zone(orig, { mode: all ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom }, ctx);
   }
@@ -547,13 +556,16 @@
     // an indicator line: a Path2D, or a path of 3+ segments, not in a candle colour
     // (candle wicks / borders can be Path2D in TradingView's own candle colours: those aren't indicators)
     const candleCol = typeof cur === "string" && ((candles && remap(cur) !== cur) || (() => { const r = rgbKey(cur); return !!r && sides.has(r.key); })());
-    const indLine = polyline && typeof cur === "string" && !candleCol && (path !== undefined || k[1] >= 3);
+    // a line of one of your drawings (a trend line, a rectangle's border): listed and styled like an indicator line,
+    // but the all-indicators colour only reaches it with "Your drawings: Style them too"
+    const dk = drawCols.size && typeof cur === "string" ? rgbKey(cur) : null, isDraw = !!dk && drawCols.has(dk.key);
+    const indLine = (polyline && typeof cur === "string" && !candleCol && (path !== undefined || k[1] >= 3)) || (isDraw && !candleCol);
     if (indLine && L && L.noteSeen) L.noteSeen(cur, "line");                     // for the panel's "Each indicator" list
     const custom = fx.indCustom && Object.keys(fx.indCustom).length > 0, indOn = fx.indMode !== "own" || custom;
     if (!(candles || fx.lineGlow > 0 || indOn)) return origStroke.apply(this, arguments);
     let col = candles && !polyline ? remap(cur) : cur, gcol = col, glowAmt = fx.lineGlow, extraW = 0;
     if (indOn && indLine && (custom || glowable(cur))) {
-      const r = L && L.indicator && L.indicator(this, cur, { mode: glowable(cur) ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom });
+      const r = L && L.indicator && L.indicator(this, cur, { mode: glowable(cur) && (!isDraw || fx.drawOn) ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom });
       if (r && r.hide) return;                                                    // hidden in "Each indicator"
       if (r) { col = r.s; gcol = r.g; if (r.glow !== undefined) glowAmt = r.glow; if (r.w) extraW = r.w; }
     }
@@ -1226,6 +1238,17 @@
         if (col !== cur) strokeDesc.set.call(this, pS);
         this.lineWidth = pLW;
         return;
+      }
+    }
+    // the border of one of your drawings (a rectangle): the same colour / glow / width as the rest of that drawing
+    if (on && c && drawCols.size && isPane(c)) {
+      const cur = strokeDesc.get.call(this), k = typeof cur === "string" ? rgbKey(cur) : null, L = window.__bdCandleLooks;
+      if (k && drawCols.has(k.key) && L && L.indicator && ((fx.drawOn && fx.indMode !== "own") || (fx.indCustom && fx.indCustom[k.key]))) {
+        const r = L.indicator(this, cur, { mode: fx.drawOn && glowable(cur) ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom });
+        if (r && r.hide) return;
+        if (r) { const pS = cur, pB = this.shadowBlur, pC = this.shadowColor, pW = this.lineWidth, gl = r.glow !== undefined ? r.glow : fx.lineGlow;
+          strokeDesc.set.call(this, r.s); if (gl > 0) { this.shadowColor = r.g; this.shadowBlur = 2 + gl * 16; } if (r.w) this.lineWidth = pW * (1 + r.w * 0.75);
+          origStrokeRect.call(this, x, y, w, h); strokeDesc.set.call(this, pS); this.shadowBlur = pB; this.shadowColor = pC; this.lineWidth = pW; return; }
       }
     }
     return origStrokeRect.call(this, x, y, w, h);
