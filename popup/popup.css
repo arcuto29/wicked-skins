@@ -466,7 +466,57 @@ body.lw-page [data-tvonly] { display: none !important; }
 .ig-card #igMsg.bad { color: #ff8a8a; }
 .ig-foot { margin-top: 12px !important; color: #6c7183 !important; font-size: 11.5px !important; }
 
+   True black, quiet surfaces, thin lines. White marks what's selected; the accent only says "on" (switches, slider
+   fill). No glows or gradients behind the controls. Shared by the extension, the desktop app and Android. */
+:root { --bg: #000; --panel: #0b0b0d; --panel2: #101012; --line: rgba(255,255,255,.07); --line2: rgba(255,255,255,.12);
+  --text: #f5f5f7; --muted: #8e8e96; --dim: #66666e; --acc: #2ef2b0; --sel: #fff; }
+body { background: #000; }
+main::-webkit-scrollbar-thumb { background: #232326; border-color: #000; }
+nav { background: #000; border-right-color: var(--line); }
+nav button:hover { background: rgba(255,255,255,.05); color: #e8e8ee; }
+nav button.on { background: rgba(255,255,255,.08); border-color: transparent; box-shadow: none; color: #fff; }
+nav button.on svg { stroke: #fff; filter: none; }
+nav button.on::before { background: #fff; width: 2px; }
+.top { background: var(--panel); border-color: var(--line); }
+details.grp { background: var(--panel); border-color: var(--line); }
+details.grp[open] { border-color: var(--line); }
+.cpart { background: rgba(255,255,255,.015); }
+.finder input, .skinbar input, input[type=text], #loName, .field { background-color: var(--panel); border-color: var(--line2); }
+input:focus, button:focus-visible, .field:focus { border-color: rgba(255,255,255,.45) !important; box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
+/* selected = white, calm */
+.seg { background: var(--panel); border-color: var(--line); }
+.seg button.on { background: #1d1d20; box-shadow: none; color: #fff; }
+.chip { background: transparent; border-color: var(--line2); color: #cfcfd6; }
+.chip:hover { border-color: rgba(255,255,255,.3); }
+.chip.on { background: #fff; color: #000; border-color: #fff; box-shadow: none; }
+.card, .lookcard { background: var(--panel2); }
+.card:hover, .lookcard:hover { box-shadow: none; border-color: var(--line2); }
+.card.on, .lookcard.on { box-shadow: 0 0 0 1.5px #fff; }
+.primary { background: #fff; color: #000; box-shadow: none; }
+.primary:hover { filter: none; background: #e9e9ee; }
+button, .btn { background: rgba(255,255,255,.04); }
+.switch span { background: #2c2c30; box-shadow: none; }
+.switch input:checked + span { background: var(--acc); box-shadow: none; }
+.news { background: var(--panel); border-color: var(--line2); }
+.news .dots i.on, .tour .dots i.on { background: #fff; }
+.tour .t { background: #0b0b0d; }
+#toast { background: rgba(16,16,18,.97); }
+/* sliders: a thin track, filled up to the value (--p, set by the panel), and a small white knob */
+input[type=range] { -webkit-appearance: none; appearance: none; height: 18px; background: transparent; cursor: pointer; accent-color: initial; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px;
+  background: linear-gradient(90deg, var(--acc) 0 var(--p, 0%), #2a2a2e var(--p, 0%) 100%); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.6); transition: transform .12s; }
+input[type=range]:hover::-webkit-slider-thumb, input[type=range]:active::-webkit-slider-thumb { transform: scale(1.15); }
+input[type=range]::-moz-range-track { height: 4px; border-radius: 4px; background: #2a2a2e; }
+input[type=range]::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--acc); }
+input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; }
+.row output { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+.invite-gate { background: #000 !important; }
+=======
 /* wallpaper labels: quality (4K, 1080p…) and OLED, bottom-left over the picture */
 .wtag { position: absolute; left: 6px; top: 6px; font-size: 9px; font-weight: 800; letter-spacing: .04em; padding: 2px 5px; border-radius: 4px; background: rgba(0,0,0,.65); color: #e6e9f0; pointer-events: none; }
 .wtag.q + .wtag.oled { left: auto; top: 24px; left: 6px; }
 .wtag.oled { background: #000; color: #fff; border: 1px solid rgba(255,255,255,.35); }
+
+/* ===================== clean black theme ==============
