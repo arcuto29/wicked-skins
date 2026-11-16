@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -21,7 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
-  indMode: "own", indColor: "", indCustom: {}, drawOn: false,
+  indMode: "own", indColor: "", indCustom: {}, drawOn: false, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -1394,6 +1394,23 @@ function renderChartStyle() {
   }
   renderTicker(box);
   renderLegend(box);
+  renderChartText(box);
+}
+// Text indicators draw ON the chart (labels, levels, values, prints). Black text on a dark wallpaper is always made
+// readable; this lets you go further.
+function renderChartText(box) {
+  const card = document.createElement("div"); card.className = "cpart";
+  card.innerHTML = `<div class="cpart-h"><div><b>Chart text</b><small>Text your indicators write on the chart: labels, levels, values, prints.</small></div></div>
+    <div class="cpart-b"><div class="row"><span>Colour</span><div class="seg" id="tx-mode"></div><input type="color" id="tx-col" ${cfg.txtMode === "custom" ? "" : "hidden"} /></div>
+    <div class="row"><span>Outline</span><div class="seg" id="tx-out"></div></div>
+    <div class="row"><span>Size</span><div class="seg" id="tx-size"></div></div>
+    <p class="hint">Text inside an indicator's own label box keeps its colours. Black text on a dark wallpaper is always lightened.</p></div>`;
+  box.appendChild(card);
+  seg("tx-mode", [["own", "Own"], ["readable", "Readable"], ["candle", "Candle"], ["custom", "Custom"]], () => cfg.txtMode || "own",
+    (v) => { set(v === "custom" && !/^#/.test(cfg.txtColor || "") ? { txtMode: v, txtColor: $("tx-col").value || "#ffffff" } : { txtMode: v }); renderChartStyle(); });
+  const ci = $("tx-col"); ci.value = /^#[0-9a-f]{6}$/i.test(cfg.txtColor || "") ? cfg.txtColor : "#ffffff"; ci.oninput = (e) => set({ txtColor: e.target.value });
+  seg("tx-out", [[0, "Off"], [1, "Soft"], [2, "Strong"]], () => +cfg.txtOutline || 0, (v) => set({ txtOutline: v }));
+  seg("tx-size", [[0, "Normal"], [1, "Large"], [2, "XL"]], () => +cfg.txtSize || 0, (v) => set({ txtSize: v }));
 }
 // The legend: indicator names and values, and O H L C, at the top left of the chart. Made for the platform's own
 // background, so on some wallpapers it's hard to read: give it your colour and / or a backing.
@@ -2205,7 +2222,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Zones look like neon boxes: a glowing edge, price still visible inside. Plus a calmer Gradient next to Rainbow (Style \u203a Indicators)",
+const WHATS_NEW = ["Chart text: your indicators\u2019 labels in any colour, with an outline, and black text is always readable (Style \u203a Chart text)",
+  "Zones look like neon boxes: a glowing edge, price still visible inside. Plus a calmer Gradient next to Rainbow (Style \u203a Indicators)",
   "Priism is invite only now: enter your invite code once in the panel",
   "Rainbow and the other indicator colours now reach your zones too (bands, boxes, prints)",
   "Style your own drawings too: colour, rainbow and glow for rectangles and lines you draw (Style \u203a Indicators)",

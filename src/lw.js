@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 7;
+  const LW_VERSION = 8;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -107,11 +107,15 @@
   let lfx = null;
   const colOk = (v) => (v === "candle" || /^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
   const styleOk = (v, d, extra = []) => (["solid", "dotted", "dashed", ...extra].includes(v) ? v : d);
+  let ltx = null;
   function readFx() {
     try {
       const f = JSON.parse(htmlEl().getAttribute("data-ws-fx") || "null");
       const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
       const any = f && (f.lineGlow > 0 || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
+      // Chart text: read whenever Priism is on (its "Own" setting still lightens black text on a dark wallpaper)
+      ltx = f ? { mode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", color: hex(f.txtColor), outline: Math.max(0, Math.min(2, +f.txtOutline || 0)),
+        size: Math.max(0, Math.min(2, +f.txtSize || 0)), bg: f.bg === "light" ? "light" : "dark" } : null;
       lfx = any ? {
         // price scale text + backing
         scaleText: hex(f.scaleText), scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)), scaleBold: !!f.scaleBold, scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
@@ -130,13 +134,13 @@
           if (/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) && e && typeof e === "object") o[k] = { c: e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "",
             g: e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0)), w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h }; return o; })(),
         accent: hex(f.accent) } : null;
-    } catch { lfx = null; }
+    } catch { lfx = null; ltx = null; }
   }
   let lfxSig = "null", candSig = null, onWas = null;
   // data-ws-fx also carries the wallpaper brightness, refreshed every few seconds: only redraw when something we use changed
   const settingsObserver = new MutationObserver(() => {
     on = htmlEl().classList.contains("bd-on");
-    const cs = htmlEl().getAttribute("data-ws-candles"); readFx(); const ls = JSON.stringify(lfx);
+    const cs = htmlEl().getAttribute("data-ws-candles"); readFx(); const ls = JSON.stringify(lfx) + JSON.stringify(ltx);
     if (cs === candSig && ls === lfxSig && on === onWas) return;
     candSig = cs; lfxSig = ls; onWas = on; readCandles(); remapCache.clear(); repaint();
   });
@@ -294,7 +298,7 @@
   function inLwTable(c) { let v = lwTableCache.get(c); if (v === undefined) { try { v = !!(c.closest && c.closest(ROOT_SEL)); } catch { v = false; } lwTableCache.set(c, v); } return v; }
 
   // ---------- install the canvas hooks (once, when this is a LW page) ----------
-  let active = false, lineHook = null, lineIsCurve = () => false;
+  let active = false, lineHook = null, lineIsCurve = () => false, noteSolidHook = () => {};
   function install() {
     if (active) return;
     active = true;
@@ -377,6 +381,7 @@
         }
       }
       drawCalls.fillRect++;
+      if (on && c) noteSolidHook(this, x, y, w, h);
       if (on && c && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle) && labelBox(this, w, h)) {
         const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p);
         lastBox.set(this, "xh:" + col); return;
@@ -408,6 +413,7 @@
     proto.fill = function (...a) {
       const c = this.canvas;
       if (on && c && typeof this.__bdLwOrig === "string" && isChart(c)) { noteFill(this.__bdLwOrig); drawCalls.fill++; }
+      if (on && c && !a.length) { const b = pbox.get(this); if (b) noteSolidHook(this, b.x, b.y, b.w, b.h); }
       if (on && c && !inLook && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle)) { const b = pbox.get(this);
         if (b && labelBox(this, b.w, b.h)) { const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); lastBox.set(this, "xh:" + col); return r; } }
       if (on && c && !inLook && (isAxis(c) || isPaneC(c))) { const b = pbox.get(this); if (b && labelBox(this, b.w, b.h)) { noteBox(this, b.w, b.h); noteTagRow(this, b.y, b.h);
@@ -587,7 +593,17 @@
       const t = g.getTransform(), Y = (y + h / 2) * (t.d || 1) + t.f, now = performance.now(), i = tagRows.findIndex((e) => Math.abs(e.y - Y) <= 3);
       if (i >= 0) tagRows[i] = { y: Y, t: now }; else { tagRows.push({ y: Y, t: now }); if (tagRows.length > 60) tagRows.shift(); } }
     const onTagRow = (Y) => { const now = performance.now(); for (const e of tagRows) if (now - e.t < 20000 && Math.abs(e.y - Y) <= 6) return true; return false; };
-    const oText = proto.fillText;
+    const oText = proto.fillText, oStrokeText = proto.strokeText;
+    // solid boxes drawn on the chart lately (an indicator's label box): the text inside keeps its own colours
+    const solidLw = new WeakMap();
+    function noteSolidLw(g, x, y, w, h) { const c = g.canvas; if (!c || !isPaneC(c) || !ltx) return;
+      const r = rgbKey(String(g.fillStyle)); if (!r || (r.a !== null && +r.a < 0.6)) return;
+      const t = g.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1)); if (W >= c.width * 0.6 || H >= c.height * 0.5) return;
+      const x0 = x * (t.a || 1) + t.e, y0 = y * (t.d || 1) + t.f; let a = solidLw.get(g); if (!a) { a = []; solidLw.set(g, a); }
+      a.push({ x0: Math.min(x0, x0 + w * (t.a || 1)), y0: Math.min(y0, y0 + h * (t.d || 1)), x1: Math.max(x0, x0 + w * (t.a || 1)), y1: Math.max(y0, y0 + h * (t.d || 1)), t: performance.now() }); if (a.length > 40) a.shift(); }
+    function inSolidLw(g, x, y) { const a = solidLw.get(g); if (!a || !a.length) return false; const t = g.getTransform(), X = x * (t.a || 1) + t.e, Y = y * (t.d || 1) + t.f, now = performance.now();
+      for (let i = a.length - 1; i >= 0; i--) { const b = a[i]; if (now - b.t > 150) break; if (X >= b.x0 - 2 && X <= b.x1 + 2 && Y >= b.y0 - 2 && Y <= b.y1 + 2) return true; } return false; }
+    noteSolidHook = noteSolidLw;
     proto.fillText = function (t, x, y, ...rest) {
       const c = this.canvas;
       if (!on || !c || inLook) return oText.call(this, t, x, y, ...rest);
@@ -605,6 +621,12 @@
           if (lfx.bracketOn) { const col = sign > 0 && lfx.bracketProfit ? lfx.bracketProfit : sign < 0 && lfx.bracketLoss ? lfx.bracketLoss : lfx.bracketText;
             if (col) fillDesc.set.call(this, col); if (lfx.bracketSize) this.font = sizeUp(pF, lfx.bracketSize); }
           const r = oText.call(this, privText(t), x, y, ...rest); this.font = pF; fillDesc.set.call(this, pS); return r;
+        }
+        // Chart text (Style > Chart text): the platform's / an indicator's text on the chart, not inside its own box
+        if (ltx && !inSolidLw(this, x, y)) {   // (even on Own: black text on a dark wallpaper is lightened)
+          const L = window.__bdCandleLooks;
+          if (L && L.chartText && L.chartText(this, { fill: (v) => fillDesc.set.call(this, v), stroke: (v) => strokeDesc.set.call(this, v), text: (...q) => oText.apply(this, q), strokeText: (...q) => oStrokeText.apply(this, q) },
+            [t, x, y, ...rest], { ...ltx, up: candles && candles.upHex })) return;
         }
         return oText.call(this, t, x, y, ...rest);
       }

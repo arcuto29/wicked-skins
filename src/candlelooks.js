@@ -306,5 +306,47 @@
     return P ? { s: withAlpha(P[i % P.length], al), g: P[i % P.length] } : null;
   }
 
-  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf };
+  // ---------- chart text (Style > Chart text): text indicators draw ON the chart (labels, levels, values, prints) ----------
+  // Shared by hook.js (TradingView) and lw.js (Lightweight Charts platforms). The hooks decide WHICH text (not order
+  // pills, scales, crosshair labels, or text inside a label's own box); this draws it. o = { mode, color, outline,
+  // size, bg: "dark" | "light", up }. k = the untouched canvas calls { fill(v), stroke(v), text(...), strokeText(...) }.
+  // Returns false to let the caller draw the text as it is.
+  const TXT_SIZE = [0, 2, 4], TXT_LINE = [0, 2.6, 4.2];
+  function readableText(r, dark) {
+    const [R, G, B] = r.k.split(",").map(Number), mx = Math.max(R, G, B), mn = Math.min(R, G, B), lum = (0.2126 * R + 0.7152 * G + 0.0722 * B) / 255;
+    if ((mx - mn) / 255 < 0.18) return dark ? "#eef1f6" : "#14161f";                 // grey / black / white text: clear white or ink
+    const mix = (t, f) => toHex([R, G, B].map((v, i) => Math.round(v + (t[i] - v) * f)));
+    if (dark && lum < 0.5) return mix([255, 255, 255], 0.5);                           // a dark colour on a dark wallpaper: lighter, same hue
+    if (!dark && lum > 0.6) return mix([0, 0, 0], 0.45);
+    return null;                                                                       // already reads: keep its own colour
+  }
+  function chartText(ctx, k, args, o) {
+    const own = String(ctx.fillStyle), r = keyOf(own);
+    if (!r || r.a < 0.3 || typeof args[0] !== "string" || !args[0].trim()) return false;   // faint text (a watermark) stays as it is
+    const dark = o.bg !== "light";
+    let col = null;
+    if (o.mode === "custom" && isHex(o.color)) col = o.color;
+    else if (o.mode === "candle" && isHex(o.up)) col = o.up;
+    else if (o.mode === "readable") col = readableText(r, dark);
+    else if (dark) {   // Own: only black / near-black grey text on a dark wallpaper (made for a light chart) is lightened
+      const [R, G, B] = r.k.split(",").map(Number);
+      if (Math.max(R, G, B) - Math.min(R, G, B) < 46 && (0.2126 * R + 0.7152 * G + 0.0722 * B) / 255 < 0.33) col = "#e6e9f0";
+    }
+    const out = o.outline > 0 ? o.outline : o.mode === "readable" ? 1 : 0, add = TXT_SIZE[o.size] || 0;
+    if (!col && !out && !add) return false;
+    const pFont = ctx.font, pW = ctx.lineWidth, pJ = ctx.lineJoin, pM = ctx.miterLimit, pS = ctx.strokeStyle;
+    if (add) ctx.font = pFont.replace(/(\d+(?:\.\d+)?)px/, (m0, n) => (+n + add) + "px");
+    if (out) {   // a thin outline UNDER the letters, in the wallpaper's opposite tone: crisp on any background
+      const sx = ctx.getTransform().a || 1, dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
+      k.stroke(dark ? "rgba(6,8,12,0.88)" : "rgba(255,255,255,0.92)"); ctx.lineWidth = TXT_LINE[out] * dpr / sx; ctx.lineJoin = "round"; ctx.miterLimit = 2;
+      k.strokeText(...args);
+    }
+    if (col) k.fill(col);
+    k.text(...args);
+    if (col) k.fill(own);
+    ctx.font = pFont; ctx.lineWidth = pW; ctx.lineJoin = pJ; ctx.miterLimit = pM; if (out) k.stroke(pS);
+    return true;
+  }
+
+  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText };
 })();

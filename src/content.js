@@ -57,6 +57,9 @@
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
     indMode: "own", indColor: "", indCustom: {},
     drawOn: false,            // your own drawings (rectangles, zones you draw) follow the indicator colours too
+    // Chart text: text indicators draw ON the chart (labels, levels, values, prints). own | readable | custom | candle,
+    // outline 0 off / 1 soft / 2 strong, size 0 normal / 1 large / 2 XL
+    txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
     plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -1366,7 +1369,7 @@
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
-    "indMode", "indColor", "indCustom", "drawOn", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
+    "indMode", "indColor", "indCustom", "drawOn", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper

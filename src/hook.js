@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 16;
+  const HOOK_VERSION = 17;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -87,7 +87,7 @@
     privacyPnl: "hide", tickSize: 0,
     bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
-    indMode: "own", indColor: "", indCustom: {}, drawOn: false,
+    indMode: "own", indColor: "", indCustom: {}, drawOn: false, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -147,6 +147,7 @@
         axOn: !!f.axOn, axColor: colOpt(f.axColor), axW: Math.max(0, Math.min(2, +f.axW || 0)), axStyle: ["solid", "none"].includes(f.axStyle) ? f.axStyle : "solid",
         indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: cleanCustom(f.indCustom), drawOn: !!f.drawOn,
+        txtMode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", txtColor: /^#[0-9a-f]{6}$/i.test(f.txtColor || "") ? f.txtColor : "", txtOutline: Math.max(0, Math.min(2, +f.txtOutline || 0)), txtSize: Math.max(0, Math.min(2, +f.txtSize || 0)),
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
@@ -160,7 +161,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.drawOn, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -364,6 +365,45 @@
   }
   const levelFirst = new Map();   // "r,g,b" -> when a level line in that colour was first seen
   let levelT = 0;
+  // solid boxes drawn on the chart lately (an indicator's label, a table cell): text drawn inside one keeps its colours
+  const solidBoxes = new WeakMap();   // ctx -> [{ x0, y0, x1, y1, t }] in device px
+  function noteSolidBox(ctx, x0, y0, x1, y1) {
+    let a = solidBoxes.get(ctx); if (!a) { a = []; solidBoxes.set(ctx, a); }
+    a.push({ x0: Math.min(x0, x1), y0: Math.min(y0, y1), x1: Math.max(x0, x1), y1: Math.max(y0, y1), t: performance.now() }); if (a.length > 40) a.shift();
+  }
+  function inSolidBox(ctx, x, y) {
+    const a = solidBoxes.get(ctx); if (!a || !a.length) return false;
+    const t = ctx.getTransform(), X = (x || 0) * (t.a || 1) + t.e, Y = (y || 0) * (t.d || 1) + t.f, now = performance.now();
+    for (let i = a.length - 1; i >= 0; i--) { const b = a[i]; if (now - b.t > 150) break; if (X >= b.x0 - 2 && X <= b.x1 + 2 && Y >= b.y0 - 2 && Y <= b.y1 + 2) return true; }
+    return false;
+  }
+  const origStrokeText = proto.strokeText;
+  // TradingView draws some indicator text (Pivot Points' R1 / P / S1 …) ONCE into a hidden canvas and pastes that
+  // picture onto the chart. Remember the text written into hidden canvases (only canvases holding nothing but text);
+  // when one is pasted onto the chart, paste a restyled copy instead, built once per change (cheap to paste).
+  const hiddenText = new WeakMap();   // hidden canvas -> { ops: [...], mixed, w, h, ver }
+  function hiddenOf(c) { let h = hiddenText.get(c);
+    if (!h || h.w !== c.width || h.h !== c.height) { h = { ops: [], mixed: false, w: c.width, h: c.height, ver: (h ? h.ver : 0) + 1 }; hiddenText.set(c, h); } return h; }
+  function noteHiddenText(ctx, a) { const c = ctx.canvas; if (c.width > 800 || c.height > 4000) return; const h = hiddenOf(c);
+    if (h.ops.length > 300) { h.mixed = true; return; }
+    h.ops.push({ a: a.slice(), font: ctx.font, fill: String(origFillDesc.get.call(ctx)), align: ctx.textAlign, base: ctx.textBaseline, tf: ctx.getTransform() }); h.ver++; }
+  function noteHiddenOther(ctx) { const c = ctx.canvas; if (c && !c.isConnected) { const h = hiddenText.get(c); if (h && !h.mixed) { h.mixed = true; h.ver++; } } }
+  function noteHiddenClear(ctx, x, y, w, h0) { const c = ctx.canvas; if (!c || c.isConnected) return; const t = ctx.getTransform();
+    if (Math.abs(w * (t.a || 1)) >= c.width - 1 && Math.abs(h0 * (t.d || 1)) >= c.height - 1) { const h = hiddenOf(c); h.ops = []; h.mixed = false; h.ver++; } }
+  const styledCopies = new WeakMap();  // hidden canvas -> { key, canvas }
+  function styledCopy(img) {
+    const h = hiddenText.get(img); if (!h || h.mixed || !h.ops.length || h.w !== img.width || h.h !== img.height) return null;
+    const L = window.__bdCandleLooks; if (!L || !L.chartText) return null;
+    const o = { mode: fx.txtMode, color: fx.txtColor, outline: fx.txtOutline, size: 0, bg: fx.bg || "dark", up: candles && candles.upHex };   // (no size change: the picture has a fixed size)
+    const key = h.ver + "|" + JSON.stringify(o), s0 = styledCopies.get(img); if (s0 && s0.key === key) return s0.canvas;
+    const cv = (s0 && s0.canvas) || document.createElement("canvas"); cv.width = img.width; cv.height = img.height;
+    const g = cv.getContext("2d"), k = txtK(g); let changed = false;
+    for (const op of h.ops) { g.setTransform(op.tf); g.font = op.font; origFillDesc.set.call(g, op.fill); g.textAlign = op.align; g.textBaseline = op.base;
+      if (L.chartText(g, k, op.a, o)) changed = true; else origText.apply(g, op.a); }
+    const out = changed ? cv : null; styledCopies.set(img, { key, canvas: out || cv }); if (!changed) styledCopies.set(img, { key, canvas: null }); return out;
+  }
+  const txtK = (ctx) => ({ fill: (v) => origFillDesc.set.call(ctx, v), stroke: (v) => strokeDesc.set.call(ctx, v),
+    text: (...a) => origText.apply(ctx, a), strokeText: (...a) => origStrokeText.apply(ctx, a) });
   // draw a zone: its fill (glowing only if it has no edge), then its neon edge with the glow. stroke = draws the edge.
   function drawZone(ctx, z, fill, stroke) {
     const pF = ctx.fillStyle, pSB = ctx.shadowBlur, pSC = ctx.shadowColor;
@@ -581,6 +621,7 @@
 
   proto.stroke = function (path) {
     const c = this.canvas;
+    if (c && !c.isConnected) noteHiddenOther(this);
     if (on && path === undefined && c && styling() && (isPane(c) || (fx.axOn && isAxis(c))) && styleLine(this, c, arguments)) return;
     // Bracket level line: a wide, horizontal stroke sitting at a pill's height. Recolour / thicken it so the whole
     // bracket level is easy to see. Done before the candle/glow path because it can be on when those are off.
@@ -960,6 +1001,8 @@
   const origDrawImage = proto.drawImage;
   proto.drawImage = function (img, ...r) {
     const c = this.canvas;
+    if (c && !c.isConnected) noteHiddenOther(this);
+    if (on && c && img instanceof HTMLCanvasElement && !img.isConnected && isPane(c) && !isTop(c)) { const sc = styledCopy(img); if (sc) return origDrawImage.call(this, sc, ...r); }
     // a label picture pasted onto the chart (TradingView draws order / position tags this way): note its row, so the
     // line on that row is never taken for an indicator's level line
     if (on && c && img && isPane(c) && (img instanceof HTMLCanvasElement || (typeof OffscreenCanvas !== "undefined" && img instanceof OffscreenCanvas))) {
@@ -1011,6 +1054,7 @@
 
   proto.fillText = function (...a) {
     const c = this.canvas;
+    if (c && !c.isConnected) noteHiddenText(this, a);
     if (on && fx.chOn && fx.chLabels && c && isAxis(c) && isTop(c) && chLabel.get(this)) {
       const pF = this.fillStyle; origFillDesc.set.call(this, readableOn(chLabel.get(this)) || "#ffffff");
       const r = origText.apply(this, a); origFillDesc.set.call(this, pF); return r;
@@ -1110,6 +1154,13 @@
       this.fillStyle = pF; this.font = pFont; this.shadowBlur = pSB; this.shadowColor = pSC;
       return;
     }
+    // Chart text (Style > Chart text): text indicators draw on the chart. Not the crosshair overlay, and not text
+    // inside a label's own solid box (that box already gives it contrast). Even on Own, black text on a dark
+    // wallpaper (made for a light chart) is lightened so it can be read.
+    if (on && c && isPane(c) && !isTop(c) && !inSolidBox(this, a[1], a[2])) {
+      const L = window.__bdCandleLooks;
+      if (L && L.chartText && L.chartText(this, txtK(this), a, { mode: fx.txtMode, color: fx.txtColor, outline: fx.txtOutline, size: fx.txtSize, bg: fx.bg || "dark", up: candles && candles.upHex })) return;
+    }
     const bgDark = fx.bg ? fx.bg === "dark" : htmlEl().classList.contains("theme-light"); // before 1st measurement: old behaviour
     if (on && !htmlEl().classList.contains("bd-over-mode") && this.canvas && inChart(this.canvas) && isScaleLabel(this.fillStyle) &&
         (bgDark ? isDark(this.fillStyle) : !isDark(this.fillStyle))) {
@@ -1165,10 +1216,12 @@
   }
   proto.fill = function (...a) {
     const c = this.canvas;
+    if (c && !c.isConnected) noteHiddenOther(this);
     // a solid rounded tag on the chart (order / position labels): note its row, so its level line is never an indicator's
     if (on && c && a.length === 0 && isPane(c)) { const b = pathBox.get(this);
       if (b) { const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1, w = (b.x1 - b.x0) / dpr, h = (b.y1 - b.y0) / dpr, k = rgbKey(String(this.fillStyle));
-        if (h >= 8 && h <= 40 && w >= 10 && w <= 460 && k && (k.a === null || +k.a >= 0.9)) noteLabelRow(this, (b.y0 + b.y1) / 2); } }
+        if (h >= 8 && h <= 40 && w >= 10 && w <= 460 && k && (k.a === null || +k.a >= 0.9)) noteLabelRow(this, (b.y0 + b.y1) / 2);
+        if (k && (k.a === null || +k.a >= 0.6) && b.x1 - b.x0 < c.width * 0.6 && b.y1 - b.y0 < c.height * 0.5) noteSolidBox(this, b.x0, b.y0, b.x1, b.y1); } }
     // rounded pill box (TradingView's newer trading labels draw their box as a path, not a rect)
     if (on && (fx.bracketOn || fx.privacy) && c && a.length === 0 && bracketCanvas(c)) {
       const b = pathBox.get(this);
@@ -1217,6 +1270,7 @@
   const origStrokeRectRaw = proto.strokeRect, origFillPathRaw = origFillPath;   // the untouched fill: candle looks never pass through the pill / label logic
   proto.fillRect = function (x, y, w, h) {
     const c = this.canvas;
+    if (c && !c.isConnected) noteHiddenOther(this);
     // scale border: a 1px rect along the edge of the price / time scale
     if (on && fx.axOn && c && isAxis(c)) {
       const t = this.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
@@ -1228,6 +1282,8 @@
       }
     }
     if (on && c && w * (this.getTransform().a || 1) <= 40 && isPane(c)) noteFill(this.__bdFill);
+    if (on && c && isPane(c)) { const k = rgbKey(String(this.fillStyle)), t = this.getTransform();
+      if (k && (k.a === null || +k.a >= 0.6) && Math.abs(w * (t.a || 1)) < c.width * 0.6 && Math.abs(h * (t.d || 1)) < c.height * 0.5) noteSolidBox(this, x * (t.a || 1) + t.e, y * (t.d || 1) + t.f, (x + w) * (t.a || 1) + t.e, (y + h) * (t.d || 1) + t.f); }
     if (on && c && isPane(c) && pillBox(this, x, y, w, h)) { const k = rgbKey(String(this.fillStyle)); if (k && (k.a === null || +k.a >= 0.9)) { const t = this.getTransform(); noteLabelRow(this, (y + h / 2) * (t.d || 1) + t.f); } }
     // Bracket pills: record the box so the text drawn next knows it belongs to a pill. Optionally strengthen the
     // box backing so the TP/Stop/P&L number stays readable on busy wallpapers.
@@ -1284,8 +1340,10 @@
   // TradingView outlines each pill with a 1px strokeRect right after the box fill. When bracket styling is on we
   // restyle that outline: bolder, a glow, or a custom / profit-loss colour — so the whole pill level stands out.
   const origStrokeRect = proto.strokeRect;
+  { const oc = proto.clearRect; proto.clearRect = function (x, y, w, h) { const c = this.canvas; if (c && !c.isConnected) noteHiddenClear(this, x, y, w, h); return oc.call(this, x, y, w, h); }; }
   proto.strokeRect = function (x, y, w, h) {
     const c = this.canvas;
+    if (c && !c.isConnected) noteHiddenOther(this);
     if (on && fx.bracketOn && (fx.bracketBorderColor || fx.bracketBorderW > 0) && c && isPane(c)) {
       const pill = lastPill.get(this), t = this.getTransform(), sx = t.a || 1;
       const bx = x * sx + t.e, by = y * (t.d || 1) + t.f, bw = Math.abs(w * sx), bh = Math.abs(h * (t.d || 1));
