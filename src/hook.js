@@ -354,13 +354,15 @@
     if (onLabelRow(c, z.y)) return false;
     // a new line counts only after ~1 s: by then any price tag on its row has been drawn (an order line's tag is
     // painted just after its line), so an order / position line is never taken for a level, not even for one frame
-    const key = r.key + "@" + Math.round(z.y / 4), now = performance.now(), first = levelFirst.get(key);
-    if (first === undefined) { if (levelFirst.size > 400) levelFirst.clear(); levelFirst.set(key, now);
+    // by colour: once a colour has been a level for a second it stays one (no flashing back as lines move or as more
+    // levels appear); the price-tag check above still runs on every draw, row by row
+    const key = r.key, now = performance.now(), first = levelFirst.get(key);
+    if (first === undefined) { if (levelFirst.size > 300) levelFirst.delete(levelFirst.keys().next().value); levelFirst.set(key, now);
       if (!levelT) levelT = setTimeout(() => { levelT = 0; if (on) forceRepaint(true); }, 1100);   // a still chart may not repaint by itself
       return false; }
     return now - first > 1000;
   }
-  const levelFirst = new Map();   // "r,g,b@row" -> when a level line was first seen there
+  const levelFirst = new Map();   // "r,g,b" -> when a level line in that colour was first seen
   let levelT = 0;
   // draw a zone: its fill (glowing only if it has no edge), then its neon edge with the glow. stroke = draws the edge.
   function drawZone(ctx, z, fill, stroke) {

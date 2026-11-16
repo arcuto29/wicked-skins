@@ -547,8 +547,9 @@
       return k.hz && k.n >= 1 && k.hy !== null && !ctx.getLineDash().length && !(greyish(col) && k.n >= 2) && !(shapeSides.has((rgbKey(col) || {}).key)) && !onTagRow(k.hy) && settled(col, k.hy); };
     // a new level line counts only after ~1 s: by then an order line's price tag on the same row is known
     const levelFirst = new Map();
-    const settled = (col, Y) => { const key = col + "@" + Math.round(Y / 4), now = performance.now(), f = levelFirst.get(key);
-      if (f === undefined) { if (levelFirst.size > 400) levelFirst.clear(); levelFirst.set(key, now);
+    // by colour: once settled it stays (no flashing back as lines move); the price-tag check still runs on every draw
+    const settled = (col) => { const key = col, now = performance.now(), f = levelFirst.get(key);
+      if (f === undefined) { if (levelFirst.size > 300) levelFirst.delete(levelFirst.keys().next().value); levelFirst.set(key, now);
         if (!levelT) levelT = setTimeout(() => { levelT = 0; if (on) repaint(); }, 1100);   // a still chart may not repaint by itself
         return false; } return now - f > 1000; };
     let levelT = 0;

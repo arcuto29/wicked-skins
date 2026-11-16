@@ -184,8 +184,15 @@
   // Shared by hook.js (TradingView) and lw.js (Lightweight Charts platforms like nq.vision). Each indicator keeps its
   // own slot (by its original colour, in the order first drawn), so two moving averages stay told apart: they get
   // neighbouring shades of the chosen colours. o = { mode, color, up, down, accent }.
+  // Each indicator's slot (which shade / which Rainbow start it gets) is handed out once, in the order first drawn,
+  // and then KEPT: it never resets. (It used to start over past 24 colours, and with many zones, as prints indicators
+  // draw, the slots were re-dealt all the time, so every zone's colour and every Rainbow jumped while price moved.)
+  // The first indicator still gets your exact Custom / candle colour. Past 2000 colours new ones get a fixed hash slot.
   const slots = new Map();
-  const slotOf = (orig) => { let i = slots.get(orig); if (i === undefined) { if (slots.size > 24) slots.clear(); i = slots.size; slots.set(orig, i); } return i; };
+  const slotOf = (orig) => { let i = slots.get(orig); if (i !== undefined) return i;
+    if (slots.size < 2000) i = slots.size;
+    else { let h = 2166136261; const s = String(orig); for (let j = 0; j < s.length; j++) { h ^= s.charCodeAt(j); h = Math.imul(h, 16777619); } return (h >>> 0) % 997; }
+    slots.set(orig, i); return i; };
   const isHex = (h) => /^#[0-9a-f]{6}$/i.test(h || "");
   const shade = (hex, deg) => toHex(hueRotate(rgbOf(hex), deg));
   function indPalette(o) {
