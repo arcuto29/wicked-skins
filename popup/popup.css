@@ -466,7 +466,6 @@ body.lw-page [data-tvonly] { display: none !important; }
 .ig-card #igMsg.bad { color: #ff8a8a; }
 .ig-foot { margin-top: 12px !important; color: #6c7183 !important; font-size: 11.5px !important; }
 
-/* ===================== clean black theme =====================
    True black, quiet surfaces, thin lines. White marks what's selected; the accent only says "on" (switches, slider
    fill). No glows or gradients behind the controls. Shared by the extension, the desktop app and Android. */
 :root { --bg: #000; --panel: #0b0b0d; --panel2: #101012; --line: rgba(255,255,255,.07); --line2: rgba(255,255,255,.12);
@@ -514,3 +513,10 @@ input[type=range]::-moz-range-progress { height: 4px; border-radius: 4px; backgr
 input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; }
 .row output { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
 .invite-gate { background: #000 !important; }
+=======
+/* wallpaper labels: quality (4K, 1080p…) and OLED, bottom-left over the picture */
+.wtag { position: absolute; left: 6px; top: 6px; font-size: 9px; font-weight: 800; letter-spacing: .04em; padding: 2px 5px; border-radius: 4px; background: rgba(0,0,0,.65); color: #e6e9f0; pointer-events: none; }
+.wtag.q + .wtag.oled { left: auto; top: 24px; left: 6px; }
+.wtag.oled { background: #000; color: #fff; border: 1px solid rgba(255,255,255,.35); }
+
+/* ===================== clean black theme ==============

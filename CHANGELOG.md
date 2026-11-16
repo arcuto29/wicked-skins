@@ -2,6 +2,9 @@
 
 ## 0.1.60 (unreleased)
 - **A cleaner panel in true black.** The Priism panel (extension, desktop app and Android) now has a black background, quiet surfaces and thin lines, white for whatever you've selected, and slimmer sliders with a filled track and a small knob. No more glows behind the controls.
+- **New in the Workshop: a space photo pack** from the James Webb Space Telescope (Cosmic Cliffs, Pillars of Creation, Cassiopeia A, NGC 602 and more), in up to 4K, each credited on its card as the licence asks (ESA/Webb, CC BY 4.0). Workshop cards now show who to credit.
+- **New: wallpaper labels.** Every wallpaper shows its **quality** (4K, 1440p, 1080p, 720p or Low res) and an **OLED** tag when it suits OLED screens: mostly true black (those pixels are off on an OLED), dark overall, and no bright part that stays in one place (that can burn in). Skins → **OLED** lists the 9 built-in ones that fit (Deep Field, Code Rain, Ticker Tape, Spiral Galaxy, Kaleidoscope, Soft Focus, Lightspeed, Circuit, Wormhole). Built-in wallpapers are drawn live, so they're sharp at any size. Your uploads are labelled when you add them (older ones get measured once by themselves), and Workshop wallpapers show both labels, with an **OLED** filter on the website.
+
 - **New: black & white wallpapers.** Adjust → Picture → Colour: **Black & white** turns any wallpaper (built-in or your own) grey, while your candles, indicators and the rest of the chart keep their colours.
 
 ## 0.1.59 (2026-11-04)
