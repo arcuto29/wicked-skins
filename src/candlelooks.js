@@ -193,7 +193,7 @@
     const base = o.mode === "custom" ? o.color : o.mode === "wallpaper" ? o.accent : null;
     return isHex(base) ? [base, shade(base, 42), shade(base, -42), shade(base, 90), shade(base, -90), shade(base, 180)] : null;
   }
-  const hsl = (h) => `hsl(${Math.round(((h % 360) + 360) % 360)},95%,62%)`;
+  const hsl = (h, a) => `hsl(${Math.round(((h % 360) + 360) % 360)} 95% 62%${a !== undefined && a < 1 ? " / " + +a.toFixed(3) : ""})`;
   const grads = new WeakMap();   // ctx -> Map(key -> rainbow gradient), so a gradient is made once per canvas size
   // ---------- each indicator on its own (Style > Indicators > Each indicator) ----------
   // Indicators are told apart by their own colour on the chart (a line's stroke, a zone's fill). We note every colour
@@ -230,11 +230,17 @@
   const custOf = (o, orig) => { if (!o || !o.custom) return null; const r = keyOf(orig); return r ? { r, e: o.custom[r.k] || null } : null; };
   const withAlpha = (hex, a) => (a >= 0.99 ? hex : `rgba(${rgbOf(hex).join(",")},${+a.toFixed(3)})`);
   // A zone (an indicator's filled box / band): { hide } | { f: fill, g: glow colour, glow: 0..1 } | null = as it is
-  function zone(orig, o) {
-    const c = custOf(o, orig); if (!c || !c.e) return null;
-    const e = c.e; if (e.h) return { hide: true };
+  // Its own settings (Each indicator) win; otherwise the all-indicators colour (o.mode) applies, at the zone's own
+  // see-through-ness, so a band stays a soft band. Rainbow works on zones too (ctx: the gradient is per canvas).
+  function zone(orig, o, ctx) {
+    const c = custOf(o, orig), e = c && c.e;
+    if (e && e.h) return { hide: true };
+    const r = keyOf(orig); if (!r) return null;
+    const all = ctx ? indicatorAll(ctx, orig, o, !!(e && e.c === "rainbow"), r.a) : null;
+    if (!e) return all ? { f: all.s, g: all.g, glow: 0 } : null;
     const hex = /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : null;
-    return { f: hex ? withAlpha(hex, c.r.a) : orig, g: hex || `rgb(${c.r.k})`, glow: +e.g || 0 };
+    if (hex) return { f: withAlpha(hex, r.a), g: hex, glow: +e.g || 0 };
+    return { f: all ? all.s : orig, g: all ? all.g : `rgb(${r.k})`, glow: +e.g || 0 };
   }
 
   // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour,
@@ -250,19 +256,24 @@
     if (+e.w > 0) r.w = +e.w;
     return r;
   }
-  function indicatorAll(ctx, orig, o, forceRainbow) {
+  // alpha: a zone's own see-through-ness (lines: undefined = as drawn). A line and the zone in its colour (RSI and its
+  // band) share a slot, so they get the same shade.
+  function indicatorAll(ctx, orig, o, forceRainbow, alpha) {
     if (!o || ((!o.mode || o.mode === "own") && !forceRainbow)) return null;
-    const i = slotOf(String(orig));
+    const kk = keyOf(String(orig)), i = slotOf(kk ? kk.k : String(orig));
+    // very faint zones (TradingView draws Bollinger's band at 5%) would hide the new colour: lift them to a visible but
+    // still soft strength (3x, at most 22%); stronger zones keep their own
+    const al = alpha === undefined || alpha >= 0.99 ? 1 : Math.max(+alpha, Math.min(0.22, +alpha * 3));
     if (forceRainbow || o.mode === "rainbow") {   // the whole spectrum across the chart, left to right; each indicator starts at its own hue
-      const t = ctx.getTransform(), a = t.a || 1, w = ctx.canvas.width, off = (i * 67) % 360, key = w + "|" + t.e + "|" + a + "|" + off;
+      const t = ctx.getTransform(), a = t.a || 1, w = ctx.canvas.width, off = (i * 67) % 360, key = w + "|" + t.e + "|" + a + "|" + off + "|" + al.toFixed(2);
       let m = grads.get(ctx); if (!m) { m = new Map(); grads.set(ctx, m); }
       let gr = m.get(key);
       if (!gr) { if (m.size > 30) m.clear(); gr = ctx.createLinearGradient((0 - t.e) / a, 0, (w - t.e) / a, 0);
-        for (let j = 0; j <= 6; j++) gr.addColorStop(j / 6, hsl(off + j * 60)); m.set(key, gr); }
+        for (let j = 0; j <= 6; j++) gr.addColorStop(j / 6, hsl(off + j * 60, al)); m.set(key, gr); }
       return { s: gr, g: hsl(off + 180) };
     }
     const P = memo("ind|" + o.mode + o.color + o.up + o.down + o.accent, () => indPalette(o));
-    return P ? { s: P[i % P.length], g: P[i % P.length] } : null;
+    return P ? { s: withAlpha(P[i % P.length], al), g: P[i % P.length] } : null;
   }
 
   window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf };

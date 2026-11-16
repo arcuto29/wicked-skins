@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.1.59 (2026-11-04)
+- **Fixed: Rainbow (and the other indicator colours) now reach your indicators' zones too, on tradingview.com and platforms like nq.vision.** Before, Style → Indicators coloured only the lines, so filled bands and boxes (RSI's band, Bollinger's fill, zone and print indicators) kept their own colour on tradingview.com, and Rainbow for a single zone under Each indicator did nothing. Now Rainbow, Candles, Wallpaper and Custom colour the zones as well, each zone keeping its see-through look; very faint ones (Bollinger's 5% band) are lifted a little so the colour shows. A band takes the same shade as its line. Your candles, your own drawings (rectangles, the Long / Short tool) and grey zones are left as they are.
 - **Priism is now invite only.** The extension, the desktop app and the Android app ask for an invite code before they skin anything. Enter it once in the Priism panel. Each code works on a set number of devices (2 unless the person who made it chose otherwise), and it's checked again about once a day, so a code that's been turned off stops working within a day. Without internet, a code you've already entered keeps working. Charts are never blocked: without a code you simply see the platform's own look.
 - **Workshop page → Invites (admins only):** make codes, see how many devices use each one, turn a code off or on again, or delete it.
 - Privacy: the invite check sends only the code, a random ID for this copy of Priism and which app it is. Chart pages never send it. See the privacy page.

@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 6;
+  const LW_VERSION = 7;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -234,14 +234,18 @@
     const lum = (k) => k.split(",").reduce((s, v) => s + +v, 0);
     return lum(a) >= lum(b) ? [[a, "up"], [b, "down"]] : [[b, "up"], [a, "down"]];
   }
-  let lastShape = [];
+  let lastShape = [], apiSides = 0;
+  // the platform's OWN candle colours are known (from its chart API, or found by their shape): only then can a filled
+  // bar safely be called an indicator zone for the all-indicators colours, and never a candle
+  const candlesKnown = () => apiSides > 0 || shapeSides.size > 0;
+  const ownCandle = (k) => sides.has(k) || shapeSides.has(k);
   function learnSides() {
     if (!active) return;
     const best = new Map();
     const add = (c, side, rank) => { const r = rgbKey(c); if (!r) return; const cur = best.get(r.key);
       if (!cur || rank > cur.rank) best.set(r.key, { side, rank, tie: false }); else if (rank === cur.rank && side !== cur.side) cur.tie = true; };
     for (const [c, s] of DEFAULTS) add(c, s, 0);
-    const api = learnFromApi(); for (const [c, s] of api) add(c, s, 3);
+    const api = learnFromApi(); for (const [c, s] of api) add(c, s, 3); apiSides = api.length;
     if (!api.length) {
       const sh = learnShape();
       if (sh) {                                             // found by shape: these are the candles, nothing else
@@ -353,7 +357,11 @@
         const L = window.__bdCandleLooks, t = this.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
         if (L && L.zone && W >= 12 && H >= 2 && W * H >= 150) {
           L.noteSeen(this.__bdLwOrig, "zone");
-          const z = lfx && lfx.indCustom && L.keyOf(this.__bdLwOrig) && lfx.indCustom[L.keyOf(this.__bdLwOrig).k] ? L.zone(this.__bdLwOrig, { custom: lfx.indCustom }) : null;
+          // its own settings (Each indicator), or the all-indicators colour (greys stay grey, like grey lines)
+          const zk = L.keyOf(this.__bdLwOrig), own = zk && lfx && lfx.indCustom && lfx.indCustom[zk.k];
+          const all = zk && lfx && lfx.indMode && lfx.indMode !== "own" && !greyish(`rgb(${zk.k})`) && candlesKnown() && !ownCandle(zk.k);
+          const z = own || all ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom }, this) : null;
+          if (z && W <= 60 && H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
           if (z) { if (z.hide) return; const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
             fillDesc.set.call(this, z.f); if (z.glow > 0) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
             origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, pF); this.shadowBlur = pB; this.shadowColor = pC; return; }

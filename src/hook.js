@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 15;
+  const HOOK_VERSION = 16;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -218,6 +218,9 @@
   const KIND = { upColor: "body", downColor: "body", borderUpColor: "border", borderDownColor: "border", wickUpColor: "wick", wickDownColor: "wick" };
   const STYLES = ["candleStyle", "hollowCandleStyle", "haStyle", "barStyle", "volCandlesStyle", "hlcBarsStyle"];
 
+  // The colours of your drawings (rectangles, the Long / Short position tool, fib fills…), so "all indicators" colours
+  // never repaint them: they're yours, not an indicator's.
+  let drawCols = new Set();
   // Names for "Each indicator": where TradingView's internals are reachable (tradingview.com), each indicator's plot
   // colours -> its title ("MA (20, close)"), so the panel can say which line is which. Elsewhere lines go by colour.
   setInterval(() => {
@@ -237,6 +240,14 @@
       }
     } catch {}
     if (m.size) L.setNames(m);
+    try {
+      const ac = window.TradingViewApi && window.TradingViewApi.activeChart && window.TradingViewApi.activeChart(), d = new Set();
+      const walk = (o, n) => { if (!o || n > 4) return; for (const k in o) { const v = o[k];
+        if (typeof v === "string") { const r = L.keyOf(v); if (r) d.add(r.k); } else if (v && typeof v === "object") walk(v, n + 1); } };
+      const shapes = ac && ac.getAllShapes ? ac.getAllShapes().slice(0, 300) : [];
+      for (const sh of shapes) { try { walk(ac.getShapeById(sh.id).getProperties(), 0); } catch {} }
+      drawCols = d;
+    } catch {}
   }, 3000);
   function chartWidgets() {
     const api = window.TradingViewApi || window.tradingViewApi, out = [];
@@ -307,7 +318,11 @@
     if (r.a >= 0.95 && H / dpr >= 8 && H / dpr <= 40 && W / dpr <= 460) return null;   // a solid label box (price tags, order pills, session labels), not a zone
     if (sides.has(r.k) || (candles && (r.k === candles.up.join(",") || r.k === candles.down.join(",")))) return null;   // candles / volume
     L.noteSeen(orig, "zone");
-    return fx.indCustom && fx.indCustom[r.k] ? L.zone(orig, { custom: fx.indCustom }) : null;
+    // its own settings (Each indicator), or the all-indicators colour: never your drawings (a rectangle, the Long /
+    // Short position tool), and greys stay grey like grey lines do
+    const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && !drawCols.has(r.k) && glowable(`rgb(${r.k})`);
+    if (!own && !all) return null;
+    return L.zone(orig, { mode: all ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom }, ctx);
   }
   function noteFill(col) { if (typeof col === "string" && tally.size < 300) tally.set(col, (tally.get(col) || 0) + 1); }
   function learnedFromDrawing() {

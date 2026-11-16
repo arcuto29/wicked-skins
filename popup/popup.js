@@ -2203,6 +2203,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
 const WHATS_NEW = ["Priism is invite only now: enter your invite code once in the panel",
+  "Rainbow and the other indicator colours now reach your zones too (bands, boxes, prints)",
   "Style the legend: colour and a backing for indicator names and values, so they read on any wallpaper (Style \u203a Legend)",
   "O H L C letters are readable on dark wallpapers",
   "Customise each indicator: its own colour, glow, width, or hide it, zones included (Style \u203a Indicators \u203a Each indicator)",
