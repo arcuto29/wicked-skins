@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.60 (unreleased)
+- **A cleaner panel in true black.** The Priism panel (extension, desktop app and Android) now has a black background, quiet surfaces and thin lines, white for whatever you've selected, and slimmer sliders with a filled track and a small knob. No more glows behind the controls.
+
 ## 0.1.59 (2026-11-04)
 - **Your indicators and zones match your wallpaper.** Style → Indicators → **Wallpaper** now uses the wallpaper's own colours (up to five, read once per wallpaper) instead of shades of one colour: each indicator and zone takes one of them, so they still stay told apart. **✨ Match everything to my wallpaper** now sets your indicators and zones to it too, and makes the legend and the text your indicators write on the chart readable, all with one Undo.
 - **Fixed: clips and snapshots left out an uploaded wallpaper.** Uploaded images and videos play in a protected frame the chart page can't read, so Chart only clips (also when you picked a screen to share its sound) and snapshots showed the chart without it. While you record, that frame now sends its picture to Priism over a private channel the chart page can't use, so the wallpaper is in the clip.

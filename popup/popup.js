@@ -1329,6 +1329,12 @@ if ($("journalOn")) {
 // the page updates these while the panel is open (a trade just closed)
 try { chrome.storage.onChanged && chrome.storage.onChanged.addListener((ch, area) => { if (area !== "local") return; if (ch.dayPnl) syncGoal(); if (ch.journal) renderJournal(); }); } catch {}
 
+// sliders: their track fills up to the value (CSS reads --p), for every slider in the panel, as it moves
+function paintRange(r) { const min = +r.min || 0, max = r.max === "" ? 100 : +r.max, v = +r.value; r.style.setProperty("--p", (max > min ? ((v - min) / (max - min)) * 100 : 0) + "%"); }
+document.addEventListener("input", (e) => { if (e.target && e.target.type === "range") paintRange(e.target); }, true);
+new MutationObserver(() => document.querySelectorAll('input[type="range"]').forEach(paintRange)).observe(document.body, { childList: true, subtree: true });
+setTimeout(() => document.querySelectorAll('input[type="range"]').forEach(paintRange), 0);
+
 // ---------- tune ----------
 const SLIDERS = [
   ["opacity", "Opacity", 0, 1, 0.05, (v) => Math.round(v * 100) + "%"],
