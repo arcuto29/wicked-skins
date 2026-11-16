@@ -369,11 +369,15 @@ update public.profiles p set is_admin = false
 create table if not exists public.invites (
   code text primary key check (code ~ '^[A-Z0-9-]{8,40}$'),
   note text check (char_length(note) <= 80),
-  max_devices int not null default 2 check (max_devices between 1 and 50),
+  max_devices int not null default 2 check (max_devices between 1 and 10000),
   revoked boolean not null default false,
   created_at timestamptz not null default now(),
   created_by uuid default auth.uid()
 );
+-- a group code (one code for a whole Discord, say) can have up to 10000 devices; databases set up before kept the old
+-- limit of 50, so it's replaced here (safe to re-run)
+alter table public.invites drop constraint if exists invites_max_devices_check;
+alter table public.invites add constraint invites_max_devices_check check (max_devices between 1 and 10000);
 alter table public.invites enable row level security;
 drop policy if exists "invites: admins read" on public.invites;
 create policy "invites: admins read" on public.invites for select to authenticated using (public.is_admin((select auth.uid())));

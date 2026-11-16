@@ -67,12 +67,20 @@
     <section id="invites" hidden>
       <h2 style="font-size:22px;margin:34px 0 6px">Invites <span class="adm">ADMIN</span></h2>
       <p class="hint">Priism is invite only. Make a code, send it to someone, and they enter it in the Priism panel. Each code works on the number of devices you choose. Turn a code off and those devices lock again within a day.</p>
+      <div class="inv-kind seg" id="invKind">
+        <button type="button" data-k="one" class="on">For one person</button>
+        <button type="button" data-k="many">Several codes</button>
+        <button type="button" data-k="group">One code for a group</button>
+      </div>
       <div class="inv-new">
         <input id="invNote" class="field" maxlength="80" placeholder="Who is it for? (only you see this)">
-        <label class="inv-dev">Devices <input id="invMax" class="field" type="number" min="1" max="50" value="2"></label>
+        <label class="inv-dev" id="invCountL" hidden>Codes <input id="invCount" class="field" type="number" min="2" max="100" value="10"></label>
+        <label class="inv-dev">Devices <input id="invMax" class="field" type="number" min="1" max="10000" value="2"></label>
         <button id="invMake" class="btn primary" type="button">Make a code</button>
       </div>
+      <p class="hint" id="invKindHint">One code for one person, on up to this many of their devices.</p>
       <p class="hint" id="invMsg"></p>
+      <div id="invBatch" class="inv-batch" hidden><textarea id="invBatchText" class="field" rows="6" readonly></textarea><button id="invBatchCopy" class="btn" type="button">Copy all</button></div>
       <div id="invList" class="mine-list"></div>
     </section>
 
@@ -215,13 +223,29 @@
         list.appendChild(row);
       }
     }
+    // what to make: one code for one person, several personal codes at once, or ONE code a whole group shares
+    // (a Discord, say: you set how many devices it lets in, and can turn it off any time)
+    let invKind = "one";
+    const KIND = { one: { dev: 2, btn: "Make a code", hint: "One code for one person, on up to this many of their devices." },
+      many: { dev: 2, btn: "Make the codes", hint: "A list of personal codes, one per person. Copy them all and hand them out." },
+      group: { dev: 100, btn: "Make a group code", hint: "One code you can post for a whole group. It lets in up to this many devices; turn it off any time." } };
+    document.querySelectorAll("#invKind [data-k]").forEach((b) => (b.onclick = () => {
+      invKind = b.dataset.k; document.querySelectorAll("#invKind [data-k]").forEach((x) => x.classList.toggle("on", x === b));
+      $("invCountL").hidden = invKind !== "many"; $("invMax").value = KIND[invKind].dev; $("invMake").textContent = KIND[invKind].btn; $("invKindHint").textContent = KIND[invKind].hint;
+      $("invBatch").hidden = true;
+    }));
+    $("invBatchCopy").onclick = async (e) => { try { await navigator.clipboard.writeText($("invBatchText").value); e.target.textContent = "Copied"; } catch { $("invBatchText").select(); } };
     $("invMake").onclick = async () => {
-      const max = Math.max(1, Math.min(50, +$("invMax").value || 2)), code = newCode();
+      const max = Math.max(1, Math.min(10000, Math.round(+$("invMax").value || 2))), note = $("invNote").value.trim() || null;
+      const n = invKind === "many" ? Math.max(2, Math.min(100, Math.round(+$("invCount").value || 10))) : 1;
+      const codes = []; while (codes.length < n) { const c = newCode(); if (!codes.includes(c)) codes.push(c); }
       $("invMake").disabled = true;
-      const r = await sb.from("invites").insert({ code, note: $("invNote").value.trim() || null, max_devices: max });
+      const r = await sb.from("invites").insert(codes.map((code, i) => ({ code, note: note ? (n > 1 ? `${note} #${i + 1}` : note) : (invKind === "group" ? "group" : null), max_devices: max })));
       $("invMake").disabled = false;
-      if (r.error) return say("invMsg", "Couldn't make a code: " + r.error.message);
-      say("invMsg", `Made ${code}. Copy it and send it to them.`); $("invNote").value = ""; renderInvites();
+      if (r.error) return say("invMsg", "Couldn't make " + (n > 1 ? "the codes" : "a code") + ": " + (/check constraint/i.test(r.error.message) ? "devices must be 1 to 10000 (re-run supabase/schema.sql if it stops at 50)." : r.error.message));
+      if (n > 1) { $("invBatchText").value = codes.join("\n"); $("invBatch").hidden = false; $("invBatchCopy").textContent = "Copy all"; say("invMsg", `Made ${n} codes. Copy them all below.`); }
+      else say("invMsg", invKind === "group" ? `Made ${codes[0]} for up to ${max} devices. Post it for your group.` : `Made ${codes[0]}. Copy it and send it to them.`);
+      $("invNote").value = ""; renderInvites();
     };
 
     // ---------- admin review (wallpapers + looks) ----------
