@@ -16,10 +16,37 @@
   }
 
   addEventListener("message", (e) => {
+    if (e.data && e.data.__wicked === "rec-start" && e.ports && e.ports[0]) return void recStart(e.data, e.ports[0]);
     if (!e.data || e.data.__wicked !== "look") return;
     look = e.data.look || {};
     apply();
   });
+
+  // Chart-only clips: Priism draws each frame itself, but can't read this protected frame's pixels. While a clip
+  // records, send the picture to Priism (the extension) through a private channel: the chart page can't listen in,
+  // and only a request carrying the extension's own secret (in its storage, which pages can't read) is answered.
+  let recBusy = false;
+  async function recStart(msg, port) {
+    let ok = false;
+    try { const s = await chrome.storage.local.get("recToken"); ok = !!s.recToken && s.recToken === msg.token; } catch {}
+    if (!ok) { try { port.close(); } catch {} return; }
+    const fps = Math.max(5, Math.min(60, +msg.fps || 30)), maxW = Math.max(160, Math.min(1920, +msg.maxW || 1280));
+    let stopped = false; const until = Date.now() + 135000;   // never longer than the longest clip
+    port.onmessage = (ev) => { if (ev.data && ev.data.stop) { stopped = true; try { port.close(); } catch {} } };
+    const tick = async () => {
+      if (stopped || Date.now() > until) { try { port.close(); } catch {} return; }
+      if (!recBusy && el) {
+        recBusy = true;
+        try {
+          const nw = el.videoWidth || el.naturalWidth, nh = el.videoHeight || el.naturalHeight;
+          if (nw && nh) { const k = Math.min(1, maxW / nw), bmp = await createImageBitmap(el, { resizeWidth: Math.max(2, Math.round(nw * k)), resizeHeight: Math.max(2, Math.round(nh * k)), resizeQuality: "medium" });
+            port.postMessage({ bmp, nw, nh }, [bmp]); }
+        } catch {} finally { recBusy = false; }
+      }
+      setTimeout(tick, 1000 / fps);
+    };
+    tick();
+  }
 
   try {
     const blob = await WickedMediaDB.get(id);

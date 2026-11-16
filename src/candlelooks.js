@@ -195,7 +195,16 @@
     slots.set(orig, i); return i; };
   const isHex = (h) => /^#[0-9a-f]{6}$/i.test(h || "");
   const shade = (hex, deg) => toHex(hueRotate(rgbOf(hex), deg));
+  // the wallpaper's own colours (set by hook.js / lw.js from what the page measured), for "Wallpaper"
+  let wallCols = [];
+  function setWallColors(a) { wallCols = Array.isArray(a) ? a.filter(isHex).slice(0, 5) : []; }
   function indPalette(o) {
+    // Wallpaper: each indicator / zone takes one of the wallpaper's real colours; past those, shades in between
+    if (o.mode === "wallpaper" && wallCols.length >= 2) {
+      const out = [...wallCols];
+      for (let i = 0; i < wallCols.length && out.length < 10; i++) out.push(shade(wallCols[i], 24));
+      return out;
+    }
     if (o.mode === "candles") return isHex(o.up) && isHex(o.down) ? [o.up, o.down, shade(o.up, 38), shade(o.down, -38), shade(o.up, -38), shade(o.down, 38)] : null;
     const base = o.mode === "custom" ? o.color : o.mode === "wallpaper" ? o.accent : null;
     return isHex(base) ? [base, shade(base, 42), shade(base, -42), shade(base, 90), shade(base, -90), shade(base, 180)] : null;
@@ -302,7 +311,7 @@
         m.set(key, gr); }
       return { s: gr, g: rb ? hsl(off + 180) : G[1] };
     }
-    const P = memo("ind|" + o.mode + o.color + o.up + o.down + o.accent, () => indPalette(o));
+    const P = memo("ind|" + o.mode + o.color + o.up + o.down + o.accent + (o.mode === "wallpaper" ? wallCols.join("") : ""), () => indPalette(o));
     return P ? { s: withAlpha(P[i % P.length], al), g: P[i % P.length] } : null;
   }
 
@@ -348,5 +357,5 @@
     return true;
   }
 
-  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText };
+  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors };
 })();

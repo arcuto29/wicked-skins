@@ -418,6 +418,9 @@ async function matchEverything() {
     bracketOn: true, bracketProfit: pal.up, bracketLoss: pal.down, bracketQty: soft, bracketLineColor: accent,
     pnlUp: pal.up, pnlDown: pal.down,
     panelMode: "skin", dlgMode: "glass", uiAccent: soft,
+    // indicators and their zones take the wallpaper's own colours (each one its own), the legend and the text your
+    // indicators write on the chart stay readable on it
+    indMode: "wallpaper", lgOn: true, lgColor: "", lgVals: "own", txtMode: "readable",
   }, grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : `Everything now matches ${name}.`);
 }
 if ($("matchAll")) $("matchAll").onclick = matchEverything;
@@ -2222,7 +2225,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Chart text: your indicators\u2019 labels in any colour, with an outline, and black text is always readable (Style \u203a Chart text)",
+const WHATS_NEW = ["Match everything now colours your indicators and zones from your wallpaper\u2019s own colours",
+  "Clips and snapshots include your uploaded wallpaper",
+  "Chart text: your indicators\u2019 labels in any colour, with an outline, and black text is always readable (Style \u203a Chart text)",
   "Zones look like neon boxes: a glowing edge, price still visible inside. Plus a calmer Gradient next to Rainbow (Style \u203a Indicators)",
   "Priism is invite only now: enter your invite code once in the panel",
   "Rainbow and the other indicator colours now reach your zones too (bands, boxes, prints)",

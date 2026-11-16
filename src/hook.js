@@ -87,7 +87,7 @@
     privacyPnl: "hide", tickSize: 0,
     bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
-    indMode: "own", indColor: "", indCustom: {}, drawOn: false, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
+    indMode: "own", indColor: "", indCustom: {}, drawOn: false, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0, wallColors: [],
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -149,6 +149,7 @@
         indCustom: cleanCustom(f.indCustom), drawOn: !!f.drawOn,
         txtMode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", txtColor: /^#[0-9a-f]{6}$/i.test(f.txtColor || "") ? f.txtColor : "", txtOutline: Math.max(0, Math.min(2, +f.txtOutline || 0)), txtSize: Math.max(0, Math.min(2, +f.txtSize || 0)),
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
+        wallColors: Array.isArray(f.wallColors) ? f.wallColors.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 5) : [],
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
         prof: Array.isArray(f.prof) ? f.prof.slice(0, 18).map(Number) : [],  // brightness behind the price scale, top->bottom
@@ -161,7 +162,8 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+    if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(fx.wallColors);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
