@@ -123,6 +123,25 @@ create policy "wallpapers: delete own or admin" on public.wallpapers for delete 
   using (owner = (select auth.uid()) or public.is_admin((select auth.uid())));
 -- no UPDATE policy: changes go through the functions below
 
+-- Labels: the wallpaper's size (shown as 4K / 1440p / 1080p…) and whether it suits OLED screens (mostly true black,
+-- no bright part that stays still). Measured in the browser when it's shared; admins can (re-)measure older ones.
+alter table public.wallpapers add column if not exists width int check (width between 1 and 20000);
+alter table public.wallpapers add column if not exists height int check (height between 1 and 20000);
+alter table public.wallpapers add column if not exists oled boolean;
+create or replace function public.label_wallpaper(wallpaper uuid, w int, h int, is_oled boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_admin(auth.uid()) then raise exception 'admins only'; end if;
+  update public.wallpapers set width = w, height = h, oled = is_oled where id = wallpaper;
+end;
+$$;
+revoke execute on function public.label_wallpaper(uuid, int, int, boolean) from public, anon;
+grant execute on function public.label_wallpaper(uuid, int, int, boolean) to authenticated;
+
 -- Admin review: approve or reject.
 create or replace function public.moderate_wallpaper(wallpaper uuid, new_status text, reason text default null)
 returns void

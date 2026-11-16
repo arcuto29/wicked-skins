@@ -174,3 +174,7 @@ footer { background: linear-gradient(180deg, transparent, rgba(46,242,176,.04));
 .inv-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .04em; }
 .inv-row small a { color: inherit; }
 .inv-row .btn { padding: 7px 11px; font-size: 12.5px; }
+
+/* Workshop wallpaper labels: quality (4K, 1080p…) and OLED, under the kind tag */
+.ws-card .media .tag.q { right: auto; left: 8px; }
+.ws-card .media .tag.oled { top: auto; bottom: 8px; right: auto; left: 8px; background: #000; color: #fff; border: 1px solid rgba(255,255,255,.35); }

@@ -97,6 +97,14 @@ ok("look uses counted without an account", (await as(null, "select uses from pub
 for (const u of [U2, U3, U4]) await as(u, "insert into public.look_reports (look_id, reason) values ($1, 'spam')", [l1.id]);
 ok("3 reports hide a look until re-review", (await as(null, "select count(*)::int n from public.looks where id = $1", [l1.id])).rows[0].n === 0);
 ok("owner can delete own look", (await as(U1, "delete from public.looks where id = $1 returning id", [l1.id])).rows.length === 1);
+// ---------- wallpaper labels (quality + OLED) ----------
+{ const w = (await as(U1, "insert into public.wallpapers (title, kind, file_path, size_bytes, width, height, oled) values ('dark', 'image', 'u/x.png', 10, 3840, 2160, true) returning id, width, oled")).rows[0];
+  ok("a shared wallpaper keeps its size and OLED label", w.width === 3840 && w.oled === true);
+  ok("silly sizes are refused", (await tryAs(U1, "insert into public.wallpapers (title, kind, file_path, size_bytes, width, height) values ('x', 'image', 'u/y.png', 10, 0, 99999)")) !== "ok");
+  ok("non-admins can't relabel", (await tryAs(U2, "select public.label_wallpaper($1, 640, 360, false)", [w.id])).startsWith("denied"));
+  await as(ADMIN, "select public.label_wallpaper($1, 1920, 1080, false)", [w.id]);
+  const r = (await as(ADMIN, "select width, oled from public.wallpapers where id = $1", [w.id])).rows[0];
+  ok("admin can (re-)measure a wallpaper", r.width === 1920 && r.oled === false); }
 // ---------- invites ----------
 await db.exec("grant update on public.invites to authenticated");
 ok("non-admin can't make invites", (await tryAs(U1, "insert into public.invites (code) values ('PRIISM-AAAA-BBBB')")).startsWith("denied"));

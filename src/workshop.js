@@ -17,9 +17,13 @@
     // sort: "popular" | "new"
     async list(sort = "popular", page = 0) {
       need();
-      let q = sb.from("wallpapers").select("id, title, kind, file_path, thumb_path, size_bytes, likes, uses, created_at").eq("status", "approved");
-      q = sort === "new" ? q.order("created_at", { ascending: false }) : q.order("likes", { ascending: false }).order("uses", { ascending: false });
-      const rows = err(await q.range(page * PAGE, page * PAGE + PAGE - 1));
+      // with the quality / OLED labels; a server set up before labels existed doesn't know those columns yet
+      const query = (cols) => { let q = sb.from("wallpapers").select(cols).eq("status", "approved");
+        q = sort === "new" ? q.order("created_at", { ascending: false }) : q.order("likes", { ascending: false }).order("uses", { ascending: false });
+        return q.range(page * PAGE, page * PAGE + PAGE - 1); };
+      const base = "id, title, kind, file_path, thumb_path, size_bytes, likes, uses, created_at";
+      let res = await query(base + ", width, height, oled"); if (res.error && /column|width|oled/i.test(res.error.message || "")) res = await query(base);
+      const rows = err(res);
       return rows.map((r) => ({ ...r, fileUrl: publicUrl(r.file_path), thumbUrl: publicUrl(r.thumb_path) || publicUrl(r.file_path) }));
     },
     // community looks (whole setups, stored as settings): sort "top" | "new"

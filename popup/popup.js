@@ -51,7 +51,7 @@ document.querySelectorAll("#nav button").forEach((b) => {
 // ---------- skins (live previews share one loop) ----------
 let previews = [], quickPreviews = [], activeCat = "All";
 function renderSkins() {
-  const cats = ["All", "Wow", ...new Set(Object.values(WickedSkins).map((s) => s.cat))];
+  const cats = ["All", "Wow", "OLED", ...new Set(Object.values(WickedSkins).map((s) => s.cat))];
   $("chips").innerHTML = "";
   cats.forEach((c) => {
     const b = document.createElement("button");
@@ -73,8 +73,8 @@ function renderSkins() {
   }
   for (const [id, s] of list) {
     if (id === "__h") { const h = document.createElement("h5"); h.className = "grp-h"; h.textContent = s; $("skinCards").appendChild(h); continue; }
-    if (!grouped && (activeCat === "Wow" ? !s.wow : activeCat !== "All" && s.cat !== activeCat)) continue;
-    if (!matchQ(s.name, s.cat, s.wow ? "wow" : "")) continue;
+    if (!grouped && (activeCat === "Wow" ? !s.wow : activeCat === "OLED" ? !s.oled : activeCat !== "All" && s.cat !== activeCat)) continue;
+    if (!matchQ(s.name, s.cat, (s.wow ? "wow " : "") + (s.oled ? "oled" : ""))) continue;
     shown++;
     const card = document.createElement("button");
     card.className = "card" + (currentSrc() === id ? " on" : "");
@@ -84,7 +84,7 @@ function renderSkins() {
     const skin = s.create(cv.getContext("2d")); skin.resize(CW, CH);
     previews.push(watchPreview({ skin, t: 0 }, cv));
     card.append(cv);
-    card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span><div class="label">${esc(s.name)}</div>`);
+    card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span>${s.oled ? '<span class="wtag oled" title="Mostly true black and no bright part that stays still: easy on OLED screens">OLED</span>' : ""}<div class="label">${esc(s.name)}</div>`);
     card.onclick = () => pickSource(id);
     $("skinCards").appendChild(card);
   }
@@ -656,8 +656,25 @@ const IS_TAB = new URLSearchParams(location.search).has("page");
 const MAX_FILE_MB = EXT_MODE ? 2048 : MAX_MB;
 const converting = {}; // id -> progress 0..1
 
+// quality (resolution) + OLED tags for a wallpaper card
+function wallTags(w, h, oled) {
+  const q = window.PriismWallInfo && w && h ? PriismWallInfo.qualityOf(w, h) : "";
+  return (q ? `<span class="wtag q" title="${w}\u00D7${h}">${q}</span>` : "") + (oled ? '<span class="wtag oled" title="Mostly true black and no bright part that stays still: easy on OLED screens">OLED</span>' : "");
+}
+// uploads from before labels existed: measure them once, quietly, one at a time
+let measuring = false;
+async function labelOldUploads() {
+  if (measuring || !window.PriismWallInfo) return; const todo = cfg.media.filter((m) => !m.pending && m.w === undefined); if (!todo.length) return;
+  measuring = true;
+  try { for (const m of todo) {
+    let q = null; try { const src = m.file && window.WickedMediaDB ? await WickedMediaDB.get(m.id) : m.src; if (src) q = await PriismWallInfo.measure(src, m.type); } catch {}
+    const cur = cfg.media.find((x) => x.id === m.id); if (!cur) continue;
+    Object.assign(cur, q ? { w: q.w, h: q.h, oled: q.oled } : { w: 0, h: 0 });
+  } set({ media: cfg.media }); renderMedia(); } finally { measuring = false; }
+}
 function renderMedia() {
   const box = $("mediaCards"); box.innerHTML = "";
+  setTimeout(labelOldUploads, 400);
   cfg.media.forEach((m) => {
     const card = document.createElement("div");
     card.className = "card" + (currentSrc() === "media:" + m.id ? " on" : "");
@@ -673,7 +690,7 @@ function renderMedia() {
     }
     const badge = m.pending ? `<span class="live">${converting[m.id] !== undefined ? "CONVERTING " + Math.round(converting[m.id] * 100) + "%" : "WAITING TO CONVERT"}</span>`
       : m.type === "video" ? '<span class="live">● VIDEO</span>' : "";
-    card.insertAdjacentHTML("beforeend", `${badge}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">${ICON_X}</button></div>`);
+    card.insertAdjacentHTML("beforeend", `${badge}${wallTags(m.w, m.h, m.oled)}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">${ICON_X}</button></div>`);
     card.onclick = (e) => {
       if (e.target.classList.contains("x")) {
         const media = cfg.media.filter((x) => x.id !== m.id);
@@ -765,7 +782,8 @@ async function addFiles(files) {
     URL.revokeObjectURL(url);
     if (p) {
       await WickedMediaDB.put(id, f);
-      cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size }];
+      let q = null; try { q = await window.PriismWallInfo.measure(f, c.type); } catch {}
+      cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size, ...(q ? { w: q.w, h: q.h, oled: q.oled } : {}) }];
       lastId = id; added++;
     } else if (c.type === "video") {
       await WickedMediaDB.put(id + ":src", f); // original kept until converted
@@ -965,7 +983,7 @@ function wsRender() {
   for (const it of wsItems) {
     const card = document.createElement("div"); card.className = "card ws";
     const sub = `${it.likes} like${it.likes === 1 ? "" : "s"} · ${it.uses} use${it.uses === 1 ? "" : "s"}`;
-    card.innerHTML = `<img alt="" loading="lazy" src="${esc(it.thumbUrl || "")}"><span class="live">${it.kind === "video" ? "● VIDEO" : "IMAGE"}</span>
+    card.innerHTML = `<img alt="" loading="lazy" src="${esc(it.thumbUrl || "")}"><span class="live">${it.kind === "video" ? "● VIDEO" : "IMAGE"}</span>${wallTags(it.width, it.height, it.oled)}
       <div class="label"><span>${esc(it.title)}<small>${esc(sub)}</small></span></div><div class="acts"></div>`;
     const acts = card.querySelector(".acts");
     const btn = (label, fn, cls) => { const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls; b.onclick = (e) => { e.stopPropagation(); fn(b); }; acts.appendChild(b); return b; };
