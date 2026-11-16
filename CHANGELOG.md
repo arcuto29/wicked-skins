@@ -2,6 +2,7 @@
 
 ## 0.1.60 (unreleased)
 - **A cleaner panel in true black.** The Priism panel (extension, desktop app and Android) now has a black background, quiet surfaces and thin lines, white for whatever you've selected, and slimmer sliders with a filled track and a small knob. No more glows behind the controls.
+- **New: black & white wallpapers.** Adjust → Picture → Colour: **Black & white** turns any wallpaper (built-in or your own) grey, while your candles, indicators and the rest of the chart keep their colours.
 
 ## 0.1.59 (2026-11-04)
 - **Your indicators and zones match your wallpaper.** Style → Indicators → **Wallpaper** now uses the wallpaper's own colours (up to five, read once per wallpaper) instead of shades of one colour: each indicator and zone takes one of them, so they still stay told apart. **✨ Match everything to my wallpaper** now sets your indicators and zones to it too, and makes the legend and the text your indicators write on the chart readable, all with one Undo.
