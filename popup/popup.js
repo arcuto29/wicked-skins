@@ -2251,7 +2251,11 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Match everything now colours your indicators and zones from your wallpaper\u2019s own colours",
+const WHATS_NEW = ["A cleaner panel in true black, with slimmer sliders",
+  "Wallpapers show their quality (4K, 1080p\u2026) and OLED, with an OLED filter (Skins \u203a OLED)",
+  "A Webb space photo pack in the Workshop, up to 4K",
+  "Black & white wallpapers (Adjust \u203a Picture \u203a Colour)",
+  "Match everything now colours your indicators and zones from your wallpaper\u2019s own colours",
   "Clips and snapshots include your uploaded wallpaper",
   "Chart text: your indicators\u2019 labels in any colour, with an outline, and black text is always readable (Style \u203a Chart text)",
   "Zones look like neon boxes: a glowing edge, price still visible inside. Plus a calmer Gradient next to Rainbow (Style \u203a Indicators)",
