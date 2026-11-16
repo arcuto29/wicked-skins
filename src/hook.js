@@ -448,7 +448,10 @@
     const now = performance.now(); if (now - tvLines.t < 3000) return tvLines;
     const next = { grid: new Set(), sb: new Set(), ch: new Set(), t: now };
     const add = (set, v) => { try { const r = rgbKey(typeof v === "function" ? v() : v); if (r) set.add(r.key); } catch {} };
-    for (const w of chartWidgets()) {
+    // the charts: as everywhere else, plus TradingView's charting library (nq.vision), whose chart API is tradingViewApi
+    const ws = chartWidgets();
+    try { const a = window.tradingViewApi && window.tradingViewApi._activeChartWidgetWV && window.tradingViewApi._activeChartWidgetWV.value(); if (a && !ws.includes(a)) ws.push(a); } catch {}
+    for (const w of ws) {
       try {
         const cw = w._chartWidget || w, m = cw.model().model ? cw.model().model() : cw.model(), P = m.properties().childs();
         const pp = P.paneProperties.childs();
@@ -475,7 +478,9 @@
     else if (vert && knownLines().sb.has((rgbKey(cur) || {}).key) && !knownLines().grid.has((rgbKey(cur) || {}).key)) { if (!fx.sbOn) return false; part = "sb"; }
     else if (vert && fx.sbOn && !greyish(cur) && !candleCol(cur) && ctx.getLineDash().length) part = "sb";
     else if (horiz && fx.plOn && candleCol(cur) && ctx.getLineDash().length) part = "pl";
-    else if (fx.gridOn && greyish(cur)) part = "grid";
+    // the grid: where TradingView tells us its grid colour, only lines in that colour. A white / grey level an indicator
+    // draws across the chart (session high, a zone's edge) must never be restyled or hidden as if it were grid.
+    else if (fx.gridOn && greyish(cur) && (!knownLines().grid.size || knownLines().grid.has((rgbKey(cur) || {}).key))) part = "grid";
     if (!part) return false;
     if ((part === "grid" && fx.gridStyle === "none") || (part === "sb" && fx.sbStyle === "none") || (part === "ax" && fx.axStyle === "none")) return true;   // hidden
     const sx = ctx.getTransform().a || 1;

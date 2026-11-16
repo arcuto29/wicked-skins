@@ -492,7 +492,9 @@
       if (k.n === 1 && dashed && k.h && (isCandleCol(cur) || candleOrig)) part = lfx.plOn ? "pl" : null;
       else if (k.n === 1 && k.h && !greyish(cur) && !isCandleCol(cur)) part = lfx.bracketOn && (lfx.bracketLineColor || lfx.bracketLineW) ? "lvl" : null;   // an order / position line
       else if (k.n === 1 && dashed) part = lfx.chOn ? "ch" : null;
-      else if (greyish(cur)) part = lfx.gridOn ? "grid" : null;
+      // the grid: Lightweight Charts draws all its grid lines of one direction in ONE stroke (many segments). A single
+      // grey / white line is a level an indicator draws (session high, VWAP band…): never restyle or hide it as grid.
+      else if (greyish(cur) && k.n >= 2) part = lfx.gridOn ? "grid" : null;
       if (!part) return false;
       if (part === "grid" && lfx.gridStyle === "none") return true;
       const opt = part === "grid" ? [lfx.gridColor, lfx.gridW, lfx.gridStyle] : part === "ch" ? [lfx.chColor, lfx.chW, lfx.chStyle] : part === "lvl" ? [lfx.bracketLineColor || cur, lfx.bracketLineW, null] : [lfx.plColor, lfx.plW, lfx.plStyle];
