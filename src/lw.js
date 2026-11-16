@@ -382,7 +382,7 @@
         lastBox.set(this, "xh:" + col); return;
       }
       if (on && c && (isAxis(c) || isPaneC(c))) {
-        noteBox(this, w, h);
+        noteBox(this, w, h); if (labelBox(this, w, h)) noteTagRow(this, y, h);
         if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) {
           if (labelBox(this, w, h)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p); return; }
         }
@@ -410,7 +410,7 @@
       if (on && c && typeof this.__bdLwOrig === "string" && isChart(c)) { noteFill(this.__bdLwOrig); drawCalls.fill++; }
       if (on && c && !inLook && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle)) { const b = pbox.get(this);
         if (b && labelBox(this, b.w, b.h)) { const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); lastBox.set(this, "xh:" + col); return r; } }
-      if (on && c && !inLook && (isAxis(c) || isPaneC(c))) { const b = pbox.get(this); if (b && labelBox(this, b.w, b.h)) { noteBox(this, b.w, b.h);
+      if (on && c && !inLook && (isAxis(c) || isPaneC(c))) { const b = pbox.get(this); if (b && labelBox(this, b.w, b.h)) { noteBox(this, b.w, b.h); noteTagRow(this, b.y, b.h);
         if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); return r; } } }
       if (on && c && !a.length && !inLook && isPaneC(c)) { const b = pbox.get(this);
         if (b) {                                             // candles drawn as one-rectangle shapes
@@ -466,10 +466,12 @@
     const seg = new WeakMap();   // ctx -> { n, ok, x0, y0, last:[x,y] }
     const oBegin = proto.beginPath, oMove = proto.moveTo, oLine = proto.lineTo;
     const lineFx = () => on;   // (always: the "Each indicator" list needs to see the lines even with no styling on)
-    proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null }); pbox.delete(this); return oBegin.call(this); };
-    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) k.p = [x, y]; if (on) pbox.set(this, null); return oMove.call(this, x, y); };
+    // hz / hy / hp: the path is only horizontal straight lines (an indicator's levels, like prints); y in device px
+    proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null, hz: true, hy: null, hp: null }); pbox.delete(this); return oBegin.call(this); };
+    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) { k.p = [x, y]; if (k.hz) { const t = this.getTransform(); k.hp = y * (t.d || 1) + t.f; if (k.hy === null) k.hy = k.hp; } } if (on) pbox.set(this, null); return oMove.call(this, x, y); };
     proto.lineTo = function (x, y) {
       const k = lineFx() && seg.get(this);
+      if (k && k.hz) { const t = this.getTransform(), Y = y * (t.d || 1) + t.f; if (k.hp === null || Math.abs(Y - k.hp) > 1.5) k.hz = false; else k.hp = Y; }
       if (k && !k.ok) k.n++;                    // a curve (indicator line): just count its points, for Line glow
       else if (k && k.ok) {
         const c = this.canvas, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, p = k.p;
@@ -483,7 +485,7 @@
       if (on) pbox.set(this, null);
       return oLine.call(this, x, y);
     };
-    for (const nm of ["arc", "arcTo", "quadraticCurveTo", "bezierCurveTo", "ellipse"]) { const o = proto[nm]; if (o) proto[nm] = function (...a) { if (on) pbox.set(this, null); return o.apply(this, a); }; }
+    for (const nm of ["arc", "arcTo", "quadraticCurveTo", "bezierCurveTo", "ellipse", "rect", "roundRect"]) { const o = proto[nm]; if (o) proto[nm] = function (...a) { if (on) { if (nm !== "rect" && nm !== "roundRect") pbox.set(this, null); const k = seg.get(this); if (k) k.hz = false; } return o.apply(this, a); }; }
     const DASH = { solid: [], dotted: [1, 3], dashed: [5, 5] };
     // grid colours are muted: little colour in them (dark navy greys count), or mostly transparent
     const greyish = (col) => { const r = rgbKey(col); if (!r) return false; const [R, G, B] = r.key.split(",").map(Number);
@@ -537,7 +539,19 @@
     }
     const xhair = new WeakMap();   // canvas ctx -> where this frame's crosshair lines are
     let strokeNo = 0;              // counts restyled lines, to know which two were drawn back to back
-    lineIsCurve = (ctx) => { const k = seg.get(ctx), col = strokeDesc.get.call(ctx); return !!k && !k.ok && k.n >= 3 && typeof col === "string" && !greyish(col) && !isCandleCol(col); };
+    // an indicator line: a curve (3+ points, not straight across), or an indicator's LEVEL line (prints, pivots):
+    // straight horizontal, solid, not a candle colour, not the grid (that's several lines in one stroke), and not an
+    // order / position line (those have a coloured price tag on the scale at the same height)
+    lineIsCurve = (ctx) => { const k = seg.get(ctx), col = strokeDesc.get.call(ctx); if (!k || typeof col !== "string" || isCandleCol(col)) return false;
+      if (!k.ok && k.n >= 3 && !greyish(col)) return true;
+      return k.hz && k.n >= 1 && k.hy !== null && !ctx.getLineDash().length && !(greyish(col) && k.n >= 2) && !(shapeSides.has((rgbKey(col) || {}).key)) && !onTagRow(k.hy) && settled(col, k.hy); };
+    // a new level line counts only after ~1 s: by then an order line's price tag on the same row is known
+    const levelFirst = new Map();
+    const settled = (col, Y) => { const key = col + "@" + Math.round(Y / 4), now = performance.now(), f = levelFirst.get(key);
+      if (f === undefined) { if (levelFirst.size > 400) levelFirst.clear(); levelFirst.set(key, now);
+        if (!levelT) levelT = setTimeout(() => { levelT = 0; if (on) repaint(); }, 1100);   // a still chart may not repaint by itself
+        return false; } return now - f > 1000; };
+    let levelT = 0;
     lineHook = styleLines;
 
     // ---------- price scale text, bracket labels, P&L and last price ----------
@@ -566,6 +580,12 @@
       if (H < 8 || H > 60 || W < 12 || W > c.width * 1.01) return false;
       return isAxis(c) || (isPaneC(c) && W >= 24 && W < c.width * 0.5 && !greyish(g.fillStyle) && !isCandleCol(g.fillStyle)); };
     function noteBox(g, w, h) { if (labelBox(g, w, h)) lastBox.set(g, String(g.fillStyle)); }
+    // rows (device y) of the coloured price tags on the price scale lately: order / position / price lines have one
+    const tagRows = [];
+    function noteTagRow(g, y, h) { const c = g.canvas; if (!c || !isAxis(c) || greyish(g.fillStyle)) return;   // grey = the crosshair's tag
+      const t = g.getTransform(), Y = (y + h / 2) * (t.d || 1) + t.f, now = performance.now(), i = tagRows.findIndex((e) => Math.abs(e.y - Y) <= 3);
+      if (i >= 0) tagRows[i] = { y: Y, t: now }; else { tagRows.push({ y: Y, t: now }); if (tagRows.length > 60) tagRows.shift(); } }
+    const onTagRow = (Y) => { const now = performance.now(); for (const e of tagRows) if (now - e.t < 20000 && Math.abs(e.y - Y) <= 6) return true; return false; };
     const oText = proto.fillText;
     proto.fillText = function (t, x, y, ...rest) {
       const c = this.canvas;

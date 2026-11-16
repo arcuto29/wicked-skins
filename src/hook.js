@@ -336,6 +336,32 @@
     if (z && z.e && !(H < c.height * 0.9 && W >= 6 && H >= 3)) z.e = null;
     return z;
   }
+  // An indicator's LEVEL line (prints, pivots, session levels): straight horizontal lines in a solid stroke. Never the
+  // grid (TradingView's grid colour, or any grey when that isn't known), the crosshair (top canvas), the dotted price
+  // line (candle colour + dashed), or an order / position line: those always have a solid price tag on the same row.
+  const labelRows = new WeakMap();   // canvas -> [{ y, t }] centres (device px) of solid tags drawn on it lately
+  function noteLabelRow(ctx, yDev) {
+    const c = ctx.canvas; let a = labelRows.get(c); if (!a) { a = []; labelRows.set(c, a); }
+    const now = performance.now(), i = a.findIndex((e) => Math.abs(e.y - yDev) <= 3);
+    if (i >= 0) a[i] = { y: yDev, t: now }; else { a.push({ y: yDev, t: now }); if (a.length > 60) a.shift(); }
+  }
+  const onLabelRow = (c, yDev) => { const a = labelRows.get(c); if (!a) return false; const now = performance.now();
+    for (const e of a) if (now - e.t < 20000 && Math.abs(e.y - yDev) <= 6) return true; return false; };   // a still chart repaints rarely: remember rows a while
+  function levelLine(ctx, c, cur) {
+    const z = hzs.get(ctx); if (!z || !z.ok || !z.n || z.y === null || isTop(c) || ctx.getLineDash().length) return false;
+    const r = rgbKey(cur); if (!r) return false;
+    const grid = knownLines().grid; if (grid.size ? grid.has(r.key) : greyish(cur)) return false;
+    if (onLabelRow(c, z.y)) return false;
+    // a new line counts only after ~1 s: by then any price tag on its row has been drawn (an order line's tag is
+    // painted just after its line), so an order / position line is never taken for a level, not even for one frame
+    const key = r.key + "@" + Math.round(z.y / 4), now = performance.now(), first = levelFirst.get(key);
+    if (first === undefined) { if (levelFirst.size > 400) levelFirst.clear(); levelFirst.set(key, now);
+      if (!levelT) levelT = setTimeout(() => { levelT = 0; if (on) forceRepaint(true); }, 1100);   // a still chart may not repaint by itself
+      return false; }
+    return now - first > 1000;
+  }
+  const levelFirst = new Map();   // "r,g,b@row" -> when a level line was first seen there
+  let levelT = 0;
   // draw a zone: its fill (glowing only if it has no edge), then its neon edge with the glow. stroke = draws the edge.
   function drawZone(ctx, z, fill, stroke) {
     const pF = ctx.fillStyle, pSB = ctx.shadowBlur, pSC = ctx.shadowColor;
@@ -426,12 +452,16 @@
   //  - any colourful, visible line can glow; grid (faint) and crosshair (grey) never do
   const segs = new WeakMap();
   const origBegin = proto.beginPath, origMove = proto.moveTo, origLine = proto.lineTo, origStroke = proto.stroke;
-  proto.beginPath = function () { segs.set(this, [0, 0]); if (on && (fx.bracketOn || styling())) lastSeg.set(this, null); if (on) pathBox.delete(this); return origBegin.call(this); };
+  // hz: is the path built so far only horizontal straight lines (an indicator's level lines, like prints)? y = device y
+  const hzs = new WeakMap();   // ctx -> { ok, n, y, py }
+  proto.beginPath = function () { segs.set(this, [0, 0]); if (on) hzs.set(this, { ok: true, n: 0, y: null, py: null }); if (on && (fx.bracketOn || styling())) lastSeg.set(this, null); if (on) pathBox.delete(this); return origBegin.call(this); };
   proto.moveTo = function (x, y) { const k = segs.get(this); if (k) k[0]++;
+    if (on) { const z = hzs.get(this); if (z && z.ok) { const t = this.getTransform(); z.py = y * (t.d || 1) + t.f; if (z.y === null) z.y = z.py; } }
     if (on) growBox(this, x, y);
     if (on && (fx.bracketOn || styling())) { const t = this.getTransform(); lastSeg.set(this, { x0: x * (t.a || 1) + t.e, y0: y * (t.d || 1) + t.f, x1: null, y1: null }); }
     return origMove.call(this, x, y); };
   proto.lineTo = function (x, y) { const k = segs.get(this); if (k) k[1]++;
+    if (on) { const z = hzs.get(this); if (z && z.ok) { const t = this.getTransform(), Y = y * (t.d || 1) + t.f; if (z.py === null || Math.abs(Y - z.py) > 1.5) z.ok = false; else { z.n++; z.py = Y; } } }
     if (on) growBox(this, x, y);
     if (on && (fx.bracketOn || styling())) { const s = lastSeg.get(this), t = this.getTransform(); if (s) { s.x1 = x * (t.a || 1) + t.e; s.y1 = y * (t.d || 1) + t.f; } }
     return origLine.call(this, x, y); };
@@ -581,7 +611,8 @@
     // a line of one of your drawings (a trend line, a rectangle's border): listed and styled like an indicator line,
     // but the all-indicators colour only reaches it with "Your drawings: Style them too"
     const dk = drawCols.size && typeof cur === "string" ? rgbKey(cur) : null, isDraw = !!dk && drawCols.has(dk.key);
-    const indLine = (polyline && typeof cur === "string" && !candleCol && (path !== undefined || k[1] >= 3)) || (isDraw && !candleCol);
+    const indLine = (polyline && typeof cur === "string" && !candleCol && (path !== undefined || k[1] >= 3)) || (isDraw && !candleCol)
+      || (path === undefined && typeof cur === "string" && !candleCol && levelLine(this, c, cur));
     if (indLine && L && L.noteSeen) L.noteSeen(cur, "line");                     // for the panel's "Each indicator" list
     const custom = fx.indCustom && Object.keys(fx.indCustom).length > 0, indOn = fx.indMode !== "own" || custom;
     if (!(candles || fx.lineGlow > 0 || indOn)) return origStroke.apply(this, arguments);
@@ -927,6 +958,14 @@
   const origDrawImage = proto.drawImage;
   proto.drawImage = function (img, ...r) {
     const c = this.canvas;
+    // a label picture pasted onto the chart (TradingView draws order / position tags this way): note its row, so the
+    // line on that row is never taken for an indicator's level line
+    if (on && c && img && isPane(c) && (img instanceof HTMLCanvasElement || (typeof OffscreenCanvas !== "undefined" && img instanceof OffscreenCanvas))) {
+      const info = srcInfo.get(img);
+      if (info && (info.box || info.text)) { let dy, dh; if (r.length >= 8) { dy = r[5]; dh = r[7]; } else if (r.length >= 4) { dy = r[1]; dh = r[3]; } else { dy = r[1]; dh = img.height; }
+        const t = this.getTransform(), hCss = Math.abs(dh * (t.d || 1)) / ((typeof devicePixelRatio === "number" && devicePixelRatio) || 1);
+        if (hCss >= 6 && hCss <= 48) noteLabelRow(this, (dy + dh / 2) * (t.d || 1) + t.f); }
+    }
     if (on && (fx.bracketOn || fx.privacy) && c && img && (img instanceof HTMLCanvasElement || (typeof OffscreenCanvas !== "undefined" && img instanceof OffscreenCanvas)) && bracketCanvas(c)) {
       const info = srcInfo.get(img);
       if (info && info.text && (info.box || BRACKET_FONT.test(info.font || ""))) {
@@ -1124,6 +1163,10 @@
   }
   proto.fill = function (...a) {
     const c = this.canvas;
+    // a solid rounded tag on the chart (order / position labels): note its row, so its level line is never an indicator's
+    if (on && c && a.length === 0 && isPane(c)) { const b = pathBox.get(this);
+      if (b) { const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1, w = (b.x1 - b.x0) / dpr, h = (b.y1 - b.y0) / dpr, k = rgbKey(String(this.fillStyle));
+        if (h >= 8 && h <= 40 && w >= 10 && w <= 460 && k && (k.a === null || +k.a >= 0.9)) noteLabelRow(this, (b.y0 + b.y1) / 2); } }
     // rounded pill box (TradingView's newer trading labels draw their box as a path, not a rect)
     if (on && (fx.bracketOn || fx.privacy) && c && a.length === 0 && bracketCanvas(c)) {
       const b = pathBox.get(this);
@@ -1183,6 +1226,7 @@
       }
     }
     if (on && c && w * (this.getTransform().a || 1) <= 40 && isPane(c)) noteFill(this.__bdFill);
+    if (on && c && isPane(c) && pillBox(this, x, y, w, h)) { const k = rgbKey(String(this.fillStyle)); if (k && (k.a === null || +k.a >= 0.9)) { const t = this.getTransform(); noteLabelRow(this, (y + h / 2) * (t.d || 1) + t.f); } }
     // Bracket pills: record the box so the text drawn next knows it belongs to a pill. Optionally strengthen the
     // box backing so the TP/Stop/P&L number stays readable on busy wallpapers.
     if (c && !c.isConnected && c.height <= 120 && h >= 6) noteSrcBox(c, this.fillStyle, w, h);
