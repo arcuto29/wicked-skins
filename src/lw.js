@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 9;
+  const LW_VERSION = 10;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -120,7 +120,7 @@
       lfx = any ? {
         // price scale text + backing
         scaleText: hex(f.scaleText), scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)), scaleBold: !!f.scaleBold, scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
-        scaleFont: ["mono", "rounded"].includes(f.scaleFont) ? f.scaleFont : "default", scaleBg: ["auto", "glass", "color", "default"].includes(f.scaleBg) ? f.scaleBg : "auto", scaleBgColor: hex(f.scaleBgColor) || "#0b1320",
+        scaleFont: /^[a-z]{1,16}$/.test(f.scaleFont || "") ? f.scaleFont : "default", scaleFamily: typeof f.scaleFamily === "string" && /^[A-Za-z0-9 ,"'\-]{1,200}$/.test(f.scaleFamily) ? f.scaleFamily : "", fontTick: +f.fontTick || 0, scaleBg: ["auto", "glass", "color", "default"].includes(f.scaleBg) ? f.scaleBg : "auto", scaleBgColor: hex(f.scaleBgColor) || "#0b1320",
         // trade brackets = the platform's own level lines (orders / positions) and their price-scale labels
         bracketOn: !!f.bracketOn, bracketFill: hex(f.bracketFill), bracketText: hex(f.bracketText), bracketProfit: hex(f.bracketProfit), bracketLoss: hex(f.bracketLoss),
         bracketSize: Math.max(0, Math.min(3, +f.bracketSize || 0)), bracketLineColor: hex(f.bracketLineColor), bracketLineW: Math.max(0, Math.min(3, +f.bracketLineW || 0)),
@@ -588,7 +588,6 @@
     // On the price-scale canvas Lightweight Charts draws each tag as a box and then its text; plain tick numbers
     // have no box. We remember the box drawn just before a text to tell them apart.
     const lastBox = new WeakMap();   // ctx -> fill colour of the label box drawn just before
-    const FONTS = { mono: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace', rounded: '"SF Pro Rounded", "Nunito", "Varela Round", ui-rounded, system-ui, sans-serif' };
     const PNL_RE = /^(?:p\s*(?:&|n|\/)?\s*l\s*:?\s*)?([+\-\u2212])?\s*([$\u20ac\u00a3\u00a5])?\s*([+\-\u2212])?\s*(\d{1,3}(?:,\d{3})*|\d+)(\.\d{1,2})\s*(usd|usdt|usdc|eur|gbp|jpy|aud|cad|chf|nzd|pts|points)?$/i;
     // the chart pane is big; the price scale (narrow) and time scale (short) canvases sit in the same table
     const isPaneC = (c) => c && isChart(c) && c.width > 200 && c.height > 120;
@@ -674,7 +673,7 @@
       } else if (!box && lfx) {                           // plain price / time numbers
         if (lfx.scaleText) fillDesc.set.call(this, lfx.scaleText);
         let f = pF; if (lfx.scaleSize) f = sizeUp(f, lfx.scaleSize * 1.5);
-        if (lfx.scaleFont !== "default") f = f.replace(/(\d+(?:\.\d+)?px)\s+.*$/, (m, sz) => sz + " " + FONTS[lfx.scaleFont]);
+        if (lfx.scaleFont !== "default" && lfx.scaleFamily) f = f.replace(/(\d+(?:\.\d+)?px)\s+.*$/, (m, sz) => sz + " " + lfx.scaleFamily);
         if (lfx.scaleBold && !/\bbold\b|\b[6-9]00\b/.test(f)) f = "bold " + f;
         this.font = f;
         if (lfx.scaleGlow > 0) { this.shadowColor = lfx.scaleText || String(pS); this.shadowBlur = 2 + lfx.scaleGlow * 8; }

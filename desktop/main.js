@@ -30,6 +30,8 @@ const read = (f) => fs.readFileSync(path.join(SRC, f), "utf8");
 
 // hook.js must run before TradingView's own scripts (it wraps the canvas API), so the TV window's
 // preload asks for it synchronously and runs it in the page world at document start.
+// Priism's bundled fonts for the chart page (base64), asked for by name only when you pick one
+ipcMain.on("font-data", (e, name) => { try { e.returnValue = /^[a-z]{1,16}$/.test(String(name)) ? fs.readFileSync(path.join(SRC, "fonts", name + ".woff2")).toString("base64") : ""; } catch { e.returnValue = ""; } });
 ipcMain.on("hook-code", (e) => { e.returnValue = read("candlelooks.js") + "\n" + read("hook.js"); });
 
 async function inject(wc) {
