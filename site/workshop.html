@@ -38,6 +38,11 @@
         <b>Publish this look to the Workshop</b>
         <p class="hint" id="lookSum"></p>
         <input id="lookTitle" class="field" maxlength="40" placeholder="Name your look">
+        <div id="lookWall" class="lookwall" hidden>
+          <p class="hint" id="lookWallSay"></p>
+          <label class="btn" style="display:inline-block;cursor:pointer"><input id="lookWallFile" type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm"><span id="lookWallPick">Choose the file</span></label>
+          <label class="hint" style="display:block;margin-top:6px"><input type="checkbox" id="lookWallRights"> I made it, or I have the right to share it</label>
+        </div>
         <div class="row2"><button id="lookGo" class="btn primary" type="button">Publish look</button><button id="lookCancel" class="btn" type="button">Cancel</button></div>
         <p class="hint" id="lookMsg"></p>
       </div>
@@ -172,7 +177,11 @@
     loadLooks();
 
     // ---------- community looks: share (a code sent from the extension) ----------
-    let pendingLook = null;
+    let pendingLook = null, lookFile = null;
+    $("lookWallFile").onchange = (e) => { const f = e.target.files[0]; if (!f) return;
+      if (f.size > LIMIT) { lookFile = null; return say("lookMsg", "That file is over the 50 MB limit."); }
+      if (!/^(image\/(png|jpeg|webp|gif|avif)|video\/(mp4|webm))$/.test(f.type)) { lookFile = null; return say("lookMsg", "Allowed: PNG, JPG, WebP, GIF, AVIF, MP4, WebM."); }
+      lookFile = f; $("lookWallPick").textContent = f.name; say("lookMsg", ""); };
     function readLook() {
       // the look comes in the address (#look=...); it's also kept here, so signing in (which reloads the page
       // without it) doesn't lose it. Cleared once it's published, or after a day.
@@ -187,9 +196,12 @@
         const bin = atob(b), bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         const p = JSON.parse(new TextDecoder().decode(bytes));
         if (!p || p.v !== 1 || !/^[a-z0-9_-]{1,40}$/.test(p.s || "") || typeof p.l !== "object") return;
-        pendingLook = { title: String(p.n || "").slice(0, 40), skin: p.s, data: p.l };
+        pendingLook = { title: String(p.n || "").slice(0, 40), skin: p.s, data: p.l, own: p.m && typeof p.m === "object" ? { name: String(p.m.n || "your wallpaper").slice(0, 80), kind: p.m.t === "video" ? "video" : "image" } : null };
+        lookFile = null; $("lookWallFile").value = ""; $("lookWallPick").textContent = "Choose the file"; $("lookWallRights").checked = false;
+        $("lookWall").hidden = !pendingLook.own;
+        if (pendingLook.own) say("lookWallSay", `This look uses your own ${pendingLook.own.kind} \u201c${pendingLook.own.name}\u201d. Files never leave your computer by themselves, so add it here and everyone who taps the look gets it too. Skip it and the look is shared with Polar Lights instead.`);
         $("lookShare").hidden = false; $("lookTitle").value = pendingLook.title;
-        const d = p.l, parts = [`wallpaper: ${p.s}`, d.candleLook ? `candles: ${d.candleLook}` : "", d.gridOn || d.chOn || d.plOn ? "chart styling" : "", d.panelMode && d.panelMode !== "off" ? "panel colours" : ""].filter(Boolean);
+        const d = p.l, parts = [pendingLook.own ? `wallpaper: ${pendingLook.own.name}` : `wallpaper: ${p.s}`, d.candleLook ? `candles: ${d.candleLook}` : "", d.gridOn || d.chOn || d.plOn ? "chart styling" : "", d.panelMode && d.panelMode !== "off" ? "panel colours" : ""].filter(Boolean);
         say("lookSum", parts.join(" · ") + ".");
         $("lookCancel").onclick = () => { pendingLook = null; try { localStorage.removeItem("priismPendingLook"); } catch {} $("lookShare").hidden = true; history.replaceState(null, "", location.pathname); };
         $("lookMsg").textContent = ""; $("lookGo").disabled = false;
@@ -200,13 +212,22 @@
     window.addEventListener("hashchange", readLook);     // another look sent to a Workshop tab that's already open
     $("lookGo").onclick = async () => {
       if (!pendingLook) return;
-      if (!user) return say("lookMsg", "Sign in first (above), then tap Publish look.");
+      if (!user) { say("lookMsg", "Sign in first: your look is kept while you do. Then tap Publish look again."); const a = document.getElementById("auth"); if (a) a.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
       const title = $("lookTitle").value.trim(); if (!title) return say("lookMsg", "Give your look a name.");
-      $("lookGo").disabled = true; say("lookMsg", "Sharing…");
-      const ins = await sb.from("looks").insert({ title, skin: pendingLook.skin, data: pendingLook.data }).select("status").single();
+      if (lookFile && !$("lookWallRights").checked) return say("lookMsg", "Tick that you have the right to share the wallpaper (or remove it).");
+      $("lookGo").disabled = true; say("lookMsg", lookFile ? "Uploading the wallpaper…" : "Sharing…");
+      let data = { ...pendingLook.data }, wallNote = "";
+      if (lookFile) {
+        try { const kind = lookFile.type.startsWith("video") ? "video" : "image", thumb = await makeThumb(lookFile, kind).catch(() => null);
+          const w = await uploadWallpaper(lookFile, kind, title, thumb); data.wallId = w.id; wallNote = w.status === "approved" ? "" : " Its wallpaper is in review too.";
+          say("lookMsg", "Sharing…"); }
+        catch (e) { $("lookGo").disabled = false; return say("lookMsg", "Couldn't upload the wallpaper: " + String((e && e.message) || e)); }
+      }
+      const ins = await sb.from("looks").insert({ title, skin: pendingLook.skin, data }).select("status").single();
       if (ins.error) { $("lookGo").disabled = false; return say("lookMsg", /looks|schema cache|relation/i.test(ins.error.message)
         ? "Looks aren't set up on the server yet (the site owner needs to re-run supabase/schema.sql). Your look is kept: try again later." : "Couldn't publish: " + ins.error.message); }
-      say("lookMsg", ins.data.status === "approved" ? "Published! It's live in the Workshop now." : "Published! It's in review: you'll see it under Your shares, and everyone sees it once it's approved.");
+      say("lookMsg", (ins.data.status === "approved" ? "Published! It's live in the Workshop now." : "Published! It's in review: you'll see it under Your shares, and everyone sees it once it's approved.") + wallNote);
+      if (lookFile) { sort = "new"; load(true); } lookFile = null;
       pendingLook = null; try { localStorage.removeItem("priismPendingLook"); } catch {} history.replaceState(null, "", location.pathname); loadLooks(); renderMine();
     };
 
@@ -352,24 +373,29 @@
         else { const v = document.createElement("video"); v.muted = true; v.src = URL.createObjectURL(file); v.onloadeddata = () => { v.currentTime = Math.min(0.1, v.duration || 0.1); }; v.onseeked = () => draw(v, v.videoWidth, v.videoHeight); v.onerror = rej; }
       });
     }
+    // one wallpaper into the Workshop (file + thumbnail + quality/OLED labels): { id, status }
+    async function uploadWallpaper(file, kind, title, thumb) {
+      const ext = (file.type.split("/")[1] || "png").replace("jpeg", "jpg");
+      const base = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+      const path = `${user.id}/${base}.${ext}`;
+      const r = await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type });
+      if (r.error) throw r.error;
+      let thumbPath = null;
+      if (thumb) { thumbPath = `${user.id}/${base}.thumb.jpg`; const tr = await sb.storage.from(BUCKET).upload(thumbPath, thumb, { contentType: "image/jpeg" }); if (tr.error) thumbPath = null; }
+      let lab = null; try { lab = await window.PriismWallInfo.measure(file, kind); } catch {}
+      const row = { title, kind, file_path: path, thumb_path: thumbPath, size_bytes: file.size };
+      let ins = await sb.from("wallpapers").insert(lab && lab.w ? { ...row, width: lab.w, height: lab.h, oled: !!lab.oled } : row).select("id,status").single();
+      if (ins.error && lab && /column|width|oled/i.test(ins.error.message || "")) ins = await sb.from("wallpapers").insert(row).select("id,status").single();
+      if (ins.error) throw ins.error;
+      return ins.data;
+    }
     $("rights").onchange = update; $("title").oninput = update;
     function update() { $("share").disabled = !(chosen && $("rights").checked && $("title").value.trim()); }
     $("share").onclick = async () => {
       if (!chosen || !user) return;
       $("share").disabled = true; say("shareMsg", "Uploading…");
       try {
-        const ext = (chosen.file.type.split("/")[1] || "png").replace("jpeg", "jpg");
-        const base = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-        const path = `${user.id}/${base}.${ext}`;
-        let r = await sb.storage.from(BUCKET).upload(path, chosen.file, { contentType: chosen.file.type });
-        if (r.error) throw r.error;
-        let thumbPath = null;
-        if (thumbBlob) { thumbPath = `${user.id}/${base}.thumb.jpg`; const tr = await sb.storage.from(BUCKET).upload(thumbPath, thumbBlob, { contentType: "image/jpeg" }); if (tr.error) thumbPath = null; }
-        let lab = null; try { lab = await window.PriismWallInfo.measure(chosen.file, chosen.kind); } catch {}   // quality + OLED labels
-        const row = { title: $("title").value.trim(), kind: chosen.kind, file_path: path, thumb_path: thumbPath, size_bytes: chosen.file.size };
-        let ins = await sb.from("wallpapers").insert(lab && lab.w ? { ...row, width: lab.w, height: lab.h, oled: !!lab.oled } : row).select("status").single();
-        if (ins.error && lab && /column|width|oled/i.test(ins.error.message || "")) ins = await sb.from("wallpapers").insert(row).select("status").single();
-        if (ins.error) throw ins.error;
+        const ins = { data: await uploadWallpaper(chosen.file, chosen.kind, $("title").value.trim(), thumbBlob) };
         say("shareMsg", ins.data.status === "approved" ? "Shared! It's live in the Workshop now." : "Shared! It's in review: you'll see it under Your shares, and everyone sees it once it's approved.");
         await renderMine();
         chosen = null; thumbBlob = null; $("file").value = ""; $("title").value = ""; $("rights").checked = false;

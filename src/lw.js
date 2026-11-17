@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 8;
+  const LW_VERSION = 9;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -66,7 +66,8 @@
       const c = raw ? JSON.parse(raw) : null;
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
         candles = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
-          glow: Math.max(0, Math.min(1, +c.glow || 0)), look: String(c.look || "solid") };
+          glow: Math.max(0, Math.min(1, +c.glow || 0)), look: String(c.look || "solid"),
+          P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null };   // wick / border / hollow / widths
       } else candles = null;
     } catch { candles = null; }
   }
@@ -320,7 +321,10 @@
     const lk = { g: null, px: 1, yfrac: 0,
       fill(x, y, w, h) { origFillRect.call(lk.g, x, y, w, h); }, style(v) { fillDesc.set.call(lk.g, v); },
       stroke(v) { strokeDesc.set.call(lk.g, v); }, strokeRect(x, y, w, h) { origStrokeRectL.call(lk.g, x, y, w, h); },
-      fillPath() { origFillPathL.call(lk.g); } };
+      fillPath() { origFillPathL.call(lk.g); }, clear(x, y, w, h) { origClearL.call(lk.g, x, y, w, h); } };
+    const origClearL = proto.clearRect, lastBodyL = new WeakMap();
+    let partsTrack = null;   // were the last paint's bodies wide enough to tell them from wicks?
+    const tracker = () => partsTrack || (window.__bdCandleLooks && window.__bdCandleLooks.paintTracker ? (partsTrack = window.__bdCandleLooks.paintTracker(() => { try { repaint(); } catch {} })) : null);
     // Draw a candle body / wick in the chosen look (glow, neon, glass…). Used for fillRect bodies and for bodies some
     // builds draw as a one-rectangle path (rect / roundRect + fill). Returns false when it isn't a candle.
     let inLook = false;   // while a look draws, its own drawing must not be taken for another candle (no recursion)
@@ -328,14 +332,26 @@
       if (inLook) return false;
       const L = window.__bdCandleLooks, look = candles && L && L.META[candles.look] ? candles.look : "solid";
       const meta = L && L.META[look], glow = candles ? Math.max(candles.glow, meta ? meta.minGlow : 0) : 0;
-      if (!(on && candles && (glow > 0 || (look !== "solid" && look !== "shift")) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(g.fillStyle))) return false;
+      const P = L && candles ? candles.P : null;
+      if (!(on && candles && (glow > 0 || (look !== "solid" && look !== "shift") || P) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(g.fillStyle))) return false;
       const t = g.getTransform(), sx = t.a || 1, sy = t.d || 1, col = toHexCol(g.fillStyle), isUp = col === candles.upHex;
+      const isBody = Math.abs(w * sx) >= 3 && Math.abs(h * sy) >= 3, tr = P ? tracker() : null;
+      // a bordered candle comes as two nested rects in the same colour: style it once
+      if (P && isBody && L.nestedDupe(lastBodyL, g, Math.min(x, x + w) * sx + t.e, Math.min(y, y + h) * sy + t.f, Math.abs(w * sx), Math.abs(h * sy), col)) return true;
       lk.g = g; lk.px = 1 / sx; lk.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
       g.save(); inLook = true;
       try {
         if (glow > 0) { g.shadowColor = L ? L.tone(look, col, lk) : col; g.shadowBlur = 3 + glow * 16; }
-        if (L && look !== "solid" && Math.abs(w * sx) >= 3 && Math.abs(h * sy) >= 3) L.draw(g, look, x, y, w, h, col, isUp, lk);
-        else { if (L) fillDesc.set.call(g, L.wick(look, col, lk)); origFillRect.call(g, x, y, w, h); }
+        if (L && P && isBody) { if (tr) tr.note(c, true, Math.abs(w * sx)); L.candle(g, look, x, y, w, h, col, isUp, lk, P); }
+        else if (L && look !== "solid" && isBody) L.draw(g, look, x, y, w, h, col, isUp, lk);
+        else {
+          // a wick: your wick colour / width only when this chart's bodies are wide enough to tell them apart
+          if (tr) tr.note(c, false, 0);
+          const bw = tr ? tr.bw(c) : 0, ok = P && bw >= 3 && Math.abs(w * sx) < 3;
+          if (L) fillDesc.set.call(g, ok ? L.wickOf(look, col, isUp, lk, P) : L.wick(look, col, lk));
+          let wx = x, ww = w; if (ok && P.wickW) { const nw = Math.min(P.wickW, Math.max(1, bw - 2)) / sx; wx = x + w / 2 - nw / 2; ww = nw; }
+          origFillRect.call(g, wx, y, ww, h);
+        }
       } finally { inLook = false; g.restore(); }
       return true;
     }

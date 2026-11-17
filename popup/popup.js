@@ -9,7 +9,7 @@ const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="tru
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
-const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
+const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -21,6 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", shiftSpeed: 10,
+  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [],
   indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -36,6 +37,8 @@ const DEFAULTS = {
 };
 let cfg = { ...DEFAULTS };
 // lastPick: you used THIS copy's panel just now, so if two copies of Priism are installed, this one draws the page
+// a built-in wallpaper with YOUR settings for it (its own options + Recolour), for every preview in the panel
+const makeSkin = (id, ctx, look) => window.PriismMakeSkin(id, ctx, look && "wallOpts" in look ? look.wallOpts : (cfg.skinOpts || {})[id]);   // a look's own wallpaper settings win
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set({ ...obj, lastPick: Date.now() }); };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -81,8 +84,8 @@ function renderSkins() {
     const cv = document.createElement("canvas");
     const CW = big ? 260 : 160, CH = big ? 128 : 76;
     cv.width = CW; cv.height = CH;
-    const skin = s.create(cv.getContext("2d")); skin.resize(CW, CH);
-    previews.push(watchPreview({ skin, t: 0 }, cv));
+    const skin = makeSkin(id, cv.getContext("2d")); skin.resize(CW, CH);
+    previews.push(watchPreview({ skin, t: 0, id, cv }, cv));
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span>${s.oled ? '<span class="wtag oled" title="Mostly true black and no bright part that stays still: easy on OLED screens">OLED</span>' : ""}<div class="label">${esc(s.name)}</div>`);
     card.onclick = () => pickSource(id);
@@ -105,6 +108,7 @@ let last = 0;
   if (now - last < 66) return; // ~15fps previews
   const dt = (now - last) / 1000; last = now;
   if (document.hidden) return;
+  if (wallPrev && wallPrev.cv.offsetParent) { const d = Math.min(dt, 0.1); try { wallPrev.skin.frame((wallPrev.t += d), d); } catch {} }
   for (const p of [...previews, ...quickPreviews, ...lookPreviews]) if (p.vis !== false) p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1));
 })(0);
 
@@ -117,10 +121,10 @@ function renderHero() {
   const bg = $("dhBg"), fg = $("dhFg"); if (!bg || !fg) return;
   const r = bg.getBoundingClientRect(); if (r.width < 50) return;
   const W = Math.round(r.width * 0.8), H = Math.round(r.height * 0.8);
-  const src = cfg.skin, sk = WickedSkins[src], key = src + "|" + W + "x" + H;
+  const src = cfg.skin, sk = WickedSkins[src], key = src + "|" + W + "x" + H + "|" + JSON.stringify((cfg.skinOpts || {})[src] || null);
   if (heroP.key !== key) {
     heroP.key = key; bg.width = W; bg.height = H; heroP.p = null;
-    if (sk) { const s = sk.create(bg.getContext("2d")); s.resize(W, H); heroP.p = { skin: s, t: 3 }; s.frame(3, 0.016); }
+    if (sk) { const s = makeSkin(src, bg.getContext("2d")); s.resize(W, H); heroP.p = { skin: s, t: 3 }; s.frame(3, 0.016); }
     else { const g = bg.getContext("2d"); g.fillStyle = "#0b0d14"; g.fillRect(0, 0, W, H); }
   }
   const media = src === "media" && (cfg.media || []).find((m) => m.id === cfg.mediaId);
@@ -137,13 +141,14 @@ function renderHero() {
   for (let i = 0; i < n; i++) { const o = p; p += (rnd() - 0.47) * 6; bars.push([o, p, Math.min(o, p) - rnd() * 3, Math.max(o, p) + rnd() * 3]); }
   let lo = Infinity, hi = -Infinity; for (const b of bars) { lo = Math.min(lo, b[2]); hi = Math.max(hi, b[3]); }
   const top = fg.height * 0.12, bot = fg.height * 0.62, Y = (v) => bot - ((v - lo) / (hi - lo || 1)) * (bot - top), slot = fg.width / (n + 1), bw = Math.max(2 * dpr, slot * 0.56);
-  const k = { fill: (a, b, c, d) => g.fillRect(a, b, c, d), style: (v) => { g.fillStyle = v; }, stroke: (v) => { g.strokeStyle = v; }, strokeRect: (a, b, c, d) => g.strokeRect(a, b, c, d), fillPath: () => g.fill(), px: dpr, yfrac: 0 };
+  const k = { fill: (a, b, c, d) => g.fillRect(a, b, c, d), style: (v) => { g.fillStyle = v; }, stroke: (v) => { g.strokeStyle = v; }, strokeRect: (a, b, c, d) => g.strokeRect(a, b, c, d), fillPath: () => g.fill(), clear: (a, b, c, d) => g.clearRect(a, b, c, d), px: dpr, yfrac: 0 };
   const glow = Math.max(+cfg.candleGlow || 0, CL && CL.META[look] ? CL.META[look].minGlow : 0);
   bars.forEach(([o, c, l, h], i) => {
     const isUp = c >= o, col = isUp ? up : dn, cx = slot * (i + 1), t0 = Y(Math.max(o, c)), t1 = Y(Math.min(o, c)); k.yfrac = t0 / fg.height;
     g.save(); if (glow > 0) { g.shadowColor = col; g.shadowBlur = (4 + glow * 18) * dpr * 0.7; }
-    g.fillStyle = CL ? CL.wick(look, col, k) : col; g.fillRect(Math.round(cx - dpr / 2), Y(h), dpr, Y(l) - Y(h));
-    if (CL) CL.draw(g, look, Math.round(cx - bw / 2), t0, Math.round(bw), Math.max(dpr, t1 - t0), col, isUp, k); else { g.fillStyle = col; g.fillRect(cx - bw / 2, t0, bw, t1 - t0); }
+    const P = CL && cfg.candleOn && CL.parts ? CL.parts(partsCfg()) : null, [wx, ww] = P ? CL.wickRect(cx - dpr / 2, dpr, k, P) : [Math.round(cx - dpr / 2), dpr];
+    g.fillStyle = CL ? (P ? CL.wickOf(look, col, isUp, k, P) : CL.wick(look, col, k)) : col; g.fillRect(wx, Y(h), ww, Y(l) - Y(h));
+    if (CL) CL.candle(g, look, Math.round(cx - bw / 2), t0, Math.round(bw), Math.max(dpr, t1 - t0), col, isUp, k, P); else { g.fillStyle = col; g.fillRect(cx - bw / 2, t0, bw, t1 - t0); }
     g.restore();
   });
   // your look, at a glance
@@ -246,10 +251,10 @@ function renderLookGrid() {
   setTimeout(renderHero, 0);
   const box = $("candleLook"), CL = window.__bdCandleLooks; if (!box || !CL) return;
   const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
-  const sig = up + down + (+cfg.candleGlow || 0) + "|" + (cfg.skin || "");
+  const sig = up + down + (+cfg.candleGlow || 0) + "|" + (cfg.skin || "") + "|" + JSON.stringify(partsCfg()) + "|" + JSON.stringify((cfg.skinOpts || {})[cfg.skin] || {});
   // one still frame of YOUR current wallpaper, used behind every look preview
   let bgc = null;
-  try { const sk = WickedSkins[cfg.skin]; if (sk) { bgc = document.createElement("canvas"); bgc.width = 200; bgc.height = 104; const s0 = sk.create(bgc.getContext("2d")); s0.resize(200, 104); s0.frame(3, 0.016); } } catch { bgc = null; }
+  try { const sk = WickedSkins[cfg.skin]; if (sk) { bgc = document.createElement("canvas"); bgc.width = 200; bgc.height = 104; const s0 = makeSkin(cfg.skin, bgc.getContext("2d")); s0.resize(200, 104); s0.frame(3, 0.016); } } catch { bgc = null; }
   if (box.dataset.sig !== sig || box.children.length !== CL.LOOKS.length) {
     box.dataset.sig = sig; box.textContent = "";
     for (const [id, name] of CL.LOOKS) {
@@ -258,7 +263,7 @@ function renderLookGrid() {
       const lab = document.createElement("span"); lab.textContent = name;
       b.append(cv, lab); box.appendChild(b);
       b.onclick = () => { set({ candleLook: id, candleOn: true }); $("candleOn").checked = true; renderCandles(); };
-      requestAnimationFrame(() => { try { CL.preview(cv, id, up, down, +cfg.candleGlow || 0, bgc); } catch {} });
+      requestAnimationFrame(() => { try { CL.preview(cv, id, up, down, +cfg.candleGlow || 0, bgc, partsCfg()); } catch {} });
     }
   }
   for (const b of box.children) b.classList.toggle("on", b.dataset.look === (cfg.candleLook || "solid"));
@@ -290,6 +295,7 @@ function renderCandles() {
   seg("scaleLabels", [[true, "Candle colours"], [false, "Original"]], () => cfg.scaleLabels, (v) => set({ scaleLabels: v }));
   $("candleGlow").value = cfg.candleGlow; $("candleGlowOut").textContent = Math.round(cfg.candleGlow * 100) + "%";
   $("candleUp").value = cfg.candleUp; $("candleDown").value = cfg.candleDown;
+  syncParts();
   // filter chips + grouped grid
   const chips = $("candleChips"); chips.innerHTML = "";
   for (const g of ["All", ...CANDLE_GROUPS]) {
@@ -299,10 +305,36 @@ function renderCandles() {
     chips.appendChild(c);
   }
   const box = $("candleCards"); box.innerHTML = "";
-  const custom = cfg.candleOn && !CANDLE_PRESETS.some(([, , u, d]) => u === cfg.candleUp && d === cfg.candleDown);
-  if (custom) {
-    box.insertAdjacentHTML("beforeend", `<div class="grp-label">Your colours</div>`);
-    box.insertAdjacentHTML("beforeend", `<button class="card preset on" disabled>${bars(cfg.candleUp, cfg.candleDown)}<div class="label">Custom</div></button>`);
+  // Yours: candle styles you saved (colours, look, glow and candle parts), first in the same grid as the built-in ones
+  const mine = Array.isArray(cfg.myCandles) ? cfg.myCandles : [], cur = candleStyleNow(), curSig = JSON.stringify(cur);
+  const saved = mine.some((m) => JSON.stringify(candleStyleOf(m)) === curSig);
+  const custom = cfg.candleOn && !saved && !CANDLE_PRESETS.some(([, , u, d]) => u === cfg.candleUp && d === cfg.candleDown);
+  if (mine.length || cfg.candleOn) box.insertAdjacentHTML("beforeend", `<div class="grp-label">Yours</div>`);
+  for (const m of mine) {
+    const b = document.createElement("button"), on = cfg.candleOn && JSON.stringify(candleStyleOf(m)) === curSig;
+    b.className = "card preset mine" + (on ? " on" : "");
+    b.innerHTML = bars(m.candleUp, m.candleDown) + `<div class="label">${esc(m.name)}</div><span class="x" title="Delete">\u2715</span><span class="ren" title="Rename">\u270E</span>`;
+    b.onclick = (e) => {
+      if (e.target.classList.contains("ren")) {               // rename in place (no pop-up: works in the app too)
+        const lab = b.querySelector(".label"), inp = document.createElement("input"); inp.className = "renin"; inp.maxLength = 24; inp.value = m.name;
+        lab.replaceWith(inp); inp.focus(); inp.select(); inp.onclick = (ev) => ev.stopPropagation();
+        const done = (keep) => { const v = inp.value.trim().slice(0, 24); if (keep && v && v !== m.name) set({ myCandles: mine.map((x) => (x.id === m.id ? { ...x, name: v } : x)) }); renderCandles(); };
+        inp.onkeydown = (ev) => { ev.stopPropagation(); if (ev.key === "Enter") done(true); if (ev.key === "Escape") done(false); }; inp.onblur = () => done(true);
+        return;
+      }
+      if (e.target.classList.contains("x")) { const before = cfg.myCandles; set({ myCandles: mine.filter((x) => x.id !== m.id) }); renderCandles();
+        return toast(`Deleted \u201c${m.name}\u201d.`, () => { set({ myCandles: before }); renderCandles(); }); }
+      applyWithUndo({ candleOn: true, candlePreset: "custom", ...candleStyleOf(m) }, `Candles: ${m.name}.`);
+    };
+    box.appendChild(b);
+  }
+  if (cfg.candleOn && !saved) {
+    const b = document.createElement("button"); b.className = "card preset save" + (custom ? " on" : "");
+    b.innerHTML = bars(cfg.candleUp, cfg.candleDown) + `<div class="label">+ Save these</div>`;
+    b.title = "Save your current candles (colours, look, glow and parts) here";
+    b.onclick = () => { let n = mine.length + 1; while (mine.some((x) => x.name === `My candles ${n}`)) n++; const name = `My candles ${n}`;
+      set({ myCandles: [...mine, { id: uid(), name, ...cur }].slice(-24) }); renderCandles(); toast(`Saved \u201c${name}\u201d under Yours. Tap \u270E to rename it.`); };
+    box.appendChild(b);
   }
   let lastGroup = null;
   CANDLE_PRESETS.filter((p) => candleGroup === "All" || p[4] === candleGroup).forEach(([id, name, up, down, group]) => {
@@ -315,6 +347,41 @@ function renderCandles() {
   });
 }
 $("candleOn").onchange = (e) => set({ candleOn: e.target.checked });
+// ---------- Candle parts: wick / border colours, hollow bodies, widths (drawn by candlelooks.js on every platform) ----------
+// a candle style = colours + look + glow + parts (what a saved "Yours" preset keeps)
+const CANDLE_STYLE_KEYS = ["candleUp", "candleDown", "candleLook", "candleGlow", "candleWick", "candleWickUp", "candleWickDown", "candleBorder", "candleBorderUp", "candleBorderDown", "candleBorderW", "candleHollow", "candleWickW", "candleBodyW"];
+const candleStyleNow = () => Object.fromEntries(CANDLE_STYLE_KEYS.map((k) => [k, cfg[k]]));
+const candleStyleOf = (m) => Object.fromEntries(CANDLE_STYLE_KEYS.map((k) => [k, k in m ? m[k] : DEFAULTS[k]]));
+const PARTS_DEF = { candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1 };
+const partsCfg = () => ({ wick: cfg.candleWick, wickUp: cfg.candleWickUp, wickDown: cfg.candleWickDown, border: cfg.candleBorder, borderUp: cfg.candleBorderUp,
+  borderDown: cfg.candleBorderDown, borderW: cfg.candleBorderW, hollow: cfg.candleHollow, wickW: cfg.candleWickW, bodyW: cfg.candleBodyW });
+// any part changed turns candles on (parts are part of Priism's candles)
+const setPart = (o) => { set({ ...o, ...(cfg.candleOn ? {} : { candleOn: true }) }); $("candleOn").checked = true; syncParts(); renderLookGrid(); };
+function syncParts() {
+  if (!$("candleWick")) return;
+  seg("candleWick", [["same", "Same"], ["soft", "Soft"], ["custom", "Colour"]], () => cfg.candleWick || "same", (v) => setPart({ candleWick: v }));
+  $("wickColRow").hidden = cfg.candleWick !== "custom";
+  $("candleWickUp").value = cfg.candleWickUp; $("candleWickDown").value = cfg.candleWickDown;
+  seg("candleWickW", [[0, "Auto"], [1, "1"], [2, "2"], [3, "3"], [4, "4"]], () => +cfg.candleWickW || 0, (v) => setPart({ candleWickW: v }));
+  seg("candleBorder", [["none", "Off"], ["custom", "Colour"]], () => cfg.candleBorder || "none", (v) => setPart({ candleBorder: v }));
+  $("borderColRow").hidden = cfg.candleBorder !== "custom";
+  $("candleBorderUp").value = cfg.candleBorderUp; $("candleBorderDown").value = cfg.candleBorderDown;
+  $("borderWRow").hidden = cfg.candleBorder !== "custom" && (cfg.candleHollow || "none") === "none";
+  seg("candleBorderW", [[1, "1"], [2, "2"], [3, "3"]], () => +cfg.candleBorderW || 1, (v) => setPart({ candleBorderW: v }));
+  seg("candleHollow", [["none", "Off"], ["up", "Up"], ["down", "Down"], ["both", "Both"]], () => cfg.candleHollow || "none", (v) => setPart({ candleHollow: v }));
+  $("candleBodyW").value = +cfg.candleBodyW || 1; $("candleBodyWOut").textContent = Math.round((+cfg.candleBodyW || 1) * 100) + "%";
+  drawPartsPreview();
+}
+for (const id of ["candleWickUp", "candleWickDown", "candleBorderUp", "candleBorderDown"]) if ($(id)) $(id).oninput = (e) => setPart({ [id]: e.target.value });
+if ($("candleBodyW")) { $("candleBodyW").oninput = (e) => setPart({ candleBodyW: +e.target.value }); $("candleBodyW").ondblclick = () => setPart({ candleBodyW: 1 }); }
+if ($("partsReset")) $("partsReset").onclick = () => applyWithUndo({ ...PARTS_DEF }, "Candle parts reset.");
+// a bigger preview of your candles with their parts, on your wallpaper
+function drawPartsPreview() {
+  const cv = $("partsPreview"), CL = window.__bdCandleLooks; if (!cv || !CL || cv.hidden) return;
+  const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
+  let bgc = null; try { const sk = WickedSkins[cfg.skin]; if (sk) { bgc = document.createElement("canvas"); bgc.width = cv.width; bgc.height = cv.height; const s0 = makeSkin(cfg.skin, bgc.getContext("2d")); s0.resize(cv.width, cv.height); s0.frame(3, 0.016); } } catch { bgc = null; }
+  try { CL.preview(cv, cfg.candleLook || "solid", up, down, +cfg.candleGlow || 0, bgc, partsCfg()); } catch {}
+}
 $("shiftSpeed").oninput = (e) => { set({ shiftSpeed: +e.target.value }); $("shiftSpeedOut").textContent = e.target.value + "s"; };
 $("lineGlow").oninput = (e) => { set({ lineGlow: +e.target.value }); $("lineGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 // Indicators: their colours (own / rainbow / your candle colours / your wallpaper's / any colour) + the glow above
@@ -407,7 +474,7 @@ async function wallpaperPixels() {
     g.drawImage(img, 0, 0, c.width, c.height); return g.getImageData(0, 0, c.width, c.height).data;
   }
   const def = WickedSkins[cfg.skin]; if (!def) return null;
-  const sk = def.create(g); sk.resize(c.width, c.height);
+  const sk = makeSkin(cfg.skin, g); sk.resize(c.width, c.height);
   // let it run ~4 s (some wallpapers build up over time, like Code Rain) and sample three moments
   const out = new Uint8ClampedArray(c.width * c.height * 4 * 3); let k = 0;
   for (let i = 1; i <= 120; i++) {
@@ -456,15 +523,18 @@ async function matchEverything(auto) {
 if ($("matchAll")) $("matchAll").onclick = () => matchEverything();
 // Auto-match: every wallpaper you pick (built-in, your own upload or from the Workshop) runs Match everything on its
 // own. One-tap looks keep their own designed colours.
-function autoMatchPick() { if (cfg.matchOnPick) matchEverything(true); }
+function autoMatchPick() { if (cfg.matchOnPick && !noAutoMatch) matchEverything(true); }
 function syncMatchOnPick() {
   const pick = (v) => { set({ matchOnPick: v }); syncMatchOnPick(); if (v) matchEverything(true); };
-  for (const id of ["matchOnPick", "matchOnPick2"]) if ($(id)) seg(id, [[false, "Off"], [true, "On"]], () => !!cfg.matchOnPick, pick);
+  for (const id of ["matchOnPick"]) if ($(id)) seg(id, [[false, "Off"], [true, "On"]], () => !!cfg.matchOnPick, pick);
   let view = ""; try { view = skinView; } catch {}                // (skinView is declared further down)
   if ($("matchPickRow")) $("matchPickRow").hidden = view === "looks";
 }
 
 function applyWithUndo(changes, label) {
+  // a look's wallOpts become that wallpaper's settings (skinOpts); a look without them leaves the wallpaper's alone
+  if ("wallOpts" in changes) { const w = changes.wallOpts, sk = changes.skin || cfg.skin; changes = { ...changes }; delete changes.wallOpts;
+    if (WickedSkins[sk]) { const all = { ...(cfg.skinOpts || {}) }; if (w && typeof w === "object") all[sk] = w; else delete all[sk]; changes.skinOpts = all; } }
   const before = Object.fromEntries(Object.keys(changes).map((k) => [k, cfg[k]]));
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
@@ -639,7 +709,7 @@ function renderQuick() {
     const card = document.createElement("button");
     card.className = "card" + (on ? " on" : "");
     const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
-    const sk = WickedSkins[q.skin].create(cv.getContext("2d")); sk.resize(160, 64); quickPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
+    const sk = makeSkin(q.skin, cv.getContext("2d")); sk.resize(160, 64); quickPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(q.set.candleUp, q.set.candleDown)}</div><div class="label"><span>${esc(q.name)}<small>${esc(q.sub)}</small></span></div>`);
     card.onclick = () => applyWithUndo($("keepBg") && $("keepBg").checked ? { enabled: true, ...q.set } : { enabled: true, skin: q.skin, ...q.set },
@@ -668,6 +738,88 @@ document.querySelectorAll("[data-goto-mine]").forEach((b) => b.addEventListener(
 }));
 if ($("skinSearch")) $("skinSearch").oninput = () => (skinView === "looks" ? renderQuick() : renderSkins());
 if ($("keepBg")) { $("keepBg").checked = localStorage.getItem("keepBg") === "1"; $("keepBg").onchange = (e) => localStorage.setItem("keepBg", e.target.checked ? "1" : "0"); }
+
+// ---------- This wallpaper: its own settings + Recolour (Adjust tab), saved per wallpaper in cfg.skinOpts ----------
+const RC_PRESETS = [["candles", "My candles", null], ["priism", "Priism", ["#19d3ff", "#2ef2b0", "#c6ff3d"]], ["ice", "Ice", ["#5ee7ff", "#4f7dff"]],
+  ["ember", "Ember", ["#ff7a1a", "#ff2e63"]], ["violet", "Violet", ["#8f5bff", "#ff4fd8"]], ["gold", "Gold", ["#ffd166", "#ff9f43"]],
+  ["emerald", "Emerald", ["#00e6a0", "#00b3ff"]], ["rose", "Rose", ["#ff8fb1", "#b48cff"]], ["mono", "Mono", ["#c9d3e3"]]];
+const wallId = () => (WickedSkins[cfg.skin] ? cfg.skin : "");
+const wallSaved = (id) => ({ ...(((cfg.skinOpts || {})[id]) || {}) });
+let wallPrev = null;
+// change this wallpaper's settings. live = only the panel previews now (while dragging); the chart gets it on release
+function setWall(patch, live) {
+  const id = wallId(); if (!id) return;
+  const cur = { ...wallSaved(id), ...patch };
+  for (const k of Object.keys(cur)) if (cur[k] === undefined) delete cur[k];
+  const all = { ...(cfg.skinOpts || {}) }; if (Object.keys(cur).length) all[id] = cur; else delete all[id];
+  if (live) cfg.skinOpts = all; else set({ skinOpts: all });
+  refreshWallPreviews(id);
+}
+function refreshWallPreviews(id) {
+  for (const p of previews) if (p.id === id && p.cv) { try { p.skin = makeSkin(id, p.cv.getContext("2d")); p.skin.resize(p.cv.width, p.cv.height); p.skin.frame(p.t || 2, 0.016); } catch {} }
+  heroP.key = ""; try { renderHero(); } catch {}
+  wallPrev = null; drawWallPrev();
+}
+function drawWallPrev() {
+  const cv = $("wallOptsPrev"), id = wallId(); if (!cv || !id || !cv.offsetParent) return;
+  if (!wallPrev) { try { wallPrev = { skin: makeSkin(id, cv.getContext("2d")), t: 2, id, cv }; wallPrev.skin.resize(cv.width, cv.height); wallPrev.skin.frame(2, 0.016); } catch { wallPrev = null; } }
+}
+function syncWallOpts() {
+  const grp = $("wallOptsGrp"); if (!grp) return;
+  const id = wallId(), def = id && WickedSkins[id];
+  grp.hidden = !def; if (!def) return;
+  $("wallOptsName").textContent = def.name;
+  const saved = wallSaved(id), vals = window.PriismSkinOpts.optsOf(def, saved), box = $("wallOptsRows"); box.innerHTML = "";
+  for (const d of def.opts || []) {
+    const row = document.createElement("div"); row.className = "row";
+    if (d.type === "toggle") {
+      row.innerHTML = `<span>${esc(d.label)}</span><div class="seg" id="wo_${d.k}"></div>`; box.appendChild(row);
+      seg("wo_" + d.k, [[true, "On"], [false, "Off"]], () => !!window.PriismSkinOpts.optsOf(def, wallSaved(id))[d.k], (v) => setWall({ [d.k]: v }));
+    } else {
+      const pct = (v) => Math.round(v * 100) + "%";
+      row.innerHTML = `<span>${esc(d.label)}</span><input type="range" min="${d.min}" max="${d.max}" step="${d.step}" /><output></output>`; box.appendChild(row);
+      const inp = row.querySelector("input"), out = row.querySelector("output"); inp.value = vals[d.k]; out.textContent = pct(vals[d.k]);
+      inp.oninput = () => { out.textContent = pct(+inp.value); setWall({ [d.k]: +inp.value }, true); };
+      inp.onchange = () => setWall({ [d.k]: +inp.value });
+      inp.ondblclick = () => { inp.value = d.def; out.textContent = pct(d.def); setWall({ [d.k]: d.def }); };
+    }
+  }
+  // Recolour
+  const rc = saved.rc && Array.isArray(saved.rc.c) ? saved.rc : null;
+  seg("rcOn", [[false, "Off"], [true, "On"]], () => !!rc, (v) => {
+    if (!v) { setWall({ rc: undefined }); return syncWallOpts(); }
+    const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#19d3ff", dn = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#c6ff3d";
+    setWall({ rc: { c: [up, dn], s: 0.85 } }); syncWallOpts(); });
+  $("rcBox").hidden = !rc; if (!rc) return;
+  const cols = rc.c.slice(0, 3);
+  ["rc0", "rc1", "rc2"].forEach((k, i) => { const el = $(k); el.hidden = i >= cols.length; el.value = cols[i] || cols[cols.length - 1];
+    el.oninput = () => { const c = cols.slice(); c[i] = el.value; setWall({ rc: { ...rc, c } }, true); };
+    el.onchange = () => { const c = cols.slice(); c[i] = el.value; setWall({ rc: { ...rc, c } }); syncWallOpts(); }; });
+  seg("rcN", [[1, "1"], [2, "2"], [3, "3"]], () => cols.length, (n) => {
+    const c = cols.slice(0, n); while (c.length < n) c.push(c.length === 1 ? "#ff4fd8" : "#c6ff3d"); setWall({ rc: { ...rc, c } }); syncWallOpts(); });
+  const sEl = $("rcS"); sEl.value = rc.s === undefined ? 0.85 : rc.s; $("rcSOut").textContent = Math.round(sEl.value * 100) + "%";
+  sEl.oninput = () => { $("rcSOut").textContent = Math.round(sEl.value * 100) + "%"; setWall({ rc: { ...rc, s: +sEl.value } }, true); };
+  sEl.onchange = () => setWall({ rc: { ...rc, s: +sEl.value } });
+  const chips = $("rcPresets"); chips.innerHTML = "";
+  for (const [pid, name, pc] of RC_PRESETS) {
+    const c = pc || [cfg.candleUp || "#19d3ff", cfg.candleDown || "#c6ff3d"], b = document.createElement("button");
+    b.className = "chip rcchip" + (JSON.stringify(c) === JSON.stringify(cols) ? " on" : "");
+    b.innerHTML = `<i style="background:linear-gradient(90deg,${c.map(esc).join(",")}${c.length === 1 ? "," + esc(c[0]) : ""})"></i>${esc(name)}`;
+    b.onclick = () => { setWall({ rc: { ...rc, c: c.slice() } }); syncWallOpts(); };
+    chips.appendChild(b);
+  }
+}
+if ($("wallOptsReset")) $("wallOptsReset").onclick = () => { const id = wallId(); if (!id) return;
+  const all = { ...(cfg.skinOpts || {}) }, before = cfg.skinOpts; delete all[id];
+  set({ skinOpts: all }); syncWallOpts(); refreshWallPreviews(id);
+  toast(`${WickedSkins[id].name} is back to how it came.`, () => { set({ skinOpts: before }); syncWallOpts(); refreshWallPreviews(id); }); };
+{ const t = document.querySelector('#nav button[data-tab="tune"]'); if (t) t.addEventListener("click", () => setTimeout(() => { wallPrev = null; drawWallPrev(); }, 60)); }
+if ($("wallOptsGrp")) $("wallOptsGrp").addEventListener("toggle", () => { if ($("wallOptsGrp").open) setTimeout(() => { wallPrev = null; drawWallPrev(); }, 30); });
+if ($("gotoWallOpts")) $("gotoWallOpts").onclick = () => {
+  const t = document.querySelector('#nav button[data-tab="tune"]'); if (t) t.click();
+  const g = $("wallOptsGrp"); if (g) { g.open = true; setTimeout(() => g.scrollIntoView({ block: "start", behavior: "smooth" }), 60); }
+  syncWallOpts(); setTimeout(drawWallPrev, 80);
+};
 
 // ---------- remember which sections are open ----------
 document.querySelectorAll("details.grp").forEach((d) => {
@@ -994,19 +1146,41 @@ function wsRenderLooks() {
     if (!WickedSkins[it.skin]) continue;
     const d = cleanLook(it.data), card = document.createElement("button"); card.className = "card wslook";
     const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
-    const sk = WickedSkins[it.skin].create(cv.getContext("2d")); sk.resize(160, 64); lookPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
+    const sk = makeSkin(it.skin, cv.getContext("2d"), it.data); sk.resize(160, 64); lookPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
     card.append(cv);
     const up = d.candleUp || "#26a69a", down = d.candleDown || "#ef5350";
     card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(up, down)}</div><span class="oncount${it.mine ? " review" : ""}">${it.mine ? "IN REVIEW" : it.uses + " ON"}</span>
       <div class="label"><span>${esc(it.title)}<small>${it.mine ? "yours" : "by " + esc(it.author || "trader")} · ${esc(WickedSkins[it.skin].name)}</small></span></div>`);
+    const wallId = it.data && typeof it.data.wallId === "string" && /^[0-9a-f-]{36}$/i.test(it.data.wallId) ? it.data.wallId : "";
+    if (wallId) W().getWallpaper(wallId).then((w) => { if (!w || !w.thumbUrl) return; const im = document.createElement("img"); im.alt = ""; im.loading = "lazy"; im.src = w.thumbUrl; im.className = "wslookimg"; cv.replaceWith(im);
+      const sm = card.querySelector(".label small"); if (sm) sm.textContent = (it.mine ? "yours" : "by " + (it.author || "trader")) + " \u00B7 its own " + (w.kind === "video" ? "video" : "picture"); }).catch(() => {});
     card.onclick = () => {
-      applyWithUndo({ ...d, enabled: true, skin: it.skin }, it.mine ? `Applied your look \u201c${it.title}\u201d.` : `Applied \u201c${it.title}\u201d by ${it.author || "trader"}.`);
+      applyWithUndo({ ...d, enabled: true, ...(wallId ? {} : { skin: it.skin }) }, it.mine ? `Applied your look \u201c${it.title}\u201d.` : `Applied \u201c${it.title}\u201d by ${it.author || "trader"}.`);
+      if (wallId) useLookWall(wallId, it.skin);
       if (!it.id) return;
       const used = new Set(JSON.parse(localStorage.getItem("usedLooks") || "[]"));
       if (!used.has(it.id)) { used.add(it.id); localStorage.setItem("usedLooks", JSON.stringify([...used].slice(-500))); W().countLookUse(it.id); }   // count each person once
     };
     box.appendChild(card);
   }
+}
+// A look that comes with its own Workshop wallpaper: use it (downloaded once into My uploads, then reused).
+// The look's own colours stay: Auto-match is skipped for this pick.
+let noAutoMatch = false;
+async function useLookWall(wallId, fallbackSkin) {
+  const have = (cfg.media || []).find((m) => m.wsId === wallId && !m.pending);
+  if (have) { pickSource("media:" + have.id); return; }
+  try {
+    const w = await W().getWallpaper(wallId); if (!w) throw new Error("its wallpaper isn't in the Workshop any more");
+    toast(`Downloading the look's wallpaper \u201c${w.title}\u201d\u2026`);
+    const blob = await W().fetchFile(w), ext = (blob.type.split("/")[1] || "").replace("jpeg", "jpg");
+    const before = new Set((cfg.media || []).map((m) => m.id));
+    noAutoMatch = true;
+    try { await addFiles([new File([blob], `${w.title}.${ext || (w.kind === "video" ? "webm" : "png")}`, { type: blob.type })]); } finally { noAutoMatch = false; }
+    const added = (cfg.media || []).find((m) => !before.has(m.id));
+    if (added) set({ media: cfg.media.map((m) => (m.id === added.id ? { ...m, wsId: wallId } : m)) });
+    toast(`\u201c${w.title}\u201d is on your chart and in My uploads.`);
+  } catch (e) { set({ skin: fallbackSkin && WickedSkins[fallbackSkin] ? fallbackSkin : "aurora" }); syncSkinView(); toast("Couldn't get the look's wallpaper (" + e.message + "), so it uses a built-in one."); }
 }
 // Publish: the website (you sign in there once; it remembers you) receives the look as a code and puts it in the
 // Workshop: live straight away for the owner, after a check for everyone else. We keep a copy here, so
@@ -1020,7 +1194,7 @@ function publishLook(name, src) {
   if (window.PriismNative && window.PriismNative.openUrl) window.PriismNative.openUrl(u);          // Android app
   else if (chrome.tabs && chrome.tabs.create) chrome.tabs.create({ url: u });                       // extension
   else window.open(u, "_blank");                                                                      // desktop app -> your browser
-  if ((src ? src.skin : cfg.skin) === "media") toast("Your own upload can't travel in a look, so it's published with a built-in wallpaper (Polar Lights).");
+  if ((src ? src.skin : cfg.skin) === "media") toast("On the website, add the same file to the look (Choose the file), so everyone gets your wallpaper too.");
 }
 const shareLook = () => publishLook(($("loName") && $("loName").value.trim()) || (WickedSkins[cfg.skin] ? WickedSkins[cfg.skin].name : "My look"));
 if ($("wsShareLook")) $("wsShareLook").onclick = shareLook;
@@ -1067,7 +1241,9 @@ function initWorkshop() {
 }
 
 // ---------- saved looks ----------
-const snapshot = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, cfg[k]]));
+// a look = these settings + the wallpaper's own settings / Recolour (wallOpts: kept per wallpaper in skinOpts)
+const wallOptsNow = () => (WickedSkins[cfg.skin] && (cfg.skinOpts || {})[cfg.skin]) || null;
+const snapshot = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, k === "wallOpts" ? wallOptsNow() : cfg[k]]));
 const lookPreviews = [];
 const sameLook = (lo) => lo.skin === cfg.skin && (lo.skin !== "media" || lo.mediaId === cfg.mediaId) &&
   ["candleOn", "candleUp", "candleDown", "candleLook", "lineGlow", "dim"].every((k) => JSON.stringify(lo.look[k]) === JSON.stringify(cfg[k]));
@@ -1113,11 +1289,16 @@ function b64urlDecode(s) {
 function lookPayload(src = { skin: cfg.skin, look: cfg }) {
   const skin = src.skin === "media" || !WickedSkins[src.skin] ? "aurora" : src.skin, look = {};
   for (const k of LOOK_KEYS) if (src.look && k in src.look && JSON.stringify(src.look[k]) !== JSON.stringify(DEFAULTS[k])) look[k] = src.look[k];
+  if (src.look === cfg && wallOptsNow()) look.wallOpts = wallOptsNow();            // the chart's current look: its wallpaper settings too
+  if (skin !== src.skin) delete look.wallOpts;                                       // (your own upload: shared on another wallpaper)
+  if (look.wallOpts == null) delete look.wallOpts;
   return { skin, look };
 }
 function makeLookCode(name, src) {
   const { skin, look } = lookPayload(src);
-  return LOOK_CODE_PREFIX + b64urlEncode(JSON.stringify({ v: 1, n: (name || "").slice(0, 40), s: skin, l: look }));
+  // your own upload can't travel in a code: say which file it was, so the website can ask you to add it to the look
+  const srcSkin = src ? src.skin : cfg.skin, mid = src ? src.mediaId : cfg.mediaId, m = srcSkin === "media" ? (cfg.media || []).find((x) => x.id === mid) : null;
+  return LOOK_CODE_PREFIX + b64urlEncode(JSON.stringify({ v: 1, n: (name || "").slice(0, 40), s: skin, l: look, ...(m ? { m: { n: String(m.name || "").slice(0, 80), t: m.type === "video" ? "video" : "image" } } : {}) }));
 }
 const lookLink = (code) => WS_SITE() + "look.html#" + code;
 function parseLookCode(code) {
@@ -1147,7 +1328,7 @@ function renderLoadouts() {
     if (media && media.thumb) { const im = document.createElement("img"); im.src = media.thumb; card.append(im); }
     else {
       const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
-      const def = WickedSkins[lo.skin] || WickedSkins.aurora; const sk = def.create(cv.getContext("2d")); sk.resize(160, 64);
+      const sk = makeSkin(WickedSkins[lo.skin] ? lo.skin : "aurora", cv.getContext("2d"), lo.look); sk.resize(160, 64);
       lookPreviews.push({ skin: sk, t: 0 }); card.append(cv);
     }
     if (lo.look.candleOn) card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(lo.look.candleUp, lo.look.candleDown)}</div>`);
@@ -1177,7 +1358,7 @@ function renderLoadouts() {
         inp.onkeydown = (k) => { if (k.key === "Enter") done(); if (k.key === "Escape") renderLoadouts(); };
         inp.onblur = done; inp.onclick = (k) => k.stopPropagation();
       } else if (act === "publish") {
-        publishLook(lo.name, { skin: lo.skin, look: lo.look });
+        publishLook(lo.name, { skin: lo.skin, mediaId: lo.mediaId, look: lo.look });
       }
     };
     box.appendChild(card);
@@ -1607,6 +1788,7 @@ if ($("dlgAlpha")) $("dlgAlpha").oninput = (e) => { set({ dlgAlpha: +e.target.va
 if ($("panelColor")) $("panelColor").oninput = (e) => set({ panelColor: e.target.value, panelMode: "color" });
 
 function syncTune() {
+  try { syncWallOpts(); wallPrev = null; setTimeout(drawWallPrev, 30); } catch {}
   $("sliders").innerHTML = "";
   SLIDERS.forEach(([key, label, min, max, step, fmt]) => {
     // only show what matters right now
@@ -2300,7 +2482,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Auto-match: every wallpaper you pick sets everything to match it (Skins \u203a Wallpapers)",
+const WHATS_NEW = ["Recolour any wallpaper to your colours, plus its own settings (Adjust \u203a This wallpaper)",
+  "Candle parts: wick and border colours, hollow candles, widths (Style \u203a Candles)",
+  "Auto-match: every wallpaper you pick sets everything to match it (Skins \u203a Wallpapers)",
   "4 new wallpapers: Trading Floor, Market Wall, Midnight Moon and Twinkle (OLED)",
   "Match everything now matches it all, with your own wallpapers too",
   "Softer zones so you see the price inside them (Style \u203a Indicators \u203a Zone fill)",

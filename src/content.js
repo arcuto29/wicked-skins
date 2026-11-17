@@ -17,6 +17,9 @@
     // Candles
     candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
     candleLook: "solid", shiftSpeed: 10, // solid | neon | prism | shift
+    // Candle parts (Candles > Candle parts): wick / border colours, hollow bodies, widths
+    candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1,
+    skinOpts: {},          // each built-in wallpaper's own settings + recolour: { twinkle: { amount: 1.4, rc: { c: [...], s: 0.8 } } }
     // Behaviour: react to the market / your own P&L (entry typed in by the user; never reads the account)
     react: "off",          // "off" | "market" | "pnl"
     reactStrength: 0.6,
@@ -692,8 +695,9 @@
     onmessage = (e) => {
       const m = e.data, v = V.get(m.id);
       try {
-        if (m.type === "add") { const def = self.WickedSkins[m.skin] || self.WickedSkins.aurora; V.set(m.id, { c: m.canvas, s: def.create(m.canvas.getContext("2d")) }); }
+        if (m.type === "add") V.set(m.id, { c: m.canvas, skin: m.skin, s: self.PriismMakeSkin(m.skin, m.canvas.getContext("2d"), m.opts) });
         else if (!v) return;
+        else if (m.type === "opts") { v.s = self.PriismMakeSkin(v.skin, v.c.getContext("2d"), m.opts); v.s.resize(v.c.width, v.c.height); v.s.frame(m.t || 0, 0); }
         else if (m.type === "resize") { v.c.width = m.w; v.c.height = m.h; v.s.resize(m.w, m.h); v.s.frame(m.t || 0, 0); }
         else if (m.type === "frame") v.s.frame(m.t, m.dt);
         else if (m.type === "remove") V.delete(m.id);
@@ -716,12 +720,12 @@
     return wallWorker;
   }
   // A stand-in for a skin with the same resize / frame calls, which forwards them to the worker.
-  function workerSkin(canvas, skinId) {
+  function workerSkin(canvas, skinId, opts) {
     const w = getWorker(); if (!w) return null;
     let off; try { off = canvas.transferControlToOffscreen(); } catch { return null; }
     const id = ++workerSeq, p = { busy: false, dt: 0, lastT: 0, sent: 0, skipped: 0 };
     w.views.set(id, p);
-    w.postMessage({ type: "add", id, skin: skinId, canvas: off }, [off]);
+    w.postMessage({ type: "add", id, skin: skinId, opts, canvas: off }, [off]);
     return {
       offThread: true,
       resize(W, H) { p.w = W; p.h = H; w.postMessage({ type: "resize", id, w: W, h: H, t: p.lastT }); },
@@ -730,9 +734,25 @@
       // how many frames we had to skip since last asked, because the worker was still drawing (0 = keeping up, 1 = never)
       load() { const n = p.sent + p.skipped, r = n ? p.skipped / n : 0; p.sent = p.skipped = 0; return r; },
       remove() { w.views.delete(id); w.postMessage({ type: "remove", id }); },
+      // your settings for this wallpaper changed: the worker rebuilds it in place (same canvas, no flash)
+      setOpts(o) { w.postMessage({ type: "opts", id, opts: o, t: p.lastT }); },
     };
   }
 
+  // your settings for a built-in wallpaper (its own options + Recolour), as plain data (it's sent to the worker)
+  function skinOptsFor(id) { const o = cfg.skinOpts && cfg.skinOpts[id]; return o && typeof o === "object" ? JSON.parse(JSON.stringify(o)) : null; }
+  // skinOpts changed: rebuild only the wallpapers whose settings changed, in place
+  function updateSkinOpts() {
+    for (const v of views) {
+      if (!v.skin || !v.skinId) continue;
+      const o = skinOptsFor(v.skinId), sig = JSON.stringify(o || null); if (sig === v.optsSig) continue;
+      v.optsSig = sig;
+      if (v.skin.setOpts) v.skin.setOpts(o);
+      else { const el = v.content; v.skin = window.PriismMakeSkin(v.skinId, el.getContext("2d"), o); v.skin.resize(el.width, el.height); v.skin.frame(v.clock || 0, 0); }
+    }
+    accentFor = "";                                                // re-read the wallpaper's colours (Recolour changes them)
+    setTimeout(measureBackdrop, 400);
+  }
   // One wallpaper element for a source ("aurora", "media:<id>").
   function makeContent(src, view) {
     const m = src.startsWith("media:") ? cfg.media.find((x) => x.id === src.slice(6)) : null;
@@ -754,7 +774,9 @@
     } else {
       const id = window.WickedSkins[src] ? src : window.WickedSkins[cfg.skin] ? cfg.skin : "aurora";
       el = document.createElement("canvas");
-      view.skin = workerSkin(el, id) || window.WickedSkins[id].create(el.getContext("2d"));
+      const o = skinOptsFor(id);
+      view.skinId = id; view.optsSig = JSON.stringify(o || null);
+      view.skin = workerSkin(el, id, o) || window.PriismMakeSkin(id, el.getContext("2d"), o);
       view.clock = 0;
     }
     return el;
@@ -1360,7 +1382,9 @@
   // Candle colours are drawn by hook.js (page world); hand it the config via an attribute.
   function pushCandles() {
     const h = document.documentElement;
-    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-ws-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow, look: cfg.candleLook }));
+    const parts = { wick: cfg.candleWick, wickUp: cfg.candleWickUp, wickDown: cfg.candleWickDown, border: cfg.candleBorder, borderUp: cfg.candleBorderUp,
+      borderDown: cfg.candleBorderDown, borderW: cfg.candleBorderW, hollow: cfg.candleHollow, wickW: cfg.candleWickW, bodyW: cfg.candleBodyW };
+    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-ws-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow, look: cfg.candleLook, parts }));
     else h.removeAttribute("data-ws-candles");
     // "Shift" look: colours cycle over time via a GPU hue animation on the chart layer (no redraws needed)
     const shift = cfg.enabled && cfg.candleOn && cfg.candleLook === "shift";
@@ -1648,6 +1672,9 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
+    // a wallpaper's own settings / Recolour: rebuilt in place (unless the whole layer is rebuilt anyway)
+    const optsChanged = keys.includes("skinOpts"); keys = keys.filter((k) => k !== "skinOpts");
+    if (optsChanged && !keys.some((k) => REBUILD.has(k))) updateSkinOpts();
     keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound", "welcomePending"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
