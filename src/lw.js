@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 11;
+  const LW_VERSION = 12;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -55,14 +55,14 @@
 
   // ---------- settings (same channel as hook.js) ----------
   const cache = new Map();          // colour-string -> { key:"r,g,b", a } | null   (declared early: readCandles clears it)
-  const remapCache = new Map();
+  const remapCacheMain = new Map();
   let on = htmlEl().classList.contains("bd-on");
   let candles = null;   // { up:[r,g,b], down:[r,g,b], upHex, downHex, glow, look }
   const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-  function readCandles() {
+  function readCandles(rawIn) {
     cache.clear();
     try {
-      const raw = htmlEl().getAttribute("data-ws-candles");
+      const raw = rawIn !== undefined ? rawIn : htmlEl().getAttribute("data-ws-candles");
       const c = raw ? JSON.parse(raw) : null;
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
         candles = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
@@ -109,9 +109,9 @@
   const colOk = (v) => (v === "candle" || /^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
   const styleOk = (v, d, extra = []) => (["solid", "dotted", "dashed", ...extra].includes(v) ? v : d);
   let ltx = null;
-  function readFx() {
+  function readFx(rawIn) {
     try {
-      const f = JSON.parse(htmlEl().getAttribute("data-ws-fx") || "null");
+      const f = JSON.parse((rawIn !== undefined ? rawIn : htmlEl().getAttribute("data-ws-fx")) || "null");
       const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
       const any = f && (f.lineGlow > 0 || f.zoneDim || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
       // Chart text: read whenever Priism is on (its "Own" setting still lightens black text on a dark wallpaper)
@@ -146,7 +146,7 @@
     on = htmlEl().classList.contains("bd-on");
     const cs = htmlEl().getAttribute("data-ws-candles"); readFx(); const ls = JSON.stringify(lfx) + JSON.stringify(ltx);
     if (cs === candSig && ls === lfxSig && on === onWas) return;
-    candSig = cs; lfxSig = ls; onWas = on; readCandles(); remapCache.clear();
+    candSig = cs; lfxSig = ls; onWas = on; readCandles(); remapCacheMain.clear();
     try { window.__bdLite = !!(JSON.parse(htmlEl().getAttribute("data-ws-fx") || "{}").lite || JSON.parse(cs || "{}").lite); } catch {}
     repaint();
   });
@@ -272,7 +272,7 @@
     } else { shapeSides = new Map(); shapeTally.clear(); }
     const next = new Map(); for (const [k, v] of best) if (!v.tie) next.set(k, v.side);
     const sig = [...next].sort().join("|");
-    if (sig !== sidesSig) { sides = next; sidesSig = sig; cache.clear(); remapCache.clear(); repaint(); }   // new colours learned: the chart has to redraw to show them
+    if (sig !== sidesSig) { sides = next; sidesSig = sig; cache.clear(); remapCacheMain.clear(); repaint(); }   // new colours learned: the chart has to redraw to show them
   }
 
   // is this (already remapped) colour one of the chosen candle colours?
@@ -280,6 +280,7 @@
   // ---------- remap ----------
   function remap(v) {
     if (!candles || typeof v !== "string") return v;
+    const remapCache = candles.cache || remapCacheMain;    // each chart its own (charts can have their own colours)
     let out = remapCache.get(v);
     if (out !== undefined) return out;
     out = v;
@@ -336,10 +337,14 @@
       const meta = L && L.META[look], glow = candles ? Math.max(candles.glow, meta ? meta.minGlow : 0) : 0;
       const P = L && candles ? candles.P : null;
       if (!(on && candles && (glow > 0 || (look !== "solid" && look !== "shift") || P) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(g.fillStyle))) return false;
-      const t = g.getTransform(), sx = t.a || 1, sy = t.d || 1, col = toHexCol(g.fillStyle), isUp = col === candles.upHex;
+      const t = g.getTransform(), sx = t.a || 1, sy = t.d || 1, col0 = toHexCol(g.fillStyle), isUp = col0 === candles.upHex;
+      // Rainbow: the colours fan out across the chart, left to right (as on TradingView)
+      let col = col0;
+      if (look === "prism" && L.hueRotate && c.width) { const step = Math.max(0, Math.min(31, Math.floor(((x * sx + t.e) / c.width) * 32)));
+        col = L.toHex(L.hueRotate(L.rgbOf(col0), -70 + (step / 31) * 140)); }
       const isBody = Math.abs(w * sx) >= 3 && Math.abs(h * sy) >= 3, tr = P ? tracker() : null;
       // a bordered candle comes as two nested rects in the same colour: style it once
-      if (P && isBody && L.nestedDupe(lastBodyL, g, Math.min(x, x + w) * sx + t.e, Math.min(y, y + h) * sy + t.f, Math.abs(w * sx), Math.abs(h * sy), col)) return true;
+      if (P && isBody && L.nestedDupe(lastBodyL, g, Math.min(x, x + w) * sx + t.e, Math.min(y, y + h) * sy + t.f, Math.abs(w * sx), Math.abs(h * sy), col0)) return true;
       lk.g = g; lk.px = 1 / sx; lk.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
       g.save(); inLook = true;
       try {
@@ -690,6 +695,41 @@
     setInterval(learnSides, 1500);
     learnSides(); setTimeout(learnSides, 400); setTimeout(learnSides, 900);
     htmlEl().setAttribute && htmlEl().setAttribute("data-bd-lw", "on");   // diagnostics: the Lightweight Charts adapter is active on this page
+    // each chart in a layout matched to its own wallpaper (data-ws-charts from content.js; chart 1 = your colours)
+    let chartCols = null, chartOfC = new WeakMap();
+    const hx = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v.toLowerCase() : "");
+    const readCharts = () => { let a = null; try { a = JSON.parse(htmlEl().getAttribute("data-ws-charts") || "null"); } catch {}
+      // a chart styled on its own (Style each chart): its candles + chart styling, parsed exactly like the main ones
+      const parseOwn = (q) => { const sf = lfx, st = ltx, sc = candles; readFx(q.fx); readCandles(q.cand || null);
+        const r = { l: +q.l || 0, t: +q.t || 0, r: +q.r || 0, b: +q.b || 0, full: true, lfx, ltx, cand: candles, colors: [] };
+        lfx = sf; ltx = st; candles = sc; if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(lfx ? lfx.wallColors : []); return r; };
+      chartCols = Array.isArray(a) && a.length > 1 ? a.slice(0, 16).map((q, i) => i && q && typeof q.fx === "string" ? parseOwn(q) : (i && q && hx(q.up) && hx(q.down)
+        ? { l: +q.l || 0, t: +q.t || 0, r: +q.r || 0, b: +q.b || 0, up: hx(q.up), down: hx(q.down), accent: hx(q.accent), text: hx(q.text), colors: Array.isArray(q.colors) ? q.colors.map(hx).filter(Boolean).slice(0, 5) : [] }
+        : i ? null : { l: +(q && q.l) || 0, t: +(q && q.t) || 0, r: +(q && q.r) || 0, b: +(q && q.b) || 0, main: true })) : null;
+      if (chartCols && !chartCols.some((q, i) => i && q)) chartCols = null; chartOfC = new WeakMap(); };
+    const chartFor = (c) => {
+      if (!chartCols || !c || !c.isConnected) return null;
+      let e = chartOfC.get(c); const now = performance.now();
+      if (!e || now - e.t > 1500) { const r = c.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2; let i = -1;
+        chartCols.forEach((q, k) => { if (q && x >= q.l && x <= q.r && y >= q.t && y <= q.b) i = k; }); e = { t: now, i }; chartOfC.set(c, e); }
+      const q = e.i > 0 ? chartCols[e.i] : null; if (!q || q.main) return null;
+      if (q.full) { if (q.cand && !q.cand.cache) q.cand.cache = new Map(); return q; }
+      if (!candles) return null;
+      if (!q.cand || q.base !== candles) { q.base = candles; q.cand = { ...candles, up: hexToRgb(q.up), down: hexToRgb(q.down), upHex: q.up, downHex: q.down, cache: new Map() }; }
+      return q; };
+    const withChart = (fn) => function (...a) {
+      const q = chartCols ? chartFor(this.canvas) : null;
+      if (!q) return fn.apply(this, a);
+      if (q.full) { const pc = candles, pf = lfx, pt = ltx, L = window.__bdCandleLooks; candles = q.cand; lfx = q.lfx; ltx = q.ltx; if (L && L.setWallColors) L.setWallColors(lfx ? lfx.wallColors : []);
+        try { return fn.apply(this, a); } finally { candles = pc; lfx = pf; ltx = pt; if (L && L.setWallColors) L.setWallColors(lfx ? lfx.wallColors : []); } }
+      const pc = candles, pa = lfx && lfx.accent, pt = ltx && ltx.color, L = window.__bdCandleLooks, wc = q.colors.length >= 2 && L && L.setWallColors;
+      candles = q.cand; if (lfx && q.accent) lfx.accent = q.accent; if (ltx && q.text && ltx.mode === "custom") ltx.color = q.text; if (wc) L.setWallColors(q.colors);
+      try { return fn.apply(this, a); } finally { candles = pc; if (lfx) lfx.accent = pa; if (ltx) ltx.color = pt; if (wc) L.setWallColors(lfx ? lfx.wallColors : []); }
+    };
+    for (const name of ["fillRect", "strokeRect", "fill", "stroke", "fillText", "strokeText"]) if (typeof proto[name] === "function") proto[name] = withChart(proto[name]);
+    for (const prop of ["fillStyle", "strokeStyle"]) { const d = Object.getOwnPropertyDescriptor(proto, prop); if (d && d.set) Object.defineProperty(proto, prop, { configurable: true, enumerable: d.enumerable, get: d.get, set: withChart(d.set) }); }
+    readCharts();
+    new MutationObserver(() => { readCharts(); repaint(); }).observe(htmlEl(), { attributes: true, attributeFilter: ["data-ws-charts"] });
     repaint();
   }
 

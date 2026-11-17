@@ -19,6 +19,8 @@
     candleLook: "solid", shiftSpeed: 10, // solid | neon | prism | shift
     // Candle parts (Candles > Candle parts): wick / border colours, hollow bodies, widths
     candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1,
+    chartColors: "auto",   // several charts: "same" | "wallpaper" (each matches its own) | "custom" (chartCustom) | "auto" (wallpaper once Match is used)
+    chartStyle: {},        // Style each chart: { 2: { candleUp, candleLook, indMode... }, ... } (only what differs from yours)
     skinOpts: {},          // each built-in wallpaper's own settings + recolour: { twinkle: { amount: 1.4, rc: { c: [...], s: 0.8 } } }
     // Behaviour: react to the market / your own P&L (entry typed in by the user; never reads the account)
     react: "off",          // "off" | "market" | "pnl"
@@ -1298,6 +1300,7 @@
     placePnl();
     placeGoal();
     placeTimer();
+    try { pushChartColors(); } catch {}                     // each chart's box moved: tell hook.js where they are now
   }
   function trackLayout() {
     if (!layer || standDown || document.querySelector(".chart-container[data-bd-repaint]")) return;   // mid-redraw: charts hidden for 2 frames
@@ -1515,12 +1518,17 @@
   }
 
   // Candle colours are drawn by hook.js (page world); hand it the config via an attribute.
+  // the candle settings hook.js / lw.js draw with, for a config (yours, or one chart's own: Style each chart)
+  function candlesJSON(c) {
+    if (!(c.enabled && c.candleOn)) return null;
+    const parts = { wick: c.candleWick, wickUp: c.candleWickUp, wickDown: c.candleWickDown, border: c.candleBorder, borderUp: c.candleBorderUp,
+      borderDown: c.candleBorderDown, borderW: c.candleBorderW, hollow: c.candleHollow, wickW: c.candleWickW, bodyW: c.candleBodyW };
+    return JSON.stringify({ up: c.candleUp, down: c.candleDown, glow: c.candleGlow, look: c.candleLook, parts, lite: liteNow() });
+  }
   function pushCandles() {
     const h = document.documentElement;
-    const parts = { wick: cfg.candleWick, wickUp: cfg.candleWickUp, wickDown: cfg.candleWickDown, border: cfg.candleBorder, borderUp: cfg.candleBorderUp,
-      borderDown: cfg.candleBorderDown, borderW: cfg.candleBorderW, hollow: cfg.candleHollow, wickW: cfg.candleWickW, bodyW: cfg.candleBodyW };
-    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-ws-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow, look: cfg.candleLook, parts, lite: liteNow() }));
-    else h.removeAttribute("data-ws-candles");
+    const j = candlesJSON(cfg);
+    if (j) h.setAttribute("data-ws-candles", j); else h.removeAttribute("data-ws-candles");
     // "Shift" look: colours cycle over time via a GPU hue animation on the chart layer (no redraws needed)
     const shift = cfg.enabled && cfg.candleOn && cfg.candleLook === "shift";
     h.classList.toggle("bd-shift", shift);
@@ -1605,7 +1613,52 @@
     if (mx === mn) return 0; const d = mx - mn; let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return h * 60; }
   function skinAccent() { return lastAccent; }
   let accentFor = "";
+  // ---------- each chart in a layout matches ITS OWN wallpaper ----------
+  // With different wallpapers on your charts (Multiple charts › Mix) and Match everything (or Auto-match) in use,
+  // charts 2, 3, 4... get candles, indicator / zone colours and a skin accent from their own wallpaper. Each chart's
+  // colours are read once per wallpaper (animated wallpapers shift colour all the time) and lifted so candles stay
+  // readable on a dark wallpaper. Chart 1 keeps your usual colours. hook.js / lw.js apply them per chart.
+  const lumHexC = (x) => [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16) / 255).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const mixHexC = (a, b, f) => "#" + [1, 3, 5].map((i) => { const x = parseInt(a.slice(i, i + 2), 16), y = parseInt(b.slice(i, i + 2), 16); return Math.round(x + (y - x) * f).toString(16).padStart(2, "0"); }).join("");
+  const liftC = (x, bright) => { if (bright || !/^#[0-9a-f]{6}$/i.test(x || "")) return x; let f = 0, y = x; while (lumHexC(y) < 0.42 && f < 0.7) { f += 0.05; y = mixHexC(x, "#ffffff", f); } return y; };
+  let chartsSig = "";
+  function pushChartColors() {
+    const h = document.documentElement;
+    const mode = cfg.chartColors === "auto" || !cfg.chartColors ? (cfg.matchOnPick || cfg.wallMatch ? "wallpaper" : "same") : cfg.chartColors;
+    const want = cfg.enabled && views.length > 1 && (mode === "custom" || (mode === "wallpaper" && new Set(views.map((v) => v.src)).size > 1));
+    let out = null;
+    if (want && mode === "custom") {                                                         // Style each chart: each its own settings
+      out = views.map((v, i) => { const box = { l: Math.round(v.x || 0), t: Math.round(v.y || 0), r: Math.round((v.x || 0) + (v.w || 0)), b: Math.round((v.y || 0) + (v.h || 0)) };
+        const ov = i && (cfg.chartStyle || {})[i + 1]; if (!ov || !Object.keys(ov).length) return box;
+        const eff = { ...cfg, ...ov }, p = v.lum && v.lum.palette && v.src !== views[0].src ? (v.matchSrc === v.src && v.matchPal) || v.lum.palette : null;
+        if (p && !v.matchPal) { v.matchPal = p; v.matchSrc = v.src; }
+        return { ...box, cand: candlesJSON(eff), fx: fxJSON(eff, tickPushed, p) }; });
+      if (!out.some((q, i) => i && q.fx)) out = null;
+    } else if (want) {
+      out = views.map((v, i) => {
+        const box = { l: Math.round(v.x || 0), t: Math.round(v.y || 0), r: Math.round((v.x || 0) + (v.w || 0)), b: Math.round((v.y || 0) + (v.h || 0)) };
+        if (!i || v.src === views[0].src) return box;                                        // chart 1 / same wallpaper: your colours
+        if (!v.matchPal || v.matchSrc !== v.src) { const p = v.lum && v.lum.palette; if (p && p.up && p.down) { v.matchPal = p; v.matchSrc = v.src; v.matchBright = v.lum.mean > 0.55; } }
+        const p = v.matchSrc === v.src ? v.matchPal : null; if (!p) return box;
+        const ac = /^#[0-9a-f]{6}$/i.test(p.accent || "") ? p.accent : "", text = ac ? (v.matchBright ? mixHexC(ac, "#000000", 0.62) : mixHexC(ac, "#ffffff", 0.5)) : "";
+        return { ...box, up: liftC(p.up, v.matchBright), down: liftC(p.down, v.matchBright), accent: ac, text, colors: (p.colors || []).slice(0, 5) };
+      });
+      if (!out.some((q, i) => i && q.up)) out = null;
+    }
+    // the legend text (indicator names / values) of each chart in a light tint of ITS wallpaper's colour: a CSS variable
+    // set on that chart's own box (the legend CSS reads it), so it never touches the other charts
+    charts.forEach((c, i) => {
+      let el = c.el; for (let k = 0; k < 3 && el.parentElement && el.parentElement !== document.body && !charts.some((o) => o !== c && el.parentElement.contains(o.el)); k++) el = el.parentElement;
+      const q = out && out[i], tint = q && q.text ? q.text : "";
+      if (tint && cfg.lgOn) { el.style.setProperty("--bd-lg-text", tint); el.dataset.bdLgTint = "1"; }
+      else if (el.dataset.bdLgTint) { el.style.removeProperty("--bd-lg-text"); delete el.dataset.bdLgTint; }
+    });
+    const sig = out ? JSON.stringify(out) : "";
+    if (sig === chartsSig) return; chartsSig = sig;
+    if (out) h.setAttribute("data-ws-charts", sig); else h.removeAttribute("data-ws-charts");
+  }
   function updateBackdrop() {
+    try { pushChartColors(); } catch {}
     // the skin colour is taken ONCE per wallpaper (animated wallpapers shift colour all the time; following that
     // re-coloured lines and panels again and again)
     const srcSig = String(cfg.skin) + "|" + String(cfg.mediaId || "");
@@ -1688,9 +1741,15 @@
     indSeenSig = v;
     try { chrome.storage.local.set({ indSeen: { host: (IN_FRAME ? (document.referrer ? new URL(document.referrer).hostname : "") : "") || location.hostname, t: Date.now(), items: JSON.parse(v) } }); } catch {}
   }, 3000);
+  // the chart styling hook.js / lw.js draw with, for a config (yours, or one chart's own); pal = that chart's wallpaper colours
+  function fxJSON(c, tick, pal) {
+    return JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, c[k]])), tickSize: tick, bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [],
+      accent: (pal && pal.accent) || skinAccent(), wallColors: pal && pal.colors && pal.colors.length >= 2 ? pal.colors.slice(0, 5) : wallColorsNow(), scaleFamily: fontStack(c.scaleFont), fontTick, lite: liteNow() });
+  }
   function pushFx() {
     const h = document.documentElement;
-    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent(), wallColors: wallColorsNow(), scaleFamily: fontStack(cfg.scaleFont), fontTick, lite: liteNow() }));
+    if (cfg.enabled) h.setAttribute("data-ws-fx", fxJSON(cfg, (tickPushed = tickSizeOf())));
+    if (cfg.chartColors === "custom") try { pushChartColors(); } catch {}   // charts styled on their own follow too
     else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     // Scale backing = real frosted glass behind the price + time scales
@@ -1807,6 +1866,7 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k === "scaleFont" || k === "tkFont" || k === "uiFont")) ensureFonts();
     if (keys.includes("react") || keys.includes("enabled")) syncMusic();
+    if (keys.some((k) => k === "chartColors" || k === "chartStyle" || k === "wallMatch" || k === "matchOnPick" || k.startsWith("candle") || FX_KEYS.includes(k))) pushChartColors();
     if (keys.includes("powerSaver") || keys.includes("autoQuality")) { liteWas = liteNow(); pushCandles(); pushFx(); }   // lite glow on / off
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
