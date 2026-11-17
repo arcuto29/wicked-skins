@@ -557,3 +557,10 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 .rcchip { display: inline-flex; align-items: center; gap: 6px; }
 .rcchip i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,.25); }
 .wslookimg { display: block; width: 100%; height: 64px; object-fit: cover; }
+/* Yours: saved candle styles in the preset grid */
+.card.preset.mine { position: relative; }
+.card.preset.mine .x, .card.preset.mine .ren { position: absolute; bottom: 12px; width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 50%; font-size: 10px; color: #c9cdd9; background: rgba(0,0,0,.55); opacity: 0; transition: opacity .15s; }
+.card.preset.mine .x { right: 4px; } .card.preset.mine .ren { right: 26px; }
+.card.preset.mine:hover .x, .card.preset.mine:hover .ren, .card.preset.mine.on .x, .card.preset.mine.on .ren { opacity: 1; }
+.card.preset.save .label { color: #eef0f6; }
+.card.preset .renin { width: calc(100% - 12px); margin: 4px 6px; font: inherit; font-size: 12px; padding: 3px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); background: #0b0d12; color: #fff; }

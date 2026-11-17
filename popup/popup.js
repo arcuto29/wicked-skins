@@ -9,7 +9,7 @@ const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="tru
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
-const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
+const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -21,7 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", shiftSpeed: 10,
-  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {},
+  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [],
   indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -38,7 +38,7 @@ const DEFAULTS = {
 let cfg = { ...DEFAULTS };
 // lastPick: you used THIS copy's panel just now, so if two copies of Priism are installed, this one draws the page
 // a built-in wallpaper with YOUR settings for it (its own options + Recolour), for every preview in the panel
-const makeSkin = (id, ctx) => window.PriismMakeSkin(id, ctx, (cfg.skinOpts || {})[id]);
+const makeSkin = (id, ctx, look) => window.PriismMakeSkin(id, ctx, look && "wallOpts" in look ? look.wallOpts : (cfg.skinOpts || {})[id]);   // a look's own wallpaper settings win
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set({ ...obj, lastPick: Date.now() }); };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -305,10 +305,36 @@ function renderCandles() {
     chips.appendChild(c);
   }
   const box = $("candleCards"); box.innerHTML = "";
-  const custom = cfg.candleOn && !CANDLE_PRESETS.some(([, , u, d]) => u === cfg.candleUp && d === cfg.candleDown);
-  if (custom) {
-    box.insertAdjacentHTML("beforeend", `<div class="grp-label">Your colours</div>`);
-    box.insertAdjacentHTML("beforeend", `<button class="card preset on" disabled>${bars(cfg.candleUp, cfg.candleDown)}<div class="label">Custom</div></button>`);
+  // Yours: candle styles you saved (colours, look, glow and candle parts), first in the same grid as the built-in ones
+  const mine = Array.isArray(cfg.myCandles) ? cfg.myCandles : [], cur = candleStyleNow(), curSig = JSON.stringify(cur);
+  const saved = mine.some((m) => JSON.stringify(candleStyleOf(m)) === curSig);
+  const custom = cfg.candleOn && !saved && !CANDLE_PRESETS.some(([, , u, d]) => u === cfg.candleUp && d === cfg.candleDown);
+  if (mine.length || cfg.candleOn) box.insertAdjacentHTML("beforeend", `<div class="grp-label">Yours</div>`);
+  for (const m of mine) {
+    const b = document.createElement("button"), on = cfg.candleOn && JSON.stringify(candleStyleOf(m)) === curSig;
+    b.className = "card preset mine" + (on ? " on" : "");
+    b.innerHTML = bars(m.candleUp, m.candleDown) + `<div class="label">${esc(m.name)}</div><span class="x" title="Delete">\u2715</span><span class="ren" title="Rename">\u270E</span>`;
+    b.onclick = (e) => {
+      if (e.target.classList.contains("ren")) {               // rename in place (no pop-up: works in the app too)
+        const lab = b.querySelector(".label"), inp = document.createElement("input"); inp.className = "renin"; inp.maxLength = 24; inp.value = m.name;
+        lab.replaceWith(inp); inp.focus(); inp.select(); inp.onclick = (ev) => ev.stopPropagation();
+        const done = (keep) => { const v = inp.value.trim().slice(0, 24); if (keep && v && v !== m.name) set({ myCandles: mine.map((x) => (x.id === m.id ? { ...x, name: v } : x)) }); renderCandles(); };
+        inp.onkeydown = (ev) => { ev.stopPropagation(); if (ev.key === "Enter") done(true); if (ev.key === "Escape") done(false); }; inp.onblur = () => done(true);
+        return;
+      }
+      if (e.target.classList.contains("x")) { const before = cfg.myCandles; set({ myCandles: mine.filter((x) => x.id !== m.id) }); renderCandles();
+        return toast(`Deleted \u201c${m.name}\u201d.`, () => { set({ myCandles: before }); renderCandles(); }); }
+      applyWithUndo({ candleOn: true, candlePreset: "custom", ...candleStyleOf(m) }, `Candles: ${m.name}.`);
+    };
+    box.appendChild(b);
+  }
+  if (cfg.candleOn && !saved) {
+    const b = document.createElement("button"); b.className = "card preset save" + (custom ? " on" : "");
+    b.innerHTML = bars(cfg.candleUp, cfg.candleDown) + `<div class="label">+ Save these</div>`;
+    b.title = "Save your current candles (colours, look, glow and parts) here";
+    b.onclick = () => { let n = mine.length + 1; while (mine.some((x) => x.name === `My candles ${n}`)) n++; const name = `My candles ${n}`;
+      set({ myCandles: [...mine, { id: uid(), name, ...cur }].slice(-24) }); renderCandles(); toast(`Saved \u201c${name}\u201d under Yours. Tap \u270E to rename it.`); };
+    box.appendChild(b);
   }
   let lastGroup = null;
   CANDLE_PRESETS.filter((p) => candleGroup === "All" || p[4] === candleGroup).forEach(([id, name, up, down, group]) => {
@@ -322,6 +348,10 @@ function renderCandles() {
 }
 $("candleOn").onchange = (e) => set({ candleOn: e.target.checked });
 // ---------- Candle parts: wick / border colours, hollow bodies, widths (drawn by candlelooks.js on every platform) ----------
+// a candle style = colours + look + glow + parts (what a saved "Yours" preset keeps)
+const CANDLE_STYLE_KEYS = ["candleUp", "candleDown", "candleLook", "candleGlow", "candleWick", "candleWickUp", "candleWickDown", "candleBorder", "candleBorderUp", "candleBorderDown", "candleBorderW", "candleHollow", "candleWickW", "candleBodyW"];
+const candleStyleNow = () => Object.fromEntries(CANDLE_STYLE_KEYS.map((k) => [k, cfg[k]]));
+const candleStyleOf = (m) => Object.fromEntries(CANDLE_STYLE_KEYS.map((k) => [k, k in m ? m[k] : DEFAULTS[k]]));
 const PARTS_DEF = { candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1 };
 const partsCfg = () => ({ wick: cfg.candleWick, wickUp: cfg.candleWickUp, wickDown: cfg.candleWickDown, border: cfg.candleBorder, borderUp: cfg.candleBorderUp,
   borderDown: cfg.candleBorderDown, borderW: cfg.candleBorderW, hollow: cfg.candleHollow, wickW: cfg.candleWickW, bodyW: cfg.candleBodyW });
@@ -496,12 +526,15 @@ if ($("matchAll")) $("matchAll").onclick = () => matchEverything();
 function autoMatchPick() { if (cfg.matchOnPick && !noAutoMatch) matchEverything(true); }
 function syncMatchOnPick() {
   const pick = (v) => { set({ matchOnPick: v }); syncMatchOnPick(); if (v) matchEverything(true); };
-  for (const id of ["matchOnPick", "matchOnPick2"]) if ($(id)) seg(id, [[false, "Off"], [true, "On"]], () => !!cfg.matchOnPick, pick);
+  for (const id of ["matchOnPick"]) if ($(id)) seg(id, [[false, "Off"], [true, "On"]], () => !!cfg.matchOnPick, pick);
   let view = ""; try { view = skinView; } catch {}                // (skinView is declared further down)
   if ($("matchPickRow")) $("matchPickRow").hidden = view === "looks";
 }
 
 function applyWithUndo(changes, label) {
+  // a look's wallOpts become that wallpaper's settings (skinOpts); a look without them leaves the wallpaper's alone
+  if ("wallOpts" in changes) { const w = changes.wallOpts, sk = changes.skin || cfg.skin; changes = { ...changes }; delete changes.wallOpts;
+    if (WickedSkins[sk]) { const all = { ...(cfg.skinOpts || {}) }; if (w && typeof w === "object") all[sk] = w; else delete all[sk]; changes.skinOpts = all; } }
   const before = Object.fromEntries(Object.keys(changes).map((k) => [k, cfg[k]]));
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
@@ -1113,7 +1146,7 @@ function wsRenderLooks() {
     if (!WickedSkins[it.skin]) continue;
     const d = cleanLook(it.data), card = document.createElement("button"); card.className = "card wslook";
     const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
-    const sk = makeSkin(it.skin, cv.getContext("2d")); sk.resize(160, 64); lookPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
+    const sk = makeSkin(it.skin, cv.getContext("2d"), it.data); sk.resize(160, 64); lookPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
     card.append(cv);
     const up = d.candleUp || "#26a69a", down = d.candleDown || "#ef5350";
     card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(up, down)}</div><span class="oncount${it.mine ? " review" : ""}">${it.mine ? "IN REVIEW" : it.uses + " ON"}</span>
@@ -1208,7 +1241,9 @@ function initWorkshop() {
 }
 
 // ---------- saved looks ----------
-const snapshot = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, cfg[k]]));
+// a look = these settings + the wallpaper's own settings / Recolour (wallOpts: kept per wallpaper in skinOpts)
+const wallOptsNow = () => (WickedSkins[cfg.skin] && (cfg.skinOpts || {})[cfg.skin]) || null;
+const snapshot = () => Object.fromEntries(LOOK_KEYS.map((k) => [k, k === "wallOpts" ? wallOptsNow() : cfg[k]]));
 const lookPreviews = [];
 const sameLook = (lo) => lo.skin === cfg.skin && (lo.skin !== "media" || lo.mediaId === cfg.mediaId) &&
   ["candleOn", "candleUp", "candleDown", "candleLook", "lineGlow", "dim"].every((k) => JSON.stringify(lo.look[k]) === JSON.stringify(cfg[k]));
@@ -1254,6 +1289,9 @@ function b64urlDecode(s) {
 function lookPayload(src = { skin: cfg.skin, look: cfg }) {
   const skin = src.skin === "media" || !WickedSkins[src.skin] ? "aurora" : src.skin, look = {};
   for (const k of LOOK_KEYS) if (src.look && k in src.look && JSON.stringify(src.look[k]) !== JSON.stringify(DEFAULTS[k])) look[k] = src.look[k];
+  if (src.look === cfg && wallOptsNow()) look.wallOpts = wallOptsNow();            // the chart's current look: its wallpaper settings too
+  if (skin !== src.skin) delete look.wallOpts;                                       // (your own upload: shared on another wallpaper)
+  if (look.wallOpts == null) delete look.wallOpts;
   return { skin, look };
 }
 function makeLookCode(name, src) {
@@ -1290,7 +1328,7 @@ function renderLoadouts() {
     if (media && media.thumb) { const im = document.createElement("img"); im.src = media.thumb; card.append(im); }
     else {
       const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
-      const sk = makeSkin(WickedSkins[lo.skin] ? lo.skin : "aurora", cv.getContext("2d")); sk.resize(160, 64);
+      const sk = makeSkin(WickedSkins[lo.skin] ? lo.skin : "aurora", cv.getContext("2d"), lo.look); sk.resize(160, 64);
       lookPreviews.push({ skin: sk, t: 0 }); card.append(cv);
     }
     if (lo.look.candleOn) card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(lo.look.candleUp, lo.look.candleDown)}</div>`);
