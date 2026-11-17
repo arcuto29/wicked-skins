@@ -545,3 +545,6 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 .ig-card button.primary:hover { filter: brightness(1.06); }
 .ig-card button.primary:disabled { opacity: .6; }
 .ig-foot { border-top: 1px solid rgba(255,255,255,.06); padding-top: 12px; }
+/* update card on black, like the rest */
+.pu-veil { background: rgba(0,0,0,.78); }
+.pu-card { background: #0b0b0d; border-color: rgba(255,255,255,.1); box-shadow: 0 30px 80px -30px rgba(0,0,0,.95); }

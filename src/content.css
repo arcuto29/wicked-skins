@@ -318,3 +318,27 @@ html.bd-on:not(.bd-over-mode) table[data-bd-lwroot], html.bd-on:not(.bd-over-mod
 html.bd-on:not(.bd-over-mode) [data-bd-lwroot] > table, html.bd-on:not(.bd-over-mode) [data-bd-lwroot] > table *:not(canvas) {
   background-color: transparent !important; background-image: none !important;
 }
+
+/* ===== Priism's own cards on the chart (record screen / sound, tips): clean, calm, one look everywhere ===== */
+.bd-ui-card { position: fixed; z-index: 2147483647; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px 12px 16px; border-radius: 14px; background: rgba(11,11,13,.97); color: #f5f5f7; border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 18px 48px -18px rgba(0,0,0,.9); font: 600 13px/1.35 ui-sans-serif, "Inter", "Segoe UI", system-ui, sans-serif;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); animation: bd-ui-in .22s ease-out; }
+@keyframes bd-ui-in { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.bd-ui-btn { all: unset; cursor: pointer; padding: 8px 12px; border-radius: 9px; color: #b9b9c2; font: 600 13px ui-sans-serif, "Inter", "Segoe UI", system-ui, sans-serif; white-space: nowrap; transition: background .15s, color .15s; }
+.bd-ui-btn:hover { color: #fff; background: rgba(255,255,255,.06); }
+.bd-ui-btn.pri { background: #fff; color: #000; font-weight: 700; }
+.bd-ui-btn.pri:hover { background: #e9e9ee; }
+/* the recording badge: a calm pill with a pulsing red dot */
+.bd-ui-rec { position: fixed; z-index: 2147483647; top: 14px; left: 50%; transform: translateX(-50%); padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  background: rgba(11,11,13,.92); color: #f5f5f7; border: 1px solid rgba(255,255,255,.12); box-shadow: 0 10px 30px -12px rgba(0,0,0,.8);
+  font: 600 12.5px ui-sans-serif, "Inter", "Segoe UI", system-ui, sans-serif; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.bd-ui-rec { padding-left: 28px; }
+.bd-ui-rec::before { content: ""; position: absolute; left: 12px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: #ff4d5e;
+  box-shadow: 0 0 0 0 rgba(255,77,94,.6); animation: bd-rec-pulse 1.6s ease-out infinite; }
+@keyframes bd-rec-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,77,94,.55); } 70% { box-shadow: 0 0 0 7px rgba(255,77,94,0); } 100% { box-shadow: 0 0 0 0 rgba(255,77,94,0); } }
+/* the short on-chart messages ("Priism Skins on", "Clip saved…"): same calm pill */
+.bd-flash { background: rgba(11,11,13,.92) !important; border: 1px solid rgba(255,255,255,.12) !important; box-shadow: 0 10px 30px -12px rgba(0,0,0,.8) !important;
+  font: 600 13px ui-sans-serif, "Inter", "Segoe UI", system-ui, sans-serif !important; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+/* "Done for today": same card look (its calm red sign stays) */
+#bd-guard { background: rgba(11,11,13,.95) !important; border-color: rgba(255,255,255,.1) !important; }

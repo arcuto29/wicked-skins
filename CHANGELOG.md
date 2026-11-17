@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.1.61 (unreleased)
+- **Cleaner everywhere, not just the panel.** Priism's own cards on the chart (record the screen, tips, quick messages like "Clip saved"), the recording badge (now with a calm pulsing red dot), the clip editor, the update card and the desktop app's tab bar all use the same clean black look: dark cards, thin borders, white for the main button, no neon glow.
 - **A cleaner Workshop.** Wallpaper cards on the website show the picture first with small labels (4K, OLED, Live) over it, a round download button, and a gentle zoom when you hover. Wallpaper cards in the panel zoom on hover too.
 - **The invite card matches Priism:** black, the Priism logo with a soft glow, and the brand gradient on its edge and button.
 
