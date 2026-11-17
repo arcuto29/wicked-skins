@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.61 (unreleased)
+- **A cleaner Workshop.** Wallpaper cards on the website show the picture first with small labels (4K, OLED, Live) over it, a round download button, and a gentle zoom when you hover. Wallpaper cards in the panel zoom on hover too.
+- **The invite card matches Priism:** black, the Priism logo with a soft glow, and the brand gradient on its edge and button.
+
 ## 0.1.60 (2026-11-16)
 - **A cleaner panel in true black.** The Priism panel (extension, desktop app and Android) now has a black background, quiet surfaces and thin lines, white for whatever you've selected, and slimmer sliders with a filled track and a small knob. No more glows behind the controls.
 - **New in the Workshop: a space photo pack** from the James Webb Space Telescope (Cosmic Cliffs, Pillars of Creation, Cassiopeia A, NGC 602 and more), in up to 4K, each credited on its card as the licence asks (ESA/Webb, CC BY 4.0). Workshop cards now show who to credit.
