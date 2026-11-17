@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.62 (unreleased)
+- **New: Auto-match.** Skins → Wallpapers (and My uploads) has an **Auto-match** switch, also under Candles next to Match everything. When it's on, every wallpaper you pick, built-in, your own upload or one from the Workshop, runs Match everything by itself: candles, indicators, zones, drawings, chart text and the rest take that wallpaper's colours. Each match shows Undo. It's off by default, and one-tap Looks keep their own designed colours. It replaces the older candles-only "Match wallpaper" switch (still shown if you had it on).
+- **Match everything keeps candles readable on dark wallpapers.** A deep colour from the wallpaper (a strong blue reads almost black on a night sky) is lightened, keeping its hue, until the candles stand out.
+- **4 new wallpapers**, all original and calm behind a chart:
+  - **Trading Floor** (Markets, Wow): a dark exchange floor in perspective, rows of desks with glowing screens fading into the haze and a quote board scrolling slowly overhead. It shows symbols only, never made-up prices.
+  - **Market Wall** (Markets): a wall of trading screens, softly out of focus, their charts drifting slowly.
+  - **Midnight Moon** (Chill): a night-blue sky with a soft crescent moon, faint drifting clouds and a dark skyline where a window lights up or goes out every few minutes.
+  - **Twinkle** (Cosmos, OLED): stars on true black that twinkle gently; the sky turns very slowly so no bright point stays in one place. Skins → OLED now lists 10.
+  - Each one has a one-tap Look too (Skins → Looks).
+
 ## 0.1.61 (2026-11-17)
 - **Match everything covers everything, with your own wallpapers too.** One tap now also sets your drawings and the session breaks, uses the exact colours it measured from your wallpaper for the candles AND your indicators and zones (they used to come from two different readings), and picks dark text for bright wallpapers so the price scale, ticker and legend stay readable.
 - **Zones are soft by default so you can see the price inside them.** Recoloured zones (Rainbow, Gradient, Wallpaper…) used to be as strong as the indicator drew them, in bright colours. New in Style → Indicators: **Zone fill** (how strong recoloured zones are, 4–45%, default 12%) and **Dim all zones** (also softens zones that keep their own colours). Zone edges stay crisp.
