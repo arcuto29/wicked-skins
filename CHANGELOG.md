@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.66 (unreleased)
+- **Smoother on slow computers.** When Priism sees the computer struggling (auto quality steps down), or with Power saver on, every glow on the chart (candle glow, line glow, zone edges) is drawn with a tighter blur. Blur was the costliest part on computers without a fast graphics card: on a simulated slow PC (CPU 6× slower, everything turned on) the chart went from 22 to 31 frames a second, and to 43 at 4× slower. Rain, snow and the other effects now count when auto quality decides to step down, too.
+- **Update a look you shared, instead of adding a second copy.** Publish a look with the same name as one you've already shared, and the website offers **Update my look** (ticked): the same Workshop card gets your new settings and keeps its uses. An admin's update is live at once; anyone else's goes back to review. Your own wallpaper stays attached unless you choose a new file. In Saved, **Update** on a look you've shared now also offers **Update in Workshop**. (Needs supabase/schema.sql re-run once.)
+
 ## 0.1.65 (2026-11-17)
 - **Fixed: the legend's Backing did nothing you could see.** It put a faint band behind each whole legend row (as wide as the chart), so on a dark wallpaper you couldn't see it and on a bright one it was a big stripe. Now it's a small box that hugs each line (symbol, Volume, your indicators), a bit stronger, and it's called **Box behind the text** (None / Box / Frosted) with a hint that says what it's for.
 

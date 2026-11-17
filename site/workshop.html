@@ -38,6 +38,7 @@
         <b>Publish this look to the Workshop</b>
         <p class="hint" id="lookSum"></p>
         <input id="lookTitle" class="field" maxlength="40" placeholder="Name your look">
+        <label id="lookUpd" class="hint" style="display:block;margin:6px 0" hidden><input type="checkbox" id="lookUpdChk" checked> Update my look <b id="lookUpdName"></b> (instead of sharing a second copy)</label>
         <div id="lookWall" class="lookwall" hidden>
           <p class="hint" id="lookWallSay"></p>
           <label class="btn" style="display:inline-block;cursor:pointer"><input id="lookWallFile" type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm"><span id="lookWallPick">Choose the file</span></label>
@@ -177,7 +178,19 @@
     loadLooks();
 
     // ---------- community looks: share (a code sent from the extension) ----------
-    let pendingLook = null, lookFile = null;
+    let pendingLook = null, lookFile = null, ownLook = null;
+    // one of YOUR shared looks with this name? then Publish updates it (same card, same uses) instead of adding a copy
+    async function checkOwnLook() {
+      ownLook = null; $("lookUpd").hidden = true;
+      if (!pendingLook || !user) return;
+      const t = $("lookTitle").value.trim().toLowerCase(); if (!t) return;
+      const { data } = await sb.from("looks").select("id,title,data,status").eq("owner", user.id).range(0, 199);
+      ownLook = (data || []).find((l) => l.title.toLowerCase() === t) || null;
+      if (ownLook) { $("lookUpdName").textContent = "\u201c" + ownLook.title + "\u201d"; $("lookUpd").hidden = false; $("lookUpdChk").checked = true; }
+      $("lookGo").textContent = ownLook && $("lookUpdChk").checked ? "Update look" : "Publish look";
+    }
+    $("lookUpdChk").onchange = () => { $("lookGo").textContent = ownLook && $("lookUpdChk").checked ? "Update look" : "Publish look"; };
+    $("lookTitle").addEventListener("input", () => { clearTimeout(checkOwnLook.t); checkOwnLook.t = setTimeout(checkOwnLook, 300); });
     $("lookWallFile").onchange = (e) => { const f = e.target.files[0]; if (!f) return;
       if (f.size > LIMIT) { lookFile = null; return say("lookMsg", "That file is over the 50 MB limit."); }
       if (!/^(image\/(png|jpeg|webp|gif|avif)|video\/(mp4|webm))$/.test(f.type)) { lookFile = null; return say("lookMsg", "Allowed: PNG, JPG, WebP, GIF, AVIF, MP4, WebM."); }
@@ -204,7 +217,7 @@
         const d = p.l, parts = [pendingLook.own ? `wallpaper: ${pendingLook.own.name}` : `wallpaper: ${p.s}`, d.candleLook ? `candles: ${d.candleLook}` : "", d.gridOn || d.chOn || d.plOn ? "chart styling" : "", d.panelMode && d.panelMode !== "off" ? "panel colours" : ""].filter(Boolean);
         say("lookSum", parts.join(" · ") + ".");
         $("lookCancel").onclick = () => { pendingLook = null; try { localStorage.removeItem("priismPendingLook"); } catch {} $("lookShare").hidden = true; history.replaceState(null, "", location.pathname); };
-        $("lookMsg").textContent = ""; $("lookGo").disabled = false;
+        $("lookMsg").textContent = ""; $("lookGo").disabled = false; setTimeout(checkOwnLook, 0);   // (after the page script has set up the account)
         document.getElementById("submit").scrollIntoView();
       } catch {}
     }
@@ -223,10 +236,20 @@
           say("lookMsg", "Sharing…"); }
         catch (e) { $("lookGo").disabled = false; return say("lookMsg", "Couldn't upload the wallpaper: " + String((e && e.message) || e)); }
       }
-      const ins = await sb.from("looks").insert({ title, skin: pendingLook.skin, data }).select("status").single();
+      let ins;
+      if (ownLook && $("lookUpdChk").checked) {
+        if (!lookFile && pendingLook.own && ownLook.data && ownLook.data.wallId) data.wallId = ownLook.data.wallId;   // keep its wallpaper
+        const r = await sb.rpc("update_my_look", { look: ownLook.id, new_title: title, new_skin: pendingLook.skin, new_data: data });
+        if (r.error && /update_my_look|function|schema cache/i.test(r.error.message)) { $("lookGo").disabled = false;
+          return say("lookMsg", "Updating looks isn't set up on the server yet: the site owner needs to re-run supabase/schema.sql. Untick \u201cUpdate my look\u201d to share a new copy instead."); }
+        ins = r.error ? { error: r.error } : { data: { status: r.data } };
+      } else ins = await sb.from("looks").insert({ title, skin: pendingLook.skin, data }).select("status").single();
       if (ins.error) { $("lookGo").disabled = false; return say("lookMsg", /looks|schema cache|relation/i.test(ins.error.message)
         ? "Looks aren't set up on the server yet (the site owner needs to re-run supabase/schema.sql). Your look is kept: try again later." : "Couldn't publish: " + ins.error.message); }
-      say("lookMsg", (ins.data.status === "approved" ? "Published! It's live in the Workshop now." : "Published! It's in review: you'll see it under Your shares, and everyone sees it once it's approved.") + wallNote);
+      const upd = ownLook && $("lookUpdChk").checked;
+      say("lookMsg", (ins.data.status === "approved" ? (upd ? "Updated! The new version is live in the Workshop now." : "Published! It's live in the Workshop now.")
+        : (upd ? "Updated! The new version is in review: everyone sees it once it's approved." : "Published! It's in review: you'll see it under Your shares, and everyone sees it once it's approved.")) + wallNote);
+      ownLook = null; $("lookUpd").hidden = true; $("lookGo").textContent = "Publish look";
       if (lookFile) { sort = "new"; load(true); } lookFile = null;
       pendingLook = null; try { localStorage.removeItem("priismPendingLook"); } catch {} history.replaceState(null, "", location.pathname); loadLooks(); renderMine();
     };
@@ -322,6 +345,7 @@
       profile = null;
       if (user) { const r = await sb.from("profiles").select("display_name,is_admin").eq("id", user.id).maybeSingle(); profile = r.data || {}; }
       renderAccount();
+      try { checkOwnLook(); } catch {}
     }
     function renderAccount() {
       $("auth").hidden = !!user; $("uploader").hidden = !user;
