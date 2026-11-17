@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.62 (unreleased)
+## 0.1.62 (2026-11-17)
 - **New: Auto-match.** Skins → Wallpapers (and My uploads) has an **Auto-match** switch, also under Candles next to Match everything. When it's on, every wallpaper you pick, built-in, your own upload or one from the Workshop, runs Match everything by itself: candles, indicators, zones, drawings, chart text and the rest take that wallpaper's colours. Each match shows Undo. It's off by default, and one-tap Looks keep their own designed colours. It replaces the older candles-only "Match wallpaper" switch (still shown if you had it on).
 - **Match everything keeps candles readable on dark wallpapers.** A deep colour from the wallpaper (a strong blue reads almost black on a night sky) is lightened, keeping its hue, until the candles stand out.
 - **4 new wallpapers**, all original and calm behind a chart:
