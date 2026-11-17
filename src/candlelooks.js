@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks && window.__bdCandleLooks.candle) return;   // an older copy (before an update) is replaced
+  if (window.__bdCandleLooks && window.__bdCandleLooks.zoneBox) return;   // an older copy (before an update) is replaced
   // Lite glow (slow computers / Power saver, set by hook.js / lw.js from content.js): every glow's blur is drawn
   // smaller. Canvas blur is the costliest thing on a chart without a fast graphics card.
   if (!window.__bdLiteBlur && window.CanvasRenderingContext2D) {
@@ -426,6 +426,36 @@
     return { f: o && o.dim && see ? `rgba(${r.k},${+zoneAlpha(r.a, o).toFixed(3)})` : orig, g: `rgb(${r.k})`, glow: gl, e: edgeOf(`rgba(${r.k},0.9)`) };
   }
 
+  // ---------- zone shapes + borders (Style > Indicators > Zones: Shape, Border) ----------
+  // Draws one rectangular zone (its fill, then its border) in a shape: square (as drawn), rounded corners, or a pill
+  // with fully round ends. k = { begin, fill, stroke }: the REAL canvas calls (unhooked). z = zone() result.
+  // st = { shape, border, px }. Returns false if there's nothing special to do (the caller draws it as before).
+  function zoneBox(g, k, x, y, w, h, z, st) {
+    if (!st || (st.shape === "square" && st.border === "line")) return false;
+    if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
+    const px = st.px || 1, r = st.shape === "pill" ? Math.min(h, w) / 2 : st.shape === "rounded" ? Math.min(h / 2, w / 2, 9 * px) : 0;
+    const path = (inset) => { k.begin(); const a = x + inset, b = y + inset, c = Math.max(0, w - 2 * inset), d = Math.max(0, h - 2 * inset), rr = Math.max(0, r - inset);
+      if (rr > 0 && g.roundRect) g.roundRect(a, b, c, d, rr); else g.rect(a, b, c, d); };
+    const pSB = g.shadowBlur, pSC = g.shadowColor, pW = g.lineWidth, pD = g.getLineDash ? g.getLineDash() : [];
+    const edge = z.e || (st.border !== "line" ? z.g : null), glow = z.glow || 0;
+    // fill (it glows itself only when there is no border to carry the glow)
+    path(0); k.style(z.f); if (glow > 0 && (!edge || st.border === "none")) { g.shadowColor = z.g; g.shadowBlur = 3 + glow * 22; } k.fill();
+    g.shadowBlur = pSB; g.shadowColor = pSC;
+    if (edge && st.border !== "none") {
+      const lw = Math.max(1, px) * (st.border === "glow" ? 1.6 : 1);
+      k.strokeStyle(edge); g.lineWidth = lw; if (g.setLineDash) g.setLineDash(st.border === "dashed" ? [6 * px, 4 * px] : []);
+      if (glow > 0 || st.border === "glow") { g.shadowColor = z.g; g.shadowBlur = st.border === "glow" ? 8 + glow * 20 : 3 + glow * 18; }
+      path(lw / 2); k.stroke();
+      if (st.border === "double" && h > 8 * px && w > 8 * px) {   // a second, fainter line inside
+        g.shadowBlur = 0; g.globalAlpha *= 0.55; path(lw / 2 + 3 * px); k.stroke(); g.globalAlpha /= 0.55; }
+    }
+    g.shadowBlur = pSB; g.shadowColor = pSC; g.lineWidth = pW; if (g.setLineDash) g.setLineDash(pD);
+    return true;
+  }
+  // a see-through zone left in its own colours, when only its shape / border is styled
+  function zoneOwn(orig) { const r = keyOf(orig); if (!r || r.a >= 0.9) return null; return { f: orig, g: `rgb(${r.k})`, glow: 0, e: `rgba(${r.k},0.9)` }; }
+  const ZONE_SHAPES = ["square", "rounded", "pill"], ZONE_BORDERS = ["line", "dashed", "double", "glow", "none"];
+
   // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour,
   // glow: its own glow (or undefined = the Glow slider), w: extra width, hide }, or null to leave the line as it is.
   function indicator(ctx, orig, o) {
@@ -513,5 +543,5 @@
     return true;
   }
 
-  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors };
+  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors };
 })();

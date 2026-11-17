@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 21;
+  const HOOK_VERSION = 22;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -93,7 +93,7 @@
     bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
     indMode: "own", indColor: "", indCustom: {}, drawOn: false, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0, wallColors: [],
-    zoneFill: 0.12, zoneDim: false, indGrad: [],
+    zoneFill: 0.12, zoneDim: false, indGrad: [], zoneShape: "square", zoneBorder: "line",
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -156,6 +156,7 @@
         indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: cleanCustom(f.indCustom), drawOn: !!f.drawOn,
         zoneFill: Math.max(0.04, Math.min(0.45, +f.zoneFill || 0.12)), zoneDim: !!f.zoneDim,
+        zoneShape: ["square", "rounded", "pill"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line",
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
         txtMode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", txtColor: /^#[0-9a-f]{6}$/i.test(f.txtColor || "") ? f.txtColor : "", txtOutline: Math.max(0, Math.min(2, +f.txtOutline || 0)), txtSize: Math.max(0, Math.min(2, +f.txtSize || 0)),
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
@@ -176,7 +177,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont, fx.scaleFamily, fx.fontTick, fx.lite,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.zoneShape, fx.zoneBorder, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(fx.wallColors);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
@@ -348,7 +349,9 @@
     // tool) only with "Your drawings: Style them too"; greys stay grey like grey lines do
     const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && (fx.drawOn || !drawCols.has(r.k)) && glowable(`rgb(${r.k})`);
     const dim = fx.zoneDim && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k));   // Dim all zones (your drawings only with "Style them too")
-    if (!own && !all && !dim) return null;
+    const shaped = (fx.zoneShape !== "square" || fx.zoneBorder !== "line") && (w !== 1e4 || !!rectPath(ctx)) && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k));   // shape / border only
+    if (!own && !all && !dim && !shaped) return null;
+    if (!own && !all && !dim) { const zo = L.zoneOwn(orig); if (zo && !(H < c.height * 0.9)) zo.e = null; return zo; }
     const z = L.zone(orig, { mode: all ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom, glow: fx.lineGlow, zoneFill: fx.zoneFill, dim, grad: fx.indGrad }, ctx);
     // the neon edge only on boxes / bands, not full-height shading (a session background, bgcolor) or slivers
     if (z && z.e && !(H < c.height * 0.9 && W >= 6 && H >= 3)) z.e = null;
@@ -640,6 +643,7 @@
   proto.stroke = function (path) {
     const c = this.canvas;
     if (c && !c.isConnected) noteHiddenOther(this);
+    if (on && path === undefined && c && shapedBox.has(this)) { const b = rectPath(this); if (b && isShapedOutline(this, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0)) return; }
     if (on && path === undefined && c && styling() && (isPane(c) || (fx.axOn && isAxis(c))) && styleLine(this, c, arguments)) return;
     // Bracket level line: a wide, horizontal stroke sitting at a pill's height. Recolour / thicken it so the whole
     // bracket level is easy to see. Done before the candle/glow path because it can be on when those are off.
@@ -905,6 +909,32 @@
   for (const name of ["rect", "roundRect"]) {
     const o = proto[name]; if (typeof o !== "function") continue;
     proto[name] = function (x, y, w, h) { if (on) { growBox(this, x, y); growBox(this, x + w, y + h); } return o.apply(this, arguments); };
+  }
+  // is the path being built just one straight-sided box (a rect(), or move + 3-4 lines along a box's edges)? Rectangle
+  // drawings and many zone boxes are drawn like that; those can take a zone shape (rounded / pill)
+  const pathPts = new WeakMap();   // ctx -> { r: rect calls, p: [[X,Y]...] (device px), bad }
+  { const ob = proto.beginPath; proto.beginPath = function () { if (on) pathPts.delete(this); return ob.call(this); }; }
+  for (const name of ["moveTo", "lineTo"]) { const o = proto[name];
+    proto[name] = function (x, y) { if (on) { let q = pathPts.get(this); if (!q) { q = { r: 0, p: [], bad: false }; pathPts.set(this, q); }
+      if (q.p.length < 7) { const t = this.getTransform(); q.p.push([x * (t.a || 1) + t.e, y * (t.d || 1) + t.f]); } else q.bad = true; } return o.apply(this, arguments); }; }
+  { const o = proto.rect; proto.rect = function () { if (on) { let q = pathPts.get(this); if (!q) { q = { r: 0, p: [], bad: false }; pathPts.set(this, q); } q.r++; } return o.apply(this, arguments); }; }
+  for (const name of ["arc", "arcTo", "bezierCurveTo", "quadraticCurveTo", "ellipse", "roundRect"]) { const o = proto[name]; if (typeof o !== "function") continue;
+    proto[name] = function () { if (on) { let q = pathPts.get(this); if (!q) { q = { r: 0, p: [], bad: false }; pathPts.set(this, q); } q.bad = true; } return o.apply(this, arguments); }; }
+  // a zone we just drew in a shape: its own square outline (a drawing's border, drawn right after) is left out, so
+  // the rounded / pill border we drew is the only one
+  const shapedBox = new WeakMap();
+  function noteShaped(ctx, X, Y, W, H) { shapedBox.set(ctx, { X, Y, W, H, t: performance.now() }); }
+  function isShapedOutline(ctx, X, Y, W, H) {
+    const s = shapedBox.get(ctx); if (!s || performance.now() - s.t > 200) return false;
+    return Math.abs(X - s.X) <= 3 && Math.abs(Y - s.Y) <= 3 && Math.abs(W - s.W) <= 5 && Math.abs(H - s.H) <= 5;
+  }
+  function rectPath(ctx) {
+    const q = pathPts.get(ctx), b = pathBox.get(ctx); if (!q || q.bad || !b) return null;
+    if (q.r === 1 && !q.p.length) return b;
+    if (q.r || q.p.length < 4 || q.p.length > 6) return null;
+    const near = (a, v) => Math.abs(a - v) <= 1.5;
+    for (const [X, Y] of q.p) if (!((near(X, b.x0) || near(X, b.x1)) && (near(Y, b.y0) || near(Y, b.y1)))) return null;
+    return b;
   }
   { const o = proto.arcTo; proto.arcTo = function (x1, y1, x2, y2) { if (on) { growBox(this, x1, y1); growBox(this, x2, y2); } return o.apply(this, arguments); }; }
   { const o = proto.quadraticCurveTo; proto.quadraticCurveTo = function (cx, cy, x, y) { if (on) { growBox(this, cx, cy); growBox(this, x, y); } return o.apply(this, arguments); }; }
@@ -1261,6 +1291,10 @@
     // a filled shape on the chart that isn't a candle (a band between two lines, a box): an indicator zone
     if (on && c && isPane(c)) { const z = zoneFor(this, 1e4, 1e4); if (z) {
       if (z.hide) return;
+      // a box drawn as a path (rectangle drawings, many zone boxes): it can take the zone shape / border too
+      const L = window.__bdCandleLooks, b = !a.length && (fx.zoneShape !== "square" || fx.zoneBorder !== "line") && L && L.zoneBox ? rectPath(this) : null;
+      if (b && b.y1 - b.y0 < c.height * 0.9) { this.save(); this.setTransform(1, 0, 0, 1, 0, 0);
+        try { if (L.zoneBox(this, zoneKit(this), b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, z, { shape: fx.zoneShape, border: fx.zoneBorder, px: (typeof devicePixelRatio === "number" && devicePixelRatio) || 1 })) { noteShaped(this, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); return; } } finally { this.restore(); } }
       return drawZone(this, z, () => origFillPath.apply(this, a), () => (a[0] && typeof a[0] === "object" ? origStroke.call(this, a[0]) : origStroke.call(this))); } }
     if (on && c && fx.scaleGlow > 0 && isAxis(c)) {
       const col = this.fillStyle;
@@ -1287,6 +1321,8 @@
     fillPath() { origFillPathRaw.call(lookK.g); },
     clear(x, y, w, h) { origClearRaw.call(lookK.g, x, y, w, h); } };
   const origStrokeRectRaw = proto.strokeRect, origFillPathRaw = origFillPath, origClearRaw = proto.clearRect;
+  const zoneKit = (g) => ({ begin: () => origBegin.call(g), fill: () => origFillPathRaw.call(g), stroke: () => origStroke.call(g),
+    style: (v) => origFillDesc.set.call(g, v), strokeStyle: (v) => strokeDesc.set.call(g, v) });
   // were the last paint's candles wide enough to tell bodies from wicks? (wick colours / widths only then)
   let partsTrack = null;
   const tracker = () => partsTrack || (window.__bdCandleLooks && window.__bdCandleLooks.paintTracker ? (partsTrack = window.__bdCandleLooks.paintTracker(() => { try { forceRepaint(true); } catch {} })) : null);   // the untouched fill: candle looks never pass through the pill / label logic
@@ -1318,6 +1354,11 @@
     // an indicator's zone (a filled box / band on the chart that isn't a candle): Each indicator's colour / glow / hide
     if (on && c && isPane(c)) { const z = zoneFor(this, w, h); if (z) {
       if (z.hide) return;
+      // a shape / border of its own (rounded, pill, dashed, double, glow): drawn as a path with the real canvas calls
+      const L = window.__bdCandleLooks;
+      if (L && L.zoneBox && (fx.zoneShape !== "square" || fx.zoneBorder !== "line") && h * (this.getTransform().d || 1) < c.height * 0.9) {
+        const k = zoneKit(this), t = this.getTransform();
+        if (L.zoneBox(this, k, x, y, w, h, z, { shape: fx.zoneShape, border: fx.zoneBorder, px: 1 / (t.a || 1) })) { noteShaped(this, Math.min(x, x + w) * (t.a || 1) + t.e, Math.min(y, y + h) * (t.d || 1) + t.f, Math.abs(w * (t.a || 1)), Math.abs(h * (t.d || 1))); return; } }
       drawZone(this, z, () => origFill.call(this, x, y, w, h), () => origStrokeRectRaw.call(this, x, y, w, h)); return; } }
     if (on && c && c.width > 20 && c.height > 20) {
       const s = this.getTransform().a || 1;
@@ -1374,6 +1415,7 @@
   { const oc = proto.clearRect; proto.clearRect = function (x, y, w, h) { const c = this.canvas; if (c && !c.isConnected) noteHiddenClear(this, x, y, w, h); return oc.call(this, x, y, w, h); }; }
   proto.strokeRect = function (x, y, w, h) {
     const c = this.canvas;
+    if (on && c && shapedBox.has(this)) { const t = this.getTransform(); if (isShapedOutline(this, Math.min(x, x + w) * (t.a || 1) + t.e, Math.min(y, y + h) * (t.d || 1) + t.f, Math.abs(w * (t.a || 1)), Math.abs(h * (t.d || 1)))) return; }
     if (c && !c.isConnected) noteHiddenOther(this);
     if (on && fx.bracketOn && (fx.bracketBorderColor || fx.bracketBorderW > 0) && c && isPane(c)) {
       const pill = lastPill.get(this), t = this.getTransform(), sx = t.a || 1;
