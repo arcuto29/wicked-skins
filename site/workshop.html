@@ -133,9 +133,13 @@
         const file = url(w.file_path), thumb = url(w.thumb_path) || file;
         const el = document.createElement("div"); el.className = "ws-card";
         const ql = window.PriismWallInfo && w.width && w.height ? PriismWallInfo.qualityOf(w.width, w.height) : "";
-        el.innerHTML = `<div class="media"><img loading="lazy" alt="" src="${esc(thumb)}"><span class="tag">${w.kind === "video" ? "VIDEO" : "IMAGE"}</span>${ql ? `<span class="tag q" title="${w.width}\u00D7${w.height}">${ql}</span>` : ""}${w.oled ? '<span class="tag oled" title="Mostly true black and no bright part that stays still: easy on OLED screens">OLED</span>' : ""}</div>
-          <div class="info"><b>${esc(w.title)}</b><small>${w.likes} like${w.likes === 1 ? "" : "s"} · ${w.uses} use${w.uses === 1 ? "" : "s"}</small>${w.credit ? `<small class="credit">Credit: ${esc(w.credit)}</small>` : ""}
-          <div class="row"><a class="btn" href="${esc(file)}" download>Download</a></div></div>`;
+        // labels: one tidy row of small pills over the picture (quality, OLED, video); nothing for a plain image
+        const pills = [ql && `<span class="pill" title="${w.width}\u00D7${w.height}">${ql}</span>`, w.oled && '<span class="pill oled" title="Mostly true black and no bright part that stays still: easy on OLED screens">OLED</span>',
+          w.kind === "video" && '<span class="pill">\u25B6 Live</span>'].filter(Boolean).join("");
+        const meta = `${w.likes} like${w.likes === 1 ? "" : "s"} \u00B7 ${w.uses} use${w.uses === 1 ? "" : "s"}`;
+        el.innerHTML = `<div class="media"><img loading="lazy" alt="" src="${esc(thumb)}">${pills ? `<div class="pills">${pills}</div>` : ""}</div>
+          <div class="info"><div class="top"><b title="${esc(w.title)}">${esc(w.title)}</b><a class="ws-dl" href="${esc(file)}" download title="Download" aria-label="Download"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></a></div><small class="meta">${meta}</small>
+          ${w.credit ? `<small class="credit" title="${esc(w.credit)}">${esc(w.credit)}</small>` : ""}</div>`;
         el.querySelector(".media").onclick = () => {
           const lb = document.createElement("div"); lb.className = "lightbox";
           lb.innerHTML = w.kind === "video" ? `<video src="${esc(file)}" autoplay loop muted playsinline></video>` : `<img src="${esc(file)}" alt="">`;

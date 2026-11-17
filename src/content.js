@@ -1892,6 +1892,18 @@
       .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
       .prog{height:6px;background:#262a36;border-radius:3px;overflow:hidden;display:none}.prog div{height:100%;width:0;background:#2ef2b0}
       .msg{font-size:12px;color:#8b8fa0}
+      /* clean black, like the panel: white for the main action, the accent only for the crop / trim handles */
+      *{font-family:ui-sans-serif,"Inter","Segoe UI",system-ui,sans-serif}
+      .bg{background:rgba(0,0,0,.84)}
+      .card{background:#0b0b0d;border-color:rgba(255,255,255,.1);border-radius:18px;padding:16px 18px;box-shadow:0 30px 80px -30px rgba(0,0,0,.95)}
+      .top b{font-size:15.5px;font-weight:700}.top small,.row>span,.msg{color:#8e8e96}.row{color:#b9b9c2}
+      .stage{border-radius:12px}
+      button{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#e8e8ee;border-radius:10px;padding:7px 12px;font-weight:600;transition:background .15s,border-color .15s}
+      button:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.22)}
+      button.on{background:#1d1d20;border-color:rgba(255,255,255,.5);color:#fff}
+      button.go{background:#fff;color:#000;border:none;font-weight:700}button.go:hover{background:#e9e9ee}
+      .trim .bar,.prog{background:#232326}
+      .est{color:#c8c8d0}
     </style>
     <div class="bg"><div class="card">
       <div class="top"><div><b>Edit your clip</b><small>Drag the box to crop · drag the green handles to trim</small></div><div style="display:flex;gap:8px">${hasAudio ? '<button data-a="snd">\u{1F508} Play sound</button>' : ""}<button data-a="discard">Discard</button></div></div>
@@ -2123,12 +2135,12 @@
     if (navigator.userActivation && navigator.userActivation.isActive) { pick(); return { ok: true, awaiting: true }; }
     cancelScreenAsk();
     const card = document.createElement("div"); card.id = "bd-screenask"; screenAsk = card;
-    card.style.cssText = "position:fixed;z-index:2147483647;top:70px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:rgba(10,12,18,.96);color:#fff;font:600 13px system-ui,sans-serif;border:1px solid rgba(46,242,176,.6);box-shadow:0 12px 40px rgba(0,0,0,.6)";
+    card.className = "bd-ui-card"; card.style.cssText = "top:70px";
     const txt = document.createElement("span"); txt.textContent = `Priism Skins \u00B7 add your computer's sound to the ${dur}s clip`;
     const go = document.createElement("button"), no = document.createElement("button");
     go.textContent = "Choose sound"; no.textContent = "Record without it";
-    go.style.cssText = "all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;background:linear-gradient(90deg,#19d3ff,#2ef2b0);color:#04140f;font:800 13px system-ui,sans-serif";
-    no.style.cssText = "all:unset;cursor:pointer;padding:8px 10px;opacity:.75;font:600 13px system-ui,sans-serif";
+    go.className = "bd-ui-btn pri";
+    no.className = "bd-ui-btn";
     card.append(txt, go, no); document.documentElement.appendChild(card);
     go.onclick = () => { cancelScreenAsk(); pick(); };
     no.onclick = () => { cancelScreenAsk(); captureClip(dur, fps, null, true).catch(() => {}); };
@@ -2192,11 +2204,11 @@
     const autoSave = true;
     // A small countdown badge on the chart. Click it to stop early. It is not part of the recording.
     const badge = document.createElement("div");
-    badge.style.cssText = "position:fixed;z-index:2147483647;top:14px;left:50%;transform:translateX(-50%);padding:7px 14px;border-radius:999px;background:rgba(10,12,18,.88);color:#fff;font:600 13px system-ui,sans-serif;border:1px solid rgba(255,80,80,.7);cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.5)";
+    badge.className = "bd-ui-rec";
     badge.title = "Click to stop and save now";
     document.documentElement.appendChild(badge);
     const t0 = performance.now();
-    const paint = () => { const left = Math.max(0, Math.ceil(dur - (performance.now() - t0) / 1000)); badge.textContent = `\u25CF Recording ${left}s \u00B7 click to stop`; };
+    const paint = () => { const left = Math.max(0, Math.ceil(dur - (performance.now() - t0) / 1000)); badge.textContent = `Recording ${left}s \u00B7 click to stop`; };
     paint(); const badgeTimer = setInterval(paint, 250);
     return await new Promise((resolve) => {
       let rafId = 0, done = false, stopTimer = 0;
@@ -2250,12 +2262,12 @@
     cancelScreenAsk();
     const dur = Math.max(2, Math.min(MAX_CLIP_SECONDS, +seconds || 5));
     const card = document.createElement("div"); card.id = "bd-screenask"; screenAsk = card;
-    card.style.cssText = "position:fixed;z-index:2147483647;top:70px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:rgba(10,12,18,.96);color:#fff;font:600 13px system-ui,sans-serif;border:1px solid rgba(46,242,176,.6);box-shadow:0 12px 40px rgba(0,0,0,.6)";
+    card.className = "bd-ui-card"; card.style.cssText = "top:70px";
     const txt = document.createElement("span"); txt.textContent = `Priism Skins \u00B7 record the screen for ${dur}s`;
     const go = document.createElement("button"), no = document.createElement("button");
     go.textContent = "Choose what to record"; no.textContent = "Cancel";
-    go.style.cssText = "all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;background:linear-gradient(90deg,#19d3ff,#2ef2b0);color:#04140f;font:800 13px system-ui,sans-serif";
-    no.style.cssText = "all:unset;cursor:pointer;padding:8px 10px;opacity:.7;font:600 13px system-ui,sans-serif";
+    go.className = "bd-ui-btn pri";
+    no.className = "bd-ui-btn";
     card.append(txt, go, no); document.documentElement.appendChild(card);
     no.onclick = cancelScreenAsk;
     go.onclick = async () => {
@@ -2311,12 +2323,11 @@
     if (document.getElementById("bd-tip") || IN_FRAME) return;
     try { if (localStorage.getItem("bdTip:" + id)) return; } catch {}
     const card = document.createElement("div"); card.id = "bd-tip"; card.dataset.bdOwner = ME.token;
-    card.style.cssText = "position:fixed;z-index:2147483646;top:56px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;max-width:min(720px,92vw);padding:11px 14px;border-radius:14px;background:rgba(10,12,18,.96);color:#fff;font:600 13px system-ui,sans-serif;border:1px solid rgba(46,242,176,.55);box-shadow:0 12px 40px rgba(0,0,0,.6)";
+    card.className = "bd-ui-card"; card.style.cssText = "top:56px;z-index:2147483646;max-width:min(720px,92vw);padding:11px 14px";
     const t = document.createElement("span"); t.textContent = text; t.style.cssText = "flex:1;line-height:1.35"; card.append(t);
     const done = () => { try { localStorage.setItem("bdTip:" + id, String(Date.now())); } catch {} card.remove(); };
     actions.forEach(([label, fn], i) => { const b = document.createElement("button"); b.textContent = label;
-      b.style.cssText = i === 0 ? "all:unset;cursor:pointer;padding:8px 14px;border-radius:9px;background:linear-gradient(90deg,#19d3ff,#2ef2b0);color:#04140f;font:800 13px system-ui,sans-serif;white-space:nowrap"
-        : "all:unset;cursor:pointer;padding:8px 8px;opacity:.75;font:600 13px system-ui,sans-serif;white-space:nowrap";
+      b.className = i === 0 ? "bd-ui-btn pri" : "bd-ui-btn";
       b.onclick = () => { done(); if (fn) fn(); }; card.append(b); });
     document.documentElement.appendChild(card);
   }
