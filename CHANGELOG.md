@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
-- **Android: updates install over the last version now.** The app is signed with Priism's own permanent key, so a new APK updates the installed app and keeps your settings. Moving from an older (test-signed) APK to this one needs one last uninstall.
-
 ## 0.1.63 (unreleased)
+- **Android: updates install over the last version now.** The app is signed with Priism's own permanent key, so a new APK updates the installed app and keeps your settings. Moving from an older (test-signed) APK to this one needs one last uninstall.
+- **12 more fonts** for the price scale, the ticker and TradingView's panels: Inter, Outfit, Grotesk, Sora, Rounded (Nunito), JetBrains, Plex Mono, Digital, Rajdhani, Chakra, Exo and Orbitron, plus Default and Mono. Each choice is shown in its own font. They come with Priism (free, open-licence fonts) and load from Priism itself, never from the internet, and only when you pick one.
+- **10 new candle looks:** Matte, Frame, Halo, Core, Split, Duo, Gem, Lifted, Lines and Dusk (26 in all). They work with your colours, glow and candle parts on every platform.
 - **Saved looks keep the wallpaper's own settings.** Save look (and Update, export, share links and Publish) now includes that wallpaper's Recolour and its own settings, and applying the look brings them back (Undo puts yours back). Looks saved before this leave the wallpaper's settings alone.
 - **Yours: your own candle presets.** In Style → Candles, the preset grid starts with **Yours**: **+ Save these** keeps your current candles (colours, look, glow and candle parts) as a card next to the built-in ones. Tap to use it, ✎ to rename it, ✕ to delete it (with Undo).
 - **Auto-match is in one place only**, at the top of Skins → Wallpapers and My uploads (the second copy under Candles is gone).

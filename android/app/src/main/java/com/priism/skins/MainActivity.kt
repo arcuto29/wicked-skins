@@ -156,5 +156,10 @@ class MainActivity : Activity() {
         }
         @JavascriptInterface fun closeSettings() = runOnUiThread { this@MainActivity.closeSettings() }
         @JavascriptInterface fun openUrl(url: String) = runOnUiThread { this@MainActivity.openUrl(url) }
+        // Priism's bundled fonts (base64), asked for by name only when one is picked
+        @JavascriptInterface fun font(name: String): String =
+            if (!Regex("^[a-z]{1,16}$").matches(name)) "" else try {
+                android.util.Base64.encodeToString(assets.open("shared/src/fonts/$name.woff2").use { it.readBytes() }, android.util.Base64.NO_WRAP)
+            } catch (e: Exception) { "" }
     }
 }

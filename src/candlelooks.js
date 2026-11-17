@@ -29,6 +29,16 @@
     ["ghost", "Ghost", "Barely-there bodies with solid open and close caps.", 0],
     ["pill", "Rounded", "Soft, rounded bodies.", 0],
     ["pixel", "Pixel", "Retro 8-bit blocks.", 0],
+    ["matte", "Matte", "Soft, slightly muted bodies with a fine edge. Easy on the eyes.", 0],
+    ["frame", "Frame", "A bold outline around a half-filled body.", 0],
+    ["halo", "Halo", "See-through bodies ringed with light.", 0.2],
+    ["core", "Core", "Dark bodies with a bright core of colour down the middle.", 0],
+    ["split", "Split", "Half solid, half see-through, like a candle cut in two.", 0],
+    ["duo", "Duo", "Two-tone: a light top half and a deeper bottom half.", 0],
+    ["gem", "Gem", "Cut like a gem: a light facet and a shadow facet.", 0],
+    ["lifted", "Lifted", "Solid bodies floating above the chart with a soft shadow.", 0],
+    ["lines", "Lines", "Fine lines across a faint body, like an old screen.", 0],
+    ["dusk", "Dusk", "Each body fades into a warmer shade of your colour.", 0],
     ["heat", "Heat", "Colours warm up the higher price goes on the chart.", 0],
     ["prism", "Rainbow", "Colours fan out across the chart, left to right.", 0],
     ["shift", "Cycle", "Colours keep flowing over time. Indicator lines cycle too.", 0],
@@ -140,6 +150,61 @@
         k.style(col); g.beginPath();
         if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h);
         k.fillPath(); return;
+      }
+      case "matte": {
+        k.style(css(mixc(c, [128, 128, 128], 0.28))); k.fill(x, y, w, h);
+        k.stroke(css(mixc(c, WHITE, 0.25), 0.8)); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px); return;
+      }
+      case "frame": {
+        const b = Math.max(px, Math.min(2 * px, w / 4));
+        k.style(css(c, 0.42)); k.fill(x, y, w, h);
+        k.stroke(col); g.lineWidth = b; k.strokeRect(x + b / 2, y + b / 2, w - b, h - b); return;
+      }
+      case "halo": {
+        k.style(css(c, 0.1)); k.fill(x, y, w, h);
+        k.stroke(css(mixc(c, WHITE, 0.3))); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px);
+        if (w > 6 * px && h > 6 * px) { k.stroke(css(c, 0.35)); k.strokeRect(x + 2.5 * px, y + 2.5 * px, w - 5 * px, h - 5 * px); }
+        return;
+      }
+      case "core": {
+        k.style(css(mixc(c, BLACK, 0.68))); k.fill(x, y, w, h);
+        const cw = Math.max(px, Math.round(w * 0.34 / px) * px);
+        k.style(css(mixc(c, WHITE, 0.15))); k.fill(x + (w - cw) / 2, y, cw, h);
+        k.stroke(css(c, 0.85)); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px); return;
+      }
+      case "split": {
+        const hw = Math.round(w / 2 / px) * px;
+        k.style(col); k.fill(x, y, hw, h);
+        k.style(css(c, 0.3)); k.fill(x + hw, y, w - hw, h);
+        k.stroke(css(c, 0.9)); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px); return;
+      }
+      case "duo": {
+        const hh = Math.round(h / 2 / px) * px;
+        k.style(css(mixc(c, WHITE, 0.25))); k.fill(x, y, w, hh);
+        k.style(css(mixc(c, BLACK, 0.3))); k.fill(x, y + hh, w, h - hh); return;
+      }
+      case "gem": {
+        k.style(col); k.fill(x, y, w, h);
+        k.style(css(mixc(c, WHITE, 0.32))); g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y); g.lineTo(x, y + Math.min(h, w * 1.2)); g.closePath(); k.fillPath();
+        k.style(css(mixc(c, BLACK, 0.35))); g.beginPath(); g.moveTo(x + w, y + h); g.lineTo(x, y + h); g.lineTo(x + w, y + h - Math.min(h, w * 1.2)); g.closePath(); k.fillPath();
+        return;
+      }
+      case "lifted": {
+        const o = Math.max(px, 2 * px);
+        k.style("rgba(0,0,0,0.45)"); k.fill(x + o, y + o, w, h);
+        k.style(col); k.fill(x, y, w, h);
+        k.style(css(mixc(c, WHITE, 0.45))); k.fill(x, y, w, px); return;
+      }
+      case "lines": {
+        k.style(css(c, 0.18)); k.fill(x, y, w, h);
+        k.style(col); const step = 3 * px, n = Math.min(200, Math.ceil(h / step));
+        for (let i = 0; i < n; i++) k.fill(x, y + i * step, w, Math.min(px, y + h - (y + i * step)));
+        k.fill(x, y + h - px, w, px); return;
+      }
+      case "dusk": {
+        const gr = g.createLinearGradient(0, y, 0, y + h);
+        gr.addColorStop(0, css(c)); gr.addColorStop(1, css(mixc(hueRotate(c, isUp ? 35 : -35), BLACK, 0.15)));
+        k.style(gr); k.fill(x, y, w, h); return;
       }
       case "pixel": {
         const b = Math.max(2 * px, Math.round(w / px) * px), gap = px;

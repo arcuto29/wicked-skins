@@ -564,3 +564,12 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 .card.preset.mine:hover .x, .card.preset.mine:hover .ren, .card.preset.mine.on .x, .card.preset.mine.on .ren { opacity: 1; }
 .card.preset.save .label { color: #eef0f6; }
 .card.preset .renin { width: calc(100% - 12px); margin: 4px 6px; font: inherit; font-size: 12px; padding: 3px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); background: #0b0d12; color: #fff; }
+/* font picker: every font shown in itself */
+.fontgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; flex: 1 1 100%; }
+.fontchip { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 9px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); color: #c9cdd9; text-align: left; }
+.fontchip b { font-weight: 600; font-size: 12.5px; }
+.fontchip small { font-size: 11px; color: #8a8fa3; }
+.fontchip.on { border-color: #fff; color: #fff; background: rgba(255,255,255,.08); }
+.fontchip.on small { color: #c9cdd9; }
+.row:has(> .fontgrid) { flex-wrap: wrap; gap: 5px 8px; min-height: 0; }
+.row:has(> .fontgrid) > span { width: 100%; font-size: 12px; color: #aeb4c3; }
