@@ -1749,8 +1749,8 @@
   function pushFx() {
     const h = document.documentElement;
     if (cfg.enabled) h.setAttribute("data-ws-fx", fxJSON(cfg, (tickPushed = tickSizeOf())));
-    if (cfg.chartColors === "custom") try { pushChartColors(); } catch {}   // charts styled on their own follow too
     else h.removeAttribute("data-ws-fx");
+    if (cfg.chartColors === "custom") try { pushChartColors(); } catch {}   // charts styled on their own follow too
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     // Scale backing = real frosted glass behind the price + time scales
     const mode = cfg.scaleBg === "default" ? "glass" : cfg.scaleBg;
