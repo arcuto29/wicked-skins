@@ -270,11 +270,12 @@
     const all = ctx ? indicatorAll(ctx, orig, o, force, r.a) : null;
     const see = r.a < 0.9, glowAll = o && o.glow > 0 ? +o.glow : 0;
     const edgeOf = (fill) => (see && ctx ? fill : null);
-    if (!e) return all ? { f: all.s, g: all.g, glow: glowAll, e: edgeOf(indicatorAll(ctx, orig, o, force, 0.9).s) } : null;
+    if (!e && !all && o && o.dim && see) return { f: `rgba(${r.k},${+zoneAlpha(r.a, o).toFixed(3)})`, g: `rgb(${r.k})`, glow: glowAll, e: null };   // Dim all zones: own colour, softer
+    if (!e) return all ? { f: all.s, g: all.g, glow: glowAll, e: edgeOf(indicatorAll(ctx, orig, o, force, 0.9, true).s) } : null;
     const hex = /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : null, gl = e.g !== undefined && e.g !== null && e.g !== "" ? +e.g || 0 : glowAll;
-    if (hex) return { f: withAlpha(hex, r.a), g: hex, glow: gl, e: edgeOf(withAlpha(hex, 0.9)) };
-    if (all) return { f: all.s, g: all.g, glow: gl, e: edgeOf(indicatorAll(ctx, orig, o, force, 0.9).s) };
-    return { f: orig, g: `rgb(${r.k})`, glow: gl, e: edgeOf(`rgba(${r.k},0.9)`) };
+    if (hex) return { f: withAlpha(hex, see ? zoneAlpha(r.a, o) : r.a), g: hex, glow: gl, e: edgeOf(withAlpha(hex, 0.9)) };
+    if (all) return { f: all.s, g: all.g, glow: gl, e: edgeOf(indicatorAll(ctx, orig, o, force, 0.9, true).s) };
+    return { f: o && o.dim && see ? `rgba(${r.k},${+zoneAlpha(r.a, o).toFixed(3)})` : orig, g: `rgb(${r.k})`, glow: gl, e: edgeOf(`rgba(${r.k},0.9)`) };
   }
 
   // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour,
@@ -292,17 +293,24 @@
   }
   // alpha: a zone's own see-through-ness (lines: undefined = as drawn). A line and the zone in its colour (RSI and its
   // band) share a slot, so they get the same shade.
-  function indicatorAll(ctx, orig, o, force, alpha) {
+  // How see-through a recoloured zone's fill is (Style > Indicators > Zones): Soft keeps the price easy to read
+  // through it; the zone still reads clearly by its edge.
+  const zoneAlpha = (a, o) => { const cap = Math.max(0.04, Math.min(0.45, o && o.zoneFill > 0 ? +o.zoneFill : 0.12));
+    return Math.min(cap, Math.max(+a, Math.min(cap, +a * 3))); };   // faint ones lifted (Bollinger is 5%), strong ones softened
+  // the gradient for one indicator: your own colours (Gradient colours, 2-3), each indicator shifted a little round the
+  // colour wheel so they stay told apart (but never out of your colours); or one of the built-in gradients
+  const GSHIFT = [0, 14, -14, 28, -28];   // small steps only: every indicator stays in your colours
+  const gradOf = (o, i) => (o && Array.isArray(o.grad) && o.grad.length >= 2 ? (i % 5 ? o.grad.map((c) => shade(c, GSHIFT[i % 5])) : o.grad) : GRADS[i % GRADS.length]);
+  // edge: a zone's outline, kept crisp (never softened like the fill)
+  function indicatorAll(ctx, orig, o, force, alpha, edge) {
     if (!o || ((!o.mode || o.mode === "own") && !force)) return null;
     const kk = keyOf(String(orig)), i = slotOf(kk ? kk.k : String(orig));
-    // very faint zones (TradingView draws Bollinger's band at 5%) would hide the new colour: lift them to a visible but
-    // still soft strength (3x, at most 22%); stronger zones keep their own
-    const al = alpha === undefined || alpha >= 0.99 ? 1 : Math.max(+alpha, Math.min(0.22, +alpha * 3));
+    const al = alpha === undefined || alpha >= 0.99 ? 1 : edge ? +alpha : zoneAlpha(alpha, o);
     // force: "rainbow" | "gradient" = this indicator's own choice (Each indicator), else the all-indicators mode
     const kind = force === "rainbow" || force === "gradient" ? force : o.mode;
     if (kind === "rainbow" || kind === "gradient") {   // left to right across the chart
-      const rb = kind === "rainbow", G = GRADS[i % GRADS.length], off = (i * 67) % 360;
-      const t = ctx.getTransform(), a = t.a || 1, w = ctx.canvas.width, key = kind + "|" + w + "|" + t.e + "|" + a + "|" + (rb ? off : i % GRADS.length) + "|" + al.toFixed(2);
+      const rb = kind === "rainbow", G = gradOf(o, i), off = (i * 67) % 360;
+      const t = ctx.getTransform(), a = t.a || 1, w = ctx.canvas.width, key = kind + "|" + w + "|" + t.e + "|" + a + "|" + (rb ? off : G.join("")) + "|" + al.toFixed(2);
       let m = grads.get(ctx); if (!m) { m = new Map(); grads.set(ctx, m); }
       let gr = m.get(key);
       if (!gr) { if (m.size > 30) m.clear(); gr = ctx.createLinearGradient((0 - t.e) / a, 0, (w - t.e) / a, 0);

@@ -89,7 +89,7 @@
     <section id="tab-candles" hidden>
       <div class="matchall">
         <button id="matchAll" class="primary keep" type="button">✨ Match everything to my wallpaper</button>
-        <p class="hint">One tap takes your wallpaper's colours and sets the candles, your indicators and their zones, crosshair, grid, price line, price scale, ticker, legend, trade brackets and TradingView's panels to match, with text kept readable. Tap Undo to go back.</p>
+        <p class="hint">One tap reads your wallpaper (built-in or your own) and sets everything to match: candles, your indicators, zones and drawings, crosshair, grid, price line, price scale, session breaks, ticker, legend, trade brackets and TradingView's panels. Zones stay soft and text stays readable, on dark or bright wallpapers. Tap Undo to go back.</p>
       </div>
 
       <details class="grp" data-grp="candles" open>
@@ -120,6 +120,12 @@
             <div class="seg" id="indMode" style="margin-bottom:8px"></div>
             <div class="row" id="indColRow" hidden><span>Colour</span><input type="color" id="indColor" /></div>
             <div class="row"><span>Glow</span><input type="range" id="lineGlow" min="0" max="1" step="0.05" /><output id="lineGlowOut"></output></div>
+            <div id="gradRow" hidden>
+              <div class="row"><span>Gradient</span><div class="seg" id="gradMode"></div></div>
+              <div class="row" id="gradPick"><span>Colours</span><input type="color" id="g1" /><input type="color" id="g2" /><input type="color" id="g3" /></div>
+            </div>
+            <div class="row" title="How see-through recoloured zones are, so you still see the price inside them"><span>Zone fill</span><input type="range" id="zoneFill" min="0.04" max="0.45" step="0.01" /><output id="zoneFillOut"></output></div>
+            <div class="row" title="Also soften zones that keep their own colours"><span>Dim all zones</span><div class="seg" id="zoneDim"></div></div>
             <div class="row" title="Rectangles, zones and lines you draw with TradingView's drawing tools"><span>Your drawings</span><div class="seg" id="drawOn"></div></div>
             <h4 style="margin:12px 0 4px">Each indicator</h4>
             <p class="hint" style="margin:0 0 6px">Give any line, zone or drawing on your chart its own colour, glow and width, or hide it. These win over the setting above.</p>
