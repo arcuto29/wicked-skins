@@ -2183,6 +2183,193 @@ function priismSkins(window, document) {
     const f = (n) => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); };
     return [f(0), f(8), f(4)];
   }
+  // ===================== Pack: night + trading =====================
+  // Midnight: a quiet city at midnight. Deep night-blue sky, a thin crescent moon with a soft halo, faint clouds
+  // drifting very slowly, and a dark skyline along the bottom where a window lights up or goes out now and then.
+  // The chart area stays dark and even; everything is drawn once, a frame only copies and shifts it.
+  const midnight = (ctx) => {
+    let w = 0, h = 0, k = 1, back = null, sky2 = null, clouds = null, glow = null, wins = [], city = null, cityY = 0;
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); back = offscreen(w, h); const g = back.getContext("2d");
+        const s = g.createLinearGradient(0, 0, 0, h); s.addColorStop(0, "#020309"); s.addColorStop(0.6, "#060b20"); s.addColorStop(1, "#0d1634"); g.fillStyle = s; g.fillRect(0, 0, w, h);
+        glowDot(g, w * 0.5, h * 1.2, Math.max(w, h) * 0.75, "50,80,170", 0.2);          // the city's glow on the low sky
+        for (let i = 0; i < 140; i++) { g.fillStyle = `rgba(200,215,255,${rnd(0.06, 0.32).toFixed(2)})`; const r = rnd(0.6, 1.4) * k; g.fillRect(rnd(0, w), rnd(0, h * 0.62), r, r); }
+        // the moon: a crescent (a disc with a sky-coloured disc over it), upper right, with a soft halo
+        const mx = w * 0.8, my = h * 0.2, mr = Math.max(9, 26 * k);
+        glowDot(g, mx, my, mr * 7, "150,170,230", 0.10); glowDot(g, mx, my, mr * 2.4, "200,210,245", 0.12);
+        const mc = offscreen(mr * 3, mr * 3), m = mc.getContext("2d");
+        m.fillStyle = "#dfe6f7"; m.beginPath(); m.arc(mr * 1.5, mr * 1.5, mr, 0, T2); m.fill();
+        m.globalCompositeOperation = "destination-out"; m.beginPath(); m.arc(mr * 1.5 + mr * 0.42, mr * 1.5 - mr * 0.18, mr * 0.9, 0, T2); m.fill();
+        g.globalAlpha = 0.6; g.drawImage(mc, mx - mr * 1.5, my - mr * 1.5); g.globalAlpha = 1;   // soft, so prices read over it
+        // the skyline, drawn into its own layer (the windows twinkle on top of it)
+        cityY = h * 0.8; city = offscreen(w, h - cityY + 2); const c = city.getContext("2d"); wins = [];
+        for (let layer = 0; layer < 2; layer++) {
+          const far = layer === 0; c.fillStyle = far ? "#0a1028" : "#04060f";
+          for (let x = 0; x < w;) {
+            const bw = rnd(26, 70) * k * (far ? 0.8 : 1), bh = (far ? rnd(0.25, 0.6) : rnd(0.15, 0.85)) * city.height;
+            c.fillRect(x, city.height - bh, bw + 1, bh);
+            if (!far) for (let wy = city.height - bh + 6 * k; wy < city.height - 4 * k; wy += 7 * k)
+              for (let wx = x + 4 * k; wx < x + bw - 5 * k; wx += 7 * k) if (Math.random() < 0.16)
+                wins.push({ x: wx, y: cityY + wy, warm: Math.random() < 0.8, on: Math.random() < 0.7, p: rnd(0, 400), sp: rnd(0.004, 0.012) });
+            x += bw + (far ? rnd(-6, 4) : rnd(2, 10)) * k;
+          }
+        }
+        // two faint cloud bands, drawn once twice as wide so they loop
+        clouds = offscreen(w * 2, h * 0.5); const cl = clouds.getContext("2d");
+        for (let i = 0; i < 26; i++) { const x = rnd(0, w), y = rnd(h * 0.05, h * 0.42), r = rnd(0.08, 0.2) * w;
+          for (const dx of [0, w]) { cl.save(); cl.translate(x + dx, y); cl.scale(1, 0.18); glowDot(cl, 0, 0, r, "120,140,200", 0.05); cl.restore(); } }
+        // a soft drifting glow, as a sprite (no gradient is built per frame)
+        glow = offscreen(128, 128); glowDot(glow.getContext("2d"), 64, 64, 64, "70,60,190", 1);
+      },
+      frame(t) {
+        ctx.drawImage(back, 0, 0);
+        ctx.globalCompositeOperation = "lighter";
+        const R = Math.max(w, h) * 0.42; ctx.globalAlpha = 0.07;
+        ctx.drawImage(glow, w * (0.3 + 0.08 * Math.sin(t * 0.03)) - R, h * (0.45 + 0.06 * Math.cos(t * 0.025)) - R, R * 2, R * 2); ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        const off = (t * 3 * k) % w; ctx.drawImage(clouds, -off, 0); ctx.drawImage(clouds, -off + w * 2, 0);
+        ctx.drawImage(city, 0, cityY);
+        // windows: each one switches on or off every few minutes (slow, never blinking)
+        for (const q of wins) { const on = Math.sin(t * q.sp + q.p) > (q.on ? -0.4 : 0.4); if (!on) continue;
+          ctx.fillStyle = q.warm ? "rgba(255,200,120,0.55)" : "rgba(170,210,255,0.45)"; ctx.fillRect(q.x, q.y, 2.4 * k, 3 * k); }
+      },
+    };
+  };
+
+  // Twinkle: true black (OLED pixels stay off) with stars that twinkle gently. The whole sky turns very slowly, so no
+  // bright point ever stays in one place.
+  const twinkle = (ctx) => {
+    let w = 0, h = 0, k = 1, st = [];
+    const COL = ["255,255,255", "200,220,255", "255,236,210", "210,200,255"];
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h);
+        const n = Math.round(420 * Math.min(2, (w * h) / (1280 * 720)) + 60);
+        st = Array.from({ length: n }, () => ({ a: rnd(0, T2), d: Math.sqrt(Math.random()) * Math.hypot(w, h) * 0.62, r: (Math.random() < 0.08 ? rnd(1.6, 2.4) : rnd(0.6, 1.4)) * k,
+          p: rnd(0, T2), s: rnd(0.6, 1.8), c: COL[(Math.random() * COL.length) | 0], b: rnd(0.35, 1) })); },
+      frame(t) {
+        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h);
+        const cx = w * 0.5, cy = h * 1.1, rot = t * 0.004;   // one turn every ~26 minutes
+        for (const s of st) {
+          const a = s.a + rot, x = cx + Math.cos(a) * s.d, y = cy + Math.sin(a) * s.d * 0.95 - h * 0.35;
+          if (x < -4 || x > w + 4 || y < -4 || y > h + 4) continue;
+          const tw = 0.5 + 0.5 * Math.sin(t * s.s + s.p), al = s.b * (0.25 + 0.75 * tw * tw);
+          ctx.fillStyle = `rgba(${s.c},${al.toFixed(3)})`; ctx.fillRect(x - s.r / 2, y - s.r / 2, s.r, s.r);
+          if (s.r > 1.5 * k && tw > 0.8) {   // the brightest stars: a small soft sparkle at their peak
+            const L = s.r * 3.2 * (tw - 0.8) * 5; ctx.fillStyle = `rgba(${s.c},${(al * 0.35).toFixed(3)})`;
+            ctx.fillRect(x - L, y - 0.35 * k, L * 2, 0.7 * k); ctx.fillRect(x - 0.35 * k, y - L, 0.7 * k, L * 2); }
+        }
+      },
+    };
+  };
+
+  // A small candle chart drawn into a screen (for the trading wallpapers): soft, low-contrast, never real data.
+  // loop = true: the chart ends where it starts (drawn twice side by side it scrolls with no seam)
+  const miniChart = (g, x, y, w, h, hue, n, seed, loop) => {
+    let q = (Math.floor(seed * 1000) % 2147483646) + 1; const R = () => ((q = (q * 16807) % 2147483647) / 2147483647);
+    const ph = [R() * T2, R() * T2, R() * T2], wave = (i) => 0.5 + 0.17 * Math.sin(T2 * i / n + ph[0]) + 0.09 * Math.sin(T2 * 2 * i / n + ph[1]) + 0.035 * Math.sin(T2 * 3 * i / n + ph[2]);
+    let v = loop ? wave(n - 1) : 0.5 + 0.2 * Math.sin(seed), prev = v; const bw = w / n;
+    for (let i = 0; i < n; i++) {
+      v = loop ? wave(i) + (R() - 0.5) * 0.03 : Math.max(0.12, Math.min(0.88, v + (Math.sin(seed * 7 + i * 0.7) * 0.06 + (R() - 0.48) * 0.08)));
+      const o = prev, c = v, hi = Math.max(o, c) + R() * 0.05, lo = Math.min(o, c) - R() * 0.05, up = c >= o;
+      g.fillStyle = up ? `hsla(${hue},80%,60%,0.75)` : `hsla(${(hue + 190) % 360},75%,62%,0.7)`;
+      const cx = x + i * bw + bw / 2; g.fillRect(cx - 0.5, y + h * (1 - hi), 1, h * (hi - lo));
+      g.fillRect(cx - bw * 0.3, y + h * (1 - Math.max(o, c)), bw * 0.6, Math.max(1, h * Math.abs(c - o))); prev = c;
+    }
+  };
+
+  // Trading Floor: a dark exchange floor in perspective. Rows of desks with glowing monitors fade into the haze, a
+  // long quote board scrolls slowly overhead (symbols only, never made-up prices), a few screens refresh now and then.
+  const tradingFloor = (ctx) => {
+    let w = 0, h = 0, k = 1, back = null, mons = [], board = null, bY = 0, bH = 0;
+    const SYMS = ["NQ", "ES", "YM", "RTY", "CL", "GC", "SI", "BTC", "ETH", "EUR", "GBP", "JPY", "AAPL", "NVDA", "TSLA", "MSFT", "AMZN", "META", "SPY", "QQQ", "VIX", "ZN", "HG", "NG"];
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); back = offscreen(w, h); const g = back.getContext("2d"); mons = [];
+        const hz = h * 0.42, vx = w * 0.5;   // horizon + vanishing point
+        const room = g.createLinearGradient(0, 0, 0, h); room.addColorStop(0, "#04060c"); room.addColorStop(0.42, "#0a1322"); room.addColorStop(1, "#05070d"); g.fillStyle = room; g.fillRect(0, 0, w, h);
+        // ceiling light strips converging on the vanishing point
+        for (let i = -6; i <= 6; i++) { const x0 = vx + i * w * 0.16; g.strokeStyle = `rgba(150,190,255,${0.05 + 0.02 * (6 - Math.abs(i)) / 6})`; g.lineWidth = Math.max(1, 3 * k * (1 - Math.abs(i) / 9));
+          g.beginPath(); g.moveTo(x0, 0); g.lineTo(vx + i * w * 0.012, hz * 0.62); g.stroke(); }
+        // desk rows, far to near: each row a band of monitors on a dark desk
+        const rows = 9;
+        for (let r = 0; r < rows; r++) {
+          const z = r / (rows - 1), y = hz + (h - hz) * Math.pow(z, 1.65) * 0.92 + 6 * k, sc = 0.18 + z * 1.05, half = w * (0.12 + z * 0.62);
+          const fog = 1 - z * 0.75;
+          // desk
+          g.fillStyle = `rgba(14,18,28,${0.6 + z * 0.4})`; g.fillRect(vx - half, y, half * 2, 10 * k * sc + 2);
+          // monitors along the row, with a gap down the middle aisle
+          const mw = 46 * k * sc, mh = 28 * k * sc, step = mw * 1.12;
+          for (let x = vx - half; x < vx + half - mw; x += step) {
+            if (Math.abs(x + mw / 2 - vx) < w * 0.03 * (0.3 + z)) continue;   // the aisle
+            const hue = [150, 160, 195, 205, 40][(Math.random() * 5) | 0], scr = { x, y: y - mh - 2 * k * sc, w: mw, h: mh, hue, fog, p: rnd(0, 60) };
+            g.fillStyle = "#06080e"; g.fillRect(scr.x - 1, scr.y - 1, mw + 2, mh + 2);
+            g.fillStyle = `hsla(${hue},60%,${8 + 6 * fog}%,1)`; g.fillRect(scr.x, scr.y, mw, mh);
+            if (mw > 9) miniChart(g, scr.x + mw * 0.08, scr.y + mh * 0.12, mw * 0.84, mh * 0.76, hue, Math.max(5, Math.round(mw / 3.5)), rnd(0, 100));
+            glowDot(g, scr.x + mw / 2, scr.y + mh / 2, mw * 1.1, hue === 40 ? "255,190,110" : "90,200,230", 0.05 * fog);
+            if (z > 0.35) mons.push(scr);
+          }
+          // haze over the far rows
+          g.fillStyle = `rgba(10,19,34,${0.55 * (1 - z)})`; g.fillRect(0, y - mh - 6 * k, w, mh + 18 * k * sc);
+        }
+        // the floor's reflection of the light, and a vignette
+        glowDot(g, vx, hz + h * 0.05, w * 0.55, "70,120,200", 0.08);
+        const vg = g.createRadialGradient(vx, h * 0.55, h * 0.2, vx, h * 0.55, Math.max(w, h) * 0.8); vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.6)"); g.fillStyle = vg; g.fillRect(0, 0, w, h);
+        // the quote board overhead: a dark band with LED symbols, drawn once wide, then scrolled
+        bH = Math.max(14, 22 * k); bY = h * 0.08;
+        const font = `700 ${Math.round(bH * 0.62)}px ui-monospace, Menlo, Consolas, monospace`, mc = offscreen(4, 4).getContext("2d"); mc.font = font;
+        const loop = SYMS.reduce((a, s) => a + mc.measureText(s).width + bH * 1.6, 0);
+        board = offscreen(Math.ceil(loop), bH); const b = board.getContext("2d");
+        b.fillStyle = "#03050a"; b.fillRect(0, 0, board.width, bH); b.font = font; b.textBaseline = "middle";
+        for (let x = bH * 0.8, i = 0; i < SYMS.length; i++) { const s = SYMS[i], up = Math.random() < 0.55;
+          b.fillStyle = up ? "rgba(70,240,170,0.55)" : "rgba(255,120,120,0.45)"; b.fillText(s, x, bH / 2); x += b.measureText(s).width + bH * 1.6;
+          b.fillStyle = "rgba(255,255,255,0.12)"; b.fillRect(x - bH * 0.8, bH * 0.3, 1, bH * 0.4); }
+      },
+      frame(t) {
+        ctx.drawImage(back, 0, 0);
+        // the quote board, scrolling slowly
+        const off = (t * 18 * k) % board.width;
+        ctx.globalAlpha = 0.9; for (let x = -off; x < w; x += board.width) ctx.drawImage(board, Math.round(x), bY); ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(120,170,255,0.12)"; ctx.fillRect(0, bY - 1, w, 1); ctx.fillRect(0, bY + bH, w, 1);
+        // a few screens gently brighten and fade, as if they refreshed
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < mons.length; i += 7) { const m = mons[i], a = Math.max(0, Math.sin(t * 0.25 + m.p)) * 0.12 * m.fog;
+          if (a > 0.01) { ctx.fillStyle = `hsla(${m.hue},70%,60%,${a.toFixed(3)})`; ctx.fillRect(m.x, m.y, m.w, m.h); } }
+        ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
+
+  // Market Wall: a wall of trading screens, softly out of focus, their charts drifting slowly to the left.
+  const marketWall = (ctx) => {
+    let w = 0, h = 0, k = 1, back = null, cells = [];
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); back = offscreen(w, h); const g = back.getContext("2d"); cells = [];
+        g.fillStyle = "#020306"; g.fillRect(0, 0, w, h);
+        const cols = 5, rows = 3, gap = 10 * k, cw = (w - gap * (cols + 1)) / cols, ch = (h * 0.86 - gap * (rows + 1)) / rows, y0 = h * 0.07;
+        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+          const x = gap + c * (cw + gap), y = y0 + gap + r * (ch + gap), hue = [150, 190, 210, 160, 30, 200, 145][(r * cols + c) % 7];
+          // each screen's chart, drawn twice as wide and pre-blurred, so a frame only copies and shifts it
+          const strip = offscreen(cw * 2, ch), sg = strip.getContext("2d");
+          sg.fillStyle = `hsla(${hue},40%,7%,1)`; sg.fillRect(0, 0, strip.width, ch);
+          sg.strokeStyle = "rgba(255,255,255,0.05)"; sg.lineWidth = 1; for (let gy = ch / 5; gy < ch; gy += ch / 5) { sg.beginPath(); sg.moveTo(0, gy); sg.lineTo(strip.width, gy); sg.stroke(); }
+          const seed = rnd(0, 100); miniChart(sg, 0, ch * 0.12, cw, ch * 0.76, hue, 24, seed, true); miniChart(sg, cw, ch * 0.12, cw, ch * 0.76, hue, 24, seed, true);   // seamless loop
+          const blurred = offscreen(cw * 2, ch), bg = blurred.getContext("2d"); bg.filter = `blur(${Math.max(0.8, 1.3 * k).toFixed(1)}px)`; bg.drawImage(strip, 0, 0); bg.filter = "none";
+          cells.push({ x, y, w: cw, h: ch, img: blurred, sp: rnd(3, 7) * k, p: rnd(0, cw), hue });
+          // bezel + the screen's glow on the wall
+          g.fillStyle = "#07090f"; g.fillRect(x - 2, y - 2, cw + 4, ch + 4);
+          glowDot(g, x + cw / 2, y + ch / 2, Math.max(cw, ch) * 0.9, hue === 30 ? "255,170,90" : "80,190,230", 0.05);
+        }
+        // the vignette, drawn once at a small size and stretched each frame (a full-screen gradient per frame is slow)
+        const vc = offscreen(160, 90), v = vc.getContext("2d"), vg = v.createRadialGradient(80, 45, 90 * 0.25, 80, 45, 160 * 0.75);
+        vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.55)"); v.fillStyle = vg; v.fillRect(0, 0, 160, 90); cells.vg = vc;
+      },
+      frame(t) {
+        ctx.drawImage(back, 0, 0);
+        for (const c of cells) { const off = (c.p + t * c.sp) % c.w; ctx.drawImage(c.img, off, 0, c.w, c.h, c.x, c.y, c.w, c.h); }
+        ctx.drawImage(cells.vg, 0, 0, w, h);
+      },
+    };
+  };
+
   window.PriismPalette = { fromData: paletteFromData, hex };
 
   // ---------- wallpaper labels: quality (resolution) and OLED ----------
@@ -2243,6 +2430,10 @@ function priismSkins(window, document) {
     circuit:   { name: "Circuit",   cat: "Electric",   create: circuit, oled: true },
     neoncity:  { name: "Skyline", cat: "Urban",   create: neoncity },
     tickertape:   { name: "Ticker Tape",   cat: "Markets", create: tickertape, oled: true },
+    tradingfloor: { name: "Trading Floor", cat: "Markets", create: tradingFloor, wow: true },
+    marketwall:   { name: "Market Wall",   cat: "Markets", create: marketWall },
+    midnight:     { name: "Midnight Moon", cat: "Chill",   create: midnight },
+    twinkle:      { name: "Twinkle",       cat: "Cosmos",  create: twinkle, oled: true },
     // pack 2
     eclipse:     { name: "Totality",       cat: "Cosmos",   create: eclipse },
     comets:      { name: "Meteor Shower",  cat: "Cosmos",   create: comets },

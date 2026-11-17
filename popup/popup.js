@@ -19,7 +19,7 @@ const DEFAULTS = {
   react: "off", reactStrength: 0.6,
   wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
-  symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
+  symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", shiftSpeed: 10,
   indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
@@ -268,8 +268,10 @@ function renderCandles() {
   seg("autoMatch", [[false, "Off"], [true, "On"]], () => !!cfg.autoMatch, (v) => { set({ autoMatch: v, ...(v ? { candleOn: true } : {}) }); if (v) $("candleOn").checked = true; });
   // Match-wallpaper only makes sense on your own uploaded wallpaper.
   const onMedia = cfg.skin === "media";
-  $("autoMatchRow").hidden = !onMedia;
-  $("autoMatchHint").hidden = !onMedia;
+  // (older candles-only switch: Auto-match replaces it; kept only for people who already have it on)
+  $("autoMatchRow").hidden = !onMedia || !cfg.autoMatch;
+  $("autoMatchHint").hidden = !onMedia || !cfg.autoMatch;
+  syncMatchOnPick();
   renderLookGrid();
   $("shiftRow").hidden = cfg.candleLook !== "shift";
   $("shiftSpeed").value = cfg.shiftSpeed; $("shiftSpeedOut").textContent = cfg.shiftSpeed + "s";
@@ -416,14 +418,23 @@ async function wallpaperPixels() {
 }
 function mixHex(a, b, f) { const x = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16)), y = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
   return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * f).toString(16).padStart(2, "0")).join(""); }
-async function matchEverything() {
+let matchRun = 0;
+async function matchEverything(auto) {
+  const run = ++matchRun, pick = String(cfg.skin) + "|" + String(cfg.mediaId || "");
   let pal = null, grey = false, lum = 0.15;
   try { const d = await wallpaperPixels(); if (d) { pal = window.PriismPalette.fromData(d, true);
     let L = 0, n = 0; for (let i = 0; i < d.length; i += 16) { L += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; n++; } lum = n ? L / n : lum; } } catch {}
   if (!pal) { pal = { up: "#9fd8ff", down: "#ff6b8b", accent: "#c9d3e3", colors: ["#c9d3e3", "#9fd8ff", "#ff6b8b"] }; grey = true; }   // a grey wallpaper: a matching silver look
   // text on the chart: light tints of the wallpaper's colour on a dark wallpaper, deep ones on a bright wallpaper
   const bright = lum > 0.55, accent = pal.accent;
+  // candles must stand out on a dark wallpaper: a deep colour (a saturated blue reads almost black) is lifted
+  // towards white until it is bright enough, keeping its hue
+  const lumHex = (x) => [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16) / 255).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const lift = (x) => { if (bright || !/^#[0-9a-f]{6}$/i.test(x || "")) return x; let f = 0, y = x; while (lumHex(y) < 0.42 && f < 0.7) { f += 0.05; y = mixHex(x, "#ffffff", f); } return y; };
+  pal = { ...pal, up: lift(pal.up), down: lift(pal.down) };
   const light = bright ? mixHex(accent, "#000000", 0.62) : mixHex(accent, "#ffffff", 0.5), soft = bright ? mixHex(accent, "#000000", 0.4) : mixHex(accent, "#ffffff", 0.25);
+  // picked another wallpaper while this one was being read: only the newest one counts
+  if (run !== matchRun || pick !== String(cfg.skin) + "|" + String(cfg.mediaId || "")) return;
   const name = cfg.skin === "media" ? "your wallpaper" : (WickedSkins[cfg.skin] || {}).name || "your wallpaper";
   const colors = (Array.isArray(pal.colors) && pal.colors.length >= 2 ? pal.colors : [pal.up, pal.down, accent]).slice(0, 5);
   applyWithUndo({
@@ -440,9 +451,18 @@ async function matchEverything() {
     // the candles), zones soft so the price reads through them; the legend and indicator text stay readable
     indMode: "wallpaper", wallMatch: { src: String(cfg.skin) + "|" + String(cfg.mediaId || ""), colors }, zoneFill: Math.min(+cfg.zoneFill || 0.12, 0.14),
     drawOn: true, lgOn: true, lgColor: bright ? light : "", lgVals: "own", txtMode: "readable",
-  }, grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : `Everything now matches ${name}.`);
+  }, grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : auto ? `Auto-matched everything to ${name}.` : `Everything now matches ${name}.`);
 }
-if ($("matchAll")) $("matchAll").onclick = matchEverything;
+if ($("matchAll")) $("matchAll").onclick = () => matchEverything();
+// Auto-match: every wallpaper you pick (built-in, your own upload or from the Workshop) runs Match everything on its
+// own. One-tap looks keep their own designed colours.
+function autoMatchPick() { if (cfg.matchOnPick) matchEverything(true); }
+function syncMatchOnPick() {
+  const pick = (v) => { set({ matchOnPick: v }); syncMatchOnPick(); if (v) matchEverything(true); };
+  for (const id of ["matchOnPick", "matchOnPick2"]) if ($(id)) seg(id, [[false, "Off"], [true, "On"]], () => !!cfg.matchOnPick, pick);
+  let view = ""; try { view = skinView; } catch {}                // (skinView is declared further down)
+  if ($("matchPickRow")) $("matchPickRow").hidden = view === "looks";
+}
 
 function applyWithUndo(changes, label) {
   const before = Object.fromEntries(Object.keys(changes).map((k) => [k, cfg[k]]));
@@ -454,9 +474,9 @@ function refreshAll() { renderChartStyle(); syncPanels(); syncShortcuts(); syncT
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 // Look groups (shown as chips). New looks: add the id here or they land in "Classic".
 const LOOK_GROUP = {
-  "ocean-calm": "Calm", nightfall: "Calm", daybreak: "Calm", sterling: "Calm", harbor: "Calm", dune: "Calm", "clean-focus": "Calm", blossom: "Calm",
+  "ocean-calm": "Calm", nightfall: "Calm", daybreak: "Calm", sterling: "Calm", harbor: "Calm", dune: "Calm", "clean-focus": "Calm", blossom: "Calm", "market-wall": "Calm", "midnight-moon": "Calm", "twinkle-oled": "Calm",
   glowstick: "Glow", blacklight: "Glow", vaporwave: "Glow", molten: "Glow", warp: "Glow", spectrum: "Glow", "neon-night": "Glow", firefly: "Glow",
-  horizon: "Wow", bloom: "Wow", ink: "Wow", kaleido: "Wow", slick: "Wow", hypercube: "Wow", helix: "Wow", synapse: "Wow", "koi-pond": "Wow", "rainy-night": "Wow", "ringed-giant": "Wow", "deep-blue": "Wow", "cozy-room": "Wow", "tokyo-night": "Wow",
+  horizon: "Wow", bloom: "Wow", ink: "Wow", kaleido: "Wow", slick: "Wow", hypercube: "Wow", helix: "Wow", synapse: "Wow", "koi-pond": "Wow", "rainy-night": "Wow", "ringed-giant": "Wow", "deep-blue": "Wow", "cozy-room": "Wow", "tokyo-night": "Wow", "trading-floor": "Wow",
   "xmas-spirit": "Seasonal", "hallows-eve": "Seasonal", "cozy-lights": "Seasonal", "silent-night": "Seasonal", "northern-noel": "Seasonal",
 };
 const LOOK_GROUPS = ["All", "Wow", "Seasonal", "Calm", "Glow", "Classic"];
@@ -502,6 +522,14 @@ const QUICK_LOOKS = [
     set: { candleOn: true, candleUp: "#ffd29a", candleDown: "#b49cff", candleLook: "fade", candleGlow: 0.2, candlePreset: "custom", lineGlow: 0.15, scaleText: "#ffe6c8", scaleGlow: 0.1, scaleBg: "auto", dim: 0.2 } },
   { id: "tokyo-night", name: "Tokyo Night", sub: "Tokyo Rooftop · Neon", skin: "tokyo",
     set: { candleOn: true, candleUp: "#2ee6ff", candleDown: "#ff3fa4", candleLook: "neon", candleGlow: 0.45, candlePreset: "custom", lineGlow: 0.35, scaleText: "#9ff3ff", scaleGlow: 0.3, scaleBg: "auto", dim: 0.25 } },
+  { id: "trading-floor", name: "Trading Floor", sub: "Trading Floor · Glass", skin: "tradingfloor",
+    set: { candleOn: true, candleUp: "#46f0aa", candleDown: "#ff6b78", candleLook: "glass", candleGlow: 0.25, candlePreset: "custom", lineGlow: 0.2, scaleText: "#bfe7ff", scaleGlow: 0.15, scaleBg: "auto", dim: 0.2 } },
+  { id: "market-wall", name: "Market Wall", sub: "Market Wall · Solid", skin: "marketwall",
+    set: { candleOn: true, candleUp: "#3ee6a0", candleDown: "#ff5f6d", candleLook: "solid", candleGlow: 0.15, candlePreset: "custom", lineGlow: 0.15, scaleText: "#d6e4f5", scaleGlow: 0.1, scaleBg: "auto", dim: 0.3 } },
+  { id: "midnight-moon", name: "Midnight Moon", sub: "Midnight Moon · Ice", skin: "midnight",
+    set: { candleOn: true, candleUp: "#9fd8ff", candleDown: "#b58cff", candleLook: "ice", candleGlow: 0.25, candlePreset: "custom", lineGlow: 0.2, scaleText: "#d9e4ff", scaleGlow: 0.15, scaleBg: "auto", dim: 0.15 } },
+  { id: "twinkle-oled", name: "Twinkle", sub: "Twinkle · Solid · OLED", skin: "twinkle",
+    set: { candleOn: true, candleUp: "#e8eefc", candleDown: "#6f7b96", candleLook: "solid", candleGlow: 0, candlePreset: "custom", lineGlow: 0.1, scaleText: "#c9d3e3", scaleGlow: 0, scaleBg: "auto", dim: 0 } },
   { id: "neon-night", name: "Neon Night", sub: "Cyber Grid · Tube", skin: "cybergrid",
     set: { candleOn: true, candleUp: "#fcee0a", candleDown: "#00f0ff", candleLook: "neon", candleGlow: 0.5, candlePreset: "cyberpunk", lineGlow: 0.5, scaleText: "#7df9ff", scaleGlow: 0.45, scaleBg: "auto", dim: 0.25 } },
   { id: "clean-focus", name: "Clean Focus", sub: "Slate · Mono", skin: "graphite",
@@ -628,6 +656,7 @@ function syncSkinView() {
   seg("skinView", [["looks", "Looks"], ["walls", "Wallpapers"], ["mine", "My uploads"]], () => skinView, (v) => { skinView = v; localStorage.setItem("skinView", v); syncSkinView(); });
   $("viewLooks").hidden = skinView !== "looks"; $("viewWalls").hidden = skinView !== "walls"; $("tab-media").hidden = skinView !== "mine";
   if ($("skinSearch")) $("skinSearch").hidden = skinView === "mine";
+  syncMatchOnPick();
   if (skinView === "mine") return renderMedia();
   if (skinView === "looks") renderQuick(); else renderSkins();
 }
@@ -776,7 +805,7 @@ const readAsDataURL = (f, mime) => new Promise((res, rej) => {
 });
 
 const hint = (t) => { $("mediaHint").textContent = t; };
-const saveMedia = (media, extra = {}) => set({ media, ...extra });
+const saveMedia = (media, extra = {}) => { set({ media, ...extra }); if (extra.skin === "media") autoMatchPick(); };
 
 async function addFiles(files) {
   const problems = []; let added = 0, needConvert = 0, lastId = null;
@@ -1724,6 +1753,7 @@ function pickSource(src) {
     set({ ...asMain, chartSkins: keep, multi: "mix" });
   } else set({ chartSkins: { ...(cfg.chartSkins || {}), [target]: src }, multi: "mix" });
   renderSkins(); renderMedia(); syncTune(); syncCharts();
+  if (target === "all" || target === 1) autoMatchPick();          // the main wallpaper changed
 }
 async function activeTab() {
   if (!EXT_MODE || IS_TAB || !chrome.tabs) return null;
@@ -2270,7 +2300,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Match everything now matches it all, with your own wallpapers too",
+const WHATS_NEW = ["Auto-match: every wallpaper you pick sets everything to match it (Skins \u203a Wallpapers)",
+  "4 new wallpapers: Trading Floor, Market Wall, Midnight Moon and Twinkle (OLED)",
+  "Match everything now matches it all, with your own wallpapers too",
   "Softer zones so you see the price inside them (Style \u203a Indicators \u203a Zone fill)",
   "Your own Gradient colours",
   "A cleaner look everywhere: chart cards, clip editor, Workshop",

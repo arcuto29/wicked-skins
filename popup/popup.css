@@ -548,3 +548,6 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 /* update card on black, like the rest */
 .pu-veil { background: rgba(0,0,0,.78); }
 .pu-card { background: #0b0b0d; border-color: rgba(255,255,255,.1); box-shadow: 0 30px 80px -30px rgba(0,0,0,.95); }
+/* Auto-match switch (Skins tab and Candles tab) */
+.row:has(> .seg) > span small { color: var(--dim); font-weight: 400; margin-left: 4px; }
+.matchpick { margin: 2px 0 8px; }
