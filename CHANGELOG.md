@@ -1,6 +1,9 @@
 # Changelog
 
-## 0.1.61 (unreleased)
+## 0.1.61 (2026-11-17)
+- **Match everything covers everything, with your own wallpapers too.** One tap now also sets your drawings and the session breaks, uses the exact colours it measured from your wallpaper for the candles AND your indicators and zones (they used to come from two different readings), and picks dark text for bright wallpapers so the price scale, ticker and legend stay readable.
+- **Zones are soft by default so you can see the price inside them.** Recoloured zones (Rainbow, Gradient, Wallpaper…) used to be as strong as the indicator drew them, in bright colours. New in Style → Indicators: **Zone fill** (how strong recoloured zones are, 4–45%, default 12%) and **Dim all zones** (also softens zones that keep their own colours). Zone edges stay crisp.
+- **Your own Gradient colours.** Style → Indicators → Gradient → **My colours**: pick 2–3 colours; every indicator and zone uses them, each a slightly different shade so they stay told apart.
 - **Cleaner everywhere, not just the panel.** Priism's own cards on the chart (record the screen, tips, quick messages like "Clip saved"), the recording badge (now with a calm pulsing red dot), the clip editor, the update card and the desktop app's tab bar all use the same clean black look: dark cards, thin borders, white for the main button, no neon glow.
 - **A cleaner Workshop.** Wallpaper cards on the website show the picture first with small labels (4K, OLED, Live) over it, a round download button, and a gentle zoom when you hover. Wallpaper cards in the panel zoom on hover too.
 - **The invite card matches Priism:** black, the Priism logo with a soft glow, and the brand gradient on its edge and button.

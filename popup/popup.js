@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -21,7 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false,
   candleLook: "solid", shiftSpeed: 10,
-  indMode: "own", indColor: "", indCustom: {}, drawOn: false, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
+  indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -321,6 +321,18 @@ function syncIndicators() {
   seg("indMode", [["own", "Own"], ["rainbow", "Rainbow"], ["gradient", "Gradient"], ["candles", "Candles"], ["wallpaper", "Wallpaper"], ["custom", "Custom"]], () => cfg.indMode || "own",
     (v) => { set(v === "custom" && !/^#/.test(cfg.indColor || "") ? { indMode: v, indColor: $("indColor").value || "#ffd166" } : { indMode: v }); syncIndicators(); });
   $("indColRow").hidden = cfg.indMode !== "custom";
+  // zones: how strong recoloured zones are (and, with Dim, every zone), so the price stays readable through them
+  if ($("zoneFill")) { const z = $("zoneFill"); z.value = +cfg.zoneFill || 0.12; $("zoneFillOut").textContent = Math.round(z.value * 100) + "%";
+    z.oninput = () => { set({ zoneFill: +z.value }); $("zoneFillOut").textContent = Math.round(z.value * 100) + "%"; }; z.ondblclick = () => { z.value = 0.12; z.oninput(); }; }
+  if ($("zoneDim")) seg("zoneDim", [[false, "Off"], [true, "On"]], () => !!cfg.zoneDim, (v) => set({ zoneDim: v }));
+  // Gradient colours: your own 2-3, or the built-in gradients
+  if ($("gradRow")) { $("gradRow").hidden = cfg.indMode !== "gradient";
+    const g = Array.isArray(cfg.indGrad) ? cfg.indGrad : [], DEF = ["#2fe6c8", "#3a9bff", "#8a6cff"];
+    ["g1", "g2", "g3"].forEach((idk, k) => { const inp = $(idk); inp.value = g[k] || DEF[k];
+      inp.oninput = () => set({ indGrad: ["g1", "g2", "g3"].map((x) => $(x).value) }); });
+    seg("gradMode", [["auto", "Built-in"], ["mine", "My colours"]], () => (Array.isArray(cfg.indGrad) && cfg.indGrad.length >= 2 ? "mine" : "auto"),
+      (v) => { set({ indGrad: v === "mine" ? ["g1", "g2", "g3"].map((x) => $(x).value) : [] }); syncIndicators(); });
+    $("gradPick").hidden = g.length < 2; }
   if ($("drawOn")) seg("drawOn", [[false, "Leave as they are"], [true, "Style them too"]], () => !!cfg.drawOn, (v) => set({ drawOn: v }));
   renderEachInd();
   $("indColor").value = /^#[0-9a-f]{6}$/i.test(cfg.indColor || "") ? cfg.indColor : "#ffd166";
@@ -405,22 +417,29 @@ async function wallpaperPixels() {
 function mixHex(a, b, f) { const x = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16)), y = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
   return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * f).toString(16).padStart(2, "0")).join(""); }
 async function matchEverything() {
-  let pal = null, grey = false; try { const d = await wallpaperPixels(); pal = d && window.PriismPalette.fromData(d, true); } catch {}
-  if (!pal) { pal = { up: "#9fd8ff", down: "#ff6b8b", accent: "#c9d3e3" }; grey = true; }   // a grey wallpaper: a matching silver look
-  const accent = pal.accent, light = mixHex(accent, "#ffffff", 0.5), soft = mixHex(accent, "#ffffff", 0.25);
+  let pal = null, grey = false, lum = 0.15;
+  try { const d = await wallpaperPixels(); if (d) { pal = window.PriismPalette.fromData(d, true);
+    let L = 0, n = 0; for (let i = 0; i < d.length; i += 16) { L += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255; n++; } lum = n ? L / n : lum; } } catch {}
+  if (!pal) { pal = { up: "#9fd8ff", down: "#ff6b8b", accent: "#c9d3e3", colors: ["#c9d3e3", "#9fd8ff", "#ff6b8b"] }; grey = true; }   // a grey wallpaper: a matching silver look
+  // text on the chart: light tints of the wallpaper's colour on a dark wallpaper, deep ones on a bright wallpaper
+  const bright = lum > 0.55, accent = pal.accent;
+  const light = bright ? mixHex(accent, "#000000", 0.62) : mixHex(accent, "#ffffff", 0.5), soft = bright ? mixHex(accent, "#000000", 0.4) : mixHex(accent, "#ffffff", 0.25);
   const name = cfg.skin === "media" ? "your wallpaper" : (WickedSkins[cfg.skin] || {}).name || "your wallpaper";
+  const colors = (Array.isArray(pal.colors) && pal.colors.length >= 2 ? pal.colors : [pal.up, pal.down, accent]).slice(0, 5);
   applyWithUndo({
     enabled: true,
     candleOn: true, candleUp: pal.up, candleDown: pal.down, candlePreset: "custom", lineGlow: Math.max(+cfg.lineGlow || 0, 0.25),
     chOn: true, chColor: accent, chLabels: true, gridOn: true, gridColor: accent, gridAlpha: 0.18, gridStyle: cfg.gridOn ? cfg.gridStyle : "dotted",
     plOn: true, plColor: "candle", scaleText: light, scaleGlow: Math.max(+cfg.scaleGlow || 0, 0.2),
-    tkOn: true, tkColor: light, tkGlow: true,
+    sbOn: true, sbColor: soft,                                     // session breaks
+    tkOn: true, tkColor: light, tkGlow: !bright,
     bracketOn: true, bracketProfit: pal.up, bracketLoss: pal.down, bracketQty: soft, bracketLineColor: accent,
     pnlUp: pal.up, pnlDown: pal.down,
     panelMode: "skin", dlgMode: "glass", uiAccent: soft,
-    // indicators and their zones take the wallpaper's own colours (each one its own), the legend and the text your
-    // indicators write on the chart stay readable on it
-    indMode: "wallpaper", lgOn: true, lgColor: "", lgVals: "own", txtMode: "readable",
+    // indicators, their zones and your drawings take the wallpaper's own colours (each one its own; the same reading as
+    // the candles), zones soft so the price reads through them; the legend and indicator text stay readable
+    indMode: "wallpaper", wallMatch: { src: String(cfg.skin) + "|" + String(cfg.mediaId || ""), colors }, zoneFill: Math.min(+cfg.zoneFill || 0.12, 0.14),
+    drawOn: true, lgOn: true, lgColor: bright ? light : "", lgVals: "own", txtMode: "readable",
   }, grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : `Everything now matches ${name}.`);
 }
 if ($("matchAll")) $("matchAll").onclick = matchEverything;
@@ -2251,7 +2270,11 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["A cleaner panel in true black, with slimmer sliders",
+const WHATS_NEW = ["Match everything now matches it all, with your own wallpapers too",
+  "Softer zones so you see the price inside them (Style \u203a Indicators \u203a Zone fill)",
+  "Your own Gradient colours",
+  "A cleaner look everywhere: chart cards, clip editor, Workshop",
+  "A cleaner panel in true black, with slimmer sliders",
   "Wallpapers show their quality (4K, 1080p\u2026) and OLED, with an OLED filter (Skins \u203a OLED)",
   "A Webb space photo pack in the Workshop, up to 4K",
   "Black & white wallpapers (Adjust \u203a Picture \u203a Colour)",

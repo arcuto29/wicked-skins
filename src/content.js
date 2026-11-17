@@ -57,6 +57,10 @@
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
     indMode: "own", indColor: "", indCustom: {},
     drawOn: false,            // your own drawings (rectangles, zones you draw) follow the indicator colours too
+    zoneFill: 0.12,           // how see-through recoloured zones are (4%..45%): soft keeps the price readable
+    zoneDim: false,           // also soften zones that keep their own colours
+    indGrad: [],              // your own Gradient colours (2-3); empty = the built-in gradients
+    wallMatch: null,          // { src, colors }: the wallpaper colours Match everything measured (sharper than the chart's own sample)
     // Chart text: text indicators draw ON the chart (labels, levels, values, prints). own | readable | custom | candle,
     // outline 0 off / 1 soft / 2 strong, size 0 normal / 1 large / 2 XL
     txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
@@ -1369,7 +1373,7 @@
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
-    "indMode", "indColor", "indCustom", "drawOn", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
+    "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
@@ -1433,6 +1437,10 @@
   function rawAccent() { const v = views[0], p = v && v.lum && v.lum.palette; return (p && p.accent) || ""; }
   // the wallpaper's own colours (up to 5), taken once per wallpaper like the accent: indicators / zones use them
   let lastColors = [];
+  // the colours indicators / zones use for "Wallpaper": the ones Match everything measured for THIS wallpaper (the
+  // same reading the candles came from), else the chart's own sample
+  function wallColorsNow() { const m = cfg.wallMatch, sig = String(cfg.skin) + "|" + String(cfg.mediaId || "");
+    return m && m.src === sig && Array.isArray(m.colors) && m.colors.length >= 2 ? m.colors.slice(0, 5) : lastColors; }
   function rawColors() { const v = views[0], p = v && v.lum && v.lum.palette; return (p && Array.isArray(p.colors) && p.colors.length ? p.colors : []).slice(0, 5); }
   function hueOfHex(x) { const [r, g, b] = [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16) / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
     if (mx === mn) return 0; const d = mx - mn; let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return h * 60; }
@@ -1523,7 +1531,7 @@
   }, 3000);
   function pushFx() {
     const h = document.documentElement;
-    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent(), wallColors: lastColors }));
+    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent(), wallColors: wallColorsNow() }));
     else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     // Scale backing = real frosted glass behind the price + time scales
@@ -1630,6 +1638,7 @@
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
     if (keys.some((k) => k === "panelMode" || k === "panelColor" || k === "candleUp")) applyPanels();
     if (keys.some((k) => k.startsWith("tk") || k === "candleUp" || k === "enabled")) applyTicker();
+    if (keys.includes("wallMatch")) pushFx();
     if (keys.some((k) => k.startsWith("lg") || k === "candleUp" || k === "enabled")) applyLegend();
     if (keys.some((k) => k.startsWith("dlg") || k === "panelMode" || k === "panelColor")) applyDialogs();
     if (keys.includes("sides") || keys.includes("leftBar") || keys.includes("enabled") || keys.includes("layer")) applySides();
