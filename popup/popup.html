@@ -82,6 +82,7 @@
       <div id="viewWalls" hidden>
         <div class="chartpick" hidden></div>
         <button class="link ownwall" data-goto-mine style="display:block;margin:2px 0 8px">+ Use your own image or video (private, stays on your computer)</button>
+        <button class="link ownwall" id="gotoWallOpts" type="button" style="display:block;margin:-4px 0 8px">✦ Customise this wallpaper: its settings and your own colours</button>
         <div class="chips" id="chips"></div>
         <div class="cards" id="skinCards"></div>
       </div>
@@ -110,6 +111,18 @@
         <div class="chips" id="candleChips"></div>
         <div class="cards" id="candleCards"></div>
         <div class="row"><span>Glow</span><input type="range" id="candleGlow" min="0" max="1" step="0.05" /><output id="candleGlowOut"></output></div>
+        <div class="looklabel" style="margin-top:12px">Candle parts <small>wicks, borders, hollow bodies and widths, in any look</small></div>
+        <canvas id="partsPreview" class="partsprev" width="560" height="120"></canvas>
+        <div class="row"><span>Wicks</span><div class="seg" id="candleWick"></div></div>
+        <div class="row" id="wickColRow" hidden><span>Wick colours</span><input type="color" id="candleWickUp" title="Up wicks" /> <input type="color" id="candleWickDown" title="Down wicks" /><small class="hint" style="margin:0">up · down</small></div>
+        <div class="row"><span>Wick width</span><div class="seg" id="candleWickW"></div></div>
+        <div class="row"><span>Borders</span><div class="seg" id="candleBorder"></div></div>
+        <div class="row" id="borderColRow" hidden><span>Border colours</span><input type="color" id="candleBorderUp" title="Up borders" /> <input type="color" id="candleBorderDown" title="Down borders" /><small class="hint" style="margin:0">up · down</small></div>
+        <div class="row" id="borderWRow"><span>Border width</span><div class="seg" id="candleBorderW"></div></div>
+        <div class="row"><span>Hollow</span><div class="seg" id="candleHollow"></div></div>
+        <div class="row"><span>Body width</span><input type="range" id="candleBodyW" min="0.4" max="1" step="0.05" /><output id="candleBodyWOut"></output></div>
+        <p class="hint">Hollow bodies show your wallpaper through them. Zoomed far out, candles are too thin to tell wicks from bodies, so wick colour and width apply once you zoom in a little.</p>
+        <button class="link" id="partsReset" type="button">Reset candle parts</button>
       </details>
 
 
@@ -379,6 +392,20 @@
         <p class="hint" id="smoothHint"></p>
         <div class="row" id="autoQRow"><span>Quality</span><div class="seg" id="autoQuality"></div></div>
         <p class="hint" id="autoQHint">Auto: lowers the wallpaper's detail by itself if your computer starts lagging, then raises it again. Max: always full quality.</p>
+      </details>
+
+      <details class="grp" data-grp="wallopts" id="wallOptsGrp" open>
+        <summary>This wallpaper <small id="wallOptsName"></small></summary>
+        <canvas id="wallOptsPrev" class="wallprev" width="560" height="168"></canvas>
+        <div id="wallOptsRows"></div>
+        <div class="row"><span>Recolour <small>your colours, its light and shade</small></span><div class="seg" id="rcOn"></div></div>
+        <div id="rcBox" hidden>
+          <div class="chips" id="rcPresets"></div>
+          <div class="row"><span>Colours</span><input type="color" id="rc0" title="Colour 1" /> <input type="color" id="rc1" title="Colour 2" /> <input type="color" id="rc2" title="Colour 3" /><div class="seg" id="rcN"></div></div>
+          <div class="row"><span>Strength</span><input type="range" id="rcS" min="0.1" max="1" step="0.05" /><output id="rcSOut"></output></div>
+        </div>
+        <p class="hint">Saved for this wallpaper only, and kept when you switch away and back. Black stays black, so OLED wallpapers stay OLED.</p>
+        <button class="link" id="wallOptsReset" type="button">Reset this wallpaper</button>
       </details>
 
       <details class="grp" data-grp="motion">

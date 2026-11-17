@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks && window.__bdCandleLooks.zone) return;   // an older copy (before an update) is replaced
+  if (window.__bdCandleLooks && window.__bdCandleLooks.candle) return;   // an older copy (before an update) is replaced
 
   const LOOKS = [
     // id, label, hint, minGlow (some looks are made of light, so they always glow a little)
@@ -152,10 +152,81 @@
     }
   }
 
+  // ---------- candle parts: wick / border colours, hollow bodies, widths (Candles > Candle parts) ----------
+  // P = { wick: "same"|"soft"|"custom", wickUp, wickDown, border: "none"|"custom", borderUp, borderDown, borderW (1-3),
+  //       hollow: "none"|"up"|"down"|"both", wickW (0 = the platform's, 1-4 device px), bodyW (0.4-1 of the body) }
+  // or null when nothing is changed (then the chart draws exactly as before).
+  const HEX = /^#[0-9a-f]{6}$/i;
+  function parts(o) {
+    if (!o || typeof o !== "object") return null;
+    const hx = (v) => (HEX.test(v || "") ? String(v).toLowerCase() : "");
+    const P = { wick: ["soft", "custom"].includes(o.wick) ? o.wick : "same", wickUp: hx(o.wickUp), wickDown: hx(o.wickDown),
+      border: o.border === "custom" ? "custom" : "none", borderUp: hx(o.borderUp), borderDown: hx(o.borderDown),
+      borderW: Math.max(1, Math.min(3, Math.round(+o.borderW || 1))), hollow: ["up", "down", "both"].includes(o.hollow) ? o.hollow : "none",
+      wickW: Math.max(0, Math.min(4, Math.round(+o.wickW || 0))), bodyW: Math.max(0.4, Math.min(1, +o.bodyW || 1)) };
+    const any = P.wick !== "same" || P.border !== "none" || P.hollow !== "none" || P.wickW > 0 || P.bodyW < 0.99;
+    return any ? P : null;
+  }
+  // the wick's colour with your parts (falls back to the look's own wick colour)
+  function wickOf(look, col, isUp, k, P) {
+    if (P && P.wick === "custom") { const c = isUp ? P.wickUp : P.wickDown; if (c) return c; }
+    if (P && P.wick === "soft") return memo("sw" + col, () => css(rgbOf(col), 0.5));
+    return wick(look, col, k);
+  }
+  // a wick rect with your wick width: x/w changed around the wick's centre (device px -> user units via k.px)
+  function wickRect(x, w, k, P) {
+    if (!P || !P.wickW) return [x, w];
+    const px = k.px || 1, nw = P.wickW * px; return [x + w / 2 - nw / 2, nw];
+  }
+  // One candle body with your parts. The hollow body clears what's under it on the chart canvas (the bit of wick
+  // inside it) so the wallpaper shows through, then draws its outline.
+  function candle(g, look, x, y, w, h, col, isUp, k, P) {
+    if (!P) return draw(g, look, x, y, w, h, col, isUp, k);
+    if (h < 0) { y += h; h = -h; }
+    if (w < 0) { x += w; w = -w; }
+    const px = k.px || 1;
+    if (P.bodyW < 0.99) { const nw = Math.max(3 * px, w * P.bodyW); x += (w - nw) / 2; w = nw; }
+    const hollow = P.hollow === "both" || P.hollow === (isUp ? "up" : "down");
+    const bc = (P.border === "custom" && (isUp ? P.borderUp : P.borderDown)) || (hollow ? col : "");
+    const bw = Math.min(P.borderW * px, Math.max(px, Math.min(w, h) / 3));
+    if (hollow && w > 2.5 * bw && h > 2.5 * bw) {
+      if (k.clear) k.clear(x, y, w, h);
+      k.stroke(bc); g.lineWidth = bw; k.strokeRect(x + bw / 2, y + bw / 2, w - bw, h - bw); return;
+    }
+    draw(g, look, x, y, w, h, col, isUp, k);
+    if (bc) { k.stroke(bc); g.lineWidth = bw; k.strokeRect(x + bw / 2, y + bw / 2, w - bw, h - bw); }
+  }
+  // A bordered candle is drawn by the platform as two nested rects in the same colour (border, then the body inside
+  // it, or the other way round). true = this rect is the second of such a pair: skip it, the candle is already drawn.
+  // last = a WeakMap(ctx -> last rect). X/Y/W/H in device px.
+  function nestedDupe(last, g, X, Y, W, H, col) {
+    const lb = last.get(g), cur = { x: X, y: Y, w: W, h: H, col };
+    const inside = (a, o) => a.x >= o.x - 0.5 && a.y >= o.y - 0.5 && a.x + a.w <= o.x + o.w + 0.5 && a.y + a.h <= o.y + o.h + 0.5;
+    const near = (a, o) => Math.abs(a.x - o.x) <= 2.5 && Math.abs(a.y - o.y) <= 2.5 && Math.abs(a.x + a.w - o.x - o.w) <= 2.5 && Math.abs(a.y + a.h - o.y - o.h) <= 2.5;
+    if (lb && lb.col === col && near(cur, lb) && (inside(cur, lb) || inside(lb, cur))) { last.delete(g); return true; }
+    last.set(g, cur); return false;
+  }
+
+  // Which narrow rects are wicks? Zoomed in, bodies are wide and wicks are thin; zoomed far out, bodies are thin too
+  // and look just like wicks. The chart paints a whole pane in one go, so we remember, per canvas, whether the LAST
+  // paint had real bodies (3+ device px) and how wide: wick colours / widths only apply when it did.
+  // onChange(c) is called when a canvas starts having bodies (so the host can repaint once to style its wicks).
+  function paintTracker(onChange) {
+    const st = new WeakMap();
+    return {
+      note(c, isBody, W) {
+        let s = st.get(c); if (!s) { s = { bw: 0, cur: null }; st.set(c, s); }
+        if (!s.cur) { s.cur = { b: 0, mw: 0 }; queueMicrotask(() => { const was = s.bw; s.bw = s.cur && s.cur.b ? s.cur.mw : 0; s.cur = null; if (!was && s.bw && onChange) onChange(c); }); }
+        if (isBody) { s.cur.b++; if (W > s.cur.mw) s.cur.mw = W; }
+      },
+      bw(c) { const s = st.get(c); return s ? Math.max(s.bw, s.cur ? s.cur.mw : 0) : 0; },
+    };
+  }
+
   // ---------- previews (the panel's look cards) ----------
   // A small fixed run of candles, so every card shows the same chart and only the look differs.
   const SAMPLE = [[18, 52, 8, 60], [52, 36, 28, 58], [36, 70, 32, 78], [70, 54, 46, 76], [54, 88, 50, 96], [88, 70, 64, 92]];   // open, close, low, high (0..100)
-  function preview(canvas, look, up, down, glow, bg) {
+  function preview(canvas, look, up, down, glow, bg, partsCfg) {
     const g = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
     if (bg) { try { g.drawImage(bg, 0, 0, W, H); g.fillStyle = "rgba(0,0,0,0.38)"; g.fillRect(0, 0, W, H); } catch {} }   // your wallpaper, dimmed like the chart
@@ -165,6 +236,9 @@
     const m = META[look] || META.solid, gl = Math.max(glow || 0, m.minGlow);
     const k = { fill: (a, b, c, d) => g.fillRect(a, b, c, d), style: (v) => { g.fillStyle = v; }, stroke: (v) => { g.strokeStyle = v; },
       strokeRect: (a, b, c, d) => g.strokeRect(a, b, c, d), fillPath: () => g.fill(), px: dpr, yfrac: 0 };
+    const P = parts(partsCfg), wk = P && P.wickW ? null : dpr;
+    if (P && P.hollow !== "none") k.clear = (a, b, c, d) => { if (!bg) { g.clearRect(a, b, c, d); return; }
+      g.save(); g.beginPath(); g.rect(a, b, c, d); g.clip(); g.shadowBlur = 0; g.drawImage(bg, 0, 0, W, H); g.fillStyle = "rgba(0,0,0,0.38)"; g.fillRect(0, 0, W, H); g.restore(); };
     SAMPLE.forEach(([o, c, l, hi], i) => {
       const isUp = c >= o, base = isUp ? up : down;
       let col = base;
@@ -174,8 +248,9 @@
       k.yfrac = top / H;
       g.save();
       if (gl > 0) { g.shadowColor = tone(look, col, k); g.shadowBlur = (4 + gl * 18) * dpr * 0.6; }
-      g.fillStyle = wick(look, col, k); g.fillRect(Math.round(cx - dpr / 2), Y(hi), dpr, Y(l) - Y(hi));
-      draw(g, look, Math.round(cx - bw / 2), top, Math.round(bw), Math.max(dpr, bot - top), col, isUp, k);
+      { const [wx, ww] = wk ? [Math.round(cx - dpr / 2), dpr] : wickRect(cx - dpr / 2, dpr, k, P);
+        g.fillStyle = wickOf(look, col, isUp, k, P); g.fillRect(wx, Y(hi), ww, Y(l) - Y(hi)); }
+      candle(g, look, Math.round(cx - bw / 2), top, Math.round(bw), Math.max(dpr, bot - top), col, isUp, k, P);
       g.restore();
     });
   }
@@ -365,5 +440,5 @@
     return true;
   }
 
-  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors };
+  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors };
 })();

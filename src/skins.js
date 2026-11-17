@@ -41,8 +41,8 @@ function priismSkins(window, document) {
     };
   };
 
-  const matrix = (ctx) => {
-    let w = 0, h = 0, cols = [], size = 16;
+  const matrix = (ctx, o = {}) => {
+    let w = 0, h = 0, cols = [], size = Math.round(16 * (o.size || 1));
     const chars = "01アイウエオカキクケコサシスセソ";
     return {
       resize(W, H) {
@@ -152,11 +152,12 @@ function priismSkins(window, document) {
     };
   };
 
-  const starfield = (ctx) => {
+  const AMT = { k: "amount", label: "Amount", type: "range", min: 0.3, max: 2, step: 0.1, def: 1 };
+  const starfield = (ctx, o = {}) => {
     let w = 0, h = 0, s = [];
     const mk = () => ({ x: rnd(-1, 1), y: rnd(-1, 1), z: rnd(0.1, 1) });
     return {
-      resize(W, H) { w = W; h = H; s = Array.from({ length: 220 }, mk); },
+      resize(W, H) { w = W; h = H; s = Array.from({ length: Math.round(220 * (o.amount || 1)) }, mk); },
       frame(t, dt) {
         ctx.fillStyle = "#02030a"; ctx.fillRect(0, 0, w, h);
         ctx.fillStyle = "#fff";
@@ -173,11 +174,11 @@ function priismSkins(window, document) {
     };
   };
 
-  const rain = (ctx) => {
+  const rain = (ctx, o = {}) => {
     let w = 0, h = 0, d = [];
     const mk = () => ({ x: rnd(0, w), y: rnd(-h, 0), l: rnd(10, 28), v: rnd(500, 900) });
     return {
-      resize(W, H) { w = W; h = H; d = Array.from({ length: 140 }, mk); },
+      resize(W, H) { w = W; h = H; d = Array.from({ length: Math.round(140 * (o.amount || 1)) }, mk); },
       frame(t, dt) {
         const g = ctx.createLinearGradient(0, 0, 0, h);
         g.addColorStop(0, "#0a1220"); g.addColorStop(1, "#16243a");
@@ -228,10 +229,10 @@ function priismSkins(window, document) {
     };
   };
 
-  const fireflies = (ctx) => {
+  const fireflies = (ctx, o = {}) => {
     let w = 0, h = 0, f = [];
     return {
-      resize(W, H) { w = W; h = H; const k = Math.max(0.25, Math.min(w, h) / 600); f = Array.from({ length: 70 }, () => ({ x: rnd(0, w), y: rnd(0, h), a: rnd(0, TAU), s: rnd(8, 25) * k, p: rnd(0, TAU), r: rnd(1.5, 3.5) * k })); },
+      resize(W, H) { w = W; h = H; const k = Math.max(0.25, Math.min(w, h) / 600); f = Array.from({ length: Math.round(70 * (o.amount || 1)) }, () => ({ x: rnd(0, w), y: rnd(0, h), a: rnd(0, TAU), s: rnd(8, 25) * k, p: rnd(0, TAU), r: rnd(1.5, 3.5) * k })); },
       frame(t, dt) {
         const g = ctx.createLinearGradient(0, 0, 0, h);
         g.addColorStop(0, "#020806"); g.addColorStop(1, "#0b1d10");
@@ -250,11 +251,11 @@ function priismSkins(window, document) {
     };
   };
 
-  const snow = (ctx) => {
+  const snow = (ctx, o = {}) => {
     let w = 0, h = 0, s = [];
     const mk = (init) => ({ x: rnd(0, w), y: init ? rnd(0, h) : -5, r: rnd(0.8, 3), v: rnd(15, 50), p: rnd(0, TAU) });
     return {
-      resize(W, H) { w = W; h = H; s = Array.from({ length: 220 }, () => mk(true)); },
+      resize(W, H) { w = W; h = H; s = Array.from({ length: Math.round(220 * (o.amount || 1)) }, () => mk(true)); },
       frame(t, dt) {
         const g = ctx.createLinearGradient(0, 0, 0, h);
         g.addColorStop(0, "#0d1626"); g.addColorStop(1, "#2a3a55");
@@ -302,11 +303,11 @@ function priismSkins(window, document) {
     };
   };
 
-  const sakura = (ctx) => {
+  const sakura = (ctx, o = {}) => {
     let w = 0, h = 0, p = [];
     const mk = (init) => ({ x: rnd(-50, w), y: init ? rnd(0, h) : -10, s: rnd(4, 9), r: rnd(0, TAU), vr: rnd(-2, 2), vx: rnd(10, 40), vy: rnd(20, 50), ph: rnd(0, TAU) });
     return {
-      resize(W, H) { w = W; h = H; p = Array.from({ length: 90 }, () => mk(true)); },
+      resize(W, H) { w = W; h = H; p = Array.from({ length: Math.round(90 * (o.amount || 1)) }, () => mk(true)); },
       frame(t, dt) {
         const g = ctx.createLinearGradient(0, 0, w, h);
         g.addColorStop(0, "#1a0a16"); g.addColorStop(1, "#3a1530");
@@ -412,10 +413,10 @@ function priismSkins(window, document) {
     };
   };
 
-  const bokeh = (ctx) => {
+  const bokeh = (ctx, o = {}) => {
     let w = 0, h = 0, c = [];
     return {
-      resize(W, H) { w = W; h = H; c = Array.from({ length: 28 }, () => ({ x: rnd(0, 1), y: rnd(0, 1), r: rnd(0.03, 0.1), hue: rnd(20, 60) + (Math.random() < 0.4 ? 160 : 0), sp: rnd(0.01, 0.04), ph: rnd(0, TAU) })); },
+      resize(W, H) { w = W; h = H; c = Array.from({ length: Math.round(28 * (o.amount || 1)) }, () => ({ x: rnd(0, 1), y: rnd(0, 1), r: rnd(0.03, 0.1), hue: rnd(20, 60) + (Math.random() < 0.4 ? 160 : 0), sp: rnd(0.01, 0.04), ph: rnd(0, TAU) })); },
       frame(t) {
         ctx.fillStyle = "#0a0806"; ctx.fillRect(0, 0, w, h);
         ctx.globalCompositeOperation = "lighter";
@@ -2187,7 +2188,7 @@ function priismSkins(window, document) {
   // Midnight: a quiet city at midnight. Deep night-blue sky, a thin crescent moon with a soft halo, faint clouds
   // drifting very slowly, and a dark skyline along the bottom where a window lights up or goes out now and then.
   // The chart area stays dark and even; everything is drawn once, a frame only copies and shifts it.
-  const midnight = (ctx) => {
+  const midnight = (ctx, o = {}) => {
     let w = 0, h = 0, k = 1, back = null, sky2 = null, clouds = null, glow = null, wins = [], city = null, cityY = 0;
     return {
       resize(W, H) { w = W; h = H; k = kOf(w, h); back = offscreen(w, h); const g = back.getContext("2d");
@@ -2196,11 +2197,13 @@ function priismSkins(window, document) {
         for (let i = 0; i < 140; i++) { g.fillStyle = `rgba(200,215,255,${rnd(0.06, 0.32).toFixed(2)})`; const r = rnd(0.6, 1.4) * k; g.fillRect(rnd(0, w), rnd(0, h * 0.62), r, r); }
         // the moon: a crescent (a disc with a sky-coloured disc over it), upper right, with a soft halo
         const mx = w * 0.8, my = h * 0.2, mr = Math.max(9, 26 * k);
+        if (o.moon !== false) {
         glowDot(g, mx, my, mr * 7, "150,170,230", 0.10); glowDot(g, mx, my, mr * 2.4, "200,210,245", 0.12);
         const mc = offscreen(mr * 3, mr * 3), m = mc.getContext("2d");
         m.fillStyle = "#dfe6f7"; m.beginPath(); m.arc(mr * 1.5, mr * 1.5, mr, 0, T2); m.fill();
         m.globalCompositeOperation = "destination-out"; m.beginPath(); m.arc(mr * 1.5 + mr * 0.42, mr * 1.5 - mr * 0.18, mr * 0.9, 0, T2); m.fill();
         g.globalAlpha = 0.6; g.drawImage(mc, mx - mr * 1.5, my - mr * 1.5); g.globalAlpha = 1;   // soft, so prices read over it
+        }
         // the skyline, drawn into its own layer (the windows twinkle on top of it)
         cityY = h * 0.8; city = offscreen(w, h - cityY + 2); const c = city.getContext("2d"); wins = [];
         for (let layer = 0; layer < 2; layer++) {
@@ -2227,7 +2230,8 @@ function priismSkins(window, document) {
         const R = Math.max(w, h) * 0.42; ctx.globalAlpha = 0.07;
         ctx.drawImage(glow, w * (0.3 + 0.08 * Math.sin(t * 0.03)) - R, h * (0.45 + 0.06 * Math.cos(t * 0.025)) - R, R * 2, R * 2); ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = "source-over";
-        const off = (t * 3 * k) % w; ctx.drawImage(clouds, -off, 0); ctx.drawImage(clouds, -off + w * 2, 0);
+        if (o.clouds !== false) { const off = (t * 3 * k) % w; ctx.drawImage(clouds, -off, 0); ctx.drawImage(clouds, -off + w * 2, 0); }
+        if (o.skyline === false) return;
         ctx.drawImage(city, 0, cityY);
         // windows: each one switches on or off every few minutes (slow, never blinking)
         for (const q of wins) { const on = Math.sin(t * q.sp + q.p) > (q.on ? -0.4 : 0.4); if (!on) continue;
@@ -2238,12 +2242,12 @@ function priismSkins(window, document) {
 
   // Twinkle: true black (OLED pixels stay off) with stars that twinkle gently. The whole sky turns very slowly, so no
   // bright point ever stays in one place.
-  const twinkle = (ctx) => {
+  const twinkle = (ctx, o = {}) => {
     let w = 0, h = 0, k = 1, st = [];
     const COL = ["255,255,255", "200,220,255", "255,236,210", "210,200,255"];
     return {
       resize(W, H) { w = W; h = H; k = kOf(w, h);
-        const n = Math.round(420 * Math.min(2, (w * h) / (1280 * 720)) + 60);
+        const n = Math.round((420 * Math.min(2, (w * h) / (1280 * 720)) + 60) * (o.amount || 1));
         st = Array.from({ length: n }, () => ({ a: rnd(0, T2), d: Math.sqrt(Math.random()) * Math.hypot(w, h) * 0.62, r: (Math.random() < 0.08 ? rnd(1.6, 2.4) : rnd(0.6, 1.4)) * k,
           p: rnd(0, T2), s: rnd(0.6, 1.8), c: COL[(Math.random() * COL.length) | 0], b: rnd(0.35, 1) })); },
       frame(t) {
@@ -2254,7 +2258,7 @@ function priismSkins(window, document) {
           if (x < -4 || x > w + 4 || y < -4 || y > h + 4) continue;
           const tw = 0.5 + 0.5 * Math.sin(t * s.s + s.p), al = s.b * (0.25 + 0.75 * tw * tw);
           ctx.fillStyle = `rgba(${s.c},${al.toFixed(3)})`; ctx.fillRect(x - s.r / 2, y - s.r / 2, s.r, s.r);
-          if (s.r > 1.5 * k && tw > 0.8) {   // the brightest stars: a small soft sparkle at their peak
+          if (o.sparkle !== false && s.r > 1.5 * k && tw > 0.8) {   // the brightest stars: a small soft sparkle at their peak
             const L = s.r * 3.2 * (tw - 0.8) * 5; ctx.fillStyle = `rgba(${s.c},${(al * 0.35).toFixed(3)})`;
             ctx.fillRect(x - L, y - 0.35 * k, L * 2, 0.7 * k); ctx.fillRect(x - 0.35 * k, y - L, 0.7 * k, L * 2); }
         }
@@ -2279,7 +2283,7 @@ function priismSkins(window, document) {
 
   // Trading Floor: a dark exchange floor in perspective. Rows of desks with glowing monitors fade into the haze, a
   // long quote board scrolls slowly overhead (symbols only, never made-up prices), a few screens refresh now and then.
-  const tradingFloor = (ctx) => {
+  const tradingFloor = (ctx, o = {}) => {
     let w = 0, h = 0, k = 1, back = null, mons = [], board = null, bY = 0, bH = 0;
     const SYMS = ["NQ", "ES", "YM", "RTY", "CL", "GC", "SI", "BTC", "ETH", "EUR", "GBP", "JPY", "AAPL", "NVDA", "TSLA", "MSFT", "AMZN", "META", "SPY", "QQQ", "VIX", "ZN", "HG", "NG"];
     return {
@@ -2326,9 +2330,12 @@ function priismSkins(window, document) {
       frame(t) {
         ctx.drawImage(back, 0, 0);
         // the quote board, scrolling slowly
+        if (o.board !== false) {
         const off = (t * 18 * k) % board.width;
         ctx.globalAlpha = 0.9; for (let x = -off; x < w; x += board.width) ctx.drawImage(board, Math.round(x), bY); ctx.globalAlpha = 1;
         ctx.fillStyle = "rgba(120,170,255,0.12)"; ctx.fillRect(0, bY - 1, w, 1); ctx.fillRect(0, bY + bH, w, 1);
+        }
+        if (o.refresh === false) return;
         // a few screens gently brighten and fade, as if they refreshed
         ctx.globalCompositeOperation = "lighter";
         for (let i = 0; i < mons.length; i += 7) { const m = mons[i], a = Math.max(0, Math.sin(t * 0.25 + m.p)) * 0.12 * m.fog;
@@ -2339,7 +2346,7 @@ function priismSkins(window, document) {
   };
 
   // Market Wall: a wall of trading screens, softly out of focus, their charts drifting slowly to the left.
-  const marketWall = (ctx) => {
+  const marketWall = (ctx, o = {}) => {
     let w = 0, h = 0, k = 1, back = null, cells = [];
     return {
       resize(W, H) { w = W; h = H; k = kOf(w, h); back = offscreen(w, h); const g = back.getContext("2d"); cells = [];
@@ -2352,7 +2359,7 @@ function priismSkins(window, document) {
           sg.fillStyle = `hsla(${hue},40%,7%,1)`; sg.fillRect(0, 0, strip.width, ch);
           sg.strokeStyle = "rgba(255,255,255,0.05)"; sg.lineWidth = 1; for (let gy = ch / 5; gy < ch; gy += ch / 5) { sg.beginPath(); sg.moveTo(0, gy); sg.lineTo(strip.width, gy); sg.stroke(); }
           const seed = rnd(0, 100); miniChart(sg, 0, ch * 0.12, cw, ch * 0.76, hue, 24, seed, true); miniChart(sg, cw, ch * 0.12, cw, ch * 0.76, hue, 24, seed, true);   // seamless loop
-          const blurred = offscreen(cw * 2, ch), bg = blurred.getContext("2d"); bg.filter = `blur(${Math.max(0.8, 1.3 * k).toFixed(1)}px)`; bg.drawImage(strip, 0, 0); bg.filter = "none";
+          const blurred = offscreen(cw * 2, ch), bg = blurred.getContext("2d"); const fb = (o.focus === undefined ? 1 : +o.focus) * Math.max(0.8, 1.3 * k); if (fb > 0.05) bg.filter = `blur(${fb.toFixed(1)}px)`; bg.drawImage(strip, 0, 0); bg.filter = "none";
           cells.push({ x, y, w: cw, h: ch, img: blurred, sp: rnd(3, 7) * k, p: rnd(0, cw), hue });
           // bezel + the screen's glow on the wall
           g.fillStyle = "#07090f"; g.fillRect(x - 2, y - 2, cw + 4, ch + 4);
@@ -2364,7 +2371,7 @@ function priismSkins(window, document) {
       },
       frame(t) {
         ctx.drawImage(back, 0, 0);
-        for (const c of cells) { const off = (c.p + t * c.sp) % c.w; ctx.drawImage(c.img, off, 0, c.w, c.h, c.x, c.y, c.w, c.h); }
+        for (const c of cells) { const off = (c.p + (o.drift === false ? 0 : t) * c.sp) % c.w; ctx.drawImage(c.img, off, 0, c.w, c.h, c.x, c.y, c.w, c.h); }
         ctx.drawImage(cells.vg, 0, 0, w, h);
       },
     };
@@ -2405,21 +2412,47 @@ function priismSkins(window, document) {
   }
   window.PriismWallInfo = { qualityOf, oledFrom, measure: measureWall };
 
+  // ---------- each wallpaper's own settings + Recolour ----------
+  // A wallpaper can list settings (opts: [{ k, label, type: "range"|"toggle", min, max, step, def }]); its create(ctx, o)
+  // gets the values, checked and with defaults filled in. Any wallpaper can also be Recoloured to your 2-3 colours:
+  // after each frame a "color" layer gives every pixel your colours' hue while keeping its brightness (black stays
+  // black, so OLED wallpapers stay OLED). saved = { amount: 1.4, rc: { c: ["#hex", ...], s: 0..1 } }.
+  const optsOf = (def, saved) => { const r = {};
+    for (const d of def.opts || []) { const v = saved ? saved[d.k] : undefined;
+      r[d.k] = d.type === "toggle" ? (typeof v === "boolean" ? v : d.def) : (v !== undefined && v !== null && v !== "" && Number.isFinite(+v) ? Math.max(d.min, Math.min(d.max, +v)) : d.def); }
+    return r; };
+  const recolourOf = (saved) => { const rc = saved && saved.rc; if (!rc || !Array.isArray(rc.c)) return null;
+    const c = rc.c.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3), st = rc.s === undefined ? 0.85 : Math.max(0, Math.min(1, +rc.s || 0));
+    return c.length && st > 0.01 ? { c, s: st } : null; };
+  const recolourSprite = (cols) => { const c = offscreen(64, 36), g = c.getContext("2d");
+    if (cols.length === 1) { g.fillStyle = cols[0]; g.fillRect(0, 0, 64, 36); return c; }
+    const gr = g.createLinearGradient(0, 36, 64, 0); cols.forEach((x, i) => gr.addColorStop(i / (cols.length - 1), x)); g.fillStyle = gr; g.fillRect(0, 0, 64, 36); return c; };
+  function makeSkin(id, ctx, saved) {
+    const def = window.WickedSkins[id] || window.WickedSkins.aurora, sk = def.create(ctx, optsOf(def, saved)), rc = recolourOf(saved);
+    if (!rc) return sk;
+    let spr = null;
+    const paint = () => { if (!spr) return; const cv = ctx.canvas; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = "color"; ctx.globalAlpha = rc.s;
+      ctx.drawImage(spr, 0, 0, cv.width, cv.height); ctx.restore(); };
+    return { resize(W, H) { spr = spr || recolourSprite(rc.c); sk.resize(W, H); }, frame(t, dt) { sk.frame(t, dt); paint(); } };
+  }
+  window.PriismMakeSkin = makeSkin;
+  window.PriismSkinOpts = { optsOf, recolourOf };
+
   window.WickedSkins = {
     aurora:    { name: "Polar Lights",    cat: "Wild", create: aurora },
     nebula:    { name: "Stardust",    cat: "Cosmos",  create: nebula },
-    starfield: { name: "Deep Field", cat: "Cosmos",  create: starfield, oled: true },
+    starfield: { name: "Deep Field", cat: "Cosmos",  create: starfield, oled: true , opts: [AMT] },
     embers:    { name: "Cinders",    cat: "Fire",   create: embers },
-    matrix:    { name: "Code Rain",    cat: "Electric",   create: matrix, oled: true },
+    matrix:    { name: "Code Rain",    cat: "Electric",   create: matrix, oled: true, opts: [{ k: "size", label: "Size", type: "range", min: 0.7, max: 1.8, step: 0.1, def: 1 }] },
     synthwave: { name: "Retro Sun", cat: "Electric",   create: synthwave },
-    rain:      { name: "Night Drizzle", cat: "Urban",   create: rain },
+    rain:      { name: "Night Drizzle", cat: "Urban",   create: rain , opts: [AMT] },
     graphite:  { name: "Slate",  cat: "Chill",   create: graphite },
     ocean:     { name: "Tide",     cat: "Chill",   create: ocean },
     deepsea:   { name: "Abyssal Glow",  cat: "Chill",   create: deepsea },
-    bokeh:     { name: "Soft Focus",     cat: "Chill",   create: bokeh, oled: true },
-    fireflies: { name: "Glowbugs", cat: "Wild", create: fireflies },
-    sakura:    { name: "Petal Drift",    cat: "Wild", create: sakura },
-    snow:      { name: "Snowfall",  cat: "Elements", create: snow },
+    bokeh:     { name: "Soft Focus",     cat: "Chill",   create: bokeh, oled: true , opts: [AMT] },
+    fireflies: { name: "Glowbugs", cat: "Wild", create: fireflies , opts: [AMT] },
+    sakura:    { name: "Petal Drift",    cat: "Wild", create: sakura , opts: [AMT] },
+    snow:      { name: "Snowfall",  cat: "Elements", create: snow , opts: [AMT] },
     storm:     { name: "Thunderstorm", cat: "Elements", create: storm },
     sunset:    { name: "Dusk Clouds", cat: "Elements", create: sunsetclouds },
     galaxy:    { name: "Spiral Galaxy",    cat: "Cosmos",  create: galaxy, oled: true },
@@ -2430,10 +2463,14 @@ function priismSkins(window, document) {
     circuit:   { name: "Circuit",   cat: "Electric",   create: circuit, oled: true },
     neoncity:  { name: "Skyline", cat: "Urban",   create: neoncity },
     tickertape:   { name: "Ticker Tape",   cat: "Markets", create: tickertape, oled: true },
-    tradingfloor: { name: "Trading Floor", cat: "Markets", create: tradingFloor, wow: true },
-    marketwall:   { name: "Market Wall",   cat: "Markets", create: marketWall },
-    midnight:     { name: "Midnight Moon", cat: "Chill",   create: midnight },
-    twinkle:      { name: "Twinkle",       cat: "Cosmos",  create: twinkle, oled: true },
+    tradingfloor: { name: "Trading Floor", cat: "Markets", create: tradingFloor, wow: true,
+      opts: [{ k: "board", label: "Quote board", type: "toggle", def: true }, { k: "refresh", label: "Screens refresh", type: "toggle", def: true }] },
+    marketwall:   { name: "Market Wall",   cat: "Markets", create: marketWall,
+      opts: [{ k: "focus", label: "Blur", type: "range", min: 0, max: 3, step: 0.25, def: 1 }, { k: "drift", label: "Charts drift", type: "toggle", def: true }] },
+    midnight:     { name: "Midnight Moon", cat: "Chill",   create: midnight,
+      opts: [{ k: "moon", label: "Moon", type: "toggle", def: true }, { k: "clouds", label: "Clouds", type: "toggle", def: true }, { k: "skyline", label: "Skyline", type: "toggle", def: true }] },
+    twinkle:      { name: "Twinkle",       cat: "Cosmos",  create: twinkle, oled: true,
+      opts: [{ ...AMT, label: "Stars" }, { k: "sparkle", label: "Sparkle", type: "toggle", def: true }] },
     // pack 2
     eclipse:     { name: "Totality",       cat: "Cosmos",   create: eclipse },
     comets:      { name: "Meteor Shower",  cat: "Cosmos",   create: comets },

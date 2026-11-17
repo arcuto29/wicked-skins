@@ -551,3 +551,8 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 /* Auto-match switch (Skins tab and Candles tab) */
 .row:has(> .seg) > span small { color: var(--dim); font-weight: 400; margin-left: 4px; }
 .matchpick { margin: 2px 0 8px; }
+/* Candle parts preview + This wallpaper preview and recolour chips */
+.partsprev, .wallprev { display: block; width: 100%; height: auto; aspect-ratio: 560 / 120; margin: 6px 0 4px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); background: #000; }
+.wallprev { aspect-ratio: 560 / 168; }
+.rcchip { display: inline-flex; align-items: center; gap: 6px; }
+.rcchip i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; border: 1px solid rgba(255,255,255,.25); }

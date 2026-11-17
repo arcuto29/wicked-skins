@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 17;
+  const HOOK_VERSION = 18;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -58,7 +58,8 @@
       const c = raw ? JSON.parse(raw) : null;
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
         candles = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
-          glow: Math.max(0, Math.min(1, +c.glow || 0)), look: lookIds().includes(c.look) ? c.look : "solid" };
+          glow: Math.max(0, Math.min(1, +c.glow || 0)), look: lookIds().includes(c.look) ? c.look : "solid",
+          P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null };   // wick / border / hollow / widths
       } else candles = null;
     } catch { candles = null; }
   }
@@ -1272,8 +1273,12 @@
     style(v) { origFillDesc.set.call(lookK.g, v); },
     stroke(v) { strokeDesc.set.call(lookK.g, v); },
     strokeRect(x, y, w, h) { origStrokeRectRaw.call(lookK.g, x, y, w, h); },
-    fillPath() { origFillPathRaw.call(lookK.g); } };
-  const origStrokeRectRaw = proto.strokeRect, origFillPathRaw = origFillPath;   // the untouched fill: candle looks never pass through the pill / label logic
+    fillPath() { origFillPathRaw.call(lookK.g); },
+    clear(x, y, w, h) { origClearRaw.call(lookK.g, x, y, w, h); } };
+  const origStrokeRectRaw = proto.strokeRect, origFillPathRaw = origFillPath, origClearRaw = proto.clearRect;
+  // were the last paint's candles wide enough to tell bodies from wicks? (wick colours / widths only then)
+  let partsTrack = null;
+  const tracker = () => partsTrack || (window.__bdCandleLooks && window.__bdCandleLooks.paintTracker ? (partsTrack = window.__bdCandleLooks.paintTracker(() => { try { forceRepaint(true); } catch {} })) : null);   // the untouched fill: candle looks never pass through the pill / label logic
   proto.fillRect = function (x, y, w, h) {
     const c = this.canvas;
     if (c && !c.isConnected) noteHiddenOther(this);
@@ -1311,14 +1316,15 @@
         return this.clearRect(x, y, w, h);
       }
     }
-    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift")) && h < c.height * 0.8 && isPane(c)) {
+    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P) && h < c.height * 0.8 && isPane(c)) {
       const fs = this.fillStyle; // already remapped, normalised to "#rrggbb" for opaque colours
       if (fs === candles.upHex || fs === candles.downHex) {
         const L = window.__bdCandleLooks, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, body = w * sx >= 3;
         const isUp = fs === candles.upHex, look = L ? candles.look : (candles.look === "neon" ? "neon" : "solid");
         // TradingView draws a bordered candle as an outer rect then the body inside it, both in our colour: draw the
         // look once (on the outer rect) so outlines / glass don't double up.
-        if (body && look !== "solid") {
+        const P = L ? candles.P : null, tr = P ? tracker() : null;
+        if (body && (look !== "solid" || P)) {
           const lb = lastBody.get(this), X = x * sx + t.e, Y = y * sy + t.f, W = w * sx, H = h * sy;
           // either order: body-then-border or border-then-body (within ~2 device px on every side)
           const inside = (a, o) => a.x >= o.x - 0.5 && a.y >= o.y - 0.5 && a.x + a.w <= o.x + o.w + 0.5 && a.y + a.h <= o.y + o.h + 0.5;
@@ -1333,8 +1339,16 @@
         lookK.g = this; lookK.px = 1 / sx; lookK.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
         this.save();
         if (glow > 0) { this.shadowColor = L ? L.tone(look, col, lookK) : col; this.shadowBlur = 4 + glow * 22; }
-        if (L && body && h * sy >= 3) L.draw(this, look, x, y, w, h, col, isUp, lookK);
-        else { const wc = L ? L.wick(look, col, lookK) : col; origFillDesc.set.call(this, wc); origFill.call(this, x, y, w, h); }
+        if (L && body && h * sy >= 3) { if (tr) tr.note(c, true, w * sx); P ? L.candle(this, look, x, y, w, h, col, isUp, lookK, P) : L.draw(this, look, x, y, w, h, col, isUp, lookK); }
+        else {
+          // a wick (or a body too thin to style): your wick colour / width only when this chart's bodies are wide enough
+          // to tell them apart (zoomed far out, thin bodies keep the candle colour)
+          if (tr) tr.note(c, false, 0);
+          const bw = tr ? tr.bw(c) : 0, ok = P && bw >= 3 && w * sx < 3;
+          const wc = L ? (ok ? L.wickOf(look, col, isUp, lookK, P) : L.wick(look, col, lookK)) : col;
+          let wx = x, ww = w; if (ok && P.wickW) { const nw = Math.min(P.wickW, Math.max(1, bw - 2)) / sx; wx = x + w / 2 - nw / 2; ww = nw; }
+          origFillDesc.set.call(this, wc); origFill.call(this, wx, y, ww, h);
+        }
         this.restore();
         return;
       }
