@@ -26,15 +26,31 @@ jobs:
         working-directory: android
         # retried: the Gradle download is sometimes briefly unavailable, which shouldn't fail a release
         run: for i in 1 2 3 4 5; do gradle wrapper --gradle-version 8.9 && exit 0; echo "retry $i"; sleep 30; done; exit 1
-      - name: Build debug APK
+      # Signed with Priism's permanent key (secrets ANDROID_KEYSTORE_B64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS),
+      # so every new APK installs over the last one and keeps your settings. Without the secrets: a debug build, as before.
+      - name: Build the APK (signed release when the key is set up)
         working-directory: android
-        run: for i in 1 2 3; do ./gradlew --no-daemon assembleDebug && exit 0; echo "retry $i"; sleep 30; done; exit 1
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -n "$KS_B64" ] && [ -n "$KS_PW" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/priism.jks"
+            ARGS="-PPRIISM_KEYSTORE=$RUNNER_TEMP/priism.jks -PPRIISM_KEYSTORE_PASSWORD=$KS_PW -PPRIISM_KEY_ALIAS=${KS_ALIAS:-priism} -PPRIISM_KEY_PASSWORD=$KS_PW"
+            for i in 1 2 3; do ./gradlew --no-daemon assembleRelease $ARGS && break; echo "retry $i"; sleep 30; [ $i = 3 ] && exit 1; done
+            echo "APK=app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No Android signing key secrets: building a debug APK (it can't update over the last one)."
+            for i in 1 2 3; do ./gradlew --no-daemon assembleDebug && break; echo "retry $i"; sleep 30; [ $i = 3 ] && exit 1; done
+            echo "APK=app/build/outputs/apk/debug/app-debug.apk" >> "$GITHUB_ENV"
+          fi
       - name: Rename the APK
         working-directory: android
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk "out/Priism-Skins-${GITHUB_REF_NAME#v}-android.apk" 2>/dev/null \
-            || cp app/build/outputs/apk/debug/app-debug.apk "out/Priism-Skins-android.apk"
+          case "$GITHUB_REF" in refs/tags/v*) N="Priism-Skins-${GITHUB_REF_NAME#v}-android.apk";; *) N="Priism-Skins-android.apk";; esac
+          cp "$APK" "out/$N"
           ls -la out
       - name: Upload the APK as a build artifact
         uses: actions/upload-artifact@v4
