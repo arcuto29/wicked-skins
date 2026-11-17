@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks && window.__bdCandleLooks.zoneBox) return;   // an older copy (before an update) is replaced
+  if (window.__bdCandleLooks && window.__bdCandleLooks.ZONE_STYLES) return;   // an older copy (before an update) is replaced
   // Lite glow (slow computers / Power saver, set by hook.js / lw.js from content.js): every glow's blur is drawn
   // smaller. Canvas blur is the costliest thing on a chart without a fast graphics card.
   if (!window.__bdLiteBlur && window.CanvasRenderingContext2D) {
@@ -431,16 +431,31 @@
   // with fully round ends. k = { begin, fill, stroke }: the REAL canvas calls (unhooked). z = zone() result.
   // st = { shape, border, px }. Returns false if there's nothing special to do (the caller draws it as before).
   function zoneBox(g, k, x, y, w, h, z, st) {
-    if (!st || (st.shape === "square" && st.border === "line")) return false;
+    if (!st || (st.shape === "square" && st.border === "line" && (!st.style || st.style === "flat"))) return false;
     if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
-    const px = st.px || 1, r = st.shape === "pill" ? Math.min(h, w) / 2 : st.shape === "rounded" ? Math.min(h / 2, w / 2, 9 * px) : 0;
+    // Rounded = soft corners (a third of the height, at most 10 px); Pill = fully round ends
+    const px = st.px || 1, r = st.shape === "pill" ? Math.min(h, w) / 2 : st.shape === "rounded" ? Math.max(Math.min(2 * px, h / 2), Math.min(h * 0.3, w / 2, 10 * px)) : 0;
     const path = (inset) => { k.begin(); const a = x + inset, b = y + inset, c = Math.max(0, w - 2 * inset), d = Math.max(0, h - 2 * inset), rr = Math.max(0, r - inset);
       if (rr > 0 && g.roundRect) g.roundRect(a, b, c, d, rr); else g.rect(a, b, c, d); };
     const pSB = g.shadowBlur, pSC = g.shadowColor, pW = g.lineWidth, pD = g.getLineDash ? g.getLineDash() : [];
-    const edge = z.e || (st.border !== "line" ? z.g : null), glow = z.glow || 0;
+    const edge = z.e || (st.border !== "line" || st.style === "hollow" ? z.g : null), glow = z.glow || 0;
     // fill (it glows itself only when there is no border to carry the glow)
-    path(0); k.style(z.f); if (glow > 0 && (!edge || st.border === "none")) { g.shadowColor = z.g; g.shadowBlur = 3 + glow * 22; } k.fill();
-    g.shadowBlur = pSB; g.shadowColor = pSC;
+    // the fill, in its style: Flat, Fade (strong at the start, fading into the future), Shine (lit from the top),
+    // Glass (top-lit with a fine highlight), Hollow (no fill, the border only)
+    const style = st.style || "flat", rk = typeof z.f === "string" ? keyOf(z.f) : null;
+    const fillRgba = (a) => (rk ? `rgba(${rk.k},${Math.max(0, Math.min(1, a)).toFixed(3)})` : z.f);
+    if (style !== "hollow") {
+      let f = z.f;
+      if (rk && style === "fade") { const gr = g.createLinearGradient(x, 0, x + w, 0); gr.addColorStop(0, fillRgba(rk.a * 1.9)); gr.addColorStop(0.55, fillRgba(rk.a * 0.9)); gr.addColorStop(1, fillRgba(rk.a * 0.12)); f = gr; }
+      else if (rk && style === "glass") { const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, fillRgba(rk.a * 1.8)); gr.addColorStop(1, fillRgba(rk.a * 0.45)); f = gr; }
+      path(0); k.style(f); if (glow > 0 && (!edge || st.border === "none")) { g.shadowColor = z.g; g.shadowBlur = 3 + glow * 22; } k.fill();
+      g.shadowBlur = pSB; g.shadowColor = pSC;
+      if (style === "shine" || style === "glass") {           // a soft light from the top edge
+        const gr = g.createLinearGradient(0, y, 0, y + h * (style === "glass" ? 0.5 : 0.65)); gr.addColorStop(0, `rgba(255,255,255,${style === "glass" ? 0.16 : 0.22})`); gr.addColorStop(1, "rgba(255,255,255,0)");
+        path(0); k.style(gr); k.fill();
+        if (style === "glass" && h > 6 * px) { k.strokeStyle("rgba(255,255,255,0.35)"); g.lineWidth = px; k.begin(); const rr = Math.max(0, r - px); g.moveTo(x + rr + px, y + 1.5 * px); g.lineTo(x + w - rr - px, y + 1.5 * px); k.stroke(); }
+      }
+    }
     if (edge && st.border !== "none") {
       const lw = Math.max(1, px) * (st.border === "glow" ? 1.6 : 1);
       k.strokeStyle(edge); g.lineWidth = lw; if (g.setLineDash) g.setLineDash(st.border === "dashed" ? [6 * px, 4 * px] : []);
@@ -454,7 +469,7 @@
   }
   // a see-through zone left in its own colours, when only its shape / border is styled
   function zoneOwn(orig) { const r = keyOf(orig); if (!r || r.a >= 0.9) return null; return { f: orig, g: `rgb(${r.k})`, glow: 0, e: `rgba(${r.k},0.9)` }; }
-  const ZONE_SHAPES = ["square", "rounded", "pill"], ZONE_BORDERS = ["line", "dashed", "double", "glow", "none"];
+  const ZONE_SHAPES = ["square", "rounded", "pill"], ZONE_BORDERS = ["line", "dashed", "double", "glow", "none"], ZONE_STYLES = ["flat", "fade", "shine", "glass", "hollow"];
 
   // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour,
   // glow: its own glow (or undefined = the Glow slider), w: extra width, hide }, or null to leave the line as it is.
@@ -543,5 +558,5 @@
     return true;
   }
 
-  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors };
+  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors };
 })();

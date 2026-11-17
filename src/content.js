@@ -39,7 +39,7 @@
     clipEdit: true,
     clipAudio: "none",        // sound in clips: none | mic (your voice) | computer (what's playing: music, videos) | both
     // Shortcuts (changeable in Adjust > Shortcuts). Stored as "Alt+Shift+KeyF" (modifiers + the key's code).
-    toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS",
+    toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS",
     clipLen: 10,              // seconds a shortcut recording lasts (the Clip section's length)
     focus: false, focusHides: "wallpaper",   // Focus mode: hide just the wallpaper, or the wallpaper AND all styling
     // Session timer: a slim countdown to the next market open / close, styled to match your look.
@@ -63,7 +63,7 @@
     indMode: "own", indColor: "", indCustom: {},
     drawOn: false,            // your own drawings (rectangles, zones you draw) follow the indicator colours too
     zoneFill: 0.12,           // how see-through recoloured zones are (4%..45%): soft keeps the price readable
-    zoneShape: "square", zoneBorder: "line",   // zone boxes: square | rounded | pill ; border: line | dashed | double | glow | none
+    zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",   // zoneStyle: flat | fade | shine | glass | hollow   // zone boxes: square | rounded | pill ; border: line | dashed | double | glow | none
     zoneDim: false,           // also soften zones that keep their own colours
     indGrad: [],              // your own Gradient colours (2-3); empty = the built-in gradients
     wallMatch: null,          // { src, colors }: the wallpaper colours Match everything measured (sharper than the chart's own sample)
@@ -1541,7 +1541,7 @@
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
-    "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "zoneShape", "zoneBorder", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
+    "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "zoneShape", "zoneBorder", "zoneStyle", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
