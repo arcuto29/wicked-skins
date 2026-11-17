@@ -276,11 +276,79 @@
     } catch { return null; }
   }
 
+  // ---------- Music: the glow and the wallpaper move with the music you're playing ----------
+  // You choose the tab (or, on Windows / ChromeOS, the whole screen) playing your music in the browser's own picker,
+  // with "Share audio" ticked. Priism only measures how loud the bass and the whole mix are, a few dozen times a second:
+  // nothing is recorded, played back or sent anywhere, and the picture of what you shared is dropped straight away.
+  let music = null, musicAsk = null;
+  const musicWanted = () => cfg.enabled && cfg.react === "music" && !!layer;
+  function syncMusic() { if (!musicWanted()) { stopMusic(); cancelMusicAsk(); return; } if (!music && !musicAsk) showMusicAsk(); }
+  function cancelMusicAsk() { if (musicAsk) { musicAsk.remove(); musicAsk = null; } }
+  function showMusicAsk(again) {
+    if (window.top !== window && !layer) return;
+    const card = document.createElement("div"); card.id = "bd-musicask"; musicAsk = card;
+    card.className = "bd-ui-card"; card.style.cssText = "top:70px";
+    const txt = document.createElement("span"); txt.textContent = again ? "Priism Skins \u00B7 the music stopped. Listen again?" : "Priism Skins \u00B7 move with your music";
+    const go = document.createElement("button"), no = document.createElement("button");
+    go.textContent = "Choose the music tab"; no.textContent = "Not now"; go.className = "bd-ui-btn pri"; no.className = "bd-ui-btn";
+    card.append(txt, go, no); document.documentElement.appendChild(card);
+    no.onclick = cancelMusicAsk;
+    go.onclick = async () => {
+      let stream;
+      try { stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, systemAudio: "include", selfBrowserSurface: "exclude", preferCurrentTab: false }); }
+      catch (e) { txt.textContent = "Not started: sharing was cancelled or isn't allowed here."; go.remove(); setTimeout(cancelMusicAsk, 3500); return; }
+      stream.getVideoTracks().forEach((t) => t.stop());            // only the sound is used
+      if (!stream.getAudioTracks().length) { txt.textContent = "No sound came through: pick the tab playing your music and tick \u201cShare tab audio\u201d."; go.textContent = "Try again"; return; }
+      cancelMusicAsk(); startMusic(stream);
+    };
+  }
+  function startMusic(stream) {
+    stopMusic();
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)(), src = ac.createMediaStreamSource(stream), an = ac.createAnalyser();
+      an.fftSize = 1024; an.smoothingTimeConstant = 0.6; src.connect(an);                  // not connected to the speakers: no echo
+      const bins = new Uint8Array(an.frequencyBinCount), hz = ac.sampleRate / an.fftSize;
+      const b0 = Math.max(1, Math.round(35 / hz)), b1 = Math.max(b0 + 1, Math.round(160 / hz));
+      music = { stream, ac, level: 0, avg: 0.2, last: 0 };
+      music.timer = setInterval(() => {
+        if (!music) return;
+        an.getByteFrequencyData(bins);
+        let bass = 0; for (let i = b0; i <= b1; i++) bass += bins[i]; bass /= (b1 - b0 + 1) * 255;
+        let all = 0; for (let i = 1; i < bins.length / 2; i++) all += bins[i]; all /= (bins.length / 2 - 1) * 255;
+        const e = Math.min(1, bass * 0.85 + all * 0.35);
+        music.avg += (e - music.avg) * 0.02;                                     // the song's usual energy (seconds)
+        const lift = Math.max(0, e - music.avg * 1.08);
+        music.level += ((Math.min(1, e * 0.8 + lift * 2)) - music.level) * (e > music.level ? 0.55 : 0.22);   // quick up, softer down
+        const beat = bass > 0.35 && bass > music.avg * 1.35 && performance.now() - music.last > 300;
+        if (beat) music.last = performance.now();
+        updateReact(beat ? 1 : 0);
+        // the wallpaper breathes a little brighter on the beat (the dim layer lifts for a moment)
+        const lift2 = Math.min(0.12, music.level * 0.12 * cfg.reactStrength);
+        for (const v of views) if (v.dim) v.dim.style.opacity = String(Math.max(0, Math.min(0.95, +cfg.dim + (cfg.calm && calmActive ? 0.3 : 0)) - lift2));
+      }, 33);
+      stream.getAudioTracks().forEach((t) => t.addEventListener("ended", () => { stopMusic(); if (musicWanted()) showMusicAsk(true); }));
+    } catch { stopMusic(); }
+  }
+  // tests only (localStorage bdTest=1): listen to a built-in kick drum instead of a shared tab (headless browsers can't share)
+  window.addEventListener("message", (e) => { if (e.source !== window || !e.data || e.data.__bdTest !== "music") return;
+    try { if (localStorage.getItem("bdTest") !== "1") return; } catch { return; }
+    const ac = new AudioContext(), dst = ac.createMediaStreamDestination();
+    setInterval(() => { const t = ac.currentTime + 0.02, o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.25);
+      g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3); o.connect(g).connect(dst); o.start(t); o.stop(t + 0.32); }, 500);
+    cancelMusicAsk(); startMusic(dst.stream); });
+  function stopMusic() {
+    if (!music) return;
+    clearInterval(music.timer);
+    try { music.stream.getTracks().forEach((t) => t.stop()); } catch {}
+    try { music.ac.close(); } catch {}
+    music = null; mood = 0; updateReact(0); applyLook();
+  }
   function updateReact(tick) {
     if (!reactEl) return;
-    let active = cfg.react !== "off" && (!!quote || cfg.react === "pnl");
+    let active = cfg.react !== "off" && (!!quote || cfg.react === "pnl" || cfg.react === "music");
     let label = "";
     if (!active) mood = 0;
+    else if (cfg.react === "music") { active = !!music; mood = music ? music.level : 0; }   // 0..1 with the music's energy
     else if (cfg.react === "market") { mood = clamp(quote.chg / 2); }          // ±2% day move = full
     else {
       const p = readPnl();
@@ -291,15 +359,19 @@
         label = `P&L ${p.v >= 0 ? "+" : "\u2212"}${unit}${Math.abs(p.v).toFixed(2)}${code}`;
       }
     }
-    const col = mood >= 0 ? upColor() : downColor();
+    const col = cfg.react === "music" ? (skinAccent() || upColor()) : mood >= 0 ? upColor() : downColor();
     const k = Math.abs(mood) * cfg.reactStrength;
+    // music changes ~30 times a second: only the opacity moves then (cheap); the glow's shape is set once
+    const isMusic = cfg.react === "music", ks = isMusic ? cfg.reactStrength : k;
+    reactEl.classList.toggle("bd-music", isMusic);
     reactEl.style.setProperty("--bd-react", col);
-    reactEl.style.opacity = String(active ? 0.15 + 0.85 * k : 0);
-    reactEl.style.boxShadow = `inset 0 0 ${40 + 160 * k}px ${10 + 40 * k}px ${col}`;
-    reactEl.style.background = `radial-gradient(ellipse at 50% ${mood >= 0 ? "110%" : "-10%"}, ${col}55, transparent 60%)`;
-    if (active && tick && performance.now() - lastPulse > 1200) {   // fast tickers: max ~1 pulse/1.2s
+    reactEl.style.opacity = String(active ? (isMusic ? 0.05 + 0.95 * k : 0.15 + 0.85 * k) : 0);
+    const sh = `inset 0 0 ${40 + 160 * ks}px ${10 + 40 * ks}px ${col}`, bgc = `radial-gradient(ellipse at 50% ${mood >= 0 ? "110%" : "-10%"}, ${col}55, transparent 60%)`;
+    if (reactEl.__sh !== sh) { reactEl.__sh = sh; reactEl.style.boxShadow = sh; }
+    if (reactEl.__bg !== bgc) { reactEl.__bg = bgc; reactEl.style.background = bgc; }
+    if (active && tick && performance.now() - lastPulse > (cfg.react === "music" ? 380 : 1200)) {   // fast tickers: max ~1 pulse/1.2s; beats: ~2.5/s at most
       lastPulse = performance.now();
-      const tcol = tick > 0 ? upColor() : downColor();
+      const tcol = cfg.react === "music" ? col : tick > 0 ? upColor() : downColor();
       reactEl.style.setProperty("--bd-pulse", tcol);
       reactEl.classList.remove("bd-pulse"); void reactEl.offsetWidth; reactEl.classList.add("bd-pulse");
     }
@@ -1201,7 +1273,7 @@
     placeViews(); watchCharts();
     resetQuality(); lastMatch = "";
     if (views.some((v) => v.skin || v.fx)) startLoop();
-    applyLook();
+    applyLook(); syncMusic();
     renderPnl();
   }
 
@@ -1727,6 +1799,7 @@
     if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k === "scaleFont" || k === "tkFont" || k === "uiFont")) ensureFonts();
+    if (keys.includes("react") || keys.includes("enabled")) syncMusic();
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
     // a wallpaper's own settings / Recolour: rebuilt in place (unless the whole layer is rebuilt anyway)
