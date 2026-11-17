@@ -2270,7 +2270,11 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["A cleaner panel in true black, with slimmer sliders",
+const WHATS_NEW = ["Match everything now matches it all, with your own wallpapers too",
+  "Softer zones so you see the price inside them (Style \u203a Indicators \u203a Zone fill)",
+  "Your own Gradient colours",
+  "A cleaner look everywhere: chart cards, clip editor, Workshop",
+  "A cleaner panel in true black, with slimmer sliders",
   "Wallpapers show their quality (4K, 1080p\u2026) and OLED, with an OLED filter (Skins \u203a OLED)",
   "A Webb space photo pack in the Workshop, up to 4K",
   "Black & white wallpapers (Adjust \u203a Picture \u203a Colour)",
