@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 18;
+  const HOOK_VERSION = 19;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -111,6 +111,8 @@
     }
     return out;
   }
+  // the font's CSS family, sent by content.js (it loads Priism's bundled fonts); only safe characters
+  const famOf = (f) => (typeof f.scaleFamily === "string" && /^[A-Za-z0-9 ,"'\-]{1,200}$/.test(f.scaleFamily) ? f.scaleFamily : "");
   function readFx() {
     try {
       const raw = htmlEl().getAttribute("data-ws-fx"), f = raw ? JSON.parse(raw) : {};
@@ -122,7 +124,7 @@
         scaleBg: ["auto", "glass", "color", "default"].includes(f.scaleBg) ? f.scaleBg : "auto",
         scaleBgColor: /^#[0-9a-f]{6}$/i.test(f.scaleBgColor || "") ? f.scaleBgColor : "#0b1320",
         scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
-        scaleFont: ["default", "mono", "rounded"].includes(f.scaleFont) ? f.scaleFont : "default",
+        scaleFont: /^[a-z]{1,16}$/.test(f.scaleFont || "") ? f.scaleFont : "default", scaleFamily: famOf(f), fontTick: +f.fontTick || 0,
         scaleLabels: !!f.scaleLabels,
         bracketOn: !!f.bracketOn,
         bracketSize: Math.max(0, Math.min(3, +f.bracketSize || 0)),
@@ -163,7 +165,7 @@
       };
     } catch { fx = { ...FX0 }; }
     remapCache.clear();
-    const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont,
+    const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont, fx.scaleFamily, fx.fontTick,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
       fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
@@ -789,11 +791,11 @@
   function isPriceAxis(c) { let v = paCache.get(c); if (v === undefined) { v = !!(c.closest && c.closest(".price-axis, [class*='price-axis']")); paCache.set(c, v); } return v; }
   const autoOn = () => !htmlEl().classList.contains("bd-over-mode") && !!fx.bg;
   const scaleStyled = () => fx.scaleText || fx.scaleGlow > 0 || fx.scaleBold || fx.scaleSize > 0 || fx.scaleFont !== "default" || autoOn();
-  const FONTS = { mono: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace', rounded: '"SF Pro Rounded", "Nunito", "Varela Round", ui-rounded, system-ui, sans-serif' };
+
   function styledFont(font) {
     let f = font;
     if (fx.scaleSize > 0) f = f.replace(/(\d+(?:\.\d+)?)px/, (m, n) => (+n + fx.scaleSize * 1.5) + "px");
-    if (fx.scaleFont !== "default") f = f.replace(/(\d+(?:\.\d+)?px)\s+.*$/, (m, sz) => sz + " " + FONTS[fx.scaleFont]);
+    if (fx.scaleFont !== "default" && fx.scaleFamily) f = f.replace(/(\d+(?:\.\d+)?px)\s+.*$/, (m, sz) => sz + " " + fx.scaleFamily);
     if (fx.scaleBold && !/\bbold\b|\b[6-9]00\b/.test(f)) f = "bold " + f;
     return f;
   }

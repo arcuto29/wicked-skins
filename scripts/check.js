@@ -30,7 +30,11 @@ const refs = [
   ...Object.values(manifest.icons || {}),
   ...(manifest.web_accessible_resources || []).flatMap((w) => w.resources),
 ].filter(Boolean);
-for (const r of refs) if (!fs.existsSync(path.join(ROOT, r))) { bad++; console.error("✗ manifest points at missing file:", r); }
+// (a "dir/*.ext" pattern must match at least one file)
+const exists = (r) => { if (!r.includes("*")) return fs.existsSync(path.join(ROOT, r));
+  const dir = path.join(ROOT, path.dirname(r)), re = new RegExp("^" + path.basename(r).replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+  return fs.existsSync(dir) && fs.readdirSync(dir).some((f) => re.test(f)); };
+for (const r of refs) if (!exists(r)) { bad++; console.error("✗ manifest points at missing file:", r); }
 
 if (process.env.EXPECT_VERSION && process.env.EXPECT_VERSION !== manifest.version) {
   bad++; console.error(`✗ tag v${process.env.EXPECT_VERSION} doesn't match manifest version ${manifest.version}`);

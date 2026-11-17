@@ -53,7 +53,7 @@ dependencies {
 // Keep one copy of the skin code: copy the shared JS/CSS + the settings popup into assets before building.
 tasks.register('syncShared', Copy) {
     into layout.projectDirectory.dir('src/main/assets/shared')
-    into('src') { from(rootProject.file('../src')) { include '*.js', '*.css' } }
+    into('src') { from(rootProject.file('../src')) { include '*.js', '*.css', 'fonts/*.woff2' } }
     into('popup') { from(rootProject.file('../popup')) }
     into('vendor') { from(rootProject.file('../vendor')) }
     into('player') { from(rootProject.file('../player')) }

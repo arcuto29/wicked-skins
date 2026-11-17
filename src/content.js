@@ -985,7 +985,31 @@
   }
 
   // UI style: font / size / accent for TradingView's own HTML panels (watchlist, toolbars, order area, timeframes).
-  const UI_FONTS = { mono: 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace', rounded: '"SF Pro Rounded", "Nunito", "Varela Round", ui-rounded, system-ui, sans-serif' };
+  // ---------- fonts: Priism's bundled fonts (src/fonts), loaded into this page only when one is picked ----------
+  // Loaded from Priism's own files as data (FontFace from bytes), so the page's rules for outside fonts don't matter.
+  const fontRow = (id) => (window.PriismFonts || []).find((f) => f[0] === id);
+  const fontStack = (id) => { const f = fontRow(id); return f ? f[3] : ""; };
+  const fontLoaded = new Map();   // file -> Promise
+  let fontTick = 0;
+  async function fontBytes(file) {
+    if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) return (await fetch(chrome.runtime.getURL(`src/fonts/${file}.woff2`))).arrayBuffer();
+    const b64 = window.PriismFontBridge ? window.PriismFontBridge.get(file) : window.PriismNative && window.PriismNative.font ? window.PriismNative.font(file) : "";   // desktop app / Android
+    if (!b64) throw new Error("no font");
+    const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer;
+  }
+  function loadFont(id) {
+    const f = fontRow(id); if (!f || !f[2] || typeof FontFace === "undefined") return null;
+    const file = f[2];
+    if (!fontLoaded.has(file)) fontLoaded.set(file, fontBytes(file).then((buf) => { const face = new FontFace(`Priism ${file}`, buf, { weight: "100 900" }); document.fonts.add(face); return face.load(); })
+      .then(() => true, () => false));
+    return fontLoaded.get(file);
+  }
+  // the fonts you picked: load any that aren't here yet, then redraw what uses them (the canvas needs a nudge)
+  function ensureFonts() {
+    const waits = [cfg.scaleFont, cfg.tkFont, cfg.uiFont].map(loadFont).filter(Boolean);
+    if (!waits.length) return;
+    Promise.all(waits).then((r) => { if (!r.some(Boolean)) return; fontTick++; pushFx(); tkApplied = ""; applyTicker(); applyUiStyle(); });
+  }
   // ---------- the ticker (TradingView's legend: symbol name · timeframe · exchange) ----------
   // Only the main symbol's line (legendMainSourceWrapper), never indicator names like Vol. One <style>, no per-frame work.
   const TK_SIZES = [14, 17, 21, 26];
@@ -993,7 +1017,7 @@
   function applyTicker() {
     const on = cfg.enabled && cfg.tkOn;
     const col = cfg.tkColor === "candle" ? upColor() : /^#[0-9a-f]{6}$/i.test(cfg.tkColor || "") ? cfg.tkColor : (skinAccent() || upColor());
-    const px = TK_SIZES[Math.max(0, Math.min(3, +cfg.tkSize || 0))], font = UI_FONTS[cfg.tkFont] || "";
+    const px = TK_SIZES[Math.max(0, Math.min(3, +cfg.tkSize || 0))], font = fontStack(cfg.tkFont);
     const sig = on ? [col, px, font, !!cfg.tkGlow, !!cfg.tkOnly].join("|") : "";
     if (sig === tkApplied) return; tkApplied = sig;
     let st = document.getElementById("bd-ticker-css");
@@ -1046,13 +1070,13 @@
   }
   function applyUiStyle() {
     const h = document.documentElement;
-    const font = ["mono", "rounded"].includes(cfg.uiFont) ? cfg.uiFont : "";
+    const font = fontStack(cfg.uiFont) ? cfg.uiFont : "";
     const accent = /^#[0-9a-f]{6}$/i.test(cfg.uiAccent || "") ? cfg.uiAccent : "";
     const on = cfg.enabled && (font || cfg.uiSize > 0 || accent);
     h.classList.toggle("bd-ui", !!on);
     h.classList.toggle("bd-ui-font", !!font);
     h.classList.toggle("bd-ui-big", on && cfg.uiSize > 0);
-    h.style.setProperty("--bd-ui-font", font ? UI_FONTS[font] : "");
+    h.style.setProperty("--bd-ui-font", font ? fontStack(font) : "");
     h.style.setProperty("--bd-ui-accent", accent || "");
     h.classList.toggle("bd-ui-accent", !!(on && accent));
     h.classList.toggle("bd-lwpage", isLwPage());
@@ -1104,7 +1128,7 @@
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
     document.documentElement.classList.toggle("bd-on", cfg.enabled && !focusAll());
-    applySides(); applyUiStyle(); applyPanels(); applyDialogs(); applyTicker(); applyLegend();
+    applySides(); applyUiStyle(); applyPanels(); applyDialogs(); applyTicker(); applyLegend(); ensureFonts();
     if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
@@ -1555,7 +1579,7 @@
   }, 3000);
   function pushFx() {
     const h = document.documentElement;
-    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent(), wallColors: wallColorsNow() }));
+    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent(), wallColors: wallColorsNow(), scaleFamily: fontStack(cfg.scaleFont), fontTick }));
     else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     // Scale backing = real frosted glass behind the price + time scales
@@ -1670,6 +1694,7 @@
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
+    if (keys.some((k) => k === "scaleFont" || k === "tkFont" || k === "uiFont")) ensureFonts();
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
     // a wallpaper's own settings / Recolour: rebuilt in place (unless the whole layer is rebuilt anyway)
