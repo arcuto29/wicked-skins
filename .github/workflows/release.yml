@@ -39,9 +39,15 @@ jobs:
           name: Priism Skins ${{ github.ref_name }}
           body_path: notes.md
           files: dist/priism-skins-*.zip
+      # The store refuses a new upload while the last one is still in review. That must not stop the desktop apps
+      # from being built and attached: warn instead, and upload the latest zip in the dashboard once review is done.
       - name: Publish to Chrome Web Store
         if: env.EXTENSION_ID != '' && env.REFRESH_TOKEN != '' && env.CLIENT_ID != '' && env.PUBLISHER_ID != ''
-        run: npx --yes chrome-webstore-upload-cli@4 --source "dist/priism-skins-${GITHUB_REF_NAME#v}.zip"
+        run: |
+          set -o pipefail
+          if ! npx --yes chrome-webstore-upload-cli@4 --source "dist/priism-skins-${GITHUB_REF_NAME#v}.zip" 2>&1 | tee cws.log; then
+            echo "::warning::Not sent to the Chrome Web Store: $(grep -o 'You may not.*review\.' cws.log || tail -1 cws.log). The release and desktop apps still go out; upload this zip in the dashboard later, or the next release will."
+          fi
       - name: Chrome Web Store not connected yet
         if: env.EXTENSION_ID == '' || env.REFRESH_TOKEN == '' || env.CLIENT_ID == '' || env.PUBLISHER_ID == ''
         run: echo "::notice::Not published to the Chrome Web Store - add the CWS_* secrets (see RELEASING.md) and every tag publishes automatically."
