@@ -33,6 +33,12 @@
       q = sort === "new" ? q.order("created_at", { ascending: false }) : q.order("uses", { ascending: false }).order("created_at", { ascending: false });
       return err(await q.range(page * PAGE, page * PAGE + PAGE - 1));
     },
+    // one approved wallpaper by id (a look that comes with its own wallpaper)
+    async getWallpaper(id) {
+      need();
+      const r = err(await sb.from("wallpapers").select("id, title, kind, file_path, thumb_path").eq("id", id).eq("status", "approved").maybeSingle());
+      return r ? { ...r, fileUrl: publicUrl(r.file_path), thumbUrl: publicUrl(r.thumb_path) || publicUrl(r.file_path) } : null;
+    },
     countLookUse(id) { if (sb) sb.rpc("count_look_use", { look: id }).then(() => {}, () => {}); },
     // download the file so it can be added to your Uploads (and count the use)
     async fetchFile(item) {

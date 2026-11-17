@@ -493,7 +493,7 @@ async function matchEverything(auto) {
 if ($("matchAll")) $("matchAll").onclick = () => matchEverything();
 // Auto-match: every wallpaper you pick (built-in, your own upload or from the Workshop) runs Match everything on its
 // own. One-tap looks keep their own designed colours.
-function autoMatchPick() { if (cfg.matchOnPick) matchEverything(true); }
+function autoMatchPick() { if (cfg.matchOnPick && !noAutoMatch) matchEverything(true); }
 function syncMatchOnPick() {
   const pick = (v) => { set({ matchOnPick: v }); syncMatchOnPick(); if (v) matchEverything(true); };
   for (const id of ["matchOnPick", "matchOnPick2"]) if ($(id)) seg(id, [[false, "Off"], [true, "On"]], () => !!cfg.matchOnPick, pick);
@@ -1118,14 +1118,36 @@ function wsRenderLooks() {
     const up = d.candleUp || "#26a69a", down = d.candleDown || "#ef5350";
     card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(up, down)}</div><span class="oncount${it.mine ? " review" : ""}">${it.mine ? "IN REVIEW" : it.uses + " ON"}</span>
       <div class="label"><span>${esc(it.title)}<small>${it.mine ? "yours" : "by " + esc(it.author || "trader")} · ${esc(WickedSkins[it.skin].name)}</small></span></div>`);
+    const wallId = it.data && typeof it.data.wallId === "string" && /^[0-9a-f-]{36}$/i.test(it.data.wallId) ? it.data.wallId : "";
+    if (wallId) W().getWallpaper(wallId).then((w) => { if (!w || !w.thumbUrl) return; const im = document.createElement("img"); im.alt = ""; im.loading = "lazy"; im.src = w.thumbUrl; im.className = "wslookimg"; cv.replaceWith(im);
+      const sm = card.querySelector(".label small"); if (sm) sm.textContent = (it.mine ? "yours" : "by " + (it.author || "trader")) + " \u00B7 its own " + (w.kind === "video" ? "video" : "picture"); }).catch(() => {});
     card.onclick = () => {
-      applyWithUndo({ ...d, enabled: true, skin: it.skin }, it.mine ? `Applied your look \u201c${it.title}\u201d.` : `Applied \u201c${it.title}\u201d by ${it.author || "trader"}.`);
+      applyWithUndo({ ...d, enabled: true, ...(wallId ? {} : { skin: it.skin }) }, it.mine ? `Applied your look \u201c${it.title}\u201d.` : `Applied \u201c${it.title}\u201d by ${it.author || "trader"}.`);
+      if (wallId) useLookWall(wallId, it.skin);
       if (!it.id) return;
       const used = new Set(JSON.parse(localStorage.getItem("usedLooks") || "[]"));
       if (!used.has(it.id)) { used.add(it.id); localStorage.setItem("usedLooks", JSON.stringify([...used].slice(-500))); W().countLookUse(it.id); }   // count each person once
     };
     box.appendChild(card);
   }
+}
+// A look that comes with its own Workshop wallpaper: use it (downloaded once into My uploads, then reused).
+// The look's own colours stay: Auto-match is skipped for this pick.
+let noAutoMatch = false;
+async function useLookWall(wallId, fallbackSkin) {
+  const have = (cfg.media || []).find((m) => m.wsId === wallId && !m.pending);
+  if (have) { pickSource("media:" + have.id); return; }
+  try {
+    const w = await W().getWallpaper(wallId); if (!w) throw new Error("its wallpaper isn't in the Workshop any more");
+    toast(`Downloading the look's wallpaper \u201c${w.title}\u201d\u2026`);
+    const blob = await W().fetchFile(w), ext = (blob.type.split("/")[1] || "").replace("jpeg", "jpg");
+    const before = new Set((cfg.media || []).map((m) => m.id));
+    noAutoMatch = true;
+    try { await addFiles([new File([blob], `${w.title}.${ext || (w.kind === "video" ? "webm" : "png")}`, { type: blob.type })]); } finally { noAutoMatch = false; }
+    const added = (cfg.media || []).find((m) => !before.has(m.id));
+    if (added) set({ media: cfg.media.map((m) => (m.id === added.id ? { ...m, wsId: wallId } : m)) });
+    toast(`\u201c${w.title}\u201d is on your chart and in My uploads.`);
+  } catch (e) { set({ skin: fallbackSkin && WickedSkins[fallbackSkin] ? fallbackSkin : "aurora" }); syncSkinView(); toast("Couldn't get the look's wallpaper (" + e.message + "), so it uses a built-in one."); }
 }
 // Publish: the website (you sign in there once; it remembers you) receives the look as a code and puts it in the
 // Workshop: live straight away for the owner, after a check for everyone else. We keep a copy here, so
@@ -1139,7 +1161,7 @@ function publishLook(name, src) {
   if (window.PriismNative && window.PriismNative.openUrl) window.PriismNative.openUrl(u);          // Android app
   else if (chrome.tabs && chrome.tabs.create) chrome.tabs.create({ url: u });                       // extension
   else window.open(u, "_blank");                                                                      // desktop app -> your browser
-  if ((src ? src.skin : cfg.skin) === "media") toast("Your own upload can't travel in a look, so it's published with a built-in wallpaper (Polar Lights).");
+  if ((src ? src.skin : cfg.skin) === "media") toast("On the website, add the same file to the look (Choose the file), so everyone gets your wallpaper too.");
 }
 const shareLook = () => publishLook(($("loName") && $("loName").value.trim()) || (WickedSkins[cfg.skin] ? WickedSkins[cfg.skin].name : "My look"));
 if ($("wsShareLook")) $("wsShareLook").onclick = shareLook;
@@ -1236,7 +1258,9 @@ function lookPayload(src = { skin: cfg.skin, look: cfg }) {
 }
 function makeLookCode(name, src) {
   const { skin, look } = lookPayload(src);
-  return LOOK_CODE_PREFIX + b64urlEncode(JSON.stringify({ v: 1, n: (name || "").slice(0, 40), s: skin, l: look }));
+  // your own upload can't travel in a code: say which file it was, so the website can ask you to add it to the look
+  const srcSkin = src ? src.skin : cfg.skin, mid = src ? src.mediaId : cfg.mediaId, m = srcSkin === "media" ? (cfg.media || []).find((x) => x.id === mid) : null;
+  return LOOK_CODE_PREFIX + b64urlEncode(JSON.stringify({ v: 1, n: (name || "").slice(0, 40), s: skin, l: look, ...(m ? { m: { n: String(m.name || "").slice(0, 80), t: m.type === "video" ? "video" : "image" } } : {}) }));
 }
 const lookLink = (code) => WS_SITE() + "look.html#" + code;
 function parseLookCode(code) {
@@ -1296,7 +1320,7 @@ function renderLoadouts() {
         inp.onkeydown = (k) => { if (k.key === "Enter") done(); if (k.key === "Escape") renderLoadouts(); };
         inp.onblur = done; inp.onclick = (k) => k.stopPropagation();
       } else if (act === "publish") {
-        publishLook(lo.name, { skin: lo.skin, look: lo.look });
+        publishLook(lo.name, { skin: lo.skin, mediaId: lo.mediaId, look: lo.look });
       }
     };
     box.appendChild(card);
