@@ -1729,14 +1729,14 @@ function renderLegend(box) {
   const cur = cfg.lgColor || "", body = document.createElement("div"); body.className = "cpart-b";
   body.innerHTML = `<div class="row"><span>Text</span><div class="seg" id="lg-cm"></div><input type="color" id="lg-col" ${/^#/.test(cur) ? "" : "hidden"} /></div>
     <div class="row"><span>Values</span><div class="seg" id="lg-vals"></div></div>
-    <div class="row"><span>Backing</span><div class="seg" id="lg-back"></div></div>
-    <p class="hint">Readable picks white or black text for your wallpaper. The ticker's own style (above) still wins for the symbol name.</p>`;
+    <div class="row"><span>Box behind the text</span><div class="seg" id="lg-back"></div></div>
+    <p class="hint"><b>Text</b>: Readable picks white or black for your wallpaper. <b>Box behind the text</b> puts a small dark box (or a light one on bright wallpapers) behind each legend line, so names and values stay easy to read on a busy wallpaper. Frosted blurs the wallpaper behind it. The ticker's own style (above) still wins for the symbol name.</p>`;
   card.appendChild(body);
   seg("lg-cm", [["", "Readable"], ["candle", "Candle"], ["custom", "Custom"]], () => (/^#/.test(cfg.lgColor || "") ? "custom" : cfg.lgColor || ""),
     (v) => { set({ lgColor: v === "custom" ? ($("lg-col").value || "#ffffff") : v }); renderChartStyle(); });
   const ci = $("lg-col"); ci.value = /^#/.test(cur) ? cur : "#ffffff"; ci.oninput = (e) => set({ lgColor: e.target.value });
   seg("lg-vals", [["own", "Keep their colours"], ["all", "Same colour"]], () => cfg.lgVals === "all" ? "all" : "own", (v) => set({ lgVals: v }));
-  seg("lg-back", [["none", "None"], ["shade", "Shade"], ["glass", "Glass"]], () => ["shade", "glass"].includes(cfg.lgBack) ? cfg.lgBack : "none", (v) => set({ lgBack: v }));
+  seg("lg-back", [["none", "None"], ["shade", "Box"], ["glass", "Frosted"]], () => ["shade", "glass"].includes(cfg.lgBack) ? cfg.lgBack : "none", (v) => set({ lgBack: v }));
 }
 // The ticker: the symbol name at the top left of the chart (plus timeframe and exchange). Not a line, but it lives
 // with the other parts of the chart you can style.

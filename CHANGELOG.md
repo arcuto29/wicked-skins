@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.65 (2026-11-17)
+- **Fixed: the legend's Backing did nothing you could see.** It put a faint band behind each whole legend row (as wide as the chart), so on a dark wallpaper you couldn't see it and on a bright one it was a big stripe. Now it's a small box that hugs each line (symbol, Volume, your indicators), a bit stronger, and it's called **Box behind the text** (None / Box / Frosted) with a hint that says what it's for.
+
 ## 0.1.64 (2026-11-17)
 - **New: Live mood › Music.** The glow around your chart and your wallpaper move with the music you're playing: the glow rises with the music's energy and pulses on the beat, and the wallpaper brightens a little with it. On the chart, tap **Choose the music tab**, pick the tab playing it (YouTube, Spotify, SoundCloud…) and tick **Share tab audio**. On Windows you can also share the whole screen with its sound, including in the desktop app. Priism only measures how loud the beat is: nothing is recorded, played or sent anywhere. Strength sets how much it moves. Stop sharing from the browser's bar, or pick Off.
 

@@ -1163,8 +1163,9 @@
     const LW = 'html.bd-on.bd-lwpage:not(.bd-x) [data-bd-halo]';
     css += `${all ? `${LW}[data-bd-lg]` : `${LW}[data-bd-lg="n"]`}{color:var(--bd-lg-text)!important}`;
     if (back !== "none") {
-      const a = back === "glass" ? 0.4 : 0.66, blur = back === "glass" ? "-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);" : "";
-      css += `${L}[class*="series-"], ${L}[class*="study-"]{background:rgba(var(--bd-lg-back),${a})!important;${blur}border-radius:6px!important;box-shadow:0 0 0 3px rgba(var(--bd-lg-back),${a})!important}`;
+      const a = back === "glass" ? 0.45 : 0.72, blur = back === "glass" ? "-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);" : "";
+      // a small box that hugs each legend line (its rows are as wide as the chart, which made one big band before)
+      css += `${L}[class*="series-"], ${L}[class*="study-"]{width:max-content!important;max-width:calc(100% - 8px)!important;box-sizing:border-box!important;padding:0 6px!important;margin:1px 0!important;background:rgba(var(--bd-lg-back),${a})!important;${blur}border-radius:6px!important}`;
       css += `${LW}{text-shadow:0 0 2px rgba(var(--bd-lg-back),1),0 0 5px rgba(var(--bd-lg-back),.95),0 0 9px rgba(var(--bd-lg-back),.8)!important}`;
     }
     st.textContent = css;
