@@ -63,6 +63,7 @@
     indMode: "own", indColor: "", indCustom: {},
     drawOn: false,            // your own drawings (rectangles, zones you draw) follow the indicator colours too
     zoneFill: 0.12,           // how see-through recoloured zones are (4%..45%): soft keeps the price readable
+    zoneShape: "square", zoneBorder: "line",   // zone boxes: square | rounded | pill ; border: line | dashed | double | glow | none
     zoneDim: false,           // also soften zones that keep their own colours
     indGrad: [],              // your own Gradient colours (2-3); empty = the built-in gradients
     wallMatch: null,          // { src, colors }: the wallpaper colours Match everything measured (sharper than the chart's own sample)
@@ -1540,7 +1541,7 @@
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
-    "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
+    "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "zoneShape", "zoneBorder", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper

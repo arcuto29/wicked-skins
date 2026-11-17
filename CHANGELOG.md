@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.68 (2026-11-17)
+- **New: zone shapes and borders** (Style › Indicators, under Zone fill, with a live preview on your wallpaper). **Zone shape**: Square (as drawn), **Rounded** corners, or **Pill** with fully round ends. **Zone border**: Line, **Dashed**, **Double** (a second fine line inside), **Glow** (a soft lit edge) or None. Works on indicator zones (supply / demand, prints, sessions) and your own rectangle drawings, in their own colours or recoloured (Rainbow, Gradient, Wallpaper…), on tradingview.com, TradingView-based platforms and nq.vision. Your drawing's square outline is replaced by the rounded one. Bands that aren't boxes (Bollinger, clouds) keep their shape. Saved in looks, and per chart with Style each chart.
+
 ## 0.1.67 (2026-11-17)
 - **Style each chart in a layout on its own.** Adjust › Multiple charts › **Colours** has three choices: **Same as chart 1**, **Match each wallpaper**, and **Style each chart**. With Style each chart, the Style tab gets a **Styling: Chart 1 · Chart 2 · …** bar at the top. Pick a chart, and everything you change there (candle colours and looks including Rainbow and Cycle, candle parts, glow, indicator colours including Rainbow and Gradient, zones, grid, crosshair, price line, session breaks, chart text, price scale, trade brackets) applies to that chart only. Match everything matches that chart to its own wallpaper. **Make chart 2 like chart 1** undoes it. TradingView's panels, the ticker and the legend are one per page, so they stay shared. Works on tradingview.com, TradingView-based platforms and nq.vision-style Lightweight charts.
 - **Rainbow candles now fan out across the chart on Lightweight-chart platforms like nq.vision too** (before, they stayed one colour there).

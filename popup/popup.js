@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -21,7 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", shiftSpeed: 10,
-  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {},
+  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line",
   indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -59,7 +59,7 @@ function fontPicker(boxId, key) {
 // (TradingView's panels, the ticker, the legend and dialogs are one per page, so they stay shared.)
 const PER_CHART_KEYS = new Set(["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW",
   "lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW",
-  "indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","indGrad","txtMode","txtColor","txtOutline","txtSize","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle"]);
+  "indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","indGrad","txtMode","txtColor","txtOutline","txtSize","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle"]);
 let styleChart = 1, baseStyle = null;
 function routeChartStyle(obj) {
   if (styleChart < 2 || !baseStyle) return obj;
@@ -415,6 +415,20 @@ function drawPartsPreview() {
 }
 $("shiftSpeed").oninput = (e) => { set({ shiftSpeed: +e.target.value }); $("shiftSpeedOut").textContent = e.target.value + "s"; };
 $("lineGlow").oninput = (e) => { set({ lineGlow: +e.target.value }); $("lineGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+// a small preview of a zone in the chosen shape + border, on your wallpaper (drawn with the chart's own code)
+function drawZonePreview() {
+  const cv = $("zonePrev"), L = window.__bdCandleLooks; if (!cv || !L || !L.zoneBox) return;
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+  try { if (WickedSkins[cfg.skin]) { const s = makeSkin(cfg.skin, g); s.resize(W, H); s.frame(3, 0.016); g.fillStyle = "rgba(0,0,0,0.35)"; g.fillRect(0, 0, W, H); } else { g.fillStyle = "#0b0d12"; g.fillRect(0, 0, W, H); } } catch {}
+  const col = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff3366", c2 = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#33ff99";
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(",");
+  const k = { begin: () => g.beginPath(), fill: () => g.fill(), stroke: () => g.stroke(), style: (v) => { g.fillStyle = v; }, strokeStyle: (v) => { g.strokeStyle = v; } };
+  const st = { shape: cfg.zoneShape || "square", border: cfg.zoneBorder || "line", px: 2 }, a = Math.max(0.08, Math.min(0.45, +cfg.zoneFill || 0.12)) + 0.08, glow = +cfg.lineGlow || 0;
+  const box = (x, y, w, h, c) => { const z = { f: `rgba(${rgb(c)},${a})`, g: c, glow, e: `rgba(${rgb(c)},0.9)` };
+    if (!L.zoneBox(g, k, x, y, w, h, z, st)) { g.fillStyle = z.f; g.fillRect(x, y, w, h); g.strokeStyle = z.e; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, w - 2, h - 2); } };
+  box(30, 22, W * 0.62, 34, col); box(W * 0.3, 74, W * 0.62, 30, c2);
+}
 // Indicators: their colours (own / rainbow / your candle colours / your wallpaper's / any colour) + the glow above
 function syncIndicators() {
   if (!$("indMode")) return;
@@ -425,6 +439,10 @@ function syncIndicators() {
   if ($("zoneFill")) { const z = $("zoneFill"); z.value = +cfg.zoneFill || 0.12; $("zoneFillOut").textContent = Math.round(z.value * 100) + "%";
     z.oninput = () => { set({ zoneFill: +z.value }); $("zoneFillOut").textContent = Math.round(z.value * 100) + "%"; }; z.ondblclick = () => { z.value = 0.12; z.oninput(); }; }
   if ($("zoneDim")) seg("zoneDim", [[false, "Off"], [true, "On"]], () => !!cfg.zoneDim, (v) => set({ zoneDim: v }));
+  // zone boxes: their shape (rounded corners, pill ends) and border design, also for zones left in their own colours
+  if ($("zoneShape")) seg("zoneShape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"]], () => cfg.zoneShape || "square", (v) => { set({ zoneShape: v }); drawZonePreview(); });
+  if ($("zoneBorder")) seg("zoneBorder", [["line", "Line"], ["dashed", "Dashed"], ["double", "Double"], ["glow", "Glow"], ["none", "None"]], () => cfg.zoneBorder || "line", (v) => { set({ zoneBorder: v }); drawZonePreview(); });
+  drawZonePreview();
   // Gradient colours: your own 2-3, or the built-in gradients
   if ($("gradRow")) { $("gradRow").hidden = cfg.indMode !== "gradient";
     const g = Array.isArray(cfg.indGrad) ? cfg.indGrad : [], DEF = ["#2fe6c8", "#3a9bff", "#8a6cff"];
