@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.64 (unreleased)
+## 0.1.64 (2026-11-17)
 - **New: Live mood › Music.** The glow around your chart and your wallpaper move with the music you're playing: the glow rises with the music's energy and pulses on the beat, and the wallpaper brightens a little with it. On the chart, tap **Choose the music tab**, pick the tab playing it (YouTube, Spotify, SoundCloud…) and tick **Share tab audio**. On Windows you can also share the whole screen with its sound, including in the desktop app. Priism only measures how loud the beat is: nothing is recorded, played or sent anywhere. Strength sets how much it moves. Stop sharing from the browser's bar, or pick Off.
 
 ## 0.1.63 (2026-11-17)
