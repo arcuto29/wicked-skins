@@ -1880,7 +1880,7 @@ function syncTune() {
   seg("uiAccentMode", [["off", "Default"], ["custom", "Custom"]], () => (cfg.uiAccent ? "custom" : "off"),
     (v) => { set({ uiAccent: v === "custom" ? ($("uiAccent").value || "#2ef2b0") : "" }); syncTune(); });
   $("uiAccent").value = cfg.uiAccent || "#2ef2b0"; $("uiAccent").hidden = !cfg.uiAccent;
-  seg("react", [["off", "Off"], ["market", "Day\u2019s move"], ["pnl", "My position"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
+  seg("react", [["off", "Off"], ["market", "Day\u2019s move"], ["pnl", "My position"], ["music", "Music"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
   syncReact();
 }
 function syncReact() {
@@ -1889,7 +1889,9 @@ function syncReact() {
   $("reactStrength").value = cfg.reactStrength;
   $("reactStrengthOut").textContent = Math.round(cfg.reactStrength * 100) + "%";
 
-  $("reactHint").textContent = cfg.react === "market"
+  $("reactHint").textContent = cfg.react === "music"
+    ? "The glow and your wallpaper move with the music you're playing. On the chart, tap \u201cChoose the music tab\u201d, pick the tab playing it (YouTube, Spotify, SoundCloud\u2026) and tick \u201cShare tab audio\u201d. On Windows you can also share the whole screen with its sound. Priism only measures how loud the beat is: nothing is recorded or sent anywhere. Stop sharing any time from the browser's bar."
+    : cfg.react === "market"
     ? "Chart edges glow green/red with the day's move and pulse on every tick. Skins speed up when price moves."
     : "Glows green/red with the open P&L shown on your chart's position line (broker, prop platform or paper trading). Nothing is sent anywhere.";
 }
@@ -2532,7 +2534,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Rain, storms, snow and more over any wallpaper (Adjust \u203a This wallpaper \u203a Effect)",
+const WHATS_NEW = ["Your chart can move with your music (Trading \u203a Live mood \u203a Music)",
+  "Rain, storms, snow and more over any wallpaper (Adjust \u203a This wallpaper \u203a Effect)",
   "12 more fonts and 10 new candle looks",
   "Recolour any wallpaper to your colours, plus its own settings (Adjust \u203a This wallpaper)",
   "Candle parts: wick and border colours, hollow candles, widths (Style \u203a Candles)",
