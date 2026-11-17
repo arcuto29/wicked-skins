@@ -96,6 +96,16 @@ await as(null, "select public.count_look_use($1)", [l1.id]); await as(null, "sel
 ok("look uses counted without an account", (await as(null, "select uses from public.looks where id = $1", [l1.id])).rows[0].uses === 2);
 for (const u of [U2, U3, U4]) await as(u, "insert into public.look_reports (look_id, reason) values ($1, 'spam')", [l1.id]);
 ok("3 reports hide a look until re-review", (await as(null, "select count(*)::int n from public.looks where id = $1", [l1.id])).rows[0].n === 0);
+{ const lu = (await share(U2, "Mine")).rows[0];
+  ok("someone else can't update your look", (await tryAs(U1, "select public.update_my_look($1, 'x', 'aurora', '{}')", [lu.id])).startsWith("denied"));
+  ok("signed out can't update a look", (await tryAs(null, "select public.update_my_look($1, 'x', 'aurora', '{}')", [lu.id])).startsWith("denied"));
+  await as(ADMIN, "select public.moderate_look($1, 'approved')", [lu.id]);
+  const st = (await as(U2, "select public.update_my_look($1, 'Mine v2', 'galaxy', $2) s", [lu.id, JSON.stringify({ candleUp: "#ff0000" })])).rows[0].s;
+  const row = (await as(U2, "select title, skin, data, status from public.looks where id = $1", [lu.id])).rows[0];
+  ok("owner updates own look; it goes back to review", st === "pending" && row.title === "Mine v2" && row.skin === "galaxy" && row.data.candleUp === "#ff0000" && row.status === "pending", JSON.stringify(row));
+  ok("update checks the skin id", (await tryAs(U2, "select public.update_my_look($1, 'x', '<b>', '{}')", [lu.id])).startsWith("denied"));
+  const sa = (await as(ADMIN, "select public.update_my_look($1, 'Admin look 2', 'aurora', '{}') s", [la.id])).rows[0].s;
+  ok("an admin's update stays live", sa === "approved" && (await as(null, "select title from public.looks where id = $1", [la.id])).rows[0].title === "Admin look 2"); }
 ok("owner can delete own look", (await as(U1, "delete from public.looks where id = $1 returning id", [l1.id])).rows.length === 1);
 // ---------- wallpaper labels (quality + OLED) ----------
 { const w = (await as(U1, "insert into public.wallpapers (title, kind, file_path, size_bytes, width, height, oled) values ('dark', 'image', 'u/x.png', 10, 3840, 2160, true) returning id, width, oled")).rows[0];

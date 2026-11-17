@@ -338,6 +338,32 @@ begin
 end;
 $$;
 
+-- Update a look you shared (the same title, new settings): yours only. An admin's stays live; anyone else's goes
+-- back to review, so an approved look can't be swapped for something else unseen. Returns the new status.
+create or replace function public.update_my_look(look uuid, new_title text, new_skin text, new_data jsonb)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare st text;
+begin
+  if auth.uid() is null then raise exception 'sign in first'; end if;
+  if new_title is null or char_length(new_title) not between 1 and 40 then raise exception 'bad title'; end if;
+  if new_skin !~ '^[a-z0-9_-]{1,40}$' then raise exception 'bad skin'; end if;
+  if jsonb_typeof(new_data) <> 'object' or pg_column_size(new_data) > 8000 then raise exception 'bad data'; end if;
+  st := case when public.is_admin(auth.uid()) then 'approved' else 'pending' end;
+  update public.looks
+     set title = new_title, skin = new_skin, data = new_data, status = st, reject_reason = null,
+         reviewed_at = case when st = 'approved' then now() else null end
+   where id = look and owner = auth.uid();
+  if not found then raise exception 'not your look'; end if;
+  return st;
+end;
+$$;
+revoke all on function public.update_my_look(uuid, text, text, jsonb) from public, anon;
+grant execute on function public.update_my_look(uuid, text, text, jsonb) to authenticated;
+
 create or replace function public.count_look_use(look uuid)
 returns void
 language sql

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.66 (unreleased)
+- **Update a look you shared, instead of adding a second copy.** Publish a look with the same name as one you've already shared, and the website offers **Update my look** (ticked): the same Workshop card gets your new settings and keeps its uses. An admin's update is live at once; anyone else's goes back to review. Your own wallpaper stays attached unless you choose a new file. In Saved, **Update** on a look you've shared now also offers **Update in Workshop**. (Needs supabase/schema.sql re-run once.)
+
 ## 0.1.65 (2026-11-17)
 - **Fixed: the legend's Backing did nothing you could see.** It put a faint band behind each whole legend row (as wide as the chart), so on a dark wallpaper you couldn't see it and on a bright one it was a big stripe. Now it's a small box that hugs each line (symbol, Volume, your indicators), a bit stronger, and it's called **Box behind the text** (None / Box / Frosted) with a hint that says what it's for.
 

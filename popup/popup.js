@@ -470,10 +470,10 @@ $("candleDown").oninput = (e) => { set({ candleDown: e.target.value, candleOn: t
 // ---------- undo ----------
 // Any one-click change can be undone from the toast at the bottom.
 let undoTimer;
-function toast(msg, undo) {
+function toast(msg, undo, btn) {
   $("toastMsg").textContent = msg;
   $("toast").hidden = false;
-  $("toastUndo").hidden = !undo;
+  $("toastUndo").hidden = !undo; $("toastUndo").textContent = btn || "Undo";
   $("toastUndo").onclick = undo ? () => { undo(); $("toast").hidden = true; } : null;
   clearTimeout(undoTimer); undoTimer = setTimeout(() => ($("toast").hidden = true), undo ? 8000 : 3000);
 }
@@ -1399,7 +1399,10 @@ function renderLoadouts() {
         toast(`Deleted “${lo.name}”.`, () => { set({ loadouts: before }); renderLoadouts(); });
       } else if (act === "update") {
         set({ loadouts: cfg.loadouts.map((x) => (x.id === lo.id ? { ...x, skin: cfg.skin, mediaId: cfg.mediaId, look: snapshot() } : x)) });
-        renderLoadouts(); hintToast(`Updated “${lo.name}” with your current setup.`);
+        renderLoadouts();
+        // shared it in the Workshop before? offer to update that copy too (the website replaces it, no second card)
+        if (myShared().some((m) => m.t === lo.name)) toast(`Updated \u201c${lo.name}\u201d. Update it in the Workshop too?`, () => { const n = cfg.loadouts.find((x) => x.id === lo.id); if (n) publishLook(n.name, { skin: n.skin, mediaId: n.mediaId, look: n.look }); }, "Update in Workshop");
+        else hintToast(`Updated “${lo.name}” with your current setup.`);
       } else if (act === "rename") {
         const span = card.querySelector(".nm");
         span.innerHTML = `<input class="field" maxlength="40" value="${esc(lo.name)}" />`;
