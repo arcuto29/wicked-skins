@@ -2425,6 +2425,109 @@ function priismSkins(window, document) {
     ["exo", "Exo", "exo", fam("exo", SANS)], ["orbitron", "Orbitron", "orbitron", fam("orbitron", SANS)],
   ];
 
+  // ---------- Effects: weather and particles over ANY wallpaper (built-in or your own upload) ----------
+  // Each effect draws on its own see-through layer above the wallpaper (cleared every frame), so it works the same
+  // over a video, a picture or a live wallpaper, and never smears into wallpapers that build up over time.
+  // o.amount 0.3..2. Calm by design: soft alphas, slow movement, lightning rare and gentle (never strobing).
+  const area = (w, h) => Math.max(0.25, Math.min(2.5, (w * h) / (1280 * 720)));
+  const fxRain = (ctx, o = {}, heavy) => {
+    let w = 0, h = 0, k = 1, d = [];
+    const mk = (init) => ({ x: rnd(-0.1, 1.1), y: init ? rnd(0, 1) : rnd(-0.2, 0), l: rnd(12, 26), v: rnd(0.9, 1.4), a: rnd(0.12, 0.3) });
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); d = Array.from({ length: Math.round((heavy ? 320 : 190) * (o.amount || 1) * area(w, h)) }, () => mk(true)); },
+      frame(t, dt) {
+        const wind = heavy ? 0.22 : 0.12;
+        ctx.lineWidth = Math.max(1, 1.1 * k); ctx.lineCap = "round";
+        for (let band = 0; band < 3; band++) {          // three alpha bands = three strokes per frame, not hundreds
+          ctx.strokeStyle = `rgba(190,210,235,${[0.18, 0.28, 0.4][band]})`; ctx.beginPath();
+          for (let i = band; i < d.length; i += 3) { const p = d[i];
+            p.y += p.v * dt * (heavy ? 1.25 : 1); p.x -= p.v * dt * wind;
+            if (p.y > 1.05 || p.x < -0.15) { d[i] = mk(false); continue; }
+            const x = p.x * w, y = p.y * h, L = p.l * k; ctx.moveTo(x, y); ctx.lineTo(x + L * wind, y - L); }
+          ctx.stroke();
+        }
+      },
+    };
+  };
+  const fxStorm = (ctx, o = {}) => {
+    const rain = fxRain(ctx, o, true);
+    let w = 0, h = 0, k = 1, next = rnd(4, 9), flash = null;
+    const bolt = () => { const pts = [[rnd(0.15, 0.85) * w, 0]]; let x = pts[0][0], y = 0; const end = rnd(0.35, 0.65) * h;
+      while (y < end) { y += rnd(0.03, 0.07) * h; x += rnd(-0.04, 0.04) * w; pts.push([x, y]); } return pts; };
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); rain.resize(W, H); },
+      frame(t, dt) {
+        rain.frame(t, dt);
+        if (o.lightning === false) return;
+        next -= dt;
+        if (!flash && next <= 0) { flash = { t: 0, pts: bolt() }; next = rnd(9, 22) / Math.max(0.5, o.amount || 1); }
+        if (!flash) return;
+        flash.t += dt; const f = flash.t;
+        // two soft pulses in ~0.45 s (well under 3 flashes a second), then gone
+        const a = f < 0.12 ? f / 0.12 : f < 0.2 ? 1 - (f - 0.12) / 0.08 * 0.7 : f < 0.3 ? 0.3 + (f - 0.2) / 0.1 * 0.4 : Math.max(0, 0.7 - (f - 0.3) / 0.15 * 0.7);
+        if (f > 0.45) { flash = null; return; }
+        ctx.fillStyle = `rgba(200,215,255,${(0.13 * a).toFixed(3)})`; ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = `rgba(235,240,255,${(0.75 * a).toFixed(3)})`; ctx.lineWidth = Math.max(1, 1.6 * k); ctx.lineJoin = "round";
+        ctx.shadowColor = "rgba(170,190,255,0.9)"; ctx.shadowBlur = 14 * k;
+        ctx.beginPath(); flash.pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+        ctx.shadowBlur = 0;
+      },
+    };
+  };
+  const fxSnow = (ctx, o = {}) => {
+    let w = 0, h = 0, k = 1, s = [];
+    const mk = (init) => ({ x: rnd(0, 1), y: init ? rnd(0, 1) : -0.02, r: rnd(0.7, 2.6), v: rnd(0.02, 0.06), p: rnd(0, T2) });
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); s = Array.from({ length: Math.round(200 * (o.amount || 1) * area(w, h)) }, () => mk(true)); },
+      frame(t, dt) {
+        ctx.fillStyle = "rgba(240,245,255,0.75)"; ctx.beginPath();
+        for (let i = 0; i < s.length; i++) { const p = s[i];
+          p.y += p.v * dt * (0.6 + p.r / 3); p.x += Math.sin(t * 0.6 + p.p) * 0.012 * dt;
+          if (p.y > 1.02) { s[i] = mk(false); continue; }
+          const x = ((p.x % 1) + 1) % 1 * w, y = p.y * h, r = p.r * k; ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, T2); }
+        ctx.fill();
+      },
+    };
+  };
+  const fxFog = (ctx, o = {}) => {
+    let w = 0, h = 0, spr = null, b = [];
+    return {
+      resize(W, H) { w = W; h = H; spr = offscreen(128, 128); glowDot(spr.getContext("2d"), 64, 64, 64, "170,185,205", 1);
+        b = Array.from({ length: Math.round(9 * (o.amount || 1)) + 3 }, () => ({ x: rnd(-0.2, 1.2), y: rnd(0.25, 1.05), r: rnd(0.25, 0.5), v: rnd(0.004, 0.012), a: rnd(0.05, 0.11) })); },
+      frame(t, dt) {
+        for (const q of b) { q.x += q.v * dt; if (q.x > 1.4) q.x = -0.4;
+          const R = q.r * Math.max(w, h); ctx.globalAlpha = q.a * Math.min(1.4, o.amount || 1); ctx.drawImage(spr, q.x * w - R, q.y * h - R * 0.45, R * 2, R * 0.9); }
+        ctx.globalAlpha = 1;
+      },
+    };
+  };
+  const fxMotes = (ctx, o = {}, embers) => {
+    let w = 0, h = 0, k = 1, spr = null, m = [];
+    const mk = (init) => ({ x: rnd(0, 1), y: init ? rnd(0, 1) : 1.03, r: rnd(0.6, 1.8), v: rnd(0.01, 0.04) * (embers ? 2.2 : 1), p: rnd(0, T2), s: rnd(0.4, 1.2) });
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); spr = offscreen(32, 32); glowDot(spr.getContext("2d"), 16, 16, 16, embers ? "255,150,60" : "255,240,210", 1);
+        m = Array.from({ length: Math.round((embers ? 60 : 45) * (o.amount || 1) * area(w, h)) }, () => mk(true)); },
+      frame(t, dt) {
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < m.length; i++) { const p = m[i];
+          p.y -= p.v * dt * (embers ? 1 : 0.4); p.x += Math.sin(t * 0.3 * p.s + p.p) * 0.01 * dt;
+          if (p.y < -0.03) { m[i] = mk(false); continue; }
+          const tw = 0.5 + 0.5 * Math.sin(t * (embers ? 3 : 1.1) * p.s + p.p), R = p.r * k * (embers ? 5 : 6);
+          ctx.globalAlpha = (embers ? 0.25 + 0.55 * tw : 0.12 + 0.3 * tw) * (embers ? Math.min(1, (p.y + 0.05) * 1.6) : 1);
+          ctx.drawImage(spr, p.x * w - R, p.y * h - R, R * 2, R * 2); }
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
+  window.PriismEffects = {
+    rain:   { name: "Rain",         create: (c, o) => fxRain(c, o, false) },
+    storm:  { name: "Thunderstorm", create: fxStorm, opts: [{ k: "lightning", label: "Lightning", type: "toggle", def: true }] },
+    snow:   { name: "Snow",         create: fxSnow },
+    fog:    { name: "Fog",          create: fxFog },
+    dust:   { name: "Dust",         create: (c, o) => fxMotes(c, o, false) },
+    embers: { name: "Embers",       create: (c, o) => fxMotes(c, o, true) },
+  };
+
   // ---------- each wallpaper's own settings + Recolour ----------
   // A wallpaper can list settings (opts: [{ k, label, type: "range"|"toggle", min, max, step, def }]); its create(ctx, o)
   // gets the values, checked and with defaults filled in. Any wallpaper can also be Recoloured to your 2-3 colours:
@@ -2441,6 +2544,13 @@ function priismSkins(window, document) {
     if (cols.length === 1) { g.fillStyle = cols[0]; g.fillRect(0, 0, 64, 36); return c; }
     const gr = g.createLinearGradient(0, 36, 64, 0); cols.forEach((x, i) => gr.addColorStop(i / (cols.length - 1), x)); g.fillStyle = gr; g.fillRect(0, 0, 64, 36); return c; };
   function makeSkin(id, ctx, saved) {
+    // "fx:<effect>": an effect layer (see-through, cleared every frame). saved = { amount, lightning... }
+    if (typeof id === "string" && id.startsWith("fx:")) {
+      const e = window.PriismEffects[id.slice(3)] || window.PriismEffects.rain, o = { ...(saved || {}) };
+      o.amount = Math.max(0.3, Math.min(2, +o.amount || 1));
+      const fx = e.create(ctx, o); let W = 0, H = 0;
+      return { resize(w, h) { W = w; H = h; fx.resize(w, h); }, frame(t, dt) { const cv = ctx.canvas; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); fx.frame(t, dt); } };
+    }
     const def = window.WickedSkins[id] || window.WickedSkins.aurora, sk = def.create(ctx, optsOf(def, saved)), rc = recolourOf(saved);
     if (!rc) return sk;
     let spr = null;

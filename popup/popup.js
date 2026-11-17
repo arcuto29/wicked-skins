@@ -124,7 +124,7 @@ let last = 0;
   if (now - last < 66) return; // ~15fps previews
   const dt = (now - last) / 1000; last = now;
   if (document.hidden) return;
-  if (wallPrev && wallPrev.cv.offsetParent) { const d = Math.min(dt, 0.1); try { wallPrev.skin.frame((wallPrev.t += d), d); } catch {} }
+  if (wallPrev && wallPrev.cv.offsetParent) { try { stepWallPrev(Math.min(dt, 0.1)); } catch {} }
   for (const p of [...previews, ...quickPreviews, ...lookPreviews]) if (p.vis !== false) p.skin.frame((p.t += Math.min(dt, 0.1)), Math.min(dt, 0.1));
 })(0);
 
@@ -759,7 +759,11 @@ if ($("keepBg")) { $("keepBg").checked = localStorage.getItem("keepBg") === "1";
 const RC_PRESETS = [["candles", "My candles", null], ["priism", "Priism", ["#19d3ff", "#2ef2b0", "#c6ff3d"]], ["ice", "Ice", ["#5ee7ff", "#4f7dff"]],
   ["ember", "Ember", ["#ff7a1a", "#ff2e63"]], ["violet", "Violet", ["#8f5bff", "#ff4fd8"]], ["gold", "Gold", ["#ffd166", "#ff9f43"]],
   ["emerald", "Emerald", ["#00e6a0", "#00b3ff"]], ["rose", "Rose", ["#ff8fb1", "#b48cff"]], ["mono", "Mono", ["#c9d3e3"]]];
-const wallId = () => (WickedSkins[cfg.skin] ? cfg.skin : "");
+// the wallpaper on the chart now: a built-in id, or "media:<id>" for your own upload (effects work on both)
+const wallId = () => (WickedSkins[cfg.skin] ? cfg.skin : cfg.skin === "media" && cfg.mediaId ? "media:" + cfg.mediaId : "");
+const wallMedia = (id) => (id && id.startsWith("media:") ? (cfg.media || []).find((m) => m.id === id.slice(6)) : null);
+const wallName = (id) => (WickedSkins[id] ? WickedSkins[id].name : (wallMedia(id) || {}).name || "Your wallpaper");
+const FX_LIST = [["", "Off"], ["rain", "Rain"], ["storm", "Storm"], ["snow", "Snow"], ["fog", "Fog"], ["dust", "Dust"], ["embers", "Embers"]];
 const wallSaved = (id) => ({ ...(((cfg.skinOpts || {})[id]) || {}) });
 let wallPrev = null;
 // change this wallpaper's settings. live = only the panel previews now (while dragging); the chart gets it on release
@@ -776,16 +780,46 @@ function refreshWallPreviews(id) {
   heroP.key = ""; try { renderHero(); } catch {}
   wallPrev = null; drawWallPrev();
 }
+// the preview: the wallpaper (live, or your upload's picture) with its effect on top, like on the chart
 function drawWallPrev() {
   const cv = $("wallOptsPrev"), id = wallId(); if (!cv || !id || !cv.offsetParent) return;
-  if (!wallPrev) { try { wallPrev = { skin: makeSkin(id, cv.getContext("2d")), t: 2, id, cv }; wallPrev.skin.resize(cv.width, cv.height); wallPrev.skin.frame(2, 0.016); } catch { wallPrev = null; } }
+  if (wallPrev) return;
+  try {
+    const W = cv.width, H = cv.height, base = offscreenCanvas(W, H), fxc = offscreenCanvas(W, H), p = { cv, id, t: 2, base, fxc, skin: null, img: null, fx: null };
+    if (WickedSkins[id]) { p.skin = makeSkin(id, base.getContext("2d")); p.skin.resize(W, H); }
+    else { const m = wallMedia(id), src = m && (m.thumb || (m.type !== "video" && m.src)); if (src) { p.img = new Image(); p.img.src = src; } }
+    const f = ((cfg.skinOpts || {})[id] || {}).fx;
+    if (f && f.k) { p.fx = window.PriismMakeSkin("fx:" + f.k, fxc.getContext("2d"), f); p.fx.resize(W, H); }
+    wallPrev = p; stepWallPrev(0.016);
+  } catch { wallPrev = null; }
+}
+function offscreenCanvas(w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+function stepWallPrev(d) {
+  const p = wallPrev; if (!p) return;
+  const g = p.cv.getContext("2d"), W = p.cv.width, H = p.cv.height; p.t += d;
+  if (p.skin) { p.skin.frame(p.t, d); g.drawImage(p.base, 0, 0); }
+  else { g.fillStyle = "#000"; g.fillRect(0, 0, W, H); if (p.img && p.img.complete && p.img.naturalWidth) { const r = Math.max(W / p.img.naturalWidth, H / p.img.naturalHeight), iw = p.img.naturalWidth * r, ih = p.img.naturalHeight * r; g.drawImage(p.img, (W - iw) / 2, (H - ih) / 2, iw, ih); } }
+  if (p.fx) { p.fx.frame(p.t, d); g.drawImage(p.fxc, 0, 0); }
 }
 function syncWallOpts() {
   const grp = $("wallOptsGrp"); if (!grp) return;
   const id = wallId(), def = id && WickedSkins[id];
-  grp.hidden = !def; if (!def) return;
-  $("wallOptsName").textContent = def.name;
-  const saved = wallSaved(id), vals = window.PriismSkinOpts.optsOf(def, saved), box = $("wallOptsRows"); box.innerHTML = "";
+  grp.hidden = !id; if (!id) return;
+  $("wallOptsName").textContent = wallName(id);
+  const saved = wallSaved(id), vals = def ? window.PriismSkinOpts.optsOf(def, saved) : {}, box = $("wallOptsRows"); box.innerHTML = "";
+  // Effect: rain, a storm, snow... over this wallpaper (built-in or your own)
+  const fx = saved.fx && saved.fx.k ? saved.fx : null;
+  seg("fxK", FX_LIST, () => (fx ? fx.k : ""), (k) => { setWall({ fx: k ? { ...(fx || {}), k, amount: fx ? fx.amount || 1 : 1 } : undefined }); syncWallOpts(); });
+  $("fxAmtRow").hidden = !fx; $("fxLightRow").hidden = !fx || fx.k !== "storm";
+  if (fx) {
+    const a = $("fxA"); a.value = fx.amount || 1; $("fxAOut").textContent = Math.round(a.value * 100) + "%";
+    a.oninput = () => { $("fxAOut").textContent = Math.round(a.value * 100) + "%"; setWall({ fx: { ...fx, amount: +a.value } }, true); };
+    a.onchange = () => setWall({ fx: { ...fx, amount: +a.value } });
+    a.ondblclick = () => { a.value = 1; a.onchange(); syncWallOpts(); };
+    seg("fxL", [[true, "On"], [false, "Off"]], () => fx.lightning !== false, (v) => { setWall({ fx: { ...fx, lightning: v } }); syncWallOpts(); });
+  }
+  $("rcRow").hidden = !def;                                   // Recolour: built-in wallpapers only (yours keep their own colours)
+  if (!def) { $("rcBox").hidden = true; return; }
   for (const d of def.opts || []) {
     const row = document.createElement("div"); row.className = "row";
     if (d.type === "toggle") {
@@ -828,7 +862,7 @@ function syncWallOpts() {
 if ($("wallOptsReset")) $("wallOptsReset").onclick = () => { const id = wallId(); if (!id) return;
   const all = { ...(cfg.skinOpts || {}) }, before = cfg.skinOpts; delete all[id];
   set({ skinOpts: all }); syncWallOpts(); refreshWallPreviews(id);
-  toast(`${WickedSkins[id].name} is back to how it came.`, () => { set({ skinOpts: before }); syncWallOpts(); refreshWallPreviews(id); }); };
+  toast(`${wallName(id)} is back to how it came.`, () => { set({ skinOpts: before }); syncWallOpts(); refreshWallPreviews(id); }); };
 { const t = document.querySelector('#nav button[data-tab="tune"]'); if (t) t.addEventListener("click", () => setTimeout(() => { wallPrev = null; drawWallPrev(); }, 60)); }
 if ($("wallOptsGrp")) $("wallOptsGrp").addEventListener("toggle", () => { if ($("wallOptsGrp").open) setTimeout(() => { wallPrev = null; drawWallPrev(); }, 30); });
 if ($("gotoWallOpts")) $("gotoWallOpts").onclick = () => {
@@ -2498,7 +2532,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Recolour any wallpaper to your colours, plus its own settings (Adjust \u203a This wallpaper)",
+const WHATS_NEW = ["Rain, storms, snow and more over any wallpaper (Adjust \u203a This wallpaper \u203a Effect)",
+  "12 more fonts and 10 new candle looks",
+  "Recolour any wallpaper to your colours, plus its own settings (Adjust \u203a This wallpaper)",
   "Candle parts: wick and border colours, hollow candles, widths (Style \u203a Candles)",
   "Auto-match: every wallpaper you pick sets everything to match it (Skins \u203a Wallpapers)",
   "4 new wallpapers: Trading Floor, Market Wall, Midnight Moon and Twinkle (OLED)",
