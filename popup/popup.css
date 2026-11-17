@@ -520,3 +520,31 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 .wtag.oled { background: #000; color: #fff; border: 1px solid rgba(255,255,255,.35); }
 
 /* ===================== clean black theme ==============
+/* Workshop + wallpaper cards in the panel: the same gentle zoom on hover */
+.card img, .card canvas, .card video { transition: transform .5s cubic-bezier(.2,.7,.2,1); }
+.card:hover img, .card:hover canvas, .card:hover video { transform: scale(1.06); }
+@media (prefers-reduced-motion: reduce) { .card img, .card canvas, .card video { transition: none; } .card:hover img, .card:hover canvas, .card:hover video { transform: none; } }
+
+/* ===== invite card, in the Priism brand: black, a soft brand glow, the cyan → green → lime gradient as a hairline ===== */
+.invite-gate { background: radial-gradient(55% 40% at 50% 38%, rgba(46,242,176,.10), transparent 70%), radial-gradient(40% 30% at 30% 70%, rgba(25,211,255,.06), transparent 70%), #000 !important; }
+.ig-card { position: relative; width: min(340px, 100%); padding: 26px 22px 20px; border-radius: 20px; text-align: center;
+  background: linear-gradient(#0b0b0d, #0b0b0d) padding-box, linear-gradient(135deg, rgba(25,211,255,.55), rgba(46,242,176,.35) 45%, rgba(198,255,61,.25)) border-box;
+  border: 1px solid transparent; box-shadow: 0 30px 80px -30px rgba(46,242,176,.25), 0 20px 50px -20px rgba(0,0,0,.9); }
+.ig-mark { width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 18px; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 60%, rgba(46,242,176,.22), transparent 70%); }
+.ig-logo { width: 56px; height: 56px; border-radius: 14px; margin: 0; filter: drop-shadow(0 6px 18px rgba(46,242,176,.35)); }
+.ig-word { font: 800 10.5px/1 system-ui, sans-serif; letter-spacing: .28em; margin-bottom: 12px;
+  background: linear-gradient(100deg, #19d3ff, #2ef2b0 55%, #c6ff3d); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ig-card h2 { font-size: 20px; font-weight: 750; color: #fff; margin: 0 0 6px; }
+.ig-card p { color: #a3a8b6; }
+.ig-card .field { background: #050506 !important; border: 1px solid rgba(255,255,255,.14) !important; border-radius: 12px; color: #fff; padding: 12px; }
+.ig-card .field::placeholder { color: #4c4f5a; }
+.ig-card .field:focus { border-color: rgba(46,242,176,.7) !important; box-shadow: 0 0 0 3px rgba(46,242,176,.15) !important; }
+.ig-card button.primary { border-radius: 12px; padding: 12px; font-weight: 750; color: #03120d;
+  background: linear-gradient(100deg, #19d3ff, #2ef2b0 55%, #c6ff3d) !important; box-shadow: 0 10px 26px -12px rgba(46,242,176,.8) !important; }
+.ig-card button.primary:hover { filter: brightness(1.06); }
+.ig-card button.primary:disabled { opacity: .6; }
+.ig-foot { border-top: 1px solid rgba(255,255,255,.06); padding-top: 12px; }
+/* update card on black, like the rest */
+.pu-veil { background: rgba(0,0,0,.78); }
+.pu-card { background: #0b0b0d; border-color: rgba(255,255,255,.1); box-shadow: 0 30px 80px -30px rgba(0,0,0,.95); }
