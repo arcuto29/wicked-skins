@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.63 (unreleased)
+## 0.1.63 (2026-11-17)
 - **Saved looks keep the wallpaper's own settings.** Save look (and Update, export, share links and Publish) now includes that wallpaper's Recolour and its own settings, and applying the look brings them back (Undo puts yours back). Looks saved before this leave the wallpaper's settings alone.
 - **Yours: your own candle presets.** In Style → Candles, the preset grid starts with **Yours**: **+ Save these** keeps your current candles (colours, look, glow and candle parts) as a card next to the built-in ones. Tap to use it, ✎ to rename it, ✕ to delete it (with Undo).
 - **Auto-match is in one place only**, at the top of Skins → Wallpapers and My uploads (the second copy under Candles is gone).
