@@ -90,6 +90,7 @@
     </section>
 
     <section id="tab-candles" hidden>
+      <div class="chips stylechartbar" id="styleChartBar" hidden></div>
       <div class="matchall">
         <button id="matchAll" class="primary keep" type="button">✨ Match everything to my wallpaper</button>
         <p class="hint">One tap reads your wallpaper (built-in or your own) and sets everything to match: candles, your indicators, zones and drawings, crosshair, grid, price line, price scale, session breaks, ticker, legend, trade brackets and TradingView's panels. Zones stay soft and text stays readable, on dark or bright wallpapers. Tap Undo to go back.</p>
@@ -441,6 +442,9 @@
         <div class="row"><span>Wallpaper</span><div class="seg" id="multi"></div></div>
         <p class="hint" id="multiHint"></p>
         <div id="chartRows"></div>
+        <div class="row"><span>Colours</span><div class="seg wrap" id="chartColors"></div></div>
+        <p class="hint" id="chartColorsHint"></p>
+        <div id="chartColorRows"></div>
         <button id="showNums" class="link">Show chart numbers on the page</button>
       </details>
 

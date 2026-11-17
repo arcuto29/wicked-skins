@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 20;
+  const HOOK_VERSION = 21;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -45,23 +45,27 @@
   // ---------- settings ----------
   let on = htmlEl().classList.contains("bd-on");
   let candles = null; // { up:[r,g,b], down:[r,g,b], upHex, downHex, glow }
-  const remapCache = new Map();
+  const remapCacheMain = new Map();
 
   const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 
   // every candle look lives in candlelooks.js (shared with lw.js and the panel previews)
   const lookIds = () => (window.__bdCandleLooks && window.__bdCandleLooks.IDS) || ["solid", "neon", "prism", "shift"];
   function readCandles() {
-    remapCache.clear();
+    remapCacheMain.clear();
+    candles = parseCandles(htmlEl().getAttribute("data-ws-candles"));
+  }
+  function parseCandles(raw) {
+    let out = null;
     try {
-      const raw = htmlEl().getAttribute("data-ws-candles");
       const c = raw ? JSON.parse(raw) : null;
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
-        candles = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
+        out = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
           glow: Math.max(0, Math.min(1, +c.glow || 0)), look: lookIds().includes(c.look) ? c.look : "solid",
           P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null, lite: !!c.lite };   // wick / border / hollow / widths
-      } else candles = null;
-    } catch { candles = null; }
+      }
+    } catch { out = null; }
+    return out;
   }
   readCandles();
 
@@ -113,10 +117,10 @@
   }
   // the font's CSS family, sent by content.js (it loads Priism's bundled fonts); only safe characters
   const famOf = (f) => (typeof f.scaleFamily === "string" && /^[A-Za-z0-9 ,"'\-]{1,200}$/.test(f.scaleFamily) ? f.scaleFamily : "");
-  function readFx() {
+  function parseFx(raw) {
     try {
-      const raw = htmlEl().getAttribute("data-ws-fx"), f = raw ? JSON.parse(raw) : {};
-      fx = {
+      const f = raw ? JSON.parse(raw) : {};
+      return {
         lineGlow: Math.max(0, Math.min(1, +f.lineGlow || 0)),
         scaleText: /^#[0-9a-f]{6}$/i.test(f.scaleText || "") ? f.scaleText : "",
         scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)),
@@ -163,8 +167,11 @@
         profs: Array.isArray(f.profs) ? f.profs.slice(0, 16).filter((q) => q && Array.isArray(q.p))
           .map((q) => ({ l: +q.l || 0, t: +q.t || 0, r: +q.r || 0, b: +q.b || 0, p: q.p.slice(0, 18).map(Number) })) : [],
       };
-    } catch { fx = { ...FX0 }; }
-    remapCache.clear();
+    } catch { return { ...FX0 }; }
+  }
+  function readFx() {
+    fx = parseFx(htmlEl().getAttribute("data-ws-fx"));
+    remapCacheMain.clear();
     window.__bdLite = !!fx.lite || !!(candles && candles.lite);
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont, fx.scaleFamily, fx.fontTick, fx.lite,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
@@ -317,7 +324,7 @@
     for (const [k, v] of best) if (!v.tie) next.set(k, v.side);
     const sig = [...next].sort().join("|");
     if (sig !== sidesSig) {
-      sides = next; sidesSig = sig; remapCache.clear();
+      sides = next; sidesSig = sig; remapCacheMain.clear();
       if (candles) forceRepaint(false);
     }
   }
@@ -458,6 +465,7 @@
 
   function remap(v) {
     if (!candles || typeof v !== "string") return v;
+    const remapCache = candles.cache || remapCacheMain;    // each chart its own (charts can have their own colours)
     let out = remapCache.get(v);
     if (out !== undefined) return out;
     out = v;
@@ -1398,4 +1406,56 @@
     }
     return origStrokeRect.call(this, x, y, w, h);
   };
+
+  // ---------- each chart in a layout matched to ITS OWN wallpaper ----------
+  // content.js publishes, per chart (2, 3, 4...), where it is on screen and the colours measured from its own wallpaper
+  // (data-ws-charts; chart 1 = your usual colours). While TradingView draws on a chart's canvas, the candle colours,
+  // the wallpaper colours (indicators / zones) and the skin accent are that chart's. Nothing changes with one chart.
+  let chartCols = null, chartOfC = new WeakMap();
+  function readCharts() {
+    let a = null; try { a = JSON.parse(htmlEl().getAttribute("data-ws-charts") || "null"); } catch {}
+    const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v.toLowerCase() : "");
+    chartCols = Array.isArray(a) && a.length > 1 ? a.slice(0, 16).map((q, i) => (i && q && typeof q.fx === "string"
+      // this chart styled on its own (Style each chart): its own candles + chart styling, parsed like the main ones
+      ? { l: +q.l || 0, t: +q.t || 0, r: +q.r || 0, b: +q.b || 0, full: true, cand: parseCandles(q.cand || null), fx: parseFx(q.fx), colors: [] }
+      : i && q && hex(q.up) && hex(q.down)
+      ? { l: +q.l || 0, t: +q.t || 0, r: +q.r || 0, b: +q.b || 0, up: hex(q.up), down: hex(q.down), accent: hex(q.accent), text: hex(q.text), colors: Array.isArray(q.colors) ? q.colors.map(hex).filter(Boolean).slice(0, 5) : [] }
+      : i ? null : { l: +(q && q.l) || 0, t: +(q && q.t) || 0, r: +(q && q.r) || 0, b: +(q && q.b) || 0, main: true })) : null;
+    if (chartCols && !chartCols.some((q, i) => i && q)) chartCols = null;
+    chartOfC = new WeakMap();
+  }
+  function chartFor(c) {
+    if (!chartCols || !c || !c.isConnected) return null;
+    let e = chartOfC.get(c); const now = performance.now();
+    if (!e || now - e.t > 1500) {
+      const r = c.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2; let i = -1;
+      chartCols.forEach((q, k) => { if (q && x >= q.l && x <= q.r && y >= q.t && y <= q.b) i = k; });
+      e = { t: now, i }; chartOfC.set(c, e);
+    }
+    const q = e.i > 0 ? chartCols[e.i] : null; if (!q || q.main) return null;
+    if (q.full) { if (q.cand && !q.cand.cache) q.cand.cache = new Map(); return q; }
+    if (!candles) return null;
+    if (!q.cand || q.base !== candles) { q.base = candles; q.cand = { ...candles, up: hexToRgb(q.up), down: hexToRgb(q.down), upHex: q.up, downHex: q.down, cache: new Map() }; }
+    return q;
+  }
+  const withChart = (fn) => function (...a) {
+    const q = chartCols ? chartFor(this.canvas) : null;
+    if (!q) return fn.apply(this, a);
+    const L = window.__bdCandleLooks;
+    if (q.full) {                                          // a fully styled chart: swap the whole style while it draws
+      const pc = candles, pf = fx; candles = q.cand; fx = q.fx; if (L && L.setWallColors) L.setWallColors(fx.wallColors);
+      try { return fn.apply(this, a); } finally { candles = pc; fx = pf; if (L && L.setWallColors) L.setWallColors(fx.wallColors); }
+    }
+    const pc = candles, pa = fx.accent, pt = fx.txtColor;
+    candles = q.cand; if (q.accent) fx.accent = q.accent; if (q.text && fx.txtMode === "custom") fx.txtColor = q.text; if (L && L.setWallColors && q.colors.length >= 2) L.setWallColors(q.colors);
+    try { return fn.apply(this, a); }
+    finally { candles = pc; fx.accent = pa; fx.txtColor = pt; if (L && L.setWallColors && q.colors.length >= 2) L.setWallColors(fx.wallColors); }
+  };
+  for (const name of ["fillRect", "strokeRect", "fill", "stroke", "fillText", "strokeText"]) if (typeof proto[name] === "function") proto[name] = withChart(proto[name]);
+  for (const prop of ["fillStyle", "strokeStyle"]) {
+    const d = Object.getOwnPropertyDescriptor(proto, prop);
+    if (d && d.set) Object.defineProperty(proto, prop, { configurable: true, enumerable: d.enumerable, get: d.get, set: withChart(d.set) });
+  }
+  readCharts();
+  new MutationObserver(() => { readCharts(); try { forceRepaint(true); } catch {} }).observe(document.documentElement || document, { attributes: true, attributeFilter: ["data-ws-charts"] });
 })();

@@ -9,7 +9,7 @@ const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="tru
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
-const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
+const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -21,7 +21,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", shiftSpeed: 10,
-  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [],
+  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {},
   indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -55,7 +55,22 @@ function fontPicker(boxId, key) {
     box.appendChild(b);
   }
 }
-const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set({ ...obj, lastPick: Date.now() }); };
+// ---------- Style each chart: while you style chart 2, 3... the Style tab's changes are saved for that chart only ----------
+// (TradingView's panels, the ticker, the legend and dialogs are one per page, so they stay shared.)
+const PER_CHART_KEYS = new Set(["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW",
+  "lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW",
+  "indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","indGrad","txtMode","txtColor","txtOutline","txtSize","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle"]);
+let styleChart = 1, baseStyle = null;
+function routeChartStyle(obj) {
+  if (styleChart < 2 || !baseStyle) return obj;
+  const mine = {}, rest = {};
+  for (const [k, v] of Object.entries(obj)) (PER_CHART_KEYS.has(k) ? mine : rest)[k] = v;
+  if (!Object.keys(mine).length) return obj;
+  Object.assign(cfg, mine);
+  const all = { ...(cfg.chartStyle || {}) }; all[styleChart] = { ...(all[styleChart] || {}), ...mine };
+  rest.chartStyle = all; return rest;
+}
+const set = (obj) => { obj = routeChartStyle(obj); Object.assign(cfg, obj); chrome.storage.local.set({ ...obj, lastPick: Date.now() }); };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -482,15 +497,17 @@ function toast(msg, undo, btn) {
 // works for every wallpaper, on the browser, desktop and Android, even before a chart is open.
 async function wallpaperPixels() {
   const c = document.createElement("canvas"); c.width = 192; c.height = 108; const g = c.getContext("2d", { willReadFrequently: true });
-  if (cfg.skin === "media") {
-    const m = (cfg.media || []).find((x) => x.id === cfg.mediaId), src = m && (m.thumb || (m.type !== "video" && m.src));
+  // styling chart 2, 3...: read THAT chart's wallpaper (its Mix pick), else your main one
+  const own = styleChart > 1 && (cfg.chartSkins || {})[styleChart], skinId = own ? (own.startsWith("media:") ? "media" : own) : cfg.skin, mediaId = own && own.startsWith("media:") ? own.slice(6) : cfg.mediaId;
+  if (skinId === "media") {
+    const m = (cfg.media || []).find((x) => x.id === mediaId), src = m && (m.thumb || (m.type !== "video" && m.src));
     if (!src) return null;
     const img = new Image(); await new Promise((r) => { img.onload = img.onerror = r; img.src = src; });
     if (!img.naturalWidth) return null;
     g.drawImage(img, 0, 0, c.width, c.height); return g.getImageData(0, 0, c.width, c.height).data;
   }
-  const def = WickedSkins[cfg.skin]; if (!def) return null;
-  const sk = makeSkin(cfg.skin, g); sk.resize(c.width, c.height);
+  const def = WickedSkins[skinId]; if (!def) return null;
+  const sk = makeSkin(skinId, g); sk.resize(c.width, c.height);
   // let it run ~4 s (some wallpapers build up over time, like Code Rain) and sample three moments
   const out = new Uint8ClampedArray(c.width * c.height * 4 * 3); let k = 0;
   for (let i = 1; i <= 120; i++) {
@@ -520,7 +537,7 @@ async function matchEverything(auto) {
   if (run !== matchRun || pick !== String(cfg.skin) + "|" + String(cfg.mediaId || "")) return;
   const name = cfg.skin === "media" ? "your wallpaper" : (WickedSkins[cfg.skin] || {}).name || "your wallpaper";
   const colors = (Array.isArray(pal.colors) && pal.colors.length >= 2 ? pal.colors : [pal.up, pal.down, accent]).slice(0, 5);
-  applyWithUndo({
+  applyWithUndo((() => { const all = {
     enabled: true,
     candleOn: true, candleUp: pal.up, candleDown: pal.down, candlePreset: "custom", lineGlow: Math.max(+cfg.lineGlow || 0, 0.25),
     chOn: true, chColor: accent, chLabels: true, gridOn: true, gridColor: accent, gridAlpha: 0.18, gridStyle: cfg.gridOn ? cfg.gridStyle : "dotted",
@@ -533,8 +550,10 @@ async function matchEverything(auto) {
     // indicators, their zones and your drawings take the wallpaper's own colours (each one its own; the same reading as
     // the candles), zones soft so the price reads through them; the legend and indicator text stay readable
     indMode: "wallpaper", wallMatch: { src: String(cfg.skin) + "|" + String(cfg.mediaId || ""), colors }, zoneFill: Math.min(+cfg.zoneFill || 0.12, 0.14),
-    drawOn: true, lgOn: true, lgColor: bright ? light : "", lgVals: "own", txtMode: "readable",
-  }, grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : auto ? `Auto-matched everything to ${name}.` : `Everything now matches ${name}.`);
+    drawOn: true, lgOn: true, lgColor: light, lgVals: "own", txtMode: "custom", txtColor: light,   // legend names in a light (or, on bright wallpapers, deep) tint of the wallpaper
+  };
+  // styling chart 2, 3...: only that chart's own settings (the page-wide panels, ticker and legend stay as they are)
+  return styleChart > 1 ? Object.fromEntries(Object.entries(all).filter(([k]) => PER_CHART_KEYS.has(k))) : all; })(), grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : auto ? `Auto-matched everything to ${name}.` : `Everything now matches ${name}.`);
 }
 if ($("matchAll")) $("matchAll").onclick = () => matchEverything();
 // Auto-match: every wallpaper you pick (built-in, your own upload or from the Workshop) runs Match everything on its
@@ -2030,6 +2049,12 @@ function syncCharts() {
     set({ multi: v }); if (v !== "mix" && typeof target === "number") target = "all"; syncCharts(); renderSkins(); renderMedia();
   });
   $("multiHint").textContent = MULTI_HINT[cfg.multi] || MULTI_HINT.span;
+  // the colours of charts 2, 3, 4...: like chart 1, each matching its own wallpaper, or your own per chart
+  const ccNow = () => (cfg.chartColors === "auto" || !cfg.chartColors ? (cfg.matchOnPick || cfg.wallMatch ? "wallpaper" : "same") : cfg.chartColors);
+  seg("chartColors", [["same", "Same as chart 1"], ["wallpaper", "Match each wallpaper"], ["custom", "Style each chart"]], ccNow, (v) => { set({ chartColors: v }); if (v !== "custom") styleChartTo(1); syncCharts(); });
+  $("chartColorsHint").textContent = ccNow() === "wallpaper" ? "Charts with their own wallpaper (Mix) take candles, indicator and zone colours, the skin accent and text tints from it. Chart 1 keeps yours."
+    : ccNow() === "custom" ? "Style each chart on its own: pick a chart at the top of the Style tab, then change candles, indicators, lines, text and the price scale for that chart only." : "Every chart uses your Style settings.";
+  renderChartBar();
   $("chartsFound").textContent = chartCount > 1 ? `${chartCount} charts on this tab.` : chartCount === 1 ? "1 chart on this tab. Open a multi-chart layout to use these." : "";
   const rows = $("chartRows"); rows.innerHTML = "";
   if (cfg.multi === "mix") {
@@ -2050,6 +2075,36 @@ function syncCharts() {
     }
   }
   renderPickers();
+}
+// the "Styling: Chart 1 | Chart 2 ..." bar at the top of the Style tab (Style each chart)
+function styleChartTo(n) {
+  if (n === styleChart) return;
+  if (baseStyle) Object.assign(cfg, baseStyle);                                     // back to your own (chart 1) values
+  baseStyle = null; styleChart = n;
+  if (n > 1) { baseStyle = Object.fromEntries([...PER_CHART_KEYS].map((k) => [k, cfg[k]])); Object.assign(cfg, (cfg.chartStyle || {})[n] || {}); flashNumbers(n); }
+  refreshAll();
+}
+function renderChartBar() {
+  const bar = $("styleChartBar"); if (!bar) return;
+  const on = cfg.chartColors === "custom" && chartN() > 1;
+  bar.hidden = !on; if (!on) { if (styleChart > 1) styleChartTo(1); return; }
+  bar.innerHTML = "";
+  const lab = document.createElement("span"); lab.className = "scb-l"; lab.textContent = "Styling"; bar.appendChild(lab);
+  for (let n = 1; n <= chartN(); n++) {
+    const b = document.createElement("button"); b.className = "chip" + (n === styleChart ? " on" : ""); b.type = "button";
+    const own = n > 1 && Object.keys((cfg.chartStyle || {})[n] || {}).length;
+    b.textContent = `Chart ${n}${own ? " \u2022" : ""}`; b.title = n === 1 ? "Your main style" : own ? "Has its own style" : "Same as chart 1 until you change something";
+    b.onclick = () => { styleChartTo(n); renderChartBar(); };
+    bar.appendChild(b);
+  }
+  if (styleChart > 1) {
+    const r = document.createElement("button"); r.className = "link"; r.type = "button"; r.textContent = `Make chart ${styleChart} like chart 1`;
+    r.onclick = () => { const n = styleChart, all = { ...(cfg.chartStyle || {}) }, before = cfg.chartStyle; delete all[n];
+      chrome.storage.local.set({ chartStyle: all }); cfg.chartStyle = all; Object.assign(cfg, baseStyle); styleChart = 1; baseStyle = null; styleChartTo(n);
+      toast(`Chart ${n} is styled like chart 1 again.`, () => { chrome.storage.local.set({ chartStyle: before }); cfg.chartStyle = before; const m = styleChart; Object.assign(cfg, baseStyle || {}); styleChart = 1; baseStyle = null; styleChartTo(m); }); };
+    bar.appendChild(r);
+    const hint = document.createElement("small"); hint.className = "hint"; hint.textContent = `Changes in this tab now apply to chart ${styleChart} only.`; bar.appendChild(hint);
+  }
 }
 $("showNums").onclick = () => flashNumbers(typeof target === "number" ? target : 0);
 
