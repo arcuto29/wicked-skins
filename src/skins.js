@@ -2411,6 +2411,19 @@ function priismSkins(window, document) {
     } finally { if (typeof src !== "string") URL.revokeObjectURL(url); }
   }
   window.PriismWallInfo = { qualityOf, oledFrom, measure: measureWall };
+  // ---------- fonts for the price scale, the ticker and TradingView's panels ----------
+  // [id, label, bundled file in src/fonts (null = the computer's own), CSS family]. Bundled fonts are all SIL Open Font
+  // Licence (see src/fonts/LICENSES.md) and load from Priism itself, never from the internet.
+  const fam = (file, fallback) => `"Priism ${file}", ${fallback}`, SANS = "system-ui, sans-serif", MONO = 'ui-monospace, Menlo, Consolas, monospace';
+  window.PriismFonts = [
+    ["default", "Default", null, ""],
+    ["inter", "Inter", "inter", fam("inter", SANS)], ["outfit", "Outfit", "outfit", fam("outfit", SANS)], ["grotesk", "Grotesk", "grotesk", fam("grotesk", SANS)],
+    ["sora", "Sora", "sora", fam("sora", SANS)], ["rounded", "Rounded", "nunito", fam("nunito", '"SF Pro Rounded", ui-rounded, ' + SANS)],
+    ["mono", "Mono", null, 'ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace'], ["jetbrains", "JetBrains", "jetbrains", fam("jetbrains", MONO)],
+    ["plexmono", "Plex Mono", "plexmono", fam("plexmono", MONO)], ["sharetech", "Digital", "sharetech", fam("sharetech", MONO)],
+    ["rajdhani", "Rajdhani", "rajdhani", fam("rajdhani", SANS)], ["chakra", "Chakra", "chakra", fam("chakra", SANS)],
+    ["exo", "Exo", "exo", fam("exo", SANS)], ["orbitron", "Orbitron", "orbitron", fam("orbitron", SANS)],
+  ];
 
   // ---------- Effects: weather and particles over ANY wallpaper (built-in or your own upload) ----------
   // Each effect draws on its own see-through layer above the wallpaper (cleared every frame), so it works the same

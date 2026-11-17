@@ -513,7 +513,6 @@ input[type=range]::-moz-range-progress { height: 4px; border-radius: 4px; backgr
 input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; }
 .row output { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
 .invite-gate { background: #000 !important; }
-=======
 /* wallpaper labels: quality (4K, 1080p…) and OLED, bottom-left over the picture */
 .wtag { position: absolute; left: 6px; top: 6px; font-size: 9px; font-weight: 800; letter-spacing: .04em; padding: 2px 5px; border-radius: 4px; background: rgba(0,0,0,.65); color: #e6e9f0; pointer-events: none; }
 .wtag.q + .wtag.oled { left: auto; top: 24px; left: 6px; }
@@ -566,3 +565,12 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 .card.preset .renin { width: calc(100% - 12px); margin: 4px 6px; font: inherit; font-size: 12px; padding: 3px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); background: #0b0d12; color: #fff; }
 .seg.wrap { flex-wrap: wrap; }
 .seg.wrap button { flex: 1 0 auto; }
+/* font picker: every font shown in itself */
+.fontgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; flex: 1 1 100%; }
+.fontchip { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 9px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); color: #c9cdd9; text-align: left; }
+.fontchip b { font-weight: 600; font-size: 12.5px; }
+.fontchip small { font-size: 11px; color: #8a8fa3; }
+.fontchip.on { border-color: #fff; color: #fff; background: rgba(255,255,255,.08); }
+.fontchip.on small { color: #c9cdd9; }
+.row:has(> .fontgrid) { flex-wrap: wrap; gap: 5px 8px; min-height: 0; }
+.row:has(> .fontgrid) > span { width: 100%; font-size: 12px; color: #aeb4c3; }

@@ -39,6 +39,22 @@ let cfg = { ...DEFAULTS };
 // lastPick: you used THIS copy's panel just now, so if two copies of Priism are installed, this one draws the page
 // a built-in wallpaper with YOUR settings for it (its own options + Recolour), for every preview in the panel
 const makeSkin = (id, ctx, look) => window.PriismMakeSkin(id, ctx, look && "wallOpts" in look ? look.wallOpts : (cfg.skinOpts || {})[id]);   // a look's own wallpaper settings win
+// ---------- fonts (price scale, ticker, TradingView's panels): each choice shown in its own font ----------
+(function loadPanelFonts() {
+  const st = document.createElement("style");
+  st.textContent = (window.PriismFonts || []).filter((f) => f[2]).map((f) => `@font-face{font-family:"Priism ${f[2]}";src:url("../src/fonts/${f[2]}.woff2") format("woff2");font-weight:100 900;font-display:swap}`).join("");
+  document.head.appendChild(st);
+})();
+function fontPicker(boxId, key) {
+  const box = $(boxId); if (!box) return;
+  box.className = "fontgrid"; box.innerHTML = "";
+  for (const [id, label, , famCss] of window.PriismFonts || []) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "fontchip" + ((cfg[key] || "default") === id ? " on" : "");
+    b.innerHTML = `<b>${esc(label)}</b><small>1,234.50</small>`; if (famCss) b.style.fontFamily = famCss;
+    b.onclick = () => { set({ [key]: id }); fontPicker(boxId, key); };
+    box.appendChild(b);
+  }
+}
 const set = (obj) => { Object.assign(cfg, obj); chrome.storage.local.set({ ...obj, lastPick: Date.now() }); };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -287,7 +303,7 @@ function renderCandles() {
     (v) => { set({ scaleText: v === "custom" ? $("scaleText").value : "" }); renderCandles(); });
   $("scaleText").value = cfg.scaleText || "#e9ebf2"; $("scaleText").hidden = !cfg.scaleText;
   seg("scaleSize", [[0, "Normal"], [1, "Large"], [2, "XL"]], () => cfg.scaleSize, (v) => set({ scaleSize: v }));
-  seg("scaleFont", [["default", "Default"], ["mono", "Mono"], ["rounded", "Rounded"]], () => cfg.scaleFont, (v) => set({ scaleFont: v }));
+  fontPicker("scaleFont", "scaleFont");
   $("scaleBgColor").value = cfg.scaleBgColor || "#0b1320"; $("scaleBgColor").hidden = cfg.scaleBg !== "color";
   $("scaleGlow").value = cfg.scaleGlow; $("scaleGlowOut").textContent = Math.round(cfg.scaleGlow * 100) + "%";
   seg("scaleBold", [[false, "Regular"], [true, "Bold"]], () => cfg.scaleBold, (v) => set({ scaleBold: v }));
@@ -1741,7 +1757,7 @@ function renderTicker(box) {
     (v) => { set({ tkColor: v === "custom" ? ($("tk-col").value || "#ffffff") : v }); renderChartStyle(); });
   const ci = $("tk-col"); ci.value = /^#/.test(cur) ? cur : "#ffffff"; ci.oninput = (e) => set({ tkColor: e.target.value });
   seg("tk-size", [[0, "Normal"], [1, "Large"], [2, "XL"], [3, "Huge"]], () => +cfg.tkSize || 0, (v) => set({ tkSize: v }));
-  seg("tk-font", [["default", "Default"], ["mono", "Mono"], ["rounded", "Rounded"]], () => cfg.tkFont || "default", (v) => set({ tkFont: v }));
+  fontPicker("tk-font", "tkFont");
   seg("tk-glow", [[false, "Off"], [true, "On"]], () => !!cfg.tkGlow, (v) => set({ tkGlow: v }));
   seg("tk-only", [[false, "Name, timeframe, exchange"], [true, "Name only"]], () => !!cfg.tkOnly, (v) => set({ tkOnly: v }));
 }
@@ -1859,7 +1875,7 @@ function syncTune() {
   seg("sides", [["off", "Default"], ["glass", "Glass"], ["clear", "Clear"]], () => cfg.sides || "off", (v) => set({ sides: v }));
   if ($("leftBar")) seg("leftBar", [["off", "Default"], ["glass", "Glass"], ["clear", "Clear"]], () => cfg.leftBar || "off", (v) => set({ leftBar: v }));
   // Interface (fonts / size / accent for TradingView's own panels)
-  seg("uiFont", [["default", "Default"], ["mono", "Mono"], ["rounded", "Rounded"]], () => cfg.uiFont || "default", (v) => set({ uiFont: v }));
+  fontPicker("uiFont", "uiFont");
   seg("uiSize", [[0, "Normal"], [1, "Large"]], () => (+cfg.uiSize || 0), (v) => set({ uiSize: v }));
   seg("uiAccentMode", [["off", "Default"], ["custom", "Custom"]], () => (cfg.uiAccent ? "custom" : "off"),
     (v) => { set({ uiAccent: v === "custom" ? ($("uiAccent").value || "#2ef2b0") : "" }); syncTune(); });
