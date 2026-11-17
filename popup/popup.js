@@ -2532,7 +2532,9 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Recolour any wallpaper to your colours, plus its own settings (Adjust \u203a This wallpaper)",
+const WHATS_NEW = ["Rain, storms, snow and more over any wallpaper (Adjust \u203a This wallpaper \u203a Effect)",
+  "12 more fonts and 10 new candle looks",
+  "Recolour any wallpaper to your colours, plus its own settings (Adjust \u203a This wallpaper)",
   "Candle parts: wick and border colours, hollow candles, widths (Style \u203a Candles)",
   "Auto-match: every wallpaper you pick sets everything to match it (Skins \u203a Wallpapers)",
   "4 new wallpapers: Trading Floor, Market Wall, Midnight Moon and Twinkle (OLED)",
