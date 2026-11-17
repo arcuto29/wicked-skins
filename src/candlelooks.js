@@ -13,6 +13,14 @@
    } */
 (function () {
   if (window.__bdCandleLooks && window.__bdCandleLooks.candle) return;   // an older copy (before an update) is replaced
+  // Lite glow (slow computers / Power saver, set by hook.js / lw.js from content.js): every glow's blur is drawn
+  // smaller. Canvas blur is the costliest thing on a chart without a fast graphics card.
+  if (!window.__bdLiteBlur && window.CanvasRenderingContext2D) {
+    window.__bdLiteBlur = true;
+    const P = CanvasRenderingContext2D.prototype, d = Object.getOwnPropertyDescriptor(P, "shadowBlur");
+    if (d && d.set) Object.defineProperty(P, "shadowBlur", { configurable: true, enumerable: d.enumerable, get: d.get,
+      set(v) { d.set.call(this, window.__bdLite && v > 2 ? 2 + (v - 2) * 0.15 : v); } });
+  }
 
   const LOOKS = [
     // id, label, hint, minGlow (some looks are made of light, so they always glow a little)

@@ -1388,8 +1388,14 @@
   let qLevel = startLevel, hAcc = 0, hCount = 0, hStart = 0, hLast = 0, smoothFor = 0, needSmooth = 4, lastUp = 0;
   function resetQuality() { qLevel = startLevel; hAcc = hCount = hStart = hLast = smoothFor = 0; needSmooth = 4; lastUp = 0; }
   // the background worker that draws wallpapers: how often it couldn't keep up (frames skipped) since last asked
-  const workerLoad = () => { let m = 0; for (const v of views) if (v.skin && v.skin.load) m = Math.max(m, v.skin.load()); return m; };
-  const publishQ = () => document.documentElement.setAttribute("data-bd-q", `${qLevel + 1}/${qlevels().length}@${refreshHz}`);
+  const workerLoad = () => { let m = 0; for (const v of views) { if (v.skin && v.skin.load) m = Math.max(m, v.skin.load()); if (v.fx && v.fx.load) m = Math.max(m, v.fx.load()); } return m; };   // effects count too
+  // Lite glow: on a slow computer (auto quality in its lower half) or with Power saver, every glow on the chart is drawn
+  // with a smaller blur. Glow blur is what costs the most there: it was the difference between a smooth and a choppy
+  // chart on a slow PC. Looks nearly the same, just a tighter glow.
+  const liteNow = () => !!(cfg.powerSaver || (cfg.autoQuality && qLevel >= 2));
+  let liteWas = null;
+  const publishQ = () => { document.documentElement.setAttribute("data-bd-q", `${qLevel + 1}/${qlevels().length}@${refreshHz}`);
+    if (liteNow() !== liteWas) { liteWas = liteNow(); pushCandles(); pushFx(); } };
 
   // While one of TradingView's big windows is open (Trade / broker login, Settings, Indicators, Alerts…) the wallpaper
   // holds still: TradingView blurs everything behind those windows, and re-blurring a moving wallpaper every frame
@@ -1513,7 +1519,7 @@
     const h = document.documentElement;
     const parts = { wick: cfg.candleWick, wickUp: cfg.candleWickUp, wickDown: cfg.candleWickDown, border: cfg.candleBorder, borderUp: cfg.candleBorderUp,
       borderDown: cfg.candleBorderDown, borderW: cfg.candleBorderW, hollow: cfg.candleHollow, wickW: cfg.candleWickW, bodyW: cfg.candleBodyW };
-    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-ws-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow, look: cfg.candleLook, parts }));
+    if (cfg.enabled && cfg.candleOn) h.setAttribute("data-ws-candles", JSON.stringify({ up: cfg.candleUp, down: cfg.candleDown, glow: cfg.candleGlow, look: cfg.candleLook, parts, lite: liteNow() }));
     else h.removeAttribute("data-ws-candles");
     // "Shift" look: colours cycle over time via a GPU hue animation on the chart layer (no redraws needed)
     const shift = cfg.enabled && cfg.candleOn && cfg.candleLook === "shift";
@@ -1684,7 +1690,7 @@
   }, 3000);
   function pushFx() {
     const h = document.documentElement;
-    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent(), wallColors: wallColorsNow(), scaleFamily: fontStack(cfg.scaleFont), fontTick }));
+    if (cfg.enabled) h.setAttribute("data-ws-fx", JSON.stringify({ ...Object.fromEntries(FX_KEYS.map((k) => [k, cfg[k]])), tickSize: (tickPushed = tickSizeOf()), bg: backdrop.bg, busy: backdrop.busy, prof: backdrop.prof || [], profs: backdrop.profs || [], accent: skinAccent(), wallColors: wallColorsNow(), scaleFamily: fontStack(cfg.scaleFont), fontTick, lite: liteNow() }));
     else h.removeAttribute("data-ws-fx");
     if (pillEl) pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
     // Scale backing = real frosted glass behind the price + time scales
@@ -1801,6 +1807,7 @@
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k === "scaleFont" || k === "tkFont" || k === "uiFont")) ensureFonts();
     if (keys.includes("react") || keys.includes("enabled")) syncMusic();
+    if (keys.includes("powerSaver") || keys.includes("autoQuality")) { liteWas = liteNow(); pushCandles(); pushFx(); }   // lite glow on / off
     if (keys.some((k) => k.startsWith("pnl")) || keys.includes("enabled")) renderPnl();
     if (keys.some((k) => k.startsWith("goal") || k === "journalOn") || keys.includes("enabled")) { if (!cfg.journalOn) jShot = null; renderGoal(); tickTrades(); }
     // a wallpaper's own settings / Recolour: rebuilt in place (unless the whole layer is rebuilt anyway)
