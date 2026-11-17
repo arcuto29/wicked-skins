@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 19;
+  const HOOK_VERSION = 20;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -59,7 +59,7 @@
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
         candles = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
           glow: Math.max(0, Math.min(1, +c.glow || 0)), look: lookIds().includes(c.look) ? c.look : "solid",
-          P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null };   // wick / border / hollow / widths
+          P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null, lite: !!c.lite };   // wick / border / hollow / widths
       } else candles = null;
     } catch { candles = null; }
   }
@@ -124,7 +124,7 @@
         scaleBg: ["auto", "glass", "color", "default"].includes(f.scaleBg) ? f.scaleBg : "auto",
         scaleBgColor: /^#[0-9a-f]{6}$/i.test(f.scaleBgColor || "") ? f.scaleBgColor : "#0b1320",
         scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
-        scaleFont: /^[a-z]{1,16}$/.test(f.scaleFont || "") ? f.scaleFont : "default", scaleFamily: famOf(f), fontTick: +f.fontTick || 0,
+        scaleFont: /^[a-z]{1,16}$/.test(f.scaleFont || "") ? f.scaleFont : "default", scaleFamily: famOf(f), fontTick: +f.fontTick || 0, lite: !!f.lite,
         scaleLabels: !!f.scaleLabels,
         bracketOn: !!f.bracketOn,
         bracketSize: Math.max(0, Math.min(3, +f.bracketSize || 0)),
@@ -165,7 +165,8 @@
       };
     } catch { fx = { ...FX0 }; }
     remapCache.clear();
-    const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont, fx.scaleFamily, fx.fontTick,
+    window.__bdLite = !!fx.lite || !!(candles && candles.lite);
+    const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont, fx.scaleFamily, fx.fontTick, fx.lite,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
       fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);

@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 10;
+  const LW_VERSION = 11;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -120,7 +120,7 @@
       lfx = any ? {
         // price scale text + backing
         scaleText: hex(f.scaleText), scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)), scaleBold: !!f.scaleBold, scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
-        scaleFont: /^[a-z]{1,16}$/.test(f.scaleFont || "") ? f.scaleFont : "default", scaleFamily: typeof f.scaleFamily === "string" && /^[A-Za-z0-9 ,"'\-]{1,200}$/.test(f.scaleFamily) ? f.scaleFamily : "", fontTick: +f.fontTick || 0, scaleBg: ["auto", "glass", "color", "default"].includes(f.scaleBg) ? f.scaleBg : "auto", scaleBgColor: hex(f.scaleBgColor) || "#0b1320",
+        lite: !!f.lite, scaleFont: /^[a-z]{1,16}$/.test(f.scaleFont || "") ? f.scaleFont : "default", scaleFamily: typeof f.scaleFamily === "string" && /^[A-Za-z0-9 ,"'\-]{1,200}$/.test(f.scaleFamily) ? f.scaleFamily : "", fontTick: +f.fontTick || 0, scaleBg: ["auto", "glass", "color", "default"].includes(f.scaleBg) ? f.scaleBg : "auto", scaleBgColor: hex(f.scaleBgColor) || "#0b1320",
         // trade brackets = the platform's own level lines (orders / positions) and their price-scale labels
         bracketOn: !!f.bracketOn, bracketFill: hex(f.bracketFill), bracketText: hex(f.bracketText), bracketProfit: hex(f.bracketProfit), bracketLoss: hex(f.bracketLoss),
         bracketSize: Math.max(0, Math.min(3, +f.bracketSize || 0)), bracketLineColor: hex(f.bracketLineColor), bracketLineW: Math.max(0, Math.min(3, +f.bracketLineW || 0)),
@@ -146,7 +146,9 @@
     on = htmlEl().classList.contains("bd-on");
     const cs = htmlEl().getAttribute("data-ws-candles"); readFx(); const ls = JSON.stringify(lfx) + JSON.stringify(ltx);
     if (cs === candSig && ls === lfxSig && on === onWas) return;
-    candSig = cs; lfxSig = ls; onWas = on; readCandles(); remapCache.clear(); repaint();
+    candSig = cs; lfxSig = ls; onWas = on; readCandles(); remapCache.clear();
+    try { window.__bdLite = !!(JSON.parse(htmlEl().getAttribute("data-ws-fx") || "{}").lite || JSON.parse(cs || "{}").lite); } catch {}
+    repaint();
   });
   (function watch() {
     const el = document.documentElement;
