@@ -741,8 +741,37 @@
 
   // your settings for a built-in wallpaper (its own options + Recolour), as plain data (it's sent to the worker)
   function skinOptsFor(id) { const o = cfg.skinOpts && cfg.skinOpts[id]; return o && typeof o === "object" ? JSON.parse(JSON.stringify(o)) : null; }
+  // Effects (rain, storm, snow...) over a wallpaper: their own see-through canvas above it, drawn like a wallpaper
+  // (in the worker when possible). The setting is saved with the wallpaper: skinOpts[<skin id> or "media:<id>"].fx
+  const FX_IDS = ["rain", "storm", "snow", "fog", "dust", "embers"];
+  function fxFor(src) { const o = cfg.skinOpts && cfg.skinOpts[src], f = o && o.fx;
+    return f && FX_IDS.includes(f.k) ? JSON.parse(JSON.stringify(f)) : null; }
+  function setFx(v, src) {
+    const f = fxFor(src), sig = JSON.stringify(f);
+    if (v.fxSig === sig && (v.fx || !f)) return;
+    v.fxSig = sig;
+    if (v.fx && v.fx.remove) try { v.fx.remove(); } catch {}
+    if (v.fxEl) v.fxEl.remove();
+    v.fx = v.fxEl = null; v.fcw = v.fch = 0;
+    if (!f || !window.PriismEffects) return;
+    const el = document.createElement("canvas"); el.className = "bd-fx";
+    v.fx = workerSkin(el, "fx:" + f.k, f) || window.PriismMakeSkin("fx:" + f.k, el.getContext("2d"), f);
+    v.fxEl = el; v.fxClock = 0;
+    if (v.tile && v.content) v.content.after(el);
+    if (v.w) sizeFx(v);
+    if (layer && !running) startLoop();
+  }
+  function sizeFx(v) {
+    if (!v.fx) return;
+    const base = cfg.powerSaver ? 0.5 : 0.75, scale = Math.max(0.35, base * qlv().res);
+    const w = Math.max(2, (v.w * scale) | 0), h = Math.max(2, (v.h * scale) | 0);
+    if (v.fcw === w && v.fch === h) return; v.fcw = w; v.fch = h;
+    if (!v.fx.offThread) { v.fxEl.width = w; v.fxEl.height = h; }
+    v.fx.resize(w, h);
+  }
   // skinOpts changed: rebuild only the wallpapers whose settings changed, in place
   function updateSkinOpts() {
+    for (const v of views) setFx(v, v.src);
     for (const v of views) {
       if (!v.skin || !v.skinId) continue;
       const o = skinOptsFor(v.skinId), sig = JSON.stringify(o || null); if (sig === v.optsSig) continue;
@@ -1119,9 +1148,11 @@
     views = nums.map((n) => {
       const v = { n, tile: document.createElement("div"), dim: document.createElement("div"), vg: document.createElement("div") };
       v.tile.className = "bd-tile";
-      v.content = makeContent(sourceFor(n), v);
+      v.src = sourceFor(n);
+      v.content = makeContent(v.src, v);
       v.dim.className = "bd-dim"; v.vg.className = "bd-vignette";
       v.tile.append(v.content, v.dim, v.vg);
+      setFx(v, v.src);
       layer.appendChild(v.tile);
       return v;
     });
@@ -1145,7 +1176,7 @@
     else document.documentElement.appendChild(layer);
     placeViews(); watchCharts();
     resetQuality(); lastMatch = "";
-    if (views.some((v) => v.skin)) startLoop();
+    if (views.some((v) => v.skin || v.fx)) startLoop();
     applyLook();
     renderPnl();
   }
@@ -1212,6 +1243,7 @@
   }
 
   function sizeCanvas(v) {
+    sizeFx(v);
     if (!v.skin) return;
     // Auto quality steps the resolution down when the computer struggles (res 1 = full, 0 = lowest).
     const base = cfg.powerSaver ? 0.5 : 0.75;
@@ -1301,7 +1333,7 @@
       if (gap < 1000 / target - 2) return;
       const dt = Math.min(0.1, gap / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
       last = now;
-      for (const v of views) if (v.skin) { v.clock += dt; v.skin.frame(v.clock, dt); }
+      for (const v of views) { if (v.skin) { v.clock += dt; v.skin.frame(v.clock, dt); } if (v.fx) { v.fxClock += dt; v.fx.frame(v.fxClock, dt); } }
       fpsN++; if (now - fpsT >= 1000) { window.__bdFpsNow = Math.round((fpsN * 1000) / (now - fpsT)); fpsN = 0; fpsT = now; }
     };
     raf = requestAnimationFrame(step);
@@ -1329,7 +1361,7 @@
   function teardown() {
     if (chartRO) chartRO.disconnect();
     releaseStack();
-    for (const v of views) if (v.skin && v.skin.remove) try { v.skin.remove(); } catch {}
+    for (const v of views) { if (v.skin && v.skin.remove) try { v.skin.remove(); } catch {} if (v.fx && v.fx.remove) try { v.fx.remove(); } catch {} }
     running = false;
     cancelAnimationFrame(raf);
     if (layer) {
@@ -1737,6 +1769,7 @@
         if (t === "CANVAS" || t === "VIDEO" || t === "IMG") { g.filter = filt; drawFit(g, v.content, dx, dy, dw, dh); g.filter = "none"; }
         else if (v.recFrame) { g.filter = filt; drawFit(g, v.recFrame, dx, dy, dw, dh); g.filter = "none"; }   // an uploaded wallpaper's frame (wallFeed)
         else mediaMissed = true;
+        if (v.fxEl) g.drawImage(v.fxEl, dx, dy, dw, dh);           // the effect over it (rain, snow...)
       } catch { mediaMissed = true; }
       if (!over && dim > 0) { g.fillStyle = `rgba(0,0,0,${dim})`; g.fillRect(dx, dy, dw, dh); }
       if (cfg.vignette > 0) {       // CSS: radial-gradient(ellipse at center, transparent X%, rgba(0,0,0,a) 100%)

@@ -564,3 +564,5 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 .card.preset.mine:hover .x, .card.preset.mine:hover .ren, .card.preset.mine.on .x, .card.preset.mine.on .ren { opacity: 1; }
 .card.preset.save .label { color: #eef0f6; }
 .card.preset .renin { width: calc(100% - 12px); margin: 4px 6px; font: inherit; font-size: 12px; padding: 3px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.2); background: #0b0d12; color: #fff; }
+.seg.wrap { flex-wrap: wrap; }
+.seg.wrap button { flex: 1 0 auto; }

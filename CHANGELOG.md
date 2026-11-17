@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased (effects)
+- **New: Effects over any wallpaper** (Adjust → This wallpaper → Effect): **Rain**, **Storm** (heavier rain with soft lightning now and then: two gentle pulses in under half a second, a few times a minute, never strobing; Lightning can be turned off), **Snow**, **Fog**, **Dust** (floating light motes) and **Embers**, with an Amount slider. Works over built-in wallpapers and your own pictures and videos, saved per wallpaper (and in saved looks for built-in ones), drawn off TradingView's main thread, and included in clips and snapshots.
+
 ## 0.1.63 (unreleased)
 - **Saved looks keep the wallpaper's own settings.** Save look (and Update, export, share links and Publish) now includes that wallpaper's Recolour and its own settings, and applying the look brings them back (Undo puts yours back). Looks saved before this leave the wallpaper's settings alone.
 - **Yours: your own candle presets.** In Style → Candles, the preset grid starts with **Yours**: **+ Save these** keeps your current candles (colours, look, glow and candle parts) as a card next to the built-in ones. Tap to use it, ✎ to rename it, ✕ to delete it (with Undo).
