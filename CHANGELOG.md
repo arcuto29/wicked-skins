@@ -1,13 +1,9 @@
 # Changelog
 
-## Unreleased (effects)
+## 0.1.63 (unreleased)
 - **New: Effects over any wallpaper** (Adjust → This wallpaper → Effect): **Rain**, **Storm** (heavier rain with soft lightning now and then: two gentle pulses in under half a second, a few times a minute, never strobing; Lightning can be turned off), **Snow**, **Fog**, **Dust** (floating light motes) and **Embers**, with an Amount slider. Works over built-in wallpapers and your own pictures and videos, saved per wallpaper (and in saved looks for built-in ones), drawn off TradingView's main thread, and included in clips and snapshots.
-
-## Unreleased (fonts + looks)
 - **12 more fonts** for the price scale, the ticker and TradingView's panels: Inter, Outfit, Grotesk, Sora, Rounded (Nunito), JetBrains, Plex Mono, Digital, Rajdhani, Chakra, Exo and Orbitron, plus Default and Mono. Each choice is shown in its own font. They come with Priism (free, open-licence fonts) and load from Priism itself, never from the internet, and only when you pick one.
 - **10 new candle looks:** Matte, Frame, Halo, Core, Split, Duo, Gem, Lifted, Lines and Dusk (26 in all). They work with your colours, glow and candle parts on every platform.
-
-## 0.1.63 (unreleased)
 - **Saved looks keep the wallpaper's own settings.** Save look (and Update, export, share links and Publish) now includes that wallpaper's Recolour and its own settings, and applying the look brings them back (Undo puts yours back). Looks saved before this leave the wallpaper's settings alone.
 - **Yours: your own candle presets.** In Style → Candles, the preset grid starts with **Yours**: **+ Save these** keeps your current candles (colours, look, glow and candle parts) as a card next to the built-in ones. Tap to use it, ✎ to rename it, ✕ to delete it (with Undo).
 - **Auto-match is in one place only**, at the top of Skins → Wallpapers and My uploads (the second copy under Candles is gone).
