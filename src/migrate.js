@@ -11,6 +11,8 @@
       if (s.scaleBg === undefined) out.scaleBg = "auto";
       return out;
     } },
+    // Alt+Shift+R is TradingView's own Rectangle tool: Priism's Record-a-clip shortcut moves to Alt+Shift+V
+    { to: "0.1.69", run(s) { return s.recordKey === "Alt+Shift+KeyR" ? { recordKey: "Alt+Shift+KeyV" } : {}; } },
   ];
   const cmp = (a, b) => { const x = String(a).split(".").map(Number), y = String(b).split(".").map(Number);
     for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); return 0; };

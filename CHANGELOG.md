@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.69 (2026-11-17)
+- **New: Zone style** (Style › Indicators): **Flat**, **Fade** (strong where the zone starts, fading into the future), **Shine** (lit from the top), **Glass** (top-lit with a fine highlight) and **Hollow** (the border only, nothing over your candles). It works with every zone shape and border, on recoloured zones and ones in their own colours.
+- **Rounded and Pill now look clearly different.** Rounded is soft corners (a third of the zone's height, at most 10 px); Pill is fully round ends.
+- **Fixed: Priism's Record-a-clip shortcut (Alt+Shift+R) was also TradingView's Rectangle tool**, so pressing it to draw a rectangle started a recording instead. Record a clip is now **Alt+Shift+V** (moved automatically unless you'd changed it), and Priism warns if you pick Alt+Shift+R.
+
 ## 0.1.68 (2026-11-17)
 - **New: zone shapes and borders** (Style › Indicators, under Zone fill, with a live preview on your wallpaper). **Zone shape**: Square (as drawn), **Rounded** corners, or **Pill** with fully round ends. **Zone border**: Line, **Dashed**, **Double** (a second fine line inside), **Glow** (a soft lit edge) or None. Works on indicator zones (supply / demand, prints, sessions) and your own rectangle drawings, in their own colours or recoloured (Rainbow, Gradient, Wallpaper…), on tradingview.com, TradingView-based platforms and nq.vision. Your drawing's square outline is replaced by the rounded one. Bands that aren't boxes (Bollinger, clouds) keep their shape. Saved in looks, and per chart with Style each chart.
 

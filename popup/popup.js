@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -17,11 +17,11 @@ const DEFAULTS = {
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6,
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyR", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", shiftSpeed: 10,
-  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line",
+  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",
   indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -59,7 +59,7 @@ function fontPicker(boxId, key) {
 // (TradingView's panels, the ticker, the legend and dialogs are one per page, so they stay shared.)
 const PER_CHART_KEYS = new Set(["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW",
   "lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW",
-  "indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","indGrad","txtMode","txtColor","txtOutline","txtSize","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle"]);
+  "indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle"]);
 let styleChart = 1, baseStyle = null;
 function routeChartStyle(obj) {
   if (styleChart < 2 || !baseStyle) return obj;
@@ -424,10 +424,10 @@ function drawZonePreview() {
   const col = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff3366", c2 = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#33ff99";
   const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(",");
   const k = { begin: () => g.beginPath(), fill: () => g.fill(), stroke: () => g.stroke(), style: (v) => { g.fillStyle = v; }, strokeStyle: (v) => { g.strokeStyle = v; } };
-  const st = { shape: cfg.zoneShape || "square", border: cfg.zoneBorder || "line", px: 2 }, a = Math.max(0.08, Math.min(0.45, +cfg.zoneFill || 0.12)) + 0.08, glow = +cfg.lineGlow || 0;
+  const st = { shape: cfg.zoneShape || "square", border: cfg.zoneBorder || "line", style: cfg.zoneStyle || "flat", px: 2 }, a = Math.max(0.08, Math.min(0.45, +cfg.zoneFill || 0.12)) + 0.08, glow = +cfg.lineGlow || 0;
   const box = (x, y, w, h, c) => { const z = { f: `rgba(${rgb(c)},${a})`, g: c, glow, e: `rgba(${rgb(c)},0.9)` };
     if (!L.zoneBox(g, k, x, y, w, h, z, st)) { g.fillStyle = z.f; g.fillRect(x, y, w, h); g.strokeStyle = z.e; g.lineWidth = 2; g.strokeRect(x + 1, y + 1, w - 2, h - 2); } };
-  box(30, 22, W * 0.62, 34, col); box(W * 0.3, 74, W * 0.62, 30, c2);
+  box(30, 14, W * 0.62, 44, col); box(W * 0.3, 70, W * 0.62, 40, c2);
 }
 // Indicators: their colours (own / rainbow / your candle colours / your wallpaper's / any colour) + the glow above
 function syncIndicators() {
@@ -441,6 +441,7 @@ function syncIndicators() {
   if ($("zoneDim")) seg("zoneDim", [[false, "Off"], [true, "On"]], () => !!cfg.zoneDim, (v) => set({ zoneDim: v }));
   // zone boxes: their shape (rounded corners, pill ends) and border design, also for zones left in their own colours
   if ($("zoneShape")) seg("zoneShape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"]], () => cfg.zoneShape || "square", (v) => { set({ zoneShape: v }); drawZonePreview(); });
+  if ($("zoneStyle")) seg("zoneStyle", [["flat", "Flat"], ["fade", "Fade"], ["shine", "Shine"], ["glass", "Glass"], ["hollow", "Hollow"]], () => cfg.zoneStyle || "flat", (v) => { set({ zoneStyle: v }); drawZonePreview(); });
   if ($("zoneBorder")) seg("zoneBorder", [["line", "Line"], ["dashed", "Dashed"], ["double", "Double"], ["glow", "Glow"], ["none", "None"]], () => cfg.zoneBorder || "line", (v) => { set({ zoneBorder: v }); drawZonePreview(); });
   drawZonePreview();
   // Gradient colours: your own 2-3, or the built-in gradients
@@ -1828,7 +1829,8 @@ addEventListener("keydown", (e) => {
   if (used) return msg(`${keyLabel(spec)} is already used for ${KEY_NAMES[used]}.`);
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && ["KeyC", "KeyV", "KeyX", "KeyZ", "KeyY", "KeyS", "KeyF", "KeyP", "KeyA", "KeyR", "KeyW", "KeyT", "KeyN"].includes(e.code))
     return msg(`${keyLabel(spec)} is a browser shortcut. Pick another one.`);
-  const tvClash = e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey && TV_ALT.includes(e.code);
+  const tvClash = (e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey && TV_ALT.includes(e.code))
+    || (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && e.code === "KeyR");   // Alt+Shift+R = TradingView's Rectangle tool
   set({ [keyListen]: spec });
   msg(`${KEY_NAMES[keyListen]}: ${keyLabel(spec)}.` + (tvClash ? ` TradingView also uses ${keyLabel(spec)}; on the chart Priism takes it. Add Shift to keep both.` : ""));
   keyListen = null; syncShortcuts();

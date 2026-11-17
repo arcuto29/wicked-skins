@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 13;
+  const LW_VERSION = 14;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -113,7 +113,7 @@
     try {
       const f = JSON.parse((rawIn !== undefined ? rawIn : htmlEl().getAttribute("data-ws-fx")) || "null");
       const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
-      const any = f && (f.lineGlow > 0 || f.zoneDim || (f.zoneShape && f.zoneShape !== "square") || (f.zoneBorder && f.zoneBorder !== "line") || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
+      const any = f && (f.lineGlow > 0 || f.zoneDim || (f.zoneShape && f.zoneShape !== "square") || (f.zoneBorder && f.zoneBorder !== "line") || (f.zoneStyle && f.zoneStyle !== "flat") || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
       // Chart text: read whenever Priism is on (its "Own" setting still lightens black text on a dark wallpaper)
       ltx = f ? { mode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", color: hex(f.txtColor), outline: Math.max(0, Math.min(2, +f.txtOutline || 0)),
         size: Math.max(0, Math.min(2, +f.txtSize || 0)), bg: f.bg === "light" ? "light" : "dark" } : null;
@@ -135,7 +135,7 @@
           if (/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) && e && typeof e === "object") o[k] = { c: e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "",
             g: e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0)), w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h }; return o; })(),
         zoneFill: Math.max(0.04, Math.min(0.45, +f.zoneFill || 0.12)), zoneDim: !!f.zoneDim,
-        zoneShape: ["square", "rounded", "pill"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line",
+        zoneShape: ["square", "rounded", "pill"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
         accent: hex(f.accent), wallColors: Array.isArray(f.wallColors) ? f.wallColors.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 5) : [] } : null;
       if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(lfx ? lfx.wallColors : []);
@@ -396,7 +396,7 @@
           const zk = L.keyOf(this.__bdLwOrig), own = zk && lfx && lfx.indCustom && lfx.indCustom[zk.k];
           const all = zk && lfx && lfx.indMode && lfx.indMode !== "own" && !greyish(`rgb(${zk.k})`) && candlesKnown() && !ownCandle(zk.k);
           const dim = !!(zk && lfx && lfx.zoneDim && zk.a < 0.9 && !ownCandle(zk.k));   // Dim all zones
-          const shaped = lfx && (lfx.zoneShape !== "square" || lfx.zoneBorder !== "line") && zk && zk.a < 0.9 && !ownCandle(zk.k);
+          const shaped = lfx && (lfx.zoneShape !== "square" || lfx.zoneBorder !== "line" || lfx.zoneStyle !== "flat") && zk && zk.a < 0.9 && !ownCandle(zk.k);
           const z = !(own || all || dim) && shaped ? L.zoneOwn(this.__bdLwOrig) : own || all || dim ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow, zoneFill: lfx.zoneFill, dim, grad: lfx.indGrad }, this) : null;
           if (z && W <= candleMaxW(c) && H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
           if (z) { if (z.hide) return; const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
@@ -405,7 +405,7 @@
             if (shaped && L.zoneBox && H < c.height * 0.9) {                 // rounded / pill / dashed / double / glow
               const zz = { ...z, e: edge }, k = { begin: () => this.beginPath(), fill: () => origFillPathL.call(this), stroke: () => origStrokeP.call(this),
                 style: (v) => fillDesc.set.call(this, v), strokeStyle: (v) => strokeDesc.set.call(this, v) };
-              inLook = true; try { if (L.zoneBox(this, k, x, y, w, h, zz, { shape: lfx.zoneShape, border: lfx.zoneBorder, px: 1 / (t.a || 1) })) return; } finally { inLook = false; } }
+              inLook = true; try { if (L.zoneBox(this, k, x, y, w, h, zz, { shape: lfx.zoneShape, border: lfx.zoneBorder, style: lfx.zoneStyle, px: 1 / (t.a || 1) })) return; } finally { inLook = false; } }
             fillDesc.set.call(this, z.f); if (z.glow > 0 && !edge) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
             origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, pF); this.shadowBlur = pB; this.shadowColor = pC;
             if (edge) { const pS = strokeDesc.get.call(this), pW = this.lineWidth, pD = this.getLineDash();
