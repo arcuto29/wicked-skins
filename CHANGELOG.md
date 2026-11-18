@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.71 (2026-11-18)
+- **Fixed: zone shapes on the Long / Short position tool.** Its profit and loss areas got rounded / dashed separately, which looked broken, especially while dragging it. Priism now recognises the tool (two areas touching edge to edge) and leaves it square, as TradingView draws it. Your other zones and rectangles keep their shape.
+- **Fixed: zone shapes on thin zones when zoomed out.** Zones thinner than 8 px (or narrower than 24 px) are drawn as before, instead of as tiny dashed pills.
+
 ## 0.1.70 (2026-11-18)
 - **Live mood, better** (Trading › Live mood):
   - **Three looks**, with a preview in your up and down colours: **Glow** (a soft light around the edges, now gentler with no heavy band), **Horizon** (a light rising from the bottom when you're up, from the top when you're down, with no frame) and **Frame** (a fine lit outline).
