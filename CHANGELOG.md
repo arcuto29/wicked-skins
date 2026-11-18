@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.75 (2026-11-18)
+- **More for each zone** (Style › Indicators › Each indicator): besides its colour (or **Rainbow** / **Gradient**), glow and shape, every zone now has its own **Border** (Line, Dashed, Double, Glow, None) and **Style** (Flat, Fade, Shine, Glass, Hollow). Each one is "Like all zones" until you pick, so a session box can be a Hollow, dashed outline while your supply / demand zones are Glass pills.
+
 ## 0.1.74 (2026-11-18)
 - **Fixed: Pill made tall zones (like a session box) into ovals.** Pill now only rounds the ends of zones that are clearly wider than tall. Tall or squarish boxes get Rounded corners instead, so a session box stays a box.
 - **New: a shape for each zone** (Style › Indicators › Each indicator). Every zone has **Shape: Like all zones · Square · Rounded · Pill**, so your session box can be Square while your supply / demand zones stay Pill. Works on tradingview.com, TradingView-based platforms and nq.vision-style charts.

@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 28;
+  const HOOK_VERSION = 29;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -113,7 +113,8 @@
       if (!/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) || !e || typeof e !== "object") continue;
       const c = e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "";
       const g = e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0));
-      out[k] = { c, g, w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h, s: ["square", "rounded", "pill"].includes(e.s) ? e.s : "" };   // s: this zone's own shape ("" = like all zones)
+      out[k] = { c, g, w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h, s: ["square", "rounded", "pill"].includes(e.s) ? e.s : "",   // this zone's own shape / border / style ("" = like all zones)
+        b: ["line", "dashed", "double", "glow", "none"].includes(e.b) ? e.b : "", y: ["flat", "fade", "shine", "glass", "hollow"].includes(e.y) ? e.y : "" };
     }
     return out;
   }
@@ -935,10 +936,10 @@
     return Math.abs(X - s.X) <= 3 && Math.abs(Y - s.Y) <= 3 && Math.abs(W - s.W) <= 5 && Math.abs(H - s.H) <= 5;
   }
   // the zone being drawn may have its own shape (Each indicator), else the one for all zones
-  const zoneShapeOf = (ctx) => { const m = fx.indCustom; if (!ctx || !m) return fx.zoneShape; const L = window.__bdCandleLooks;
-    const r = L && L.keyOf(String(ctx.__bdFill !== undefined ? ctx.__bdFill : ctx.fillStyle)), e = r && m[r.k]; return e && e.s ? e.s : fx.zoneShape; };
-  const zoneSt = (ctx) => ({ shape: zoneShapeOf(ctx), border: fx.zoneBorder, style: fx.zoneStyle });
-  const zoneStyled = (ctx) => zoneShapeOf(ctx) !== "square" || fx.zoneBorder !== "line" || fx.zoneStyle !== "flat";
+  const zoneOwnOf = (ctx) => { const m = fx.indCustom; if (!ctx || !m) return null; const L = window.__bdCandleLooks;
+    const r = L && L.keyOf(String(ctx.__bdFill !== undefined ? ctx.__bdFill : ctx.fillStyle)); return (r && m[r.k]) || null; };
+  const zoneSt = (ctx) => { const e = zoneOwnOf(ctx); return { shape: (e && e.s) || fx.zoneShape, border: (e && e.b) || fx.zoneBorder, style: (e && e.y) || fx.zoneStyle }; };
+  const zoneStyled = (ctx) => { const z = zoneSt(ctx); return z.shape !== "square" || z.border !== "line" || z.style !== "flat"; };
   // Which zones may take a shape / border / style. Not:
   //  - thin or narrow ones (zoomed out, a dashed round border on a sliver looks messy): drawn as before;
   //  - the Long / Short position tool: its two areas touch edge to edge. Two zone boxes drawn on the same canvas in

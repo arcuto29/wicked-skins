@@ -448,6 +448,7 @@ body.lw-page [data-tvonly] { display: none !important; }
 .ind-h .sw { width: 14px; height: 14px; border-radius: 99px; flex: none; box-shadow: 0 0 0 1px rgba(255,255,255,.15); }
 .ind-row.set .ind-h .sw { box-shadow: 0 0 0 2px #2ef2b0; }
 .ind-c { display: flex; align-items: center; gap: 6px; } .ind-c + .ind-c { margin-top: 6px; }
+.ind-c.wrap { flex-wrap: wrap; row-gap: 4px; }
 .ind-c input[type=color] { width: 30px; height: 24px; padding: 0; border: 0; background: none; }
 .ind-c input[type=range] { flex: 1; min-width: 60px; }
 .ind-c .lbl { font-size: 11px; color: #8b8e9c; }
