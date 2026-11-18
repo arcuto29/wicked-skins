@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.70 (2026-11-18)
+- **Live mood, better** (Trading › Live mood):
+  - **Three looks**, with a preview in your up and down colours: **Glow** (a soft light around the edges, now gentler with no heavy band), **Horizon** (a light rising from the bottom when you're up, from the top when you're down, with no frame) and **Frame** (a fine lit outline).
+  - **New: Recent move.** Follows how price moved over the last 10 minutes, so it's live with the market and calms down when price goes sideways (Day's move follows the whole day).
+  - **Sensitivity** (High / Normal / Low): how big a move lights it fully. Normal is now a 1% day (was 2%, so most days barely glowed).
+  - **Pulse** on each price tick or beat: Off, **Soft** (the new default, quieter) or Strong.
+  - **Every chart in a layout gets its own glow**, instead of one glow around the whole layout. Clips and snapshots match.
+  - No more flicker between green and red when price sits right at its open: the colour only changes once the move clearly turns.
+  - Fades in and out more smoothly.
+
 ## 0.1.69 (2026-11-17)
 - **New: Zone style** (Style › Indicators): **Flat**, **Fade** (strong where the zone starts, fading into the future), **Shine** (lit from the top), **Glass** (top-lit with a fine highlight) and **Hollow** (the border only, nothing over your candles). It works with every zone shape and border, on recoloured zones and ones in their own colours.
 - **Rounded and Pill now look clearly different.** Rounded is soft corners (a third of the zone's height, at most 10 px); Pill is fully round ends.

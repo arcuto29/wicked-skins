@@ -23,8 +23,11 @@
     chartStyle: {},        // Style each chart: { 2: { candleUp, candleLook, indMode... }, ... } (only what differs from yours)
     skinOpts: {},          // each built-in wallpaper's own settings + recolour: { twinkle: { amount: 1.4, rc: { c: [...], s: 0.8 } } }
     // Behaviour: react to the market / your own P&L (entry typed in by the user; never reads the account)
-    react: "off",          // "off" | "market" | "pnl"
+    react: "off",          // "off" | "market" (day's move) | "momentum" (last 10 minutes) | "pnl" | "music"
     reactStrength: 0.6,
+    moodLook: "glow",      // glow | horizon | frame
+    moodRange: 1,          // Day's move: full glow at this % (Recent move: a quarter of it)
+    moodPulse: "soft",     // pulse on each price tick / beat: off | soft | strong
     // Watermark: your own text and/or logo on the chart (for screenshots / streams)
     // Sides: let the wallpaper flow across the panels around the chart (watchlist, toolbars, the grey areas).
     // "off" = only the chart; "glass" = frosted panels; "clear" = fully see-through panels.
@@ -346,14 +349,28 @@
     try { music.ac.close(); } catch {}
     music = null; mood = 0; updateReact(0); applyLook();
   }
+  // Recent move: prices seen in the last ~15 minutes (from the tab title or the chart's price tag)
+  const priceHist = [];
+  let histSym = "";
+  function notePrice(p, sym) { const now = Date.now(); if (!isFinite(p) || p <= 0) return; let L = priceHist[priceHist.length - 1];
+    // another symbol (or a jump no real minute makes): start the history over
+    if (sym !== histSym || (L && Math.abs(p - L.p) / L.p > 0.03)) { priceHist.length = 0; histSym = sym; L = null; }
+    if (!L || L.p !== p || now - L.t > 20000) priceHist.push({ t: now, p }); while (priceHist.length && now - priceHist[0].t > 15 * 60000) priceHist.shift(); if (priceHist.length > 2000) priceHist.splice(0, 500); }
+  let moodSide = 1;   // which colour the glow shows: it only flips once the move clearly changes side (no flicker at 0)
+  const moodEls = () => views.length ? views.map((v) => v.mood).filter(Boolean) : reactEl ? [reactEl] : [];
   function updateReact(tick) {
     if (!reactEl) return;
     let active = cfg.react !== "off" && (!!quote || cfg.react === "pnl" || cfg.react === "music");
     let label = "";
+    const range = Math.max(0.1, Math.min(5, +cfg.moodRange || 1));
+    if (quote && isFinite(quote.price)) notePrice(quote.price, quote.sym || "");
     if (!active) mood = 0;
     else if (cfg.react === "music") { active = !!music; mood = music ? music.level : 0; }   // 0..1 with the music's energy
-    else if (cfg.react === "market") { mood = clamp(quote.chg / 2); }          // ±2% day move = full
-    else {
+    else if (cfg.react === "market") { mood = clamp(quote.chg / range); }      // full glow at your Sensitivity (1% day move)
+    else if (cfg.react === "momentum") {                                        // the last 10 minutes
+      const now = Date.now(), old = priceHist.find((q) => now - q.t <= 10 * 60000) || priceHist[0];
+      mood = old && quote && old.p ? clamp(((quote.price - old.p) / old.p) * 100 / (range / 4)) : 0;
+    } else {
       const p = readPnl();
       if (!p) { active = false; mood = 0; }                                       // no open position on the chart
       else {
@@ -362,21 +379,25 @@
         label = `P&L ${p.v >= 0 ? "+" : "\u2212"}${unit}${Math.abs(p.v).toFixed(2)}${code}`;
       }
     }
-    const col = cfg.react === "music" ? (skinAccent() || upColor()) : mood >= 0 ? upColor() : downColor();
+    const isMusic = cfg.react === "music";
+    if (isMusic) moodSide = 1; else if (mood > 0.06) moodSide = 1; else if (mood < -0.06) moodSide = -1;
+    const col = isMusic ? (skinAccent() || upColor()) : moodSide > 0 ? upColor() : downColor();
     const k = Math.abs(mood) * cfg.reactStrength;
     // music changes ~30 times a second: only the opacity moves then (cheap); the glow's shape is set once
-    const isMusic = cfg.react === "music", ks = isMusic ? cfg.reactStrength : k;
-    reactEl.classList.toggle("bd-music", isMusic);
-    reactEl.style.setProperty("--bd-react", col);
-    reactEl.style.opacity = String(active ? (isMusic ? 0.05 + 0.95 * k : 0.15 + 0.85 * k) : 0);
-    const sh = `inset 0 0 ${40 + 160 * ks}px ${10 + 40 * ks}px ${col}`, bgc = `radial-gradient(ellipse at 50% ${mood >= 0 ? "110%" : "-10%"}, ${col}55, transparent 60%)`;
-    if (reactEl.__sh !== sh) { reactEl.__sh = sh; reactEl.style.boxShadow = sh; }
-    if (reactEl.__bg !== bgc) { reactEl.__bg = bgc; reactEl.style.background = bgc; }
-    if (active && tick && performance.now() - lastPulse > (cfg.react === "music" ? 380 : 1200)) {   // fast tickers: max ~1 pulse/1.2s; beats: ~2.5/s at most
-      lastPulse = performance.now();
-      const tcol = cfg.react === "music" ? col : tick > 0 ? upColor() : downColor();
-      reactEl.style.setProperty("--bd-pulse", tcol);
-      reactEl.classList.remove("bd-pulse"); void reactEl.offsetWidth; reactEl.classList.add("bd-pulse");
+    const ks = isMusic ? cfg.reactStrength : k, M = window.PriismMood;
+    const look = M && M.LOOKS.includes(cfg.moodLook) ? cfg.moodLook : "glow", css = M ? M.css(look, /^#[0-9a-f]{6}$/i.test(col) ? col : "#00e08a", ks, moodSide) : null;
+    const op = !active ? 0 : isMusic ? 0.05 + 0.95 * k : css ? css.op * Math.min(1, 0.25 + k * 1.2) : 0.15 + 0.85 * k;
+    const pulseOn = cfg.moodPulse !== "off", strong = cfg.moodPulse === "strong";
+    const fire = active && tick && pulseOn && performance.now() - lastPulse > (isMusic ? 380 : 1200);   // fast tickers: max ~1 pulse/1.2s; beats: ~2.5/s at most
+    if (fire) lastPulse = performance.now();
+    const tcol = isMusic ? col : tick > 0 ? upColor() : downColor();
+    for (const el of moodEls()) {
+      el.classList.toggle("bd-music", isMusic); el.dataset.look = look;
+      el.style.setProperty("--bd-react", col);
+      el.style.opacity = String(op);
+      if (css) { if (el.__sh !== css.shadow) { el.__sh = css.shadow; el.style.boxShadow = css.shadow; } if (el.__bg !== css.bg) { el.__bg = css.bg; el.style.background = css.bg; } }
+      if (fire) { el.style.setProperty("--bd-pulse", tcol); el.style.setProperty("--bd-pulse-op", strong ? "0.9" : "0.45"); el.style.setProperty("--bd-pulse-s", strong ? "90px 30px" : "60px 10px");
+        el.classList.remove("bd-pulse"); void el.offsetWidth; el.classList.add("bd-pulse"); }
     }
     if (pillEl) {
       pillEl.hidden = !label;
@@ -416,7 +437,8 @@
   }
   new MutationObserver(() => { if (cfg.react === "pnl") updateReact(0); renderPnl(); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-ws-pnl"] });
-  setInterval(() => { if (cfg.react === "pnl") updateReact(0); renderPnl(); }, 2000);     // clears the glow when the position closes
+  setInterval(() => { if (cfg.react === "pnl") updateReact(0); renderPnl(); }, 2000);
+  setInterval(() => { if (cfg.enabled && cfg.react === "momentum") updateReact(0); }, 5000);   // Recent move: older prices age out     // clears the glow when the position closes
 
   // ---------- big P&L readout ----------
   // Our own large, animated open-P&L number, drawn on top of the chart so it's readable on any wallpaper.
@@ -1256,9 +1278,9 @@
       layer.appendChild(v.tile);
       return v;
     });
-    reactEl = document.createElement("div");
-    reactEl.className = "bd-react";
-    layer.appendChild(reactEl);
+    // Live mood: one glow per chart (inside each chart's wallpaper tile), so every chart in a layout glows on its own
+    for (const v of views) { v.mood = document.createElement("div"); v.mood.className = "bd-react"; v.tile.appendChild(v.mood); }
+    reactEl = views[0] ? views[0].mood : document.createElement("div");
     pillEl = document.createElement("div");
     pillEl.className = "bd-pill"; pillEl.hidden = true;
     pillEl.style.setProperty("--g", String(0.35 + 0.65 * (+cfg.lineGlow || 0)));
@@ -1908,22 +1930,34 @@
     if (cfg.bw) f.push("grayscale(1)");
     return f.join(" ") || "none";
   }
-  function drawMoodGlow(g, x, y, w, h, dpr) {
+  // clips and snapshots: the same Live mood look, drawn on each chart (matches the CSS on the page)
+  function drawMoodGlow(g, box, dpr) {
     if (!reactEl) return;
     const op = parseFloat(reactEl.style.opacity) || 0; if (op <= 0.01) return;
-    const col = reactEl.style.getPropertyValue("--bd-react") || upColor(), k = Math.abs(mood) * cfg.reactStrength;
-    g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip(); g.globalAlpha *= op;
-    // soft colour pool from the top or bottom edge, like the page's radial gradient
-    const cy = y + (mood >= 0 ? 1.1 : -0.1) * h, gr = g.createRadialGradient(x + w / 2, cy, 0, x + w / 2, cy, Math.max(w, h) * 0.75);
-    gr.addColorStop(0, col + "55"); gr.addColorStop(0.6, col + "00");
-    g.fillStyle = gr; g.fillRect(x, y, w, h);
-    // inset glow around the edges (CSS: inset 0 0 B S colour)
-    // CSS draws ONLY the shadow. Canvas draws the shape as well, so the shape is placed far off-canvas and its
-    // shadow is offset back into view: what's left is the soft glow, with no hard frame.
-    const B = (40 + 160 * k) * dpr, S = (10 + 40 * k) * dpr, OFF = 20000;
-    g.shadowColor = col; g.shadowBlur = B; g.shadowOffsetX = -OFF; g.fillStyle = "#000";
-    g.beginPath(); g.rect(x - 4 * B + OFF, y - 4 * B, w + 8 * B, h + 8 * B); g.rect(x + S + OFF, y + S, w - 2 * S, h - 2 * S); g.fill("evenodd");
-    g.restore();
+    const col = reactEl.style.getPropertyValue("--bd-react") || upColor(), isMusic = cfg.react === "music";
+    const k = isMusic ? +cfg.reactStrength || 0.6 : Math.abs(mood) * cfg.reactStrength, look = reactEl.dataset.look || "glow", up = moodSide >= 0;
+    const hex = (a) => col + Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, "0");
+    for (const v of views.length ? views : [{ x: box.left, y: box.top, w: box.width, h: box.height }]) {
+      const x = (v.x - box.left) * dpr, y = (v.y - box.top) * dpr, w = v.w * dpr, h = v.h * dpr;
+      g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip(); g.globalAlpha *= op;
+      if (look === "horizon") {
+        const cy = y + (up ? 1.06 : -0.06) * h; g.translate(x + w / 2, cy); g.scale(1.3 * w / 2, (0.45 + 0.35 * k) * h);
+        const gr = g.createRadialGradient(0, 0, 0, 0, 0, 1); gr.addColorStop(0, hex(0.42)); gr.addColorStop(0.45, hex(0.14)); gr.addColorStop(0.78, hex(0));
+        g.fillStyle = gr; g.fillRect(-1, -1, 2, 2);
+      } else if (look === "frame") {
+        g.strokeStyle = hex(0.9); g.lineWidth = 1.5 * dpr; g.shadowColor = hex(0.55); g.shadowBlur = (10 + 22 * k) * dpr;
+        g.strokeRect(x + 0.75 * dpr, y + 0.75 * dpr, w - 1.5 * dpr, h - 1.5 * dpr);
+      } else {
+        const cy = y + (up ? 1.06 : -0.06) * h, gr = g.createRadialGradient(x + w / 2, cy, 0, x + w / 2, cy, Math.max(w, h) * 0.7);
+        gr.addColorStop(0, hex(0.25)); gr.addColorStop(1, hex(0)); g.fillStyle = gr; g.fillRect(x, y, w, h);
+        // inset glow around the edges (CSS: inset 0 0 B S colour). The shape is drawn far off-canvas and only its
+        // shadow is offset back into view, so there is a soft glow and no hard frame.
+        const B = (40 + 110 * k) * dpr, S = (2 + 10 * k) * dpr, OFF = 20000;
+        g.shadowColor = hex(0.6); g.shadowBlur = B; g.shadowOffsetX = -OFF; g.fillStyle = "#000";
+        g.beginPath(); g.rect(x - 4 * B + OFF, y - 4 * B, w + 8 * B, h + 8 * B); g.rect(x + S + OFF, y + S, w - 2 * S, h - 2 * S); g.fill("evenodd");
+      }
+      g.restore();
+    }
   }
   function drawWallpaper(g, box, dpr) {
     let mediaMissed = false;
@@ -2038,14 +2072,14 @@
     const layerAlpha = Math.max(0, Math.min(1, +(over ? cfg.overOpacity : cfg.opacity)));
     if (!over) {
       g.save(); g.globalAlpha = layerAlpha;
-      mediaMissed = drawWallpaper(g, box, dpr); drawMoodGlow(g, 0, 0, W, H, dpr);
+      mediaMissed = drawWallpaper(g, box, dpr); drawMoodGlow(g, box, dpr);
       g.restore();
       drawChartCanvases(g, box, dpr);
     } else {                       // "On top": the wallpaper sits over the chart, clipped to the chart panes
       drawChartCanvases(g, box, dpr);
       g.save(); g.globalAlpha = layerAlpha; g.beginPath();
       for (const c of (charts.length ? charts : [{ r: box }])) g.rect((c.r.left - box.left) * dpr, (c.r.top - box.top) * dpr, c.r.width * dpr, c.r.height * dpr);
-      g.clip(); mediaMissed = drawWallpaper(g, box, dpr); drawMoodGlow(g, 0, 0, W, H, dpr); g.restore();
+      g.clip(); mediaMissed = drawWallpaper(g, box, dpr); drawMoodGlow(g, box, dpr); g.restore();
     }
     drawMoodPill(g, box, dpr); drawPnlOverlay(g, box, dpr); drawGoalOverlay(g, box, dpr); drawTimerOverlay(g, box, dpr); drawWatermark(g, box, dpr, wmImg);
     return { mediaMissed };

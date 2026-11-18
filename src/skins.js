@@ -2411,6 +2411,18 @@ function priismSkins(window, document) {
     } finally { if (typeof src !== "string") URL.revokeObjectURL(url); }
   }
   window.PriismWallInfo = { qualityOf, oledFrom, measure: measureWall };
+  // ---------- Live mood looks (shared by the chart and the panel's preview) ----------
+  // look: glow (soft light around the edges) | horizon (a light rising from the bottom when up, the top when down;
+  // no frame) | frame (a fine lit outline). col = #rrggbb, k = 0..1 how strong, dir = +1 up / -1 down.
+  window.PriismMood = {
+    LOOKS: ["glow", "horizon", "frame"],
+    css(look, col, k, dir) {
+      const a = (x) => col + Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, "0"), at = dir >= 0 ? "106%" : "-6%";
+      if (look === "horizon") return { shadow: "none", bg: `radial-gradient(ellipse 130% ${45 + 35 * k}% at 50% ${at}, ${a(0.42)}, ${a(0.14)} 45%, transparent 78%)`, op: 0.25 + 0.75 * k };
+      if (look === "frame") return { shadow: `inset 0 0 0 1.5px ${a(0.9)}, inset 0 0 ${10 + 22 * k}px 1px ${a(0.55)}`, bg: "none", op: 0.3 + 0.7 * k };
+      return { shadow: `inset 0 0 ${40 + 110 * k}px ${2 + 10 * k}px ${a(0.6)}`, bg: `radial-gradient(ellipse 90% 60% at 50% ${at}, ${a(0.25)}, transparent 70%)`, op: 0.18 + 0.82 * k };
+    },
+  };
   // ---------- fonts for the price scale, the ticker and TradingView's panels ----------
   // [id, label, bundled file in src/fonts (null = the computer's own), CSS family]. Bundled fonts are all SIL Open Font
   // Licence (see src/fonts/LICENSES.md) and load from Priism itself, never from the internet.
