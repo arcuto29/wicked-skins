@@ -18,7 +18,7 @@ const DEFAULTS = {
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft",
   frameOn: false, framePattern: "carbon", frameMode: "accent", frameColor: "#7c6cff", frameColor2: "#ff4df0", frameW: 8, frameAlpha: 0.5, frameSize: 1, frameRound: true, frameEdge: true, frameMove: false,
-  barPatOn: false, barPattern: "hex", barMode: "accent", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.12, barSize: 1, barWhere: "tlrb",
+  barPatOn: false, barPattern: "zebra", barMode: "rainbow", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.25, barSize: 1, barWhere: "tlrb",
   wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
@@ -1898,7 +1898,7 @@ if ($("timerOn")) { $("timerOn").onchange = (e) => set({ timerOn: e.target.check
 })();
 
 // ---------- Pattern skins (TradingView tab): the chart frame + TradingView's bars ----------
-const PAT_MODES = [["accent", "Accent"], ["candles", "Candles"], ["gradient", "Gradient"], ["rainbow", "Rainbow"], ["custom", "Custom"]];
+const PAT_MODES = [["accent", "Accent"], ["candles", "Candles"], ["gradient", "Gradient"], ["rainbow", "Rainbow"], ["aurora", "Aurora"], ["custom", "Custom"]];
 const patAccent = () => { const okc = (c) => /^#[0-9a-f]{6}$/i.test(c || ""); const m = cfg.wallMatch;
   return okc(m && m.accent) ? m.accent : okc(cfg.uiAccent) ? cfg.uiAccent : okc(cfg.candleUp) && cfg.candleOn ? cfg.candleUp : "#7c6cff"; };
 const patOpts = (mode, c1, c2) => ({ mode, color: c1, color2: c2, up: cfg.candleOn ? cfg.candleUp : "#26a69a", down: cfg.candleOn ? cfg.candleDown : "#ef5350", accent: patAccent(), mood: cfg.candleOn ? cfg.candleUp : "#00e08a" });
@@ -1914,14 +1914,15 @@ function patGrid(id, cur, mode, c1, c2, pick) {
   for (const b of box.children) b.classList.toggle("on", b.dataset.p === cur);
 }
 // the preview: your wallpaper with a little chart, the frame around it, and a bar along the top
-function drawPatPreview() {
-  const cv = $("patPrev"), P = window.PriismPatterns; if (!cv || !P) return;
+function drawPatPreview() { for (const id of ["patPrev", "ifPrev"]) { const cv = $(id); if (cv && cv.offsetParent !== null) drawPatPreviewOn(cv); } }
+function drawPatPreviewOn(cv) {
+  const P = window.PriismPatterns; if (!cv || !P) return;
   const g = cv.getContext("2d"), W = cv.width, H = cv.height; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
   try { const sk = WickedSkins[cfg.skin]; if (sk) { const s0 = makeSkin(cfg.skin, g); s0.resize(W, H); s0.frame(3, 0.016); } } catch {}
   g.fillStyle = "rgba(0,0,0,0.35)"; g.fillRect(0, 0, W, H);
   const barH = 22, tv = !document.body.classList.contains("lw-page");
   if (tv) { g.fillStyle = "#131722"; g.fillRect(0, 0, W, barH); g.fillRect(0, barH, 26, H - barH); }
-  const x0 = tv ? 26 : 0, y0 = tv ? barH : 0, cw = W - x0, ch = H - y0;
+  const x0 = tv ? 26 : 0, y0 = tv ? barH : 0, cw = W - x0 - (tv && cfg.barPatOn && String(cfg.barWhere || "tlrb").includes("r") ? 70 : 0), ch = H - y0;
   // candles
   let p = 50, seed = 3; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   for (let i = 0; i < 26; i++) { const o = p; p += (rnd() - 0.47) * 9; const up = p >= o, x = x0 + 22 + i * ((cw - 44) / 26), top = y0 + ch * 0.5 - (Math.max(o, p) - 50) * 1.4, hh = Math.max(2, Math.abs(p - o) * 1.4);
@@ -1931,12 +1932,13 @@ function drawPatPreview() {
     P.band(g, x0, y0, cw, ch, Math.max(2, +cfg.frameW || 8), { ...patOpts(cfg.frameMode, cfg.frameColor, cfg.frameColor2), round: true, pattern: cfg.framePattern, scale: cfg.frameSize,
       alpha: cfg.frameAlpha, radius: cfg.frameRound ? 12 : 0, edge: !!cfg.frameEdge, dpr: 1 }); }
   if (tv && cfg.barPatOn) { if (cfg.barPattern !== "solid" && !P.image(cfg.barPattern)) wait = true;
-    const where = String(cfg.barWhere || "tlrb"), o = { ...patOpts(cfg.barMode, cfg.barColor, cfg.barColor2), round: false, pattern: cfg.barPattern, scale: cfg.barSize, alpha: Math.min(1, (+cfg.barAlpha || 0.12) * 2.2), dpr: 1 };
+    const where = String(cfg.barWhere || "tlrb"), o = { ...patOpts(cfg.barMode, cfg.barColor, cfg.barColor2), round: false, pattern: cfg.barPattern, scale: cfg.barSize, alpha: Math.min(1, (+cfg.barAlpha || 0.25) * 1.6), dpr: 1 };
     const pg = g.globalCompositeOperation; g.globalCompositeOperation = "screen";
     if (where.includes("t")) P.band(g, 0, 0, W, barH, 0, o); if (where.includes("l")) P.band(g, 0, barH, 26, H - barH, 0, o);
+    if (where.includes("r")) { g.globalCompositeOperation = pg; g.fillStyle = "#131722"; g.fillRect(W - 70, barH, 70, H - barH); g.globalCompositeOperation = "screen"; P.band(g, W - 70, barH, 70, H - barH, 0, o); }
     g.globalCompositeOperation = pg; }
   if (tv) { g.fillStyle = "rgba(226,232,244,.85)"; g.font = "600 11px system-ui"; g.fillText("NQ1!  5m", 10, 15); for (let i = 0; i < 4; i++) g.fillRect(9, barH + 12 + i * 26, 8, 8); }   // tools stay clear
-  if (!cfg.frameOn && !(tv && cfg.barPatOn)) { g.fillStyle = "rgba(255,255,255,.6)"; g.font = "600 12px system-ui"; g.textAlign = "center"; g.fillText("Turn on a frame or a bar pattern to see it here", W / 2, H - 14); g.textAlign = "start"; }
+  if (cv.id === "patPrev" ? !cfg.frameOn : !(tv && cfg.barPatOn)) { g.fillStyle = "rgba(255,255,255,.6)"; g.font = "600 12px system-ui"; g.textAlign = "center"; g.fillText(cv.id === "patPrev" ? "Turn the frame on to see it here" : "Turn the skin on to see it here", W / 2, H - 14); g.textAlign = "start"; }
   if (wait) setTimeout(drawPatPreview, 120);
 }
 function syncPatterns() {
@@ -1955,9 +1957,9 @@ function syncPatterns() {
   seg("frameMove", [[false, "Still"], [true, "Slow drift"]], () => !!cfg.frameMove, (v) => set({ frameMove: v }));
   $("frameHint").textContent = cfg.frameMode === "mood" ? (cfg.react === "off" ? "Live mood is off (Trading › Live mood): the frame stays dim in your up colour until you turn it on." : "The frame takes Live mood's colour and lights up as the glow does.")
     : "Behind the chart: candles, lines and the price scale draw over it. Slow drift moves the pattern very slowly (off with Power saver).";
-  seg("barPatOn", [[false, "Off"], [true, "On"]], () => !!cfg.barPatOn, (v) => { set({ barPatOn: v }); syncPatterns(); });
+  seg("barPatOn", [[false, "TradingView"], [true, "Skin it"]], () => !!cfg.barPatOn, (v) => { set({ barPatOn: v }); syncPatterns(); });
   $("barBox").hidden = !cfg.barPatOn || document.body.classList.contains("lw-page");
-  patGrid("barPattern", cfg.barPattern || "hex", cfg.barMode, cfg.barColor, cfg.barColor2, (p) => { set({ barPattern: p }); syncPatterns(); });
+  patGrid("barPattern", cfg.barPattern || "zebra", cfg.barMode, cfg.barColor, cfg.barColor2, (p) => { set({ barPattern: p }); syncPatterns(); });
   const where = String(cfg.barWhere || "tlrb");
   { const box = $("barWhere"); box.innerHTML = "";
     for (const [k, n] of [["t", "Top"], ["l", "Left"], ["r", "Right"], ["b", "Bottom"]]) { const b = document.createElement("button"); b.textContent = n; b.className = where.includes(k) ? "on" : "";

@@ -594,4 +594,4 @@ body.desk .patgrid { grid-template-columns: repeat(6, 1fr); }
 .patchip span { text-align: left; padding: 0 2px; }
 .patchip:hover { border-color: var(--line2, #3a3e4c); }
 .patchip.on { border-color: transparent; box-shadow: 0 0 0 2px var(--acc, #2ef2b0); color: #fff; }
-#patPrev { aspect-ratio: 560 / 150; }
+#patPrev, #ifPrev { aspect-ratio: 560 / 150; }

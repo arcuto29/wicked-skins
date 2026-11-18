@@ -34,7 +34,7 @@
     frameSize: 1, frameRound: true, frameEdge: true, frameMove: false,
     // ...and over TradingView's bars (top bar, drawing toolbar, right panels, bottom bar): faint, never in the way of a
     // click, so every tool stays clear. barWhere: any of t l r b
-    barPatOn: false, barPattern: "hex", barMode: "accent", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.12, barSize: 1, barWhere: "tlrb",
+    barPatOn: false, barPattern: "zebra", barMode: "rainbow", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.25, barSize: 1, barWhere: "tlrb",
     // Watermark: your own text and/or logo on the chart (for screenshots / streams)
     // Sides: let the wallpaper flow across the panels around the chart (watchlist, toolbars, the grey areas).
     // "off" = only the chart; "glass" = frosted panels; "clear" = fully see-through panels.
@@ -1350,6 +1350,7 @@
       f.style.setProperty("--bd-fw", W + "px"); f.style.setProperty("--bd-fr", R + "px");
       f.classList.toggle("bd-fedge", !!cfg.frameEdge); f.classList.toggle("bd-fsolid", cfg.framePattern === "solid");
       f.classList.toggle("bd-fmove", !!cfg.frameMove && !liteNow() && cfg.framePattern !== "solid");
+      f.classList.toggle("bd-aurora", cfg.frameMode === "aurora" && !liteNow());
       if (cfg.frameMode !== "mood") f.style.opacity = String(Math.max(0.05, Math.min(1, +cfg.frameAlpha || 0.5)));
       f.__key = "";
     }
@@ -1367,8 +1368,9 @@
     const m = P.mask(cfg.barPattern, cfg.barSize);
     barBox.style.setProperty("--bd-bbg", patPaint(cfg.barMode, cfg.barColor, cfg.barColor2, false));
     barBox.style.setProperty("--bd-bpat", m.image); barBox.style.setProperty("--bd-bps", m.size);
-    barBox.style.setProperty("--bd-ba", String(Math.max(0.02, Math.min(0.4, +cfg.barAlpha || 0.12))));
+    barBox.style.setProperty("--bd-ba", String(Math.max(0.02, Math.min(0.8, +cfg.barAlpha || 0.25))));
     barBox.classList.toggle("bd-bsolid", cfg.barPattern === "solid");
+    barBox.classList.toggle("bd-aurora", cfg.barMode === "aurora" && !liteNow());
     barBox.__sig = ""; placeBars();
   }
   function placeBars() {
@@ -1969,7 +1971,7 @@
     if (keys.includes("sides") || keys.includes("leftBar") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
     if (keys.some((k) => k.startsWith("frame") || k === "candleUp" || k === "candleDown" || k === "candleOn" || k === "powerSaver")) applyFrame();
-    if (keys.some((k) => k.startsWith("barPat") || k === "barMode" || k === "barColor" || k === "barColor2" || k === "barAlpha" || k === "barSize" || k === "barWhere" || k === "candleUp" || k === "candleDown" || k === "candleOn")) applyBars();
+    if (keys.some((k) => k.startsWith("barPat") || k === "powerSaver" || k === "barMode" || k === "barColor" || k === "barColor2" || k === "barAlpha" || k === "barSize" || k === "barWhere" || k === "candleUp" || k === "candleDown" || k === "candleOn")) applyBars();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
