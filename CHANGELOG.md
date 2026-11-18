@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.1.72 (2026-11-18)
+- **Fixed: the stop-loss / take-profit area you see while dragging an order took the zone shape.** That area is TradingView's trading display, not a zone: while you drag, only zones that were already on the chart keep their shape.
 - **Fixed: the Long / Short position tool turned white (or your candle colours)** with Priism's candle colours on. Its profit and loss areas use TradingView's own up / down candle colours, see-through, so Priism took them for candles and painted them in your candle colours: a whitish box with light candles. They keep their own green and red now. Candles and volume bars are recoloured as before.
 
 ## 0.1.71 (2026-11-18)

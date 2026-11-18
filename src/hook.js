@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 25;
+  const HOOK_VERSION = 26;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -940,9 +940,16 @@
   //    the same paint, sharing a horizontal edge, mark their colours as "stacked"; those stay square from then on
   //    (also while you drag the tool), and the chart is redrawn once so the first frame matches.
   const paintBoxes = new WeakMap(), stackedCols = new Set();
+  //  - things that only appear while you drag (TradingView's stop-loss / take-profit area when you drag an order's
+  //    bracket): during a drag, only zones already seen before it (your rectangle being moved) keep their shape.
+  let dragging = false, dragSkipped = false; const knownCols = new Set();
+  addEventListener("pointerdown", () => { dragging = true; dragSkipped = false; }, true);
+  // after the drag, redraw once only if something was left square because of it (and the drag area is gone anyway)
+  for (const ev of ["pointerup", "pointercancel", "blur"]) addEventListener(ev, () => { if (dragging) { dragging = false; if (dragSkipped) { dragSkipped = false; setTimeout(() => { try { forceRepaint(true); } catch {} }, 30); } } }, true);
   function shapeOK(ctx, X, Y, W, H) {
     const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
     const k = keyCol(ctx); if (k && stackedCols.has(k)) return false;
+    if (dragging && !(k && knownCols.has(k))) { dragSkipped = true; return false; }
     const c = ctx.canvas; let L = paintBoxes.get(c);
     if (!L) { L = []; paintBoxes.set(c, L); queueMicrotask(() => paintBoxes.delete(c)); }
     for (const b of L) {
@@ -950,6 +957,7 @@
       if (sameX && touch && k && b.k && k !== b.k) { stackedCols.add(k); stackedCols.add(b.k); if (b.shaped) setTimeout(() => { try { forceRepaint(true); } catch {} }, 0); return false; }
     }
     const ok = H >= 8 * dpr && W >= 24 * dpr;
+    if (ok && k && !dragging && knownCols.size < 500) knownCols.add(k);
     L.push({ X, Y, W, H, k, shaped: ok });
     return ok;
   }
