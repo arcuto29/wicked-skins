@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.78 (2026-11-18)
+- **Music, rebuilt to move with the beat** (Trading › Live mood › Glow follows: Music):
+  - **In sync:** the sound is read every screen frame (it was 30 times a second, smoothed several times over), and beats are found from sudden rises in the bass. A pulse now starts about 25 ms after each kick, with no CSS fades lagging behind. Quiet and loud songs both move fully, thanks to an auto level, and fast songs get every beat (up to ~6 a second).
+  - **More moves with it** (new **Moves**: Glow · Wallpaper · Chart frame · Interface skin): your wallpaper kicks a little brighter and slightly bigger on each beat, the chart frame flashes on the kick and glints on hi-hats and snares, and the interface skin swells with the music.
+  - **Feel:** Punchy (follows every kick) or Smooth (longer swells). **Beat sensitivity:** Low, Normal or High.
+  - Still kept calm: never a full flash, and Strength sets how much.
+
 ## 0.1.77 (2026-11-18)
 - **Interface skin, now in TradingView tab › TradingView interface** (it was under Pattern skins before, which was easy to miss). Choose **Skin it** to put a texture or colours across TradingView itself: the top bar, the drawing toolbar, the right panels and the bottom bar.
   - **New textures:** **Zebra**, **Camo**, **Leopard** and **Topo** (contour lines), plus Carbon, Hex, Circuit, Stripes, Dots, Grid, Waves, Chevron, Diamond, Scales and Solid.

@@ -28,6 +28,9 @@
     moodLook: "glow",      // glow | horizon | frame
     moodRange: 1,          // Day's move: full glow at this % (Recent move: a quarter of it)
     moodPulse: "soft",     // pulse on each price tick / beat: off | soft | strong
+    // Music (Glow follows: Music): what moves (g glow, w wallpaper, f chart frame, i interface skin), how it feels
+    // (punchy: quick kicks | smooth: longer swells) and how easily a beat counts (low | normal | high)
+    musicParts: "gwfi", musicFeel: "punchy", musicSens: "normal",
     // Pattern skins. Chart frame: a patterned band along each chart's edges (where Live mood glows). Colours: accent |
     // candles | gradient (frameColor → frameColor2) | rainbow | custom | mood (the Live mood colour, lit by it)
     frameOn: false, framePattern: "carbon", frameMode: "accent", frameColor: "#7c6cff", frameColor2: "#ff4df0", frameW: 8, frameAlpha: 0.5,
@@ -315,46 +318,98 @@
       cancelMusicAsk(); startMusic(stream);
     };
   }
+  // Music: the sound of the tab you shared is analysed here (nothing is recorded or sent). Every screen frame:
+  //  - three bands (bass 40-160 Hz, mids 300-2000 Hz, highs 4-11 kHz), unsmoothed, with an auto level so quiet and
+  //    loud songs both move fully;
+  //  - beats = sudden rises in the bass (spectral flux) above the song's own recent average (Sensitivity), at most one
+  //    every ~170 ms; hats / snares = the same in the highs;
+  //  - envelopes that jump up instantly on a beat and fall back over ~160 ms (Punchy) or ~380 ms (Smooth).
+  // What moves (Music › Moves): the glow, the wallpaper (a brighter, slightly zoomed kick), the chart frame and the
+  // interface skin.
+  const MUSIC_SENS = { low: 2.2, normal: 1.5, high: 1.05 };
+  const musicParts = () => String(cfg.musicParts == null ? "gwfi" : cfg.musicParts);
   function startMusic(stream) {
     stopMusic();
     try {
-      const ac = new (window.AudioContext || window.webkitAudioContext)(), src = ac.createMediaStreamSource(stream), an = ac.createAnalyser();
-      an.fftSize = 1024; an.smoothingTimeConstant = 0.6; src.connect(an);                  // not connected to the speakers: no echo
-      const bins = new Uint8Array(an.frequencyBinCount), hz = ac.sampleRate / an.fftSize;
-      const b0 = Math.max(1, Math.round(35 / hz)), b1 = Math.max(b0 + 1, Math.round(160 / hz));
-      music = { stream, ac, level: 0, avg: 0.2, last: 0 };
-      music.timer = setInterval(() => {
+      const ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: "interactive" }), src = ac.createMediaStreamSource(stream), an = ac.createAnalyser();
+      an.fftSize = 1024; an.smoothingTimeConstant = 0; an.minDecibels = -85; an.maxDecibels = -20; src.connect(an);   // not connected to the speakers: no echo
+      const bins = new Uint8Array(an.frequencyBinCount), prev = new Uint8Array(an.frequencyBinCount), hz = ac.sampleRate / an.fftSize;
+      const rng = (a, b) => [Math.max(1, Math.round(a / hz)), Math.max(Math.round(a / hz) + 1, Math.round(b / hz))];
+      const B = rng(40, 160), M = rng(300, 2000), H = rng(4000, 11000);
+      const mean = (r) => { let x = 0; for (let i = r[0]; i <= r[1]; i++) x += bins[i]; return x / ((r[1] - r[0] + 1) * 255); };
+      const flux = (r) => { let x = 0; for (let i = r[0]; i <= r[1]; i++) { const d = bins[i] - prev[i]; if (d > 0) x += d; } return x / ((r[1] - r[0] + 1) * 255); };
+      const hist = (n) => ({ a: new Float32Array(n), i: 0, n: 0 }), push = (h, v) => { h.a[h.i] = v; h.i = (h.i + 1) % h.a.length; h.n = Math.min(h.a.length, h.n + 1); };
+      const thr = (h, k, floor) => { if (h.n < 8) return 1; let m = 0; for (let i = 0; i < h.n; i++) m += h.a[i]; m /= h.n; let v = 0; for (let i = 0; i < h.n; i++) v += (h.a[i] - m) ** 2; return Math.max(floor, m + k * Math.sqrt(v / h.n)); };
+      const fb = hist(48), fh = hist(48);   // ~0.8 s of flux at 60 fps
+      music = { stream, ac, level: 0, kick: 0, hat: 0, bass: 0, mid: 0, high: 0, peak: 0.25, last: 0, lastHat: 0, t: performance.now(), raf: 0, timer: 0 };
+      const step = () => {
         if (!music) return;
+        const now = performance.now(), dt = Math.min(0.1, (now - music.t) / 1000); music.t = now;
         an.getByteFrequencyData(bins);
-        let bass = 0; for (let i = b0; i <= b1; i++) bass += bins[i]; bass /= (b1 - b0 + 1) * 255;
-        let all = 0; for (let i = 1; i < bins.length / 2; i++) all += bins[i]; all /= (bins.length / 2 - 1) * 255;
-        const e = Math.min(1, bass * 0.85 + all * 0.35);
-        music.avg += (e - music.avg) * 0.02;                                     // the song's usual energy (seconds)
-        const lift = Math.max(0, e - music.avg * 1.08);
-        music.level += ((Math.min(1, e * 0.8 + lift * 2)) - music.level) * (e > music.level ? 0.55 : 0.22);   // quick up, softer down
-        const beat = bass > 0.35 && bass > music.avg * 1.35 && performance.now() - music.last > 300;
-        if (beat) music.last = performance.now();
+        const bass = mean(B), mid = mean(M), high = mean(H), fB = flux(B), fH = flux(H); prev.set(bins);
+        const sens = MUSIC_SENS[cfg.musicSens] || MUSIC_SENS.normal;
+        // auto level: the loudest the bass has been lately (falls back over a few seconds)
+        music.peak = Math.max(bass, music.peak * Math.exp(-dt / 4), 0.08);
+        const norm = Math.min(1, bass / music.peak);
+        const beat = fB > thr(fb, sens, 0.025) && bass > 0.1 && now - music.last > 170; push(fb, fB);
+        const hat = fH > thr(fh, sens + 0.3, 0.03) && high > 0.06 && now - music.lastHat > 90; push(fh, fH);
+        const tau = cfg.musicFeel === "smooth" ? 0.38 : 0.16;
+        if (beat) music.last = now;
+        if (hat) music.lastHat = now;
+        music.kick = beat ? 1 : music.kick * Math.exp(-dt / tau);
+        music.hat = hat ? 1 : music.hat * Math.exp(-dt / 0.09);
+        music.bass = bass; music.mid = mid; music.high = high;
+        // the overall level: the bass's shape plus the kick on top, never jittery (follows quickly, falls back softly)
+        const target = Math.min(1, norm * 0.55 + music.kick * 0.6);
+        music.level += (target - music.level) * (target > music.level ? 0.8 : Math.min(1, dt / (tau * 0.9)));
         updateReact(beat ? 1 : 0);
-        // the wallpaper breathes a little brighter on the beat (the dim layer lifts for a moment)
-        const lift2 = Math.min(0.12, music.level * 0.12 * cfg.reactStrength);
-        for (const v of views) if (v.dim) v.dim.style.opacity = String(Math.max(0, Math.min(0.95, +cfg.dim + (cfg.calm && calmActive ? 0.3 : 0)) - lift2));
-      }, 33);
+        musicFx();
+      };
+      const loop = () => { if (!music) return; step(); music.raf = requestAnimationFrame(loop); };
+      music.raf = requestAnimationFrame(loop);
+      music.timer = setInterval(() => { if (music && document.hidden) step(); }, 50);   // a hidden tab gets no frames: keep the analysis running
+      document.documentElement.classList.add("bd-musicon");
       stream.getAudioTracks().forEach((t) => t.addEventListener("ended", () => { stopMusic(); if (musicWanted()) showMusicAsk(true); }));
     } catch { stopMusic(); }
+  }
+  // Everything else that moves with the music (the glow itself is in updateReact)
+  function musicFx(reset) {
+    const parts = reset ? "" : musicParts(), on = !!music && !reset, S = Math.max(0, Math.min(1, +cfg.reactStrength || 0.6));
+    const kick = on ? music.kick : 0, L = on ? music.level : 0, hat = on ? music.hat : 0;
+    const base = Math.max(0, Math.min(0.95, +cfg.dim + (cfg.calm && calmActive ? 0.3 : 0)));
+    for (const v of views) {
+      // wallpaper: a brighter, slightly bigger kick on every beat
+      const w = on && parts.includes("w");
+      if (v.dim) v.dim.style.opacity = String(w ? Math.max(0, base - Math.min(0.2, (kick * 0.15 + L * 0.04) * (0.4 + S))) : base);   // never a full flash
+      const sc = w ? 1 + kick * 0.016 * (0.3 + S) : 1, ts = sc === 1 ? "" : `scale(${sc.toFixed(4)})`;
+      if (v.content && v.content.__mz !== ts) { v.content.__mz = ts; v.content.style.transform = ts; }
+      // chart frame: brighter with the level, a flash on the kick, a glint on hats / snares
+      const f = v.frame;
+      if (f && !f.hidden) {
+        const fm = on && parts.includes("f"), a = Math.max(0.05, Math.min(1, +cfg.frameAlpha || 0.5));
+        if (fm) { f.style.opacity = String(Math.min(1, a * (0.35 + 0.65 * L) + kick * 0.25 * S)); const fl = `brightness(${(1 + kick * 0.7 * S + hat * 0.25 * S).toFixed(3)})`; if (f.__mf !== fl) { f.__mf = fl; f.style.filter = fl; } }
+        else if (f.__mf) { f.__mf = ""; f.style.filter = ""; if (cfg.frameMode !== "mood") f.style.opacity = String(a); }
+      }
+    }
+    // interface skin: the texture swells with the music (dimmer between beats, full on the beat)
+    if (barBox) { const im = on && parts.includes("i"), o = im ? String(Math.min(1, 0.4 + L * 0.5 + kick * 0.35 + hat * 0.1).toFixed(3)) : "";
+      if (barBox.__mo !== o) { barBox.__mo = o; barBox.style.opacity = o; } }
   }
   // tests only (localStorage bdTest=1): listen to a built-in kick drum instead of a shared tab (headless browsers can't share)
   window.addEventListener("message", (e) => { if (e.source !== window || !e.data || e.data.__bdTest !== "music") return;
     try { if (localStorage.getItem("bdTest") !== "1") return; } catch { return; }
     const ac = new AudioContext(), dst = ac.createMediaStreamDestination();
     setInterval(() => { const t = ac.currentTime + 0.02, o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.25);
+      { const h = document.documentElement, k = (h.dataset.bdKicks || "").split(",").filter(Boolean).slice(-30); k.push(String(Math.round(performance.now() + 20))); h.dataset.bdKicks = k.join(","); }   // when each test kick sounds
       g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3); o.connect(g).connect(dst); o.start(t); o.stop(t + 0.32); }, 500);
     cancelMusicAsk(); startMusic(dst.stream); });
   function stopMusic() {
     if (!music) return;
-    clearInterval(music.timer);
+    clearInterval(music.timer); cancelAnimationFrame(music.raf);
+    document.documentElement.classList.remove("bd-musicon");
     try { music.stream.getTracks().forEach((t) => t.stop()); } catch {}
     try { music.ac.close(); } catch {}
-    music = null; mood = 0; updateReact(0); applyLook();
+    music = null; mood = 0; musicFx(true); updateReact(0); applyLook();
   }
   // Recent move: prices seen in the last ~15 minutes (from the tab title or the chart's price tag)
   const priceHist = [];
@@ -393,9 +448,9 @@
     // music changes ~30 times a second: only the opacity moves then (cheap); the glow's shape is set once
     const ks = isMusic ? cfg.reactStrength : k, M = window.PriismMood;
     const look = M && M.LOOKS.includes(cfg.moodLook) ? cfg.moodLook : "glow", css = M ? M.css(look, /^#[0-9a-f]{6}$/i.test(col) ? col : "#00e08a", ks, moodSide) : null;
-    const op = !active ? 0 : isMusic ? 0.05 + 0.95 * k : css ? css.op * Math.min(1, 0.25 + k * 1.2) : 0.15 + 0.85 * k;
+    const op = !active ? 0 : isMusic ? (musicParts().includes("g") ? 0.04 + 0.96 * k : 0) : css ? css.op * Math.min(1, 0.25 + k * 1.2) : 0.15 + 0.85 * k;
     const pulseOn = cfg.moodPulse !== "off", strong = cfg.moodPulse === "strong";
-    const fire = active && tick && pulseOn && performance.now() - lastPulse > (isMusic ? 380 : 1200);   // fast tickers: max ~1 pulse/1.2s; beats: ~2.5/s at most
+    const fire = active && tick && pulseOn && performance.now() - lastPulse > (isMusic ? 150 : 1200);   // fast tickers: max ~1 pulse/1.2s; beats: ~2.5/s at most
     if (fire) lastPulse = performance.now();
     const tcol = isMusic ? col : tick > 0 ? upColor() : downColor();
     for (const el of moodEls()) {

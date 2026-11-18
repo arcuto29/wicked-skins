@@ -41,6 +41,10 @@ html.bd-focus .bd-emb { opacity: 0 !important; }
 #bd-layer .bd-react[data-look="horizon"].bd-pulse::after, .bd-emb .bd-react[data-look="horizon"].bd-pulse::after { box-shadow: none; background: radial-gradient(ellipse 120% 40% at 50% 104%, var(--bd-pulse), transparent 70%); }
 #bd-layer .bd-react[data-look="frame"].bd-pulse::after, .bd-emb .bd-react[data-look="frame"].bd-pulse::after { box-shadow: inset 0 0 0 2px var(--bd-pulse), inset 0 0 16px 2px var(--bd-pulse); }
 @keyframes bd-pulse { from { opacity: var(--o, .9); } to { opacity: 0; } }
+/* Music: Priism moves these every screen frame with its own envelopes, so no CSS fades lag behind the beat */
+html.bd-musicon #bd-layer .bd-react.bd-music, html.bd-musicon .bd-emb .bd-react.bd-music, html.bd-musicon #bd-layer .bd-frame, html.bd-musicon .bd-emb .bd-frame,
+html.bd-musicon #bd-layer .bd-dim, html.bd-musicon .bd-emb .bd-dim, html.bd-musicon #bd-barpat { transition: none !important; }
+html.bd-musicon #bd-layer .bd-react.bd-pulse::after, html.bd-musicon .bd-emb .bd-react.bd-pulse::after { animation-duration: .45s; }
 /* Pattern skins: the chart frame (a band along each chart's edges, cut to a ring by a clip path set in content.js).
    ::before = the colour (one colour / gradient / rainbow / Live mood), masked by the pattern tile; ::after = a fine
    line along the inside edge. Behind the chart, like the glow: candles and scales draw over it. */
