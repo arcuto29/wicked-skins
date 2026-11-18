@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.77 (2026-11-18)
+- **Fixed: Live mood's "Glow follows" choices were cut off** ("O…", "My po…", "M…") in the panel. They now wrap onto two rows, so Off, Day's move, Recent move, My position and Music are all readable.
+
 ## 0.1.76 (2026-11-18)
 - **New: Pattern skins** (TradingView tab › Pattern skins), with a live preview on your wallpaper. 11 patterns, all Priism's own: Carbon, Hex, Circuit, Stripes, Dots, Grid, Waves, Chevron, Diamond, Scales and Solid.
   - **Chart frame:** a patterned band along each chart's edges, where Live mood glows. Colours: **Accent**, **Candles** (up into down), **Gradient** (your two colours), **Rainbow** (all the way round), **Custom**, or **Live mood**, which takes the glow's colour and lights up with it. You can set the Width, Strength and Pattern size, choose Square or Rounded corners, add a fine Edge line, and turn on Slow drift. Every chart in a layout gets its own frame. The frame sits behind the chart, so candles and scales draw over it, and it's included in snapshots and clips.
