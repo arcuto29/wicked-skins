@@ -433,8 +433,11 @@
   function zoneBox(g, k, x, y, w, h, z, st) {
     if (!st || (st.shape === "square" && st.border === "line" && (!st.style || st.style === "flat"))) return false;
     if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
-    // Rounded = soft corners (a third of the height, at most 10 px); Pill = fully round ends
-    const px = st.px || 1, r = st.shape === "pill" ? Math.min(h, w) / 2 : st.shape === "rounded" ? Math.max(Math.min(2 * px, h / 2), Math.min(h * 0.3, w / 2, 10 * px)) : 0;
+    // Rounded = soft corners (a third of the height, at most 10 px); Pill = fully round ends. Pill only rounds the
+    // ends of a zone that's clearly wider than tall: on a tall or squarish box (a session box) it would be an oval,
+    // so those get Rounded corners.
+    const px = st.px || 1, pill = st.shape === "pill" && w >= h * 2;
+    const r = pill ? h / 2 : st.shape === "rounded" || st.shape === "pill" ? Math.max(Math.min(2 * px, h / 2), Math.min(h * 0.3, w / 2, 10 * px)) : 0;
     const path = (inset) => { k.begin(); const a = x + inset, b = y + inset, c = Math.max(0, w - 2 * inset), d = Math.max(0, h - 2 * inset), rr = Math.max(0, r - inset);
       if (rr > 0 && g.roundRect) g.roundRect(a, b, c, d, rr); else g.rect(a, b, c, d); };
     const pSB = g.shadowBlur, pSC = g.shadowColor, pW = g.lineWidth, pD = g.getLineDash ? g.getLineDash() : [];
