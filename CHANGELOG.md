@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.82 (2026-11-18)
+- **New: Magnifier.** Press **Alt+Shift+Z** on your chart for a round zoom lens that follows your cursor, so you can see exact wicks, levels and entries without changing the chart's zoom. Clicks go straight through it, so you can place a drawing or order right where it shows. A small cross marks the exact point. Press the shortcut again or **Esc** to close it. Settings › Magnifier sets the zoom (2× to 4×) and the lens size. The ring takes your accent colour. It only changes what you see.
+
 ## 0.1.81 (2026-11-18)
 - **Fixed: with Left toolbar on Glass or Clear, every drawing tool looked selected**, so it seemed a tool wasn't picked until you refreshed. Only the tool you picked is highlighted now. With an accent (Text & accent, or Match everything), it lights up in your wallpaper's colour.
 - **Match everything now matches everything:**
