@@ -609,7 +609,8 @@
   async function tcStart() {
     if (tc || !(cfg.enabled && cfg.tradeClipOn) || typeof MediaRecorder === "undefined" || (EXT && !owner)) return;
     tc = { starting: true };
-    const box = chartsBox(), scale = Math.min(1, 900 / Math.max(1, box.width)), dpr = Math.min(1.5, devicePixelRatio || 1) * scale;
+    // runs for the whole trade, so a little lighter than a clip you record yourself: up to 1280 px on the long side
+    const box = chartsBox(), dpr = Math.min(Math.min(2, devicePixelRatio || 1), 1280 / Math.max(1, Math.max(box.width, box.height)));
     const W = Math.max(2, Math.round(box.width * dpr)) & ~1, H = Math.max(2, Math.round(box.height * dpr)) & ~1;
     const cap = document.createElement("canvas"); cap.width = W; cap.height = H; const g = cap.getContext("2d");
     let wmImg = null; try { wmImg = await watermarkImage(); } catch {}
@@ -1590,7 +1591,16 @@
 
   // How many pixels a built-in wallpaper / effect is drawn with, per CSS pixel. Standard 0.75 (light), Sharp 1 (your
   // screen's size), Ultra: every real pixel (a 4K / Retina screen gets 4K), never more than 3840 x 2160 per wallpaper.
+  // while a snapshot or clip is being made, wallpapers and effects are drawn with every real pixel (up to 2x), so the
+  // picture is as sharp as the chart in it
+  let captureHi = 0;
+  async function withSharpWallpaper(fn) {
+    captureHi++; views.forEach(sizeCanvas);
+    await new Promise((r) => setTimeout(r, 160));          // a frame or two at the new size (wallpapers drawn in a worker too)
+    try { return await fn(); } finally { captureHi = Math.max(0, captureHi - 1); if (!captureHi) setTimeout(() => views.forEach(sizeCanvas), 50); }
+  }
   function resBase(v) {
+    if (captureHi) return Math.max(1, Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1));
     if (cfg.powerSaver) return 0.5;
     if (cfg.res === "sharp") return 1;
     if (cfg.res === "ultra") { const dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1)), px = Math.max(1, (v.w || 1) * (v.h || 1));
@@ -2337,7 +2347,8 @@
     if (!cfg.wmOn) return null;
     try { return await loadImage(cfg.wmStyle === "tiled" ? tilePattern() : BRAND_LOGO); } catch { return null; }
   }
-  async function captureSnapshot() {
+  const captureSnapshot = () => withSharpWallpaper(captureSnapshot0);
+  async function captureSnapshot0() {
     if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
     const box = chartsBox();
     const dpr = Math.min(2, devicePixelRatio || 1);
@@ -2360,7 +2371,8 @@
   // bitrate for a clip: High = crisp, Balanced = good + reasonable size, Small = kept under ~20 MB (Discord-friendly)
   function clipBps(W, H, fps, dur, q) {
     const px = Math.max(1, W * H * (fps || 30));
-    const high = Math.min(16e6, Math.max(4e6, px * 0.12)), bal = Math.min(8e6, Math.max(2.5e6, px * 0.06));
+    // charts are thin lines and small text: they need more bits than video of people (1080p30: ~8.7 Mbps Balanced, ~15.5 High)
+    const high = Math.min(45e6, Math.max(8e6, px * 0.25)), bal = Math.min(20e6, Math.max(5e6, px * 0.14));
     if (q === "high") return Math.round(high);
     if (q === "small") return Math.round(Math.max(600e3, Math.min(bal * 0.5, (20 * 8e6 * 0.92) / Math.max(2, dur))));
     return Math.round(bal);
@@ -2677,14 +2689,16 @@
     for (let i = 0; i < 20 && players.some((v) => !v.recFrame); i++) await new Promise((r) => setTimeout(r, 50));
     return () => { for (const [v, port] of ports) { try { port.postMessage({ stop: true }); port.close(); } catch {} if (v.recFrame && v.recFrame.close) try { v.recFrame.close(); } catch {} v.recFrame = null; } };
   }
-  async function captureClip(seconds, fpsWanted, display, soundAsked) {
+  const captureClip = (...a) => withSharpWallpaper(() => captureClip0(...a));
+  async function captureClip0(seconds, fpsWanted, display, soundAsked) {
     if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
     if (clipRec) return { ok: false, reason: "Already recording a clip." };
     if (typeof MediaRecorder === "undefined") return { ok: false, reason: "Your browser can't record clips." };
     const box = chartsBox();
-    // downscale so the clip stays small/shareable (cap the long edge ~900px of composite, times a modest dpr)
-    const scale = Math.min(1, 900 / Math.max(1, box.width));
-    const dpr = Math.min(1.5, (devicePixelRatio || 1)) * scale;
+    // full resolution: your screen's real pixels (up to 2x), the long side capped by Quality: Small 1280, Balanced 1920,
+    // High 2560 (3840 with Sharpness › Ultra 4K)
+    const cap0 = cfg.clipQuality === "small" ? 1280 : cfg.clipQuality === "high" ? (cfg.res === "ultra" ? 3840 : 2560) : (cfg.res === "ultra" ? 3840 : 1920);
+    const dpr0 = Math.min(2, devicePixelRatio || 1), dpr = Math.min(dpr0, cap0 / Math.max(1, Math.max(box.width, box.height)));
     const W = Math.max(2, Math.round(box.width * dpr)) & ~1, H = Math.max(2, Math.round(box.height * dpr)) & ~1;  // even dims for encoders
     const cap = document.createElement("canvas"); cap.width = W; cap.height = H;
     const g = cap.getContext("2d");

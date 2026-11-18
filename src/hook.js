@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 30;
+  const HOOK_VERSION = 31;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -160,7 +160,7 @@
         indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: cleanCustom(f.indCustom), drawOn: !!f.drawOn,
         zoneFill: Math.max(0.04, Math.min(0.45, +f.zoneFill || 0.12)), zoneDim: !!f.zoneDim,
-        zoneReact: ["glow", "strong"].includes(f.zoneReact) ? f.zoneReact : "off", zoneShape: ["square", "rounded", "pill", "oval"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
+        zoneReact: ["glow", "strong", "edge", "spotlight", "shimmer"].includes(f.zoneReact) ? f.zoneReact : "off", zoneShape: ["square", "rounded", "pill", "oval"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
         txtMode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", txtColor: /^#[0-9a-f]{6}$/i.test(f.txtColor || "") ? f.txtColor : "", txtOutline: Math.max(0, Math.min(2, +f.txtOutline || 0)), txtSize: Math.max(0, Math.min(2, +f.txtSize || 0)),
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
@@ -356,13 +356,13 @@
     const shaped = zoneStyled(ctx) && (w !== 1e4 || !!rectPath(ctx)) && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k))   // shape / border only
       && H >= 8 * dpr && W >= 24 * dpr && !stackedCols.has(r.k + "|" + r.a);                                      // (not slivers, not the position tool)
     // price is in this zone right now (Price in a zone: Glow), and it's a box, not full-height shading
-    let hot = 0;
+    let hot = 0, at = null;
     if (fx.zoneReact && fx.zoneReact !== "off" && r.a < 0.9 && H < c.height * 0.9 && L.zoneHot) {
       const t = ctx.getTransform(), b = w === 1e4 ? pathBox.get(ctx) : null;
       const X = b ? b.x0 : Math.min(x, x + w) * (t.a || 1) + t.e, Y = b ? b.y0 : Math.min(y, y + h) * (t.d || 1) + t.f;
-      hot = isFinite(X) && isFinite(Y) ? L.zoneHot(c, X, Y, W, H) : 0;
+      hot = isFinite(X) && isFinite(Y) ? L.zoneHot(c, X, Y, W, H) : 0; at = { ctx, X, Y, W, H };
     }
-    const heat = (z) => (hot && z ? L.zoneHeat(z, fx.zoneReact) : z);
+    const heat = (z) => (hot && z ? L.zoneHeat(z, fx.zoneReact, at) : z);
     if (!own && !all && !dim && !shaped && !hot) return null;
     if (!own && !all && !dim) { const zo = L.zoneOwn(orig); if (zo && !(H < c.height * 0.9)) zo.e = null; return heat(zo); }
     const z = L.zone(orig, { mode: all ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom, glow: fx.lineGlow, zoneFill: fx.zoneFill, dim, grad: fx.indGrad }, ctx);

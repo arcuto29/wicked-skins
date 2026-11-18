@@ -223,11 +223,11 @@
             <div class="row" title="How see-through recoloured zones are, so you still see the price inside them"><span>Zone fill</span><input type="range" id="zoneFill" min="0.04" max="0.45" step="0.01" /><output id="zoneFillOut"></output></div>
             <canvas id="zonePrev" class="partsprev" width="560" height="124"></canvas>
             <div class="row"><span>Zone shape</span><div class="seg" id="zoneShape"></div></div>
-            <p class="hint" style="margin:-2px 0 6px">Applies to every zone and every rectangle you draw. Pill rounds the ends of wide boxes and gives tall boxes rounded corners. Oval always rounds fully. Price in a zone makes a zone, or a rectangle you drew, light up and pulse softly while price is inside it. To set one zone on its own, use Each indicator below.</p>
+            <p class="hint" style="margin:-2px 0 6px">Applies to every zone and every rectangle you draw. Pill rounds the ends of wide boxes and gives tall boxes rounded corners. Price in a zone lights up a zone, or a rectangle you drew, while price is inside it: Glow and Strong brighten it with a soft pulse, Edge lights only its border, Spotlight puts a soft light right at the price inside it, and Shimmer slides a slow sheen across it. The candles always stay clear. To set one zone on its own, use Each indicator below.</p>
             <div class="row"><span>Zone style</span><div class="seg wrap" id="zoneStyle"></div></div>
             <div class="row"><span>Zone border</span><div class="seg wrap" id="zoneBorder"></div></div>
             <div class="row" title="Also soften zones that keep their own colours"><span>Dim all zones</span><div class="seg" id="zoneDim"></div></div>
-            <div class="row"><span>Price in a zone <small>the zone lights up</small></span><div class="seg" id="zoneReact"></div></div>
+            <div class="row"><span>Price in a zone <small>the zone lights up</small></span><div class="seg wrap" id="zoneReact"></div></div>
             <div class="row" title="Rectangles, zones and lines you draw with TradingView's drawing tools"><span>Your drawings</span><div class="seg" id="drawOn"></div></div>
             <h4 style="margin:12px 0 4px">Each indicator</h4>
             <p class="hint" style="margin:0 0 6px">Set any line, zone or drawing on its own: colour, glow, width, or hide it. Zones can also get their own shape, border and style. These override the settings above.</p>

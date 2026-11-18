@@ -435,9 +435,9 @@
     if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
     // Rounded = soft corners (a third of the height, at most 10 px); Pill = fully round ends. Pill only rounds the
     // ends of a zone that's clearly wider than tall: on a tall or squarish box (a session box) it would be an oval,
-    // so those get Rounded corners. Oval = always fully round, whatever the box (a tall box becomes an upright oval).
-    const px = st.px || 1, pill = st.shape === "pill" && w >= h * 2;
-    const r = st.shape === "oval" ? Math.min(h, w) / 2 : pill ? h / 2 : st.shape === "rounded" || st.shape === "pill" ? Math.max(Math.min(2 * px, h / 2), Math.min(h * 0.3, w / 2, 10 * px)) : 0;
+    // so those get Rounded corners. (An older "Oval" setting looks the same as Pill, so it draws as Pill.)
+    const shape = st.shape === "oval" ? "pill" : st.shape, px = st.px || 1, pill = shape === "pill" && w >= h * 2;
+    const r = pill ? h / 2 : shape === "rounded" || shape === "pill" ? Math.max(Math.min(2 * px, h / 2), Math.min(h * 0.3, w / 2, 10 * px)) : 0;
     const path = (inset) => { k.begin(); const a = x + inset, b = y + inset, c = Math.max(0, w - 2 * inset), d = Math.max(0, h - 2 * inset), rr = Math.max(0, r - inset);
       if (rr > 0 && g.roundRect) g.roundRect(a, b, c, d, rr); else g.rect(a, b, c, d); };
     const pSB = g.shadowBlur, pSC = g.shadowColor, pW = g.lineWidth, pD = g.getLineDash ? g.getLineDash() : [];
@@ -472,7 +472,7 @@
   }
   // a see-through zone left in its own colours, when only its shape / border is styled
   function zoneOwn(orig) { const r = keyOf(orig); if (!r || r.a >= 0.9) return null; return { f: orig, g: `rgb(${r.k})`, glow: 0, e: `rgba(${r.k},0.9)` }; }
-  const ZONE_SHAPES = ["square", "rounded", "pill", "oval"], ZONE_BORDERS = ["line", "dashed", "double", "glow", "none"], ZONE_STYLES = ["flat", "fade", "shine", "glass", "hollow"];
+  const ZONE_SHAPES = ["square", "rounded", "pill"], ZONE_BORDERS = ["line", "dashed", "double", "glow", "none"], ZONE_STYLES = ["flat", "fade", "shine", "glass", "hollow"];
 
   // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour,
   // glow: its own glow (or undefined = the Glow slider), w: extra width, hide }, or null to leave the line as it is.
@@ -661,13 +661,33 @@
     if (X + W < c.width * 0.55) return 0;
     return py >= Y - 1.5 && py <= Y + H + 1.5 ? 1 : 0;
   }
-  // a zone price is in: brighter, a lit edge, and a slow soft pulse (it moves with each price update)
-  function zoneHeat(z, how) {
+  // a zone price is in. how: glow (brighter, a lit edge, a slow soft pulse) | strong (more of it) | edge (only the
+  // border lights up; the inside stays as it was) | spotlight (a soft band of light right at the price inside the
+  // zone) | shimmer (a slow sheen sliding across the zone). at = { ctx, X, Y, W, H } in device px (for the light's
+  // position). Never covers the candles: fills stay see-through.
+  function zoneHeat(z, how, at) {
     if (!z || z.hide) return z;
-    const k = how === "strong" ? 1 : 0.6, pulse = 0.75 + 0.25 * Math.sin(performance.now() / 1000 * Math.PI * 1.2);
-    const rk = typeof z.f === "string" ? keyOf(z.f) : null, f = rk ? `rgba(${rk.k},${Math.min(0.6, Math.max(rk.a, 0.08) * (1.5 + k)).toFixed(3)})` : z.f;
-    const base = rk ? rk.k : null;
-    return { ...z, f, glow: Math.max(z.glow || 0, (0.45 + 0.45 * k) * pulse), e: base ? `rgba(${base},${(0.75 + 0.25 * pulse).toFixed(3)})` : z.e, g: base ? `rgb(${base})` : z.g, hot: true };
+    const now = performance.now() / 1000, pulse = 0.75 + 0.25 * Math.sin(now * Math.PI * 1.2);
+    const rk = typeof z.f === "string" ? keyOf(z.f) : null, base = rk ? rk.k : null, a0 = rk ? Math.max(rk.a, 0.06) : 0.12;
+    const edge = base ? `rgba(${base},${(0.75 + 0.25 * pulse).toFixed(3)})` : z.e, g = base ? `rgb(${base})` : z.g;
+    if (how === "edge") return { ...z, e: edge, g, glow: Math.max(z.glow || 0, 0.35 * pulse), hot: true };
+    const ctx = at && at.ctx, t = ctx && ctx.getTransform ? ctx.getTransform() : null, py = ctx && ctx.canvas ? priceLine.at(ctx.canvas) : null;
+    if ((how === "spotlight" || how === "shimmer") && base && t && t.a && t.d) {
+      const ux = (v) => (v - t.e) / t.a, uy = (v) => (v - t.f) / t.d, rgba = (x) => `rgba(${base},${Math.max(0, Math.min(0.7, x)).toFixed(3)})`;
+      let gr;
+      if (how === "spotlight" && py !== null) {
+        const y0 = uy(at.Y), y1 = uy(at.Y + at.H), p = Math.max(0, Math.min(1, (py - at.Y) / Math.max(1, at.H))), band = Math.min(0.45, 14 / Math.max(1, at.H));
+        gr = ctx.createLinearGradient(0, y0, 0, y1);
+        gr.addColorStop(0, rgba(a0)); gr.addColorStop(Math.max(0, p - band), rgba(a0)); gr.addColorStop(p, rgba(a0 * 3.2 * pulse + 0.06)); gr.addColorStop(Math.min(1, p + band), rgba(a0)); gr.addColorStop(1, rgba(a0));
+      } else {
+        const x0 = ux(at.X), x1 = ux(at.X + at.W), ph = (now / 3.5) % 1, wdt = 0.18;             // one slow pass every 3.5 s
+        gr = ctx.createLinearGradient(x0, uy(at.Y), x1, uy(at.Y + at.H));
+        gr.addColorStop(0, rgba(a0)); gr.addColorStop(Math.max(0, ph - wdt), rgba(a0)); gr.addColorStop(ph, rgba(a0 * 2.6 + 0.05)); gr.addColorStop(Math.min(1, ph + wdt), rgba(a0)); gr.addColorStop(1, rgba(a0));
+      }
+      return { ...z, f: gr, e: edge, g, glow: Math.max(z.glow || 0, 0.3), hot: true };
+    }
+    const k = how === "strong" ? 1 : 0.6, f = rk ? `rgba(${rk.k},${Math.min(0.6, a0 * (1.5 + k)).toFixed(3)})` : z.f;
+    return { ...z, f, glow: Math.max(z.glow || 0, (0.45 + 0.45 * k) * pulse), e: edge, g, hot: true };
   }
 
   window.__bdCandleLooks = { zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
