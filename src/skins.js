@@ -2423,6 +2423,80 @@ function priismSkins(window, document) {
       return { shadow: `inset 0 0 ${40 + 110 * k}px ${2 + 10 * k}px ${a(0.6)}`, bg: `radial-gradient(ellipse 90% 60% at 50% ${at}, ${a(0.25)}, transparent 70%)`, op: 0.18 + 0.82 * k };
     },
   };
+  // ---------- pattern skins (the chart frame + TradingView's bars) ----------
+  // Small repeating tiles, drawn here (Priism's own art), in white on transparent: used as a MASK over a colour (one
+  // colour, a gradient, rainbow, the Live mood colour), so any pattern takes any colours. [id, label, tile w, h, svg]
+  const PAT = [
+    ["carbon", "Carbon", 8, 8, '<rect width="4" height="4" opacity=".9"/><rect x="4" y="4" width="4" height="4" opacity=".9"/><rect x="4" width="4" height="4" opacity=".32"/><rect y="4" width="4" height="4" opacity=".32"/>'],
+    ["hex", "Hex", 28, 48, '<path d="M0 8L14 0L28 8V24L14 32L0 24Z M14 32V48" fill="none" stroke="#fff" stroke-width="1.4"/>'],
+    ["circuit", "Circuit", 32, 32, '<path d="M0 8H10L16 14V32 M16 0V4 M22 0V10L28 16H32 M4 24H10 M26 26H32" fill="none" stroke="#fff" stroke-width="1.3"/><circle cx="10" cy="24" r="1.8"/><circle cx="16" cy="4" r="1.8"/><circle cx="26" cy="26" r="1.8"/>'],
+    ["stripes", "Stripes", 10, 10, '<path d="M-2 2L2 -2 M0 10L10 0 M8 12L12 8" stroke="#fff" stroke-width="2.2"/>'],
+    ["dots", "Dots", 10, 10, '<circle cx="5" cy="5" r="1.5"/>'],
+    ["grid", "Grid", 14, 14, '<path d="M14 0V14H0" fill="none" stroke="#fff" stroke-width="1"/>'],
+    ["waves", "Waves", 24, 12, '<path d="M0 6Q6 0 12 6T24 6" fill="none" stroke="#fff" stroke-width="1.5"/>'],
+    ["chevron", "Chevron", 16, 10, '<path d="M0 8L8 2L16 8" fill="none" stroke="#fff" stroke-width="1.7"/>'],
+    ["diamond", "Diamond", 16, 16, '<path d="M8 1L15 8L8 15L1 8Z" fill="none" stroke="#fff" stroke-width="1.2"/>'],
+    ["scales", "Scales", 20, 10, '<path d="M0 10A10 10 0 0 1 20 10 M-10 0A10 10 0 0 1 10 0 M10 0A10 10 0 0 1 30 0" fill="none" stroke="#fff" stroke-width="1.2"/>'],
+    ["solid", "Solid", 0, 0, ""],
+  ];
+  const PMETA = Object.fromEntries(PAT.map(([id, name, w, h, body]) => [id, { id, name, w, h, body }]));
+  const svgOf = (p) => `<svg xmlns="http://www.w3.org/2000/svg" width="${p.w}" height="${p.h}" fill="#fff">${p.body}</svg>`;
+  const urlOf = (id) => { const p = PMETA[id]; return p && p.w ? `url("data:image/svg+xml,${encodeURIComponent(svgOf(p))}")` : "none"; };
+  const RAINBOW = ["#ff4d6d", "#ffb84d", "#f9f871", "#4dff9a", "#4dd8ff", "#7c6cff", "#ff4df0"];
+  const imgs = {};
+  window.PriismPatterns = {
+    LIST: PAT.map(([id, name]) => [id, name]), META: PMETA, RAINBOW,
+    // CSS: the mask image + its tile size (scale 0.5..2) for a pattern
+    mask(id, scale) { const p = PMETA[id] || PMETA.carbon, s = Math.max(0.5, Math.min(2.5, +scale || 1));
+      return { image: urlOf(p.id), size: p.w ? `${(p.w * s).toFixed(1)}px ${(p.h * s).toFixed(1)}px` : "auto", w: p.w * s, h: p.h * s }; },
+    // CSS background for a colour choice. o = { mode, color, color2, up, down, accent, mood, round }
+    // mode: accent | candles (up → down) | gradient (your two colours) | rainbow | custom | mood (the Live mood colour)
+    paint(o) {
+      const ok = (c) => /^#[0-9a-f]{6}$/i.test(c || ""), A = ok(o.accent) ? o.accent : "#7c6cff";
+      if (o.mode === "candles") return `linear-gradient(135deg, ${ok(o.up) ? o.up : "#26a69a"}, ${ok(o.down) ? o.down : "#ef5350"})`;
+      if (o.mode === "gradient") return `linear-gradient(135deg, ${ok(o.color) ? o.color : A}, ${ok(o.color2) ? o.color2 : "#ff4df0"})`;
+      if (o.mode === "rainbow") return o.round ? `conic-gradient(from 200deg, ${RAINBOW.join(", ")}, ${RAINBOW[0]})` : `linear-gradient(90deg, ${RAINBOW.join(", ")})`;
+      if (o.mode === "custom") return ok(o.color) ? o.color : A;
+      if (o.mode === "mood") return `var(--bd-mood-col, ${A})`;
+      return A;
+    },
+    // the same colours for a canvas (snapshots, clips, panel previews), over a box
+    canvasPaint(g, o, x, y, w, h) {
+      const ok = (c) => /^#[0-9a-f]{6}$/i.test(c || ""), A = ok(o.accent) ? o.accent : "#7c6cff";
+      const lin = (cols) => { const gr = g.createLinearGradient(x, y, x + w, y + h); cols.forEach((c, i) => gr.addColorStop(i / Math.max(1, cols.length - 1), c)); return gr; };
+      if (o.mode === "candles") return lin([ok(o.up) ? o.up : "#26a69a", ok(o.down) ? o.down : "#ef5350"]);
+      if (o.mode === "gradient") return lin([ok(o.color) ? o.color : A, ok(o.color2) ? o.color2 : "#ff4df0"]);
+      if (o.mode === "rainbow") { if (o.round && g.createConicGradient) { const gr = g.createConicGradient((200 - 90) * Math.PI / 180, x + w / 2, y + h / 2); [...RAINBOW, RAINBOW[0]].forEach((c, i, a) => gr.addColorStop(i / (a.length - 1), c)); return gr; }
+        const gr = g.createLinearGradient(x, 0, x + w, 0); RAINBOW.forEach((c, i) => gr.addColorStop(i / (RAINBOW.length - 1), c)); return gr; }
+      if (o.mode === "custom") return ok(o.color) ? o.color : A;
+      if (o.mode === "mood") return ok(o.mood) ? o.mood : A;
+      return A;
+    },
+    // the tile as an image (loaded once) for canvas drawing; null until it has loaded
+    image(id) { const p = PMETA[id]; if (!p || !p.w) return null; let im = imgs[id];
+      if (!im) { im = imgs[id] = new Image(); im.src = "data:image/svg+xml," + encodeURIComponent(svgOf(p)); } return im.complete && im.naturalWidth ? im : null; },
+    // Draw a patterned band (a frame of width bw inside the box x,y,w,h; bw = 0: fill the whole box) on a canvas.
+    // o = paint options + { pattern, scale, alpha, radius, edge, dpr }
+    band(g, x, y, w, h, bw, o) {
+      if (w < 4 || h < 4 || typeof document === "undefined") return;
+      const dpr = o.dpr || 1, oc = document.createElement("canvas"); oc.width = Math.ceil(w); oc.height = Math.ceil(h);
+      const q = oc.getContext("2d"), r = Math.max(0, +o.radius || 0) * dpr, B = bw * dpr;
+      const rr = (X, Y, W, H, R) => { q.beginPath(); if (q.roundRect && R > 0) q.roundRect(X, Y, W, H, Math.max(0, Math.min(R, W / 2, H / 2))); else q.rect(X, Y, W, H); };
+      q.fillStyle = this.canvasPaint(q, o, 0, 0, w, h); q.fillRect(0, 0, w, h);
+      const im = o.pattern === "solid" ? null : this.image(o.pattern || "carbon");
+      if (im) {                                     // keep the colour only where the pattern is
+        const s = Math.max(0.5, Math.min(2.5, +o.scale || 1)) * dpr, t = document.createElement("canvas"), p = PMETA[o.pattern] || PMETA.carbon;
+        t.width = Math.max(1, Math.round(p.w * s)); t.height = Math.max(1, Math.round(p.h * s)); t.getContext("2d").drawImage(im, 0, 0, t.width, t.height);
+        q.globalCompositeOperation = "destination-in"; q.fillStyle = q.createPattern(t, "repeat"); q.fillRect(0, 0, w, h);
+      } else if (o.pattern !== "solid") return;     // the tile isn't loaded yet
+      q.globalCompositeOperation = "destination-in"; rr(0, 0, w, h, r); q.fillStyle = "#000"; q.fill();
+      if (B > 0) { q.globalCompositeOperation = "destination-out"; rr(B, B, w - 2 * B, h - 2 * B, Math.max(0, r - B)); q.fill(); }
+      if (o.edge && B > 0) {                         // a fine line along the inside edge
+        q.globalCompositeOperation = "source-over"; q.strokeStyle = this.canvasPaint(q, o, 0, 0, w, h); q.lineWidth = 1.2 * dpr; q.globalAlpha = 0.9;
+        rr(B - 0.6 * dpr, B - 0.6 * dpr, w - 2 * B + 1.2 * dpr, h - 2 * B + 1.2 * dpr, Math.max(0, r - B)); q.stroke(); }
+      const pa = g.globalAlpha; g.globalAlpha = pa * Math.max(0, Math.min(1, +o.alpha || 0.5)); g.drawImage(oc, x, y); g.globalAlpha = pa;
+    },
+  };
   // ---------- fonts for the price scale, the ticker and TradingView's panels ----------
   // [id, label, bundled file in src/fonts (null = the computer's own), CSS family]. Bundled fonts are all SIL Open Font
   // Licence (see src/fonts/LICENSES.md) and load from Priism itself, never from the internet.

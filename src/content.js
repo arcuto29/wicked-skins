@@ -28,6 +28,13 @@
     moodLook: "glow",      // glow | horizon | frame
     moodRange: 1,          // Day's move: full glow at this % (Recent move: a quarter of it)
     moodPulse: "soft",     // pulse on each price tick / beat: off | soft | strong
+    // Pattern skins. Chart frame: a patterned band along each chart's edges (where Live mood glows). Colours: accent |
+    // candles | gradient (frameColor → frameColor2) | rainbow | custom | mood (the Live mood colour, lit by it)
+    frameOn: false, framePattern: "carbon", frameMode: "accent", frameColor: "#7c6cff", frameColor2: "#ff4df0", frameW: 8, frameAlpha: 0.5,
+    frameSize: 1, frameRound: true, frameEdge: true, frameMove: false,
+    // ...and over TradingView's bars (top bar, drawing toolbar, right panels, bottom bar): faint, never in the way of a
+    // click, so every tool stays clear. barWhere: any of t l r b
+    barPatOn: false, barPattern: "hex", barMode: "accent", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.12, barSize: 1, barWhere: "tlrb",
     // Watermark: your own text and/or logo on the chart (for screenshots / streams)
     // Sides: let the wallpaper flow across the panels around the chart (watchlist, toolbars, the grey areas).
     // "off" = only the chart; "glass" = frosted panels; "clear" = fully see-through panels.
@@ -399,6 +406,11 @@
       if (fire) { el.style.setProperty("--bd-pulse", tcol); el.style.setProperty("--bd-pulse-op", strong ? "0.9" : "0.45"); el.style.setProperty("--bd-pulse-s", strong ? "90px 30px" : "60px 10px");
         el.classList.remove("bd-pulse"); void el.offsetWidth; el.classList.add("bd-pulse"); }
     }
+    // the chart frame in "Live mood" colours: it takes the glow's colour and lights up with it
+    if (cfg.frameOn && cfg.frameMode === "mood") for (const v of views) if (v.frame && !v.frame.hidden) {
+      v.frame.style.setProperty("--bd-mood-col", col);
+      const a = Math.max(0.05, Math.min(1, +cfg.frameAlpha || 0.5)); v.frame.style.opacity = String(active ? a * Math.min(1, 0.35 + op * 0.9) : a * 0.35);
+    }
     if (pillEl) {
       pillEl.hidden = !label;
       pillEl.textContent = label;
@@ -744,6 +756,7 @@
   function applyLook() {
     if (!layer) return;
     setTimeout(measureBackdrop, 300);
+    applyFrame(); applyBars();
     layer.classList.toggle("bd-over", cfg.layer === "over");
     layer.classList.toggle("bd-tiled", tiled());
     document.documentElement.classList.toggle("bd-over-mode", cfg.layer === "over");
@@ -1279,6 +1292,7 @@
       return v;
     });
     // Live mood: one glow per chart (inside each chart's wallpaper tile), so every chart in a layout glows on its own
+    for (const v of views) { v.frame = document.createElement("div"); v.frame.className = "bd-frame"; v.frame.hidden = true; v.tile.appendChild(v.frame); }   // Pattern skins: the chart frame
     for (const v of views) { v.mood = document.createElement("div"); v.mood.className = "bd-react"; v.tile.appendChild(v.mood); }
     reactEl = views[0] ? views[0].mood : document.createElement("div");
     pillEl = document.createElement("div");
@@ -1303,6 +1317,75 @@
     renderPnl();
   }
 
+  // ---------- Pattern skins ----------
+  // Chart frame: a band along each chart's edges, in a pattern (PriismPatterns) and colours of your choice. It sits in
+  // the wallpaper layer (behind the chart: candles and scales draw over it), cut to a ring by a clip path so the
+  // corners can be round inside and out.
+  const patPaint = (mode, c1, c2, round) => { const P = window.PriismPatterns; if (!P) return "none";
+    return P.paint({ mode, color: c1, color2: c2, up: upColor(), down: downColor(), accent: skinAccent() || upColor(), round }); };
+  function frameRect(v) {            // the frame's box, in the tile's own coordinates
+    if (v.host || embeddedHost || tiled()) return { l: 0, t: 0, w: v.w, h: v.h };
+    const b = chartsBox(); return { l: b.left - v.x, t: b.top - v.y, w: b.width, h: b.height };
+  }
+  const frameW = () => Math.max(2, Math.min(32, +cfg.frameW || 8)), frameR = () => (cfg.frameRound ? 12 : 0);
+  function placeFrames() {
+    for (const v of views) { const f = v.frame; if (!f || f.hidden) continue;
+      const r = frameRect(v), W = frameW(), R = frameR(), key = [r.l, r.t, r.w, r.h, W, R].map(Math.round).join(",");
+      if (f.__key === key) continue; f.__key = key;
+      Object.assign(f.style, { left: r.l + "px", top: r.t + "px", width: r.w + "px", height: r.h + "px" });
+      const ring = (x, y, w, h, q) => { q = Math.max(0, Math.min(q, w / 2, h / 2));
+        return `M${x + q},${y}H${x + w - q}A${q},${q} 0 0 1 ${x + w},${y + q}V${y + h - q}A${q},${q} 0 0 1 ${x + w - q},${y + h}H${x + q}A${q},${q} 0 0 1 ${x},${y + h - q}V${y + q}A${q},${q} 0 0 1 ${x + q},${y}Z`; };
+      f.style.clipPath = r.w > 2 * W && r.h > 2 * W ? `path(evenodd, "${ring(0, 0, r.w, r.h, R)} ${ring(W, W, r.w - 2 * W, r.h - 2 * W, Math.max(0, R - W))}")` : "none";
+    }
+  }
+  function applyFrame() {
+    const P = window.PriismPatterns, on = !!(cfg.enabled && cfg.frameOn && P);
+    if (on) P.image(cfg.framePattern);   // load its tile now, so snapshots and clips can draw it straight away
+    for (const v of views) { const f = v.frame; if (!f) continue;
+      f.hidden = !on; if (!on) continue;
+      const m = P.mask(cfg.framePattern, cfg.frameSize), W = frameW(), R = frameR();
+      f.style.setProperty("--bd-fbg", patPaint(cfg.frameMode, cfg.frameColor, cfg.frameColor2, true));
+      f.style.setProperty("--bd-fpat", m.image); f.style.setProperty("--bd-fps", m.size);
+      f.style.setProperty("--bd-ftw", (m.w || 0) * 4 + "px"); f.style.setProperty("--bd-fth", (m.h || 0) * 4 + "px");
+      f.style.setProperty("--bd-fw", W + "px"); f.style.setProperty("--bd-fr", R + "px");
+      f.classList.toggle("bd-fedge", !!cfg.frameEdge); f.classList.toggle("bd-fsolid", cfg.framePattern === "solid");
+      f.classList.toggle("bd-fmove", !!cfg.frameMove && !liteNow() && cfg.framePattern !== "solid");
+      if (cfg.frameMode !== "mood") f.style.opacity = String(Math.max(0.05, Math.min(1, +cfg.frameAlpha || 0.5)));
+      f.__key = "";
+    }
+    placeFrames();
+    if (cfg.frameMode === "mood") updateReact(0);
+  }
+  // Bars: one faint patterned sheet over each of TradingView's bars, pointer-events none (clicks go straight through),
+  // blended so it only tints: icons, text and buttons stay clear. Only on TradingView (its layout areas).
+  const BAR_AREAS = { t: ".layout__area--top", l: ".layout__area--left", r: ".layout__area--right", b: ".layout__area--bottom" };
+  let barBox = null;
+  function applyBars() {
+    const P = window.PriismPatterns, on = !!(cfg.enabled && cfg.barPatOn && P && document.querySelector(".layout__area--center"));
+    if (!on) { if (barBox) { barBox.remove(); barBox = null; } return; }
+    if (!barBox || !barBox.isConnected) { barBox = document.createElement("div"); barBox.id = "bd-barpat"; barBox.dataset.bdOwner = ME.token; document.documentElement.appendChild(barBox); }
+    const m = P.mask(cfg.barPattern, cfg.barSize);
+    barBox.style.setProperty("--bd-bbg", patPaint(cfg.barMode, cfg.barColor, cfg.barColor2, false));
+    barBox.style.setProperty("--bd-bpat", m.image); barBox.style.setProperty("--bd-bps", m.size);
+    barBox.style.setProperty("--bd-ba", String(Math.max(0.02, Math.min(0.4, +cfg.barAlpha || 0.12))));
+    barBox.classList.toggle("bd-bsolid", cfg.barPattern === "solid");
+    barBox.__sig = ""; placeBars();
+  }
+  function placeBars() {
+    if (!barBox) return;
+    const where = String(cfg.barWhere || "tlrb"), parts = [];
+    for (const [k, sel] of Object.entries(BAR_AREAS)) { if (!where.includes(k)) continue;
+      const el = document.querySelector(sel), r = el && el.getBoundingClientRect();
+      if (r && r.width >= 4 && r.height >= 4) parts.push([k, r]); }
+    const sig = parts.map(([k, r]) => k + [r.left, r.top, r.width, r.height].map(Math.round).join(",")).join("|");
+    if (sig === barBox.__sig) return; barBox.__sig = sig;
+    barBox.textContent = "";
+    for (const [k, r] of parts) { const d = document.createElement("div"); d.dataset.part = k;
+      Object.assign(d.style, { left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" }); barBox.appendChild(d); }
+  }
+  addEventListener("resize", () => setTimeout(placeBars, 60));
+  setInterval(() => { if (barBox) placeBars(); }, 800);   // side panels open / close without a resize event
+
   // Keep every wallpaper on top of its chart as the layout changes (resize, 1 -> 4 charts, panels opening...).
   const sigOf = (list) => list.map((c) => [c.r.left, c.r.top, c.r.width, c.r.height].map(Math.round).join(",")).join("|") + "@" + innerWidth + "x" + innerHeight;
   let layoutSig = "";
@@ -1323,6 +1406,7 @@
     placePnl();
     placeGoal();
     placeTimer();
+    placeFrames(); placeBars();
     try { pushChartColors(); } catch {}                     // each chart's box moved: tell hook.js where they are now
   }
   function trackLayout() {
@@ -1685,7 +1769,7 @@
     // the skin colour is taken ONCE per wallpaper (animated wallpapers shift colour all the time; following that
     // re-coloured lines and panels again and again)
     const srcSig = String(cfg.skin) + "|" + String(cfg.mediaId || "");
-    if (srcSig !== accentFor && rawAccent()) { accentFor = srcSig; lastAccent = rawAccent(); lastColors = rawColors(); pushFx(); applyPanels(); applyDialogs(); applyTicker(); }
+    if (srcSig !== accentFor && rawAccent()) { accentFor = srcSig; lastAccent = rawAccent(); lastColors = rawColors(); pushFx(); applyPanels(); applyDialogs(); applyTicker(); applyFrame(); applyBars(); }
     const lit = views.filter((v) => v.lum);
     if (!lit.length) return;
     applyAutoMatch();
@@ -1884,6 +1968,8 @@
     if (keys.some((k) => k.startsWith("dlg") || k === "panelMode" || k === "panelColor")) applyDialogs();
     if (keys.includes("sides") || keys.includes("leftBar") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
+    if (keys.some((k) => k.startsWith("frame") || k === "candleUp" || k === "candleDown" || k === "candleOn" || k === "powerSaver")) applyFrame();
+    if (keys.some((k) => k.startsWith("barPat") || k === "barMode" || k === "barColor" || k === "barColor2" || k === "barAlpha" || k === "barSize" || k === "barWhere" || k === "candleUp" || k === "candleDown" || k === "candleOn")) applyBars();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
@@ -1896,7 +1982,7 @@
     // a wallpaper's own settings / Recolour: rebuilt in place (unless the whole layer is rebuilt anyway)
     const optsChanged = keys.includes("skinOpts"); keys = keys.filter((k) => k !== "skinOpts");
     if (optsChanged && !keys.some((k) => REBUILD.has(k))) updateSkinOpts();
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound", "welcomePending"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !k.startsWith("frame") && !k.startsWith("bar") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound", "welcomePending"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -1929,6 +2015,16 @@
     if (cfg.tint) f.push(`hue-rotate(${cfg.tint}deg)`);
     if (cfg.bw) f.push("grayscale(1)");
     return f.join(" ") || "none";
+  }
+  // clips and snapshots: the chart frame (Pattern skins), as on the page
+  function drawFrame(g, box, dpr) {
+    const P = window.PriismPatterns; if (!P || !(cfg.enabled && cfg.frameOn)) return;
+    for (const v of views) { const f = v.frame; if (!f || f.hidden) continue;
+      const r = frameRect(v);
+      try { P.band(g, (v.x + r.l - box.left) * dpr, (v.y + r.t - box.top) * dpr, r.w * dpr, r.h * dpr, frameW(), { mode: cfg.frameMode, color: cfg.frameColor, color2: cfg.frameColor2,
+        up: upColor(), down: downColor(), accent: skinAccent() || upColor(), mood: (f.style.getPropertyValue("--bd-mood-col") || "").trim(), round: true, pattern: cfg.framePattern,
+        scale: cfg.frameSize, alpha: parseFloat(f.style.opacity) || 0.5, radius: frameR(), edge: !!cfg.frameEdge, dpr }); } catch {}
+    }
   }
   // clips and snapshots: the same Live mood look, drawn on each chart (matches the CSS on the page)
   function drawMoodGlow(g, box, dpr) {
@@ -2072,14 +2168,14 @@
     const layerAlpha = Math.max(0, Math.min(1, +(over ? cfg.overOpacity : cfg.opacity)));
     if (!over) {
       g.save(); g.globalAlpha = layerAlpha;
-      mediaMissed = drawWallpaper(g, box, dpr); drawMoodGlow(g, box, dpr);
+      mediaMissed = drawWallpaper(g, box, dpr); drawFrame(g, box, dpr); drawMoodGlow(g, box, dpr);
       g.restore();
       drawChartCanvases(g, box, dpr);
     } else {                       // "On top": the wallpaper sits over the chart, clipped to the chart panes
       drawChartCanvases(g, box, dpr);
       g.save(); g.globalAlpha = layerAlpha; g.beginPath();
       for (const c of (charts.length ? charts : [{ r: box }])) g.rect((c.r.left - box.left) * dpr, (c.r.top - box.top) * dpr, c.r.width * dpr, c.r.height * dpr);
-      g.clip(); mediaMissed = drawWallpaper(g, box, dpr); drawMoodGlow(g, box, dpr); g.restore();
+      g.clip(); mediaMissed = drawWallpaper(g, box, dpr); drawFrame(g, box, dpr); drawMoodGlow(g, box, dpr); g.restore();
     }
     drawMoodPill(g, box, dpr); drawPnlOverlay(g, box, dpr); drawGoalOverlay(g, box, dpr); drawTimerOverlay(g, box, dpr); drawWatermark(g, box, dpr, wmImg);
     return { mediaMissed };

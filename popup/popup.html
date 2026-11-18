@@ -192,6 +192,36 @@
         <div class="row" id="dlgAlphaRow" data-tvonly><span>Strength</span><input type="range" id="dlgAlpha" min="0.4" max="1" step="0.02" /><output id="dlgAlphaOut"></output></div>
         <p class="hint" data-tvonly>TradingView's Settings window, other dialogs and dropdown menus. Glass is frosted so your wallpaper glows through.</p>
       </details>
+      <details class="grp" data-grp="patterns" open>
+        <summary>Pattern skins</summary>
+        <p class="hint">Patterns in your colours on the edges around your chart. Calm and see-through; they never cover a button or take a click.</p>
+        <canvas id="patPrev" class="partsprev" width="560" height="150"></canvas>
+        <div class="looklabel">Chart frame <small>a band along each chart's edges, where Live mood glows</small></div>
+        <div class="row"><span>Frame</span><div class="seg" id="frameOn"></div></div>
+        <div id="frameBox" hidden>
+          <div class="patgrid" id="framePattern"></div>
+          <div class="row"><span>Colours</span><div class="seg wrap" id="frameMode"></div></div>
+          <div class="row" id="frameColRow" hidden><span>Colour</span><input type="color" id="frameColor" title="Colour" /> <input type="color" id="frameColor2" title="Second colour" /></div>
+          <div class="row"><span>Width</span><input type="range" id="frameW" min="3" max="24" step="1" /><output id="frameWOut"></output></div>
+          <div class="row"><span>Strength</span><input type="range" id="frameAlpha" min="0.1" max="1" step="0.05" /><output id="frameAlphaOut"></output></div>
+          <div class="row"><span>Pattern size</span><input type="range" id="frameSize" min="0.5" max="2.5" step="0.1" /><output id="frameSizeOut"></output></div>
+          <div class="row"><span>Corners</span><div class="seg" id="frameRound"></div></div>
+          <div class="row"><span>Edge line</span><div class="seg" id="frameEdge"></div></div>
+          <div class="row"><span>Motion</span><div class="seg" id="frameMove"></div></div>
+          <p class="hint" id="frameHint"></p>
+        </div>
+        <div class="looklabel" style="margin-top:12px" data-tvonly>TradingView's bars <small>top bar, drawing toolbar, right panels, bottom bar</small></div>
+        <div class="row" data-tvonly><span>Bar pattern</span><div class="seg" id="barPatOn"></div></div>
+        <div id="barBox" hidden data-tvonly>
+          <div class="patgrid" id="barPattern"></div>
+          <div class="row"><span>On</span><div class="seg" id="barWhere"></div></div>
+          <div class="row"><span>Colours</span><div class="seg wrap" id="barMode"></div></div>
+          <div class="row" id="barColRow" hidden><span>Colour</span><input type="color" id="barColor" title="Colour" /> <input type="color" id="barColor2" title="Second colour" /></div>
+          <div class="row"><span>Strength</span><input type="range" id="barAlpha" min="0.04" max="0.35" step="0.01" /><output id="barAlphaOut"></output></div>
+          <div class="row"><span>Pattern size</span><input type="range" id="barSize" min="0.5" max="2.5" step="0.1" /><output id="barSizeOut"></output></div>
+          <p class="hint">A faint sheet over the bars that only tints them: every icon, button and number stays clear, and clicks go straight through. Keep Strength low for the calmest look.</p>
+        </div>
+      </details>
       <details class="grp" data-grp="ui">
         <summary>Text &amp; accent</summary>
         <div class="row"><span>Font</span><div class="seg" id="uiFont"></div></div>
