@@ -12,6 +12,7 @@
     // Tune
     opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
     fps: "auto", fit: "cover", posX: 50, posY: 50,
+    res: "standard",       // wallpaper sharpness: standard (light) | sharp (your screen's size) | ultra (every pixel, up to 4K)
     powerSaver: false, paused: false, bw: false,
     layer: "behind",       // "behind" | "over"
     // Candles
@@ -376,6 +377,7 @@
   function musicFx(reset) {
     const parts = reset ? "" : musicParts(), on = !!music && !reset, S = Math.max(0, Math.min(1, +cfg.reactStrength || 0.6));
     const kick = on ? music.kick : 0, L = on ? music.level : 0, hat = on ? music.hat : 0;
+    window.PriismBeat = { on, kick, level: L, hat };   // effects over your wallpaper (Bokeh, Sparkles...) swell with it
     const base = Math.max(0, Math.min(0.95, +cfg.dim + (cfg.calm && calmActive ? 0.3 : 0)));
     for (const v of views) {
       // wallpaper: a brighter, slightly bigger kick on every beat
@@ -908,11 +910,13 @@
   function skinOptsFor(id) { const o = cfg.skinOpts && cfg.skinOpts[id]; return o && typeof o === "object" ? JSON.parse(JSON.stringify(o)) : null; }
   // Effects (rain, storm, snow...) over a wallpaper: their own see-through canvas above it, drawn like a wallpaper
   // (in the worker when possible). The setting is saved with the wallpaper: skinOpts[<skin id> or "media:<id>"].fx
-  const FX_IDS = ["rain", "storm", "snow", "fog", "dust", "embers"];
+  const fxIds = () => Object.keys(window.PriismEffects || {});
   function fxFor(src) { const o = cfg.skinOpts && cfg.skinOpts[src], f = o && o.fx;
-    return f && FX_IDS.includes(f.k) ? JSON.parse(JSON.stringify(f)) : null; }
+    return f && fxIds().includes(f.k) ? JSON.parse(JSON.stringify(f)) : null; }
+  // an effect that swells with your music needs to hear it: it runs here (not in the drawing worker) while Music is on
+  const fxWithMusic = (f) => !!(f && cfg.react === "music" && window.PriismEffects[f.k] && window.PriismEffects[f.k].music);
   function setFx(v, src) {
-    const f = fxFor(src), sig = JSON.stringify(f);
+    const f = fxFor(src), sig = JSON.stringify(f) + (fxWithMusic(f) ? "|m" : "");
     if (v.fxSig === sig && (v.fx || !f)) return;
     v.fxSig = sig;
     if (v.fx && v.fx.remove) try { v.fx.remove(); } catch {}
@@ -920,7 +924,7 @@
     v.fx = v.fxEl = null; v.fcw = v.fch = 0;
     if (!f || !window.PriismEffects) return;
     const el = document.createElement("canvas"); el.className = "bd-fx";
-    v.fx = workerSkin(el, "fx:" + f.k, f) || window.PriismMakeSkin("fx:" + f.k, el.getContext("2d"), f);
+    v.fx = (!fxWithMusic(f) && workerSkin(el, "fx:" + f.k, f)) || window.PriismMakeSkin("fx:" + f.k, el.getContext("2d"), f);
     v.fxEl = el; v.fxClock = 0;
     if (v.tile && v.content) v.content.after(el);
     if (v.w) sizeFx(v);
@@ -928,7 +932,7 @@
   }
   function sizeFx(v) {
     if (!v.fx) return;
-    const base = cfg.powerSaver ? 0.5 : 0.75, scale = Math.max(0.35, base * qlv().res);
+    const base = resBase(v), scale = Math.max(0.35, base * qlv().res);
     const w = Math.max(2, (v.w * scale) | 0), h = Math.max(2, (v.h * scale) | 0);
     if (v.fcw === w && v.fch === h) return; v.fcw = w; v.fch = h;
     if (!v.fx.offThread) { v.fxEl.width = w; v.fxEl.height = h; }
@@ -1506,11 +1510,20 @@
     const area = document.querySelector(".layout__area--center"); if (area) chartRO.observe(area);   // charts added / removed
   }
 
+  // How many pixels a built-in wallpaper / effect is drawn with, per CSS pixel. Standard 0.75 (light), Sharp 1 (your
+  // screen's size), Ultra: every real pixel (a 4K / Retina screen gets 4K), never more than 3840 x 2160 per wallpaper.
+  function resBase(v) {
+    if (cfg.powerSaver) return 0.5;
+    if (cfg.res === "sharp") return 1;
+    if (cfg.res === "ultra") { const dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1)), px = Math.max(1, (v.w || 1) * (v.h || 1));
+      return Math.max(1, Math.min(dpr, Math.sqrt((3840 * 2160) / px))); }
+    return 0.75;
+  }
   function sizeCanvas(v) {
     sizeFx(v);
     if (!v.skin) return;
     // Auto quality steps the resolution down when the computer struggles (res 1 = full, 0 = lowest).
-    const base = cfg.powerSaver ? 0.5 : 0.75;
+    const base = resBase(v);
     const scale = Math.max(0.35, base * qlv().res);
     const w = Math.max(2, (v.w * scale) | 0), h = Math.max(2, (v.h * scale) | 0);
     if (v.skin.offThread) { if (v.cw !== w || v.ch !== h) { v.cw = w; v.ch = h; v.skin.resize(w, h); } return; }   // sized in the worker
@@ -2029,6 +2042,8 @@
     if (keys.some((k) => k.startsWith("barPat") || k === "powerSaver" || k === "barMode" || k === "barColor" || k === "barColor2" || k === "barAlpha" || k === "barSize" || k === "barWhere" || k === "candleUp" || k === "candleDown" || k === "candleOn")) applyBars();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
+    if (keys.includes("res")) views.forEach(sizeCanvas);
+    if (keys.includes("react")) for (const v of views) setFx(v, v.src);   // effects that swell with music run next to it
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k === "scaleFont" || k === "tkFont" || k === "uiFont")) ensureFonts();
     if (keys.includes("react") || keys.includes("enabled")) syncMusic();
@@ -2337,8 +2352,8 @@
     let outSize = 0, quality = (cfg.clipQuality === "high" || cfg.clipQuality === "small") ? cfg.clipQuality : "balanced";
     const pick = (attr, val) => root.querySelectorAll(`[data-${attr}]`).forEach((b) => b.classList.toggle("on", b.dataset[attr] === String(val)));
     const outDims = () => { let W = Math.max(2, Math.round(crop.w * (v.videoWidth || 2))), H = Math.max(2, Math.round(crop.h * (v.videoHeight || 2)));
-      // Size = the short side (1080p, 720p...), never upscaled; the long side is capped at 1920
-      const k = Math.min(1, outSize ? outSize / Math.min(W, H) : 1, 1920 / Math.max(W, H));
+      // Size = the short side (1080p, 720p...), never upscaled; the long side is capped at 1920 (3840 = 4K with Ultra sharpness)
+      const k = Math.min(1, outSize ? outSize / Math.min(W, H) : 1, (cfg.res === "ultra" ? 3840 : 1920) / Math.max(W, H));
       return [Math.max(2, Math.round(W * k) & ~1), Math.max(2, Math.round(H * k) & ~1)]; };
     const estimate = () => { const [W, H] = outDims(), d = Math.max(0.5, t1 - t0), bps = clipBps(W, H, fps || 30, d, quality);
       root.querySelector(".est").textContent = `≈ ${Math.max(0.1, (bps * d) / 8e6).toFixed(1)} MB · ${W}×${H}`; };

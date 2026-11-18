@@ -9,11 +9,11 @@ const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="tru
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const CHART_KEYS = ["frameOn","framePattern","frameMode","frameColor","frameColor2","frameW","frameAlpha","frameSize","frameRound","frameEdge","frameMove","barPatOn","barPattern","barMode","barColor","barColor2","barAlpha","barSize","barWhere","indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
-const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
+const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
-  fps: "auto", fit: "cover", posX: 50, posY: 50,
+  fps: "auto", fit: "cover", posX: 50, posY: 50, res: "standard",
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft", musicParts: "gwfi", musicFeel: "punchy", musicSens: "normal",
@@ -834,7 +834,8 @@ const RC_PRESETS = [["candles", "My candles", null], ["priism", "Priism", ["#19d
 const wallId = () => (WickedSkins[cfg.skin] ? cfg.skin : cfg.skin === "media" && cfg.mediaId ? "media:" + cfg.mediaId : "");
 const wallMedia = (id) => (id && id.startsWith("media:") ? (cfg.media || []).find((m) => m.id === id.slice(6)) : null);
 const wallName = (id) => (WickedSkins[id] ? WickedSkins[id].name : (wallMedia(id) || {}).name || "Your wallpaper");
-const FX_LIST = [["", "Off"], ["rain", "Rain"], ["storm", "Storm"], ["snow", "Snow"], ["fog", "Fog"], ["dust", "Dust"], ["embers", "Embers"]];
+// every effect (skins.js), the ones that swell with your music marked with a note
+const FX_LIST = [["", "Off"], ...Object.entries(window.PriismEffects || {}).map(([k, e]) => [k, e.name + (e.music ? " \u266A" : "")])];
 const wallSaved = (id) => ({ ...(((cfg.skinOpts || {})[id]) || {}) });
 let wallPrev = null;
 // change this wallpaper's settings. live = only the panel previews now (while dragging); the chart gets it on release
@@ -1157,9 +1158,10 @@ async function convertPending() {
         ff.on("progress", onProg);
         const inName = "in." + ((m.origName.split(".").pop() || "bin").toLowerCase());
         await ff.writeFile(inName, new Uint8Array(await src.arrayBuffer()));
-        // Wallpaper-friendly: no audio, max 1920px wide, 30 fps, fast VP8 WebM, first 3 minutes.
-        const code = await ff.exec(["-i", inName, "-t", "180", "-an", "-vf", "scale='min(1920,iw)':-2,fps=30",
-          "-c:v", "libvpx", "-b:v", "4M", "-deadline", "realtime", "-cpu-used", "8", "-pix_fmt", "yuv420p", "out.webm"]);
+        // Wallpaper-friendly: no audio, max 1920px wide (3840 = 4K with Ultra sharpness), 30 fps, fast VP8 WebM, first 3 minutes.
+        const big = cfg.res === "ultra";
+        const code = await ff.exec(["-i", inName, "-t", "180", "-an", "-vf", `scale='min(${big ? 3840 : 1920},iw)':-2,fps=30`,
+          "-c:v", "libvpx", "-b:v", big ? "14M" : "4M", "-deadline", "realtime", "-cpu-used", "8", "-pix_fmt", "yuv420p", "out.webm"]);
         ff.off("progress", onProg);
         if (code !== 0) throw new Error("ffmpeg could not read this video");
         const data = await ff.readFile("out.webm");
@@ -2014,6 +2016,10 @@ function syncTune() {
     (v) => set(v === "eco" ? { powerSaver: true, fps: 30 } : v === "balanced" ? { powerSaver: false, fps: 30 } : v === "max" ? { powerSaver: false, fps: "max" } : { powerSaver: false, fps: "auto" }));
   // Max runs at your screen's refresh rate (120/144/240Hz). Show it when known.
   const hz = +document.documentElement.getAttribute("data-bd-hz") || 0;   // only set on a chart page, not the popup
+  if ($("res")) { seg("res", [["standard", "Standard"], ["sharp", "Sharp"], ["ultra", "Ultra 4K"]], () => cfg.res || "standard", (v) => { set({ res: v }); syncTune(); });
+    $("resHint").textContent = cfg.res === "ultra" ? "Ultra: built-in wallpapers and effects drawn with every pixel of your screen (4K on a 4K or Retina screen), clips export up to 4K, and videos you upload keep up to 4K. Uses your graphics card more; Auto quality eases off if your computer can't keep up."
+      : cfg.res === "sharp" ? "Sharp: drawn at your screen's size (crisper than Standard). Your own uploaded pictures and videos always show at their own full quality."
+      : "Standard: drawn a little under your screen's size, the lightest on your computer. Your own uploaded pictures and videos always show at their own full quality."; }
   if ($("smoothHint")) $("smoothHint").textContent = cfg.powerSaver ? "Eco: 15 fps, lightest on your computer." : cfg.fps === "max" ? "Max: runs at your screen's refresh rate (e.g. 120/144/240Hz) for the smoothest motion. Uses more GPU." : cfg.fps === "auto" ? "Smooth: 60 fps." : "Balanced: 30 fps.";
   // Auto quality: meaningful on Smooth or Max (it eases off if your computer struggles). Eco/Balanced already cap things.
   $("autoQRow").hidden = cfg.powerSaver || (cfg.fps !== "auto" && cfg.fps !== "max");
@@ -2469,7 +2475,7 @@ $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
 $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cfg.wmOn || !!e.target.value });
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
-const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm"];
+const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm"];
 const STYLE_KEYS = [...CHART_KEYS, "candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.79 (2026-11-18)
+- **New: Sharpness, up to 4K** (Adjust › Motion › Sharpness):
+  - **Standard** is as before and the lightest.
+  - **Sharp** draws at your screen's size.
+  - **Ultra 4K** draws built-in wallpapers and effects with every real pixel of your screen (4K on a 4K or Retina screen), lets clips export up to 4K, and lets videos you upload keep up to 4K.
+  - Auto quality still eases off if your computer can't keep up. Your own pictures and videos always show at their own full quality.
+- **10 new effects for any wallpaper, including your own** (Adjust › This wallpaper › Effect): **Fireflies**, **Bokeh**, **Light rays**, **Aurora**, **Warp stars**, **Sparkles**, **Bubbles**, **Petals**, **Film grain** and **Retro screen** (scanlines with a slow rolling glow). The ones marked ♪ swell with your music when Live mood follows Music: fireflies glow up, bokeh brightens, warp stars jump forward on the kick, sparkles twinkle on hi-hats.
+
 ## 0.1.78 (2026-11-18)
 - **Music, rebuilt to move with the beat** (Trading › Live mood › Glow follows: Music):
   - **In sync:** the sound is read every screen frame (it was 30 times a second, smoothed several times over), and beats are found from sudden rises in the bass. A pulse now starts about 25 ms after each kick, with no CSS fades lagging behind. Quiet and loud songs both move fully, thanks to an auto level, and fast songs get every beat (up to ~6 a second).
