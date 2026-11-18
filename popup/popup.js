@@ -616,7 +616,12 @@ async function matchEverything(auto) {
   const lumHex = (x) => [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16) / 255).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
   const lift = (x) => { if (bright || !/^#[0-9a-f]{6}$/i.test(x || "")) return x; let f = 0, y = x; while (lumHex(y) < 0.42 && f < 0.7) { f += 0.05; y = mixHex(x, "#ffffff", f); } return y; };
   pal = { ...pal, up: lift(pal.up), down: lift(pal.down) };
-  const light = bright ? mixHex(accent, "#000000", 0.62) : mixHex(accent, "#ffffff", 0.5), soft = bright ? mixHex(accent, "#000000", 0.4) : mixHex(accent, "#ffffff", 0.25);
+  // text (price scale, legend, ticker) must read: on a dark / black wallpaper never darker than a light grey, on a
+  // bright one never lighter than a deep tone. A black wallpaper's "colour" is near black, so it's lifted a long way.
+  const toLum = (x, min, max) => { let y = x, f = 0; if (min) while (lumHex(y) < min && f < 1) { f += 0.04; y = mixHex(x, "#ffffff", Math.min(1, f)); }
+    if (max) while (lumHex(y) > max && f < 1) { f += 0.04; y = mixHex(x, "#000000", Math.min(1, f)); } return y; };
+  const light = bright ? toLum(mixHex(accent, "#000000", 0.62), 0, 0.3) : toLum(mixHex(accent, "#ffffff", 0.5), 0.62, 0),
+    soft = bright ? toLum(mixHex(accent, "#000000", 0.4), 0, 0.42) : toLum(mixHex(accent, "#ffffff", 0.25), 0.45, 0);
   // picked another wallpaper while this one was being read: only the newest one counts
   if (run !== matchRun || pick !== String(cfg.skin) + "|" + String(cfg.mediaId || "")) return;
   const name = cfg.skin === "media" ? "your wallpaper" : (WickedSkins[cfg.skin] || {}).name || "your wallpaper";
@@ -635,6 +640,12 @@ async function matchEverything(auto) {
     // the candles), zones soft so the price reads through them; the legend and indicator text stay readable
     indMode: "wallpaper", wallMatch: { src: String(cfg.skin) + "|" + String(cfg.mediaId || ""), colors }, zoneFill: Math.min(+cfg.zoneFill || 0.12, 0.14),
     drawOn: true, lgOn: true, lgColor: light, lgVals: "own", txtMode: "custom", txtColor: light,   // legend names in a light (or, on bright wallpapers, deep) tint of the wallpaper
+    // everything means everything: indicators you'd given their own colour (Each indicator) take the wallpaper's too
+    // (hidden ones stay hidden, and their shapes, borders, styles and widths stay), and the chart frame and interface
+    // skin, if they're on, take the wallpaper's accent
+    indCustom: Object.fromEntries(Object.entries(cfg.indCustom || {}).map(([k, e]) => { const { c, g, ...rest } = e || {}; return [k, rest]; }).filter(([, e]) => Object.values(e).some((v) => v))),
+    ...(cfg.frameOn ? { frameMode: "accent" } : {}), ...(cfg.barPatOn ? { barMode: "accent" } : {}),
+    ...(cfg.scaleBg === "color" ? { scaleBgColor: bright ? mixHex(accent, "#ffffff", 0.8) : mixHex(accent, "#000000", 0.8) } : {}),
   };
   // styling chart 2, 3...: only that chart's own settings (the page-wide panels, ticker and legend stay as they are)
   return styleChart > 1 ? Object.fromEntries(Object.entries(all).filter(([k]) => PER_CHART_KEYS.has(k))) : all; })(), grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : auto ? `Auto-matched everything to ${name}.` : `Everything now matches ${name}.`);

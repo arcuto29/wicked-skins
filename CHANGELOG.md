@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.81 (2026-11-18)
+- **Fixed: with Left toolbar on Glass or Clear, every drawing tool looked selected**, so it seemed a tool wasn't picked until you refreshed. Only the tool you picked is highlighted now. With an accent (Text & accent, or Match everything), it lights up in your wallpaper's colour.
+- **Match everything now matches everything:**
+  - Indicators you'd given your own colour in Each indicator take the wallpaper's colours too. Hidden ones stay hidden, and their shapes, borders, styles and widths are kept.
+  - The chart frame and the interface skin, if they're on, take the wallpaper's accent. The toolbar's picked tool does too.
+  - Your drawings were already included, Brush and Highlighter as well.
+- **Readable text on black wallpapers:** Match everything never makes the price scale, legend or ticker text dark on a dark or black wallpaper, or light on a bright one. All 10 OLED wallpapers were checked.
+- Brush and Highlighter drawings can be styled like your other drawings: colour, Rainbow, Gradient, glow and width (Chart › Lines, zones & labels › Your drawings, or each one under Each indicator).
+
 ## 0.1.80 (2026-11-18)
 - **A tidier panel.** The tabs are now **Wallpaper · Chart · TradingView · Trading · Capture · Workshop · My looks · Settings**, and every setting sits with what it changes:
   - **Wallpaper** has four views: Looks, Wallpapers, My uploads and **Adjust**. Adjust holds Picture, This wallpaper, Motion, Layouts, Wallpaper by session, Wallpaper by symbol and Wallpaper layer.
