@@ -464,7 +464,7 @@ function syncIndicators() {
     z.oninput = () => { set({ zoneFill: +z.value }); $("zoneFillOut").textContent = Math.round(z.value * 100) + "%"; }; z.ondblclick = () => { z.value = 0.12; z.oninput(); }; }
   if ($("zoneDim")) seg("zoneDim", [[false, "Off"], [true, "On"]], () => !!cfg.zoneDim, (v) => set({ zoneDim: v }));
   // zone boxes: their shape (rounded corners, pill ends) and border design, also for zones left in their own colours
-  if ($("zoneShape")) seg("zoneShape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"]], () => cfg.zoneShape || "square", (v) => { set({ zoneShape: v }); drawZonePreview(); });
+  if ($("zoneShape")) seg("zoneShape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"], ["oval", "Oval"]], () => cfg.zoneShape || "square", (v) => { set({ zoneShape: v }); drawZonePreview(); });
   if ($("zoneStyle")) seg("zoneStyle", [["flat", "Flat"], ["fade", "Fade"], ["shine", "Shine"], ["glass", "Glass"], ["hollow", "Hollow"]], () => cfg.zoneStyle || "flat", (v) => { set({ zoneStyle: v }); drawZonePreview(); });
   if ($("zoneBorder")) seg("zoneBorder", [["line", "Line"], ["dashed", "Dashed"], ["double", "Double"], ["glow", "Glow"], ["none", "None"]], () => cfg.zoneBorder || "line", (v) => { set({ zoneBorder: v }); drawZonePreview(); });
   drawZonePreview();
@@ -489,7 +489,7 @@ const colourName = (k) => { const [r, g, b] = k.split(",").map(Number), mx = Mat
   return h < 15 || h >= 345 ? "red" : h < 40 ? "orange" : h < 65 ? "yellow" : h < 160 ? "green" : h < 195 ? "teal" : h < 250 ? "blue" : h < 290 ? "purple" : "pink"; };
 const toHex6 = (k) => "#" + k.split(",").map((n) => (+n).toString(16).padStart(2, "0")).join("");
 // a zone's own shape / border / style in Each indicator (key in indCustom, label, choices)
-const ZONE_OWN = [["s", "Shape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"]]],
+const ZONE_OWN = [["s", "Shape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"], ["oval", "Oval"]]],
   ["b", "Border", [["line", "Line"], ["dashed", "Dashed"], ["double", "Double"], ["glow", "Glow"], ["none", "None"]]],
   ["y", "Style", [["flat", "Flat"], ["fade", "Fade"], ["shine", "Shine"], ["glass", "Glass"], ["hollow", "Hollow"]]]];
 async function renderEachInd() {

@@ -2,6 +2,7 @@
 
 ## 0.1.75 (2026-11-18)
 - **More for each zone** (Style › Indicators › Each indicator): besides its colour (or **Rainbow** / **Gradient**), glow and shape, every zone now has its own **Border** (Line, Dashed, Double, Glow, None) and **Style** (Flat, Fade, Shine, Glass, Hollow). Each one is "Like all zones" until you pick, so a session box can be a Hollow, dashed outline while your supply / demand zones are Glass pills.
+- **New zone shape: Oval.** It always rounds fully, even on tall boxes (an upright oval), like Pill did before 0.1.74. Pill still turns the wide rectangles you draw into pills. Tall ones get rounded corners. Oval is available for all zones and for each zone on its own.
 
 ## 0.1.74 (2026-11-18)
 - **Fixed: Pill made tall zones (like a session box) into ovals.** Pill now only rounds the ends of zones that are clearly wider than tall. Tall or squarish boxes get Rounded corners instead, so a session box stays a box.

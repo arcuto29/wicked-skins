@@ -435,9 +435,9 @@
     if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
     // Rounded = soft corners (a third of the height, at most 10 px); Pill = fully round ends. Pill only rounds the
     // ends of a zone that's clearly wider than tall: on a tall or squarish box (a session box) it would be an oval,
-    // so those get Rounded corners.
+    // so those get Rounded corners. Oval = always fully round, whatever the box (a tall box becomes an upright oval).
     const px = st.px || 1, pill = st.shape === "pill" && w >= h * 2;
-    const r = pill ? h / 2 : st.shape === "rounded" || st.shape === "pill" ? Math.max(Math.min(2 * px, h / 2), Math.min(h * 0.3, w / 2, 10 * px)) : 0;
+    const r = st.shape === "oval" ? Math.min(h, w) / 2 : pill ? h / 2 : st.shape === "rounded" || st.shape === "pill" ? Math.max(Math.min(2 * px, h / 2), Math.min(h * 0.3, w / 2, 10 * px)) : 0;
     const path = (inset) => { k.begin(); const a = x + inset, b = y + inset, c = Math.max(0, w - 2 * inset), d = Math.max(0, h - 2 * inset), rr = Math.max(0, r - inset);
       if (rr > 0 && g.roundRect) g.roundRect(a, b, c, d, rr); else g.rect(a, b, c, d); };
     const pSB = g.shadowBlur, pSC = g.shadowColor, pW = g.lineWidth, pD = g.getLineDash ? g.getLineDash() : [];
@@ -472,7 +472,7 @@
   }
   // a see-through zone left in its own colours, when only its shape / border is styled
   function zoneOwn(orig) { const r = keyOf(orig); if (!r || r.a >= 0.9) return null; return { f: orig, g: `rgb(${r.k})`, glow: 0, e: `rgba(${r.k},0.9)` }; }
-  const ZONE_SHAPES = ["square", "rounded", "pill"], ZONE_BORDERS = ["line", "dashed", "double", "glow", "none"], ZONE_STYLES = ["flat", "fade", "shine", "glass", "hollow"];
+  const ZONE_SHAPES = ["square", "rounded", "pill", "oval"], ZONE_BORDERS = ["line", "dashed", "double", "glow", "none"], ZONE_STYLES = ["flat", "fade", "shine", "glass", "hollow"];
 
   // What to draw one indicator line with: { s: stroke style (a colour or a rainbow gradient), g: its glow colour,
   // glow: its own glow (or undefined = the Glow slider), w: extra width, hide }, or null to leave the line as it is.

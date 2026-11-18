@@ -113,7 +113,7 @@
       if (!/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) || !e || typeof e !== "object") continue;
       const c = e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "";
       const g = e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0));
-      out[k] = { c, g, w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h, s: ["square", "rounded", "pill"].includes(e.s) ? e.s : "",   // this zone's own shape / border / style ("" = like all zones)
+      out[k] = { c, g, w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h, s: ["square", "rounded", "pill", "oval"].includes(e.s) ? e.s : "",   // this zone's own shape / border / style ("" = like all zones)
         b: ["line", "dashed", "double", "glow", "none"].includes(e.b) ? e.b : "", y: ["flat", "fade", "shine", "glass", "hollow"].includes(e.y) ? e.y : "" };
     }
     return out;
@@ -159,7 +159,7 @@
         indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: cleanCustom(f.indCustom), drawOn: !!f.drawOn,
         zoneFill: Math.max(0.04, Math.min(0.45, +f.zoneFill || 0.12)), zoneDim: !!f.zoneDim,
-        zoneShape: ["square", "rounded", "pill"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
+        zoneShape: ["square", "rounded", "pill", "oval"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
         txtMode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", txtColor: /^#[0-9a-f]{6}$/i.test(f.txtColor || "") ? f.txtColor : "", txtOutline: Math.max(0, Math.min(2, +f.txtOutline || 0)), txtSize: Math.max(0, Math.min(2, +f.txtSize || 0)),
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
