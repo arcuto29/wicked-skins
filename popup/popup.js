@@ -9,7 +9,7 @@ const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="tru
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
-const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
+const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -20,7 +20,7 @@ const DEFAULTS = {
   wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
-  candleLook: "solid", shiftSpeed: 10,
+  candleLook: "solid", candleClosedLook: "", shiftSpeed: 10,
   candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",
   indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
@@ -57,7 +57,7 @@ function fontPicker(boxId, key) {
 }
 // ---------- Style each chart: while you style chart 2, 3... the Style tab's changes are saved for that chart only ----------
 // (TradingView's panels, the ticker, the legend and dialogs are one per page, so they stay shared.)
-const PER_CHART_KEYS = new Set(["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW",
+const PER_CHART_KEYS = new Set(["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW",
   "lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW",
   "indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle"]);
 let styleChart = 1, baseStyle = null;
@@ -165,7 +165,7 @@ function renderHero() {
   // candles across the stage, in your colours and look
   const dpr = Math.min(2, devicePixelRatio || 1), fr = fg.getBoundingClientRect();
   fg.width = Math.round(fr.width * dpr); fg.height = Math.round(fr.height * dpr);
-  const g = fg.getContext("2d"), CL = window.__bdCandleLooks, look = cfg.candleOn ? cfg.candleLook || "solid" : "solid";
+  const g = fg.getContext("2d"), CL = window.__bdCandleLooks, look0 = cfg.candleOn ? cfg.candleLook || "solid" : "solid", look = look0;
   const up = cfg.candleOn && /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#26a69a", dn = cfg.candleOn && /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ef5350";
   let seed = 7, p = 50; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const n = Math.max(30, Math.round(fr.width / 16)), bars = [];
@@ -173,8 +173,9 @@ function renderHero() {
   let lo = Infinity, hi = -Infinity; for (const b of bars) { lo = Math.min(lo, b[2]); hi = Math.max(hi, b[3]); }
   const top = fg.height * 0.12, bot = fg.height * 0.62, Y = (v) => bot - ((v - lo) / (hi - lo || 1)) * (bot - top), slot = fg.width / (n + 1), bw = Math.max(2 * dpr, slot * 0.56);
   const k = { fill: (a, b, c, d) => g.fillRect(a, b, c, d), style: (v) => { g.fillStyle = v; }, stroke: (v) => { g.strokeStyle = v; }, strokeRect: (a, b, c, d) => g.strokeRect(a, b, c, d), fillPath: () => g.fill(), clear: (a, b, c, d) => g.clearRect(a, b, c, d), px: dpr, yfrac: 0 };
-  const glow = Math.max(+cfg.candleGlow || 0, CL && CL.META[look] ? CL.META[look].minGlow : 0);
+  const closed = cfg.candleOn && cfg.candleClosedLook && look !== "shift" && CL && CL.META[cfg.candleClosedLook] ? cfg.candleClosedLook : "";
   bars.forEach(([o, c, l, h], i) => {
+    const look = closed && i < n - 1 ? closed : look0, glow = Math.max(+cfg.candleGlow || 0, CL && CL.META[look] ? CL.META[look].minGlow : 0);   // the last bar is the live one
     const isUp = c >= o, col = isUp ? up : dn, cx = slot * (i + 1), t0 = Y(Math.max(o, c)), t1 = Y(Math.min(o, c)); k.yfrac = t0 / fg.height;
     g.save(); if (glow > 0) { g.shadowColor = col; g.shadowBlur = (4 + glow * 18) * dpr * 0.7; }
     const P = CL && cfg.candleOn && CL.parts ? CL.parts(partsCfg()) : null, [wx, ww] = P ? CL.wickRect(cx - dpr / 2, dpr, k, P) : [Math.round(cx - dpr / 2), dpr];
@@ -184,7 +185,7 @@ function renderHero() {
   });
   // your look, at a glance
   const lm = CL && CL.META[look];
-  $("dhLook").innerHTML = `<div class="dl-row"><span>Candles</span><b>${esc(cfg.candleOn ? (lm ? lm.name : "Solid") : "TradingView's own")}</b></div>
+  $("dhLook").innerHTML = `<div class="dl-row"><span>Candles</span><b>${esc(cfg.candleOn ? (lm ? lm.name : "Solid") + (closed ? " · closed " + CL.META[closed].name : "") : "TradingView's own")}</b></div>
     <div class="dl-row"><span>Colours</span><b><i class="sw" style="background:${up}"></i><i class="sw" style="background:${dn}"></i></b></div>
     <div class="dl-row"><span>Chart lines</span><b>${[cfg.gridOn && "grid", cfg.chOn && "crosshair", cfg.plOn && "price line"].filter(Boolean).join(", ") || "TradingView's own"}</b></div>
     <div class="dl-row"><span>TradingView</span><b>${cfg.panelMode && cfg.panelMode !== "off" ? "styled panels" : "TradingView's own"}</b></div>`;
@@ -280,25 +281,41 @@ const LOOK_HINT = {
 // the chart uses, so the preview is what you get). Redrawn when colours or glow change.
 function renderLookGrid() {
   setTimeout(renderHero, 0);
-  const box = $("candleLook"), CL = window.__bdCandleLooks; if (!box || !CL) return;
+  const CL = window.__bdCandleLooks; if (!$("candleLook") || !CL) return;
+  const live = cfg.candleLook || "solid";
+  fillLookGrid($("candleLook"), CL.LOOKS.map((l) => l[0]), live, null,
+    (id) => { set({ candleLook: id, candleOn: true, ...(id === "shift" || id === cfg.candleClosedLook ? { candleClosedLook: "" } : {}) }); $("candleOn").checked = true; renderCandles(); });
+  // Closed candles: a look of their own (Cycle moves the whole chart's colours, so it isn't one of them)
+  const own = !!cfg.candleClosedLook && live !== "shift";
+  $("closedRow").hidden = live === "shift";
+  $("closedBox").hidden = !own;
+  if (own) fillLookGrid($("closedLook"), CL.LOOKS.map((l) => l[0]).filter((id) => id !== "shift" && id !== live), cfg.candleClosedLook, live,
+    (id) => { set({ candleClosedLook: id, candleOn: true }); $("candleOn").checked = true; renderCandles(); });
+}
+// One grid of look cards, each with a small preview drawn in YOUR colours on YOUR wallpaper. liveLook: draw the
+// last candle of each preview in that look (the Closed look grid, so you see the live candle stand out).
+function fillLookGrid(box, ids, cur, liveLook, pick) {
+  const CL = window.__bdCandleLooks;
   const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
-  const sig = up + down + (+cfg.candleGlow || 0) + "|" + (cfg.skin || "") + "|" + JSON.stringify(partsCfg()) + "|" + JSON.stringify((cfg.skinOpts || {})[cfg.skin] || {});
-  // one still frame of YOUR current wallpaper, used behind every look preview
-  let bgc = null;
-  try { const sk = WickedSkins[cfg.skin]; if (sk) { bgc = document.createElement("canvas"); bgc.width = 200; bgc.height = 104; const s0 = makeSkin(cfg.skin, bgc.getContext("2d")); s0.resize(200, 104); s0.frame(3, 0.016); } } catch { bgc = null; }
-  if (box.dataset.sig !== sig || box.children.length !== CL.LOOKS.length) {
+  const sig = up + down + (+cfg.candleGlow || 0) + "|" + (cfg.skin || "") + "|" + JSON.stringify(partsCfg()) + "|" + JSON.stringify((cfg.skinOpts || {})[cfg.skin] || {}) + "|" + (liveLook || "") + "|" + ids.join(",");
+  if (box.dataset.sig !== sig) {
     box.dataset.sig = sig; box.textContent = "";
-    for (const [id, name] of CL.LOOKS) {
+    // one still frame of YOUR current wallpaper, used behind every look preview
+    let bgc = null;
+    try { const sk = WickedSkins[cfg.skin]; if (sk) { bgc = document.createElement("canvas"); bgc.width = 200; bgc.height = 104; const s0 = makeSkin(cfg.skin, bgc.getContext("2d")); s0.resize(200, 104); s0.frame(3, 0.016); } } catch { bgc = null; }
+    for (const id of ids) {
       const b = document.createElement("button"); b.className = "lookcard"; b.dataset.look = id; b.title = CL.META[id].hint;
       const cv = document.createElement("canvas"); cv.width = 200; cv.height = 104;
-      const lab = document.createElement("span"); lab.textContent = name;
+      const lab = document.createElement("span"); lab.textContent = CL.META[id].name;
       b.append(cv, lab); box.appendChild(b);
-      b.onclick = () => { set({ candleLook: id, candleOn: true }); $("candleOn").checked = true; renderCandles(); };
-      requestAnimationFrame(() => { try { CL.preview(cv, id, up, down, +cfg.candleGlow || 0, bgc, partsCfg()); } catch {} });
+      b.onclick = () => pick(id);
+      requestAnimationFrame(() => { try { CL.preview(cv, id, up, down, +cfg.candleGlow || 0, bgc, partsCfg(), liveLook || undefined); } catch {} });
     }
   }
-  for (const b of box.children) b.classList.toggle("on", b.dataset.look === (cfg.candleLook || "solid"));
+  for (const b of box.children) b.classList.toggle("on", b.dataset.look === cur);
 }
+// a calm closed look that lets the live candle stand out
+const closedSuggest = (live) => (live === "matte" ? "outline" : "matte");
 function renderCandles() {
   $("candleOn").checked = cfg.candleOn;
   seg("autoMatch", [[false, "Off"], [true, "On"]], () => !!cfg.autoMatch, (v) => { set({ autoMatch: v, ...(v ? { candleOn: true } : {}) }); if (v) $("candleOn").checked = true; });
@@ -309,6 +326,13 @@ function renderCandles() {
   $("autoMatchHint").hidden = !onMedia || !cfg.autoMatch;
   syncMatchOnPick();
   renderLookGrid();
+  seg("closedMode", [["same", "Same as live"], ["own", "Own look"]], () => (cfg.candleClosedLook ? "own" : "same"),
+    (v) => { set({ candleClosedLook: v === "own" ? (cfg.candleClosedLook || closedSuggest(cfg.candleLook || "solid")) : "", ...(v === "own" ? { candleOn: true } : {}) });
+      if (v === "own") $("candleOn").checked = true; renderCandles(); });
+  { const CL = window.__bdCandleLooks, m = CL && CL.META[cfg.candleClosedLook];
+    $("closedHint").textContent = cfg.candleLook === "shift" ? "" : m
+      ? `Closed candles: ${m.name}. The live candle (still forming) keeps your ${(CL.META[cfg.candleLook] || CL.META.solid).name} look, so it stands out. Scrolled back in history, every candle on screen is closed.`
+      : "Give closed candles a calmer look of their own, so the live candle (still forming) stands out."; }
   $("shiftRow").hidden = cfg.candleLook !== "shift";
   $("shiftSpeed").value = cfg.shiftSpeed; $("shiftSpeedOut").textContent = cfg.shiftSpeed + "s";
   { const CL = window.__bdCandleLooks, m = CL && CL.META[cfg.candleLook];
@@ -380,7 +404,7 @@ function renderCandles() {
 $("candleOn").onchange = (e) => set({ candleOn: e.target.checked });
 // ---------- Candle parts: wick / border colours, hollow bodies, widths (drawn by candlelooks.js on every platform) ----------
 // a candle style = colours + look + glow + parts (what a saved "Yours" preset keeps)
-const CANDLE_STYLE_KEYS = ["candleUp", "candleDown", "candleLook", "candleGlow", "candleWick", "candleWickUp", "candleWickDown", "candleBorder", "candleBorderUp", "candleBorderDown", "candleBorderW", "candleHollow", "candleWickW", "candleBodyW"];
+const CANDLE_STYLE_KEYS = ["candleUp", "candleDown", "candleLook","candleClosedLook", "candleGlow", "candleWick", "candleWickUp", "candleWickDown", "candleBorder", "candleBorderUp", "candleBorderDown", "candleBorderW", "candleHollow", "candleWickW", "candleBodyW"];
 const candleStyleNow = () => Object.fromEntries(CANDLE_STYLE_KEYS.map((k) => [k, cfg[k]]));
 const candleStyleOf = (m) => Object.fromEntries(CANDLE_STYLE_KEYS.map((k) => [k, k in m ? m[k] : DEFAULTS[k]]));
 const PARTS_DEF = { candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1 };
@@ -741,7 +765,7 @@ function renderSeason() {
   if (!se || !q || localStorage.getItem(key) || cfg.skin === q.skin) { bar.hidden = true; return; }
   bar.hidden = false;
   bar.innerHTML = `<span class="ic">${se.icon}</span><div><b>${esc(se.title)}</b><small>${esc(se.text)}</small></div><div class="acts"><button class="primary keep" data-a="go">Try it</button><button class="link" data-a="no">Not now</button></div>`;
-  bar.querySelector("[data-a=go]").onclick = () => { localStorage.setItem(key, "1"); applyWithUndo({ enabled: true, skin: q.skin, ...q.set }, `Applied ${q.name}. Happy holidays!`); };
+  bar.querySelector("[data-a=go]").onclick = () => { localStorage.setItem(key, "1"); applyWithUndo({ enabled: true, skin: q.skin, candleClosedLook: "", ...q.set }, `Applied ${q.name}. Happy holidays!`); };
   bar.querySelector("[data-a=no]").onclick = () => { localStorage.setItem(key, "1"); bar.hidden = true; };
 }
 function renderQuick() {
@@ -766,7 +790,7 @@ function renderQuick() {
     const sk = makeSkin(q.skin, cv.getContext("2d")); sk.resize(160, 64); quickPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(q.set.candleUp, q.set.candleDown)}</div><div class="label"><span>${esc(q.name)}<small>${esc(q.sub)}</small></span></div>`);
-    card.onclick = () => applyWithUndo($("keepBg") && $("keepBg").checked ? { enabled: true, ...q.set } : { enabled: true, skin: q.skin, ...q.set },
+    card.onclick = () => applyWithUndo($("keepBg") && $("keepBg").checked ? { enabled: true, candleClosedLook: "", ...q.set } : { enabled: true, skin: q.skin, candleClosedLook: "", ...q.set },
       $("keepBg") && $("keepBg").checked ? `Applied ${q.name} (kept your wallpaper).` : `Applied ${q.name}.`);
     box.appendChild(card);
   }
@@ -2353,7 +2377,7 @@ $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cf
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
 const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","moodLook","moodRange","moodPulse","vignette","calm"];
-const STYLE_KEYS = [...CHART_KEYS, "candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
+const STYLE_KEYS = [...CHART_KEYS, "candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
 
@@ -2697,7 +2721,7 @@ const WHATS_NEW = ["Live mood: new looks (Glow, Horizon, Frame), Recent move, Se
     const wow = QUICK_LOOKS.filter((q) => groupOf(q) === "Wow" && WickedSkins[q.skin]);
     const steps = [
       ["Pick a look", "One tap puts a matching wallpaper, candles and glow on your chart. Undo is one tap too.",
-        ["Try a Wow look", () => { const q = wow[(Math.random() * wow.length) | 0]; if (q) applyWithUndo({ enabled: true, skin: q.skin, ...q.set }, `Look: ${q.name}`); }]],
+        ["Try a Wow look", () => { const q = wow[(Math.random() * wow.length) | 0]; if (q) applyWithUndo({ enabled: true, skin: q.skin, candleClosedLook: "", ...q.set }, `Look: ${q.name}`); }]],
       ["Make it yours", "Style has 16 candle looks, your candle colours, chart lines and the ticker. TradingView styles its own panels and menus.",
         ["Open Style", () => go("candles")]],
       ["Your platform too", "Trade on a prop firm platform or another charting site (TopstepX, nq.vision…)? Open it, then tap Turn on here at the top of this panel.", null],
