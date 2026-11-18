@@ -54,6 +54,7 @@
     clipAudio: "none",        // sound in clips: none | mic (your voice) | computer (what's playing: music, videos) | both
     // Shortcuts (changeable in Adjust > Shortcuts). Stored as "Alt+Shift+KeyF" (modifiers + the key's code).
     toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS",
+    lensKey: "Alt+Shift+KeyZ", lensZoom: 2.5, lensSize: "m",   // Magnifier: its shortcut, how much it zooms, how big the lens is
     clipLen: 10,              // seconds a shortcut recording lasts (the Clip section's length)
     focus: false, focusHides: "wallpaper",   // Focus mode: hide just the wallpaper, or the wallpaper AND all styling
     // Session timer: a slim countdown to the next market open / close, styled to match your look.
@@ -2043,6 +2044,7 @@
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
     if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
     if (keys.includes("res")) views.forEach(sizeCanvas);
+    if (keys.includes("enabled") && !cfg.enabled) lensOn(false);
     if (keys.includes("react")) for (const v of views) setFx(v, v.src);   // effects that swell with music run next to it
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
     if (keys.some((k) => k === "scaleFont" || k === "tkFont" || k === "uiFont")) ensureFonts();
@@ -2810,6 +2812,46 @@
     if (isSnap) { doSnap(); return; }
     const next = !cfg.focus; save({ focus: next });
     flash(next ? `Focus on \u00B7 ${keyLabel(cfg.focusKey)} to bring it back` : "Focus off");
+  }, true);
+
+  // ---------- Magnifier: a round zoom lens over the chart, under your cursor (Settings › Magnifier) ----------
+  // Visual only: it redraws the wallpaper and TradingView's own chart canvases around the cursor, bigger. Clicks go
+  // straight through it, so you can place a drawing or an order exactly where the lens shows.
+  let lens = null;
+  function lensOn(want) {
+    if (!want) { if (lens) { cancelAnimationFrame(lens.raf); removeEventListener("pointermove", lens.move, true); lens.el.remove(); lens = null; } return; }
+    if (lens) return;
+    const el = document.createElement("div"); el.id = "bd-lens"; el.dataset.bdOwner = ME.token; el.hidden = true;
+    const cv = document.createElement("canvas"); el.appendChild(cv); document.documentElement.appendChild(el);
+    lens = { el, cv, g: cv.getContext("2d"), x: -1, y: -1, raf: 0, last: 0, dirty: true };
+    lens.move = (e) => { lens.x = e.clientX; lens.y = e.clientY; lens.dirty = true; };
+    addEventListener("pointermove", lens.move, true);
+    const loop = (now) => {
+      if (!lens) return; lens.raf = requestAnimationFrame(loop);
+      if (!lens.dirty && now - lens.last < 120) return;                       // the chart itself moves too: a few times a second
+      lens.dirty = false; lens.last = now;
+      const S = { s: 160, m: 220, l: 300 }[cfg.lensSize] || 220, Z = Math.max(1.5, Math.min(6, +cfg.lensZoom || 2.5)), dpr = Math.min(2, devicePixelRatio || 1);
+      const inside = charts.some((c) => lens.x >= c.r.left && lens.x <= c.r.right && lens.y >= c.r.top && lens.y <= c.r.bottom);
+      lens.el.hidden = !inside; if (!inside) return;
+      if (lens.cv.width !== Math.round(S * dpr)) { lens.cv.width = lens.cv.height = Math.round(S * dpr); lens.el.style.width = lens.el.style.height = S + "px"; }
+      lens.el.style.transform = `translate(${Math.round(lens.x - S / 2)}px, ${Math.round(lens.y - S / 2)}px)`;
+      const w = S / Z, box = { left: lens.x - w / 2, top: lens.y - w / 2, width: w, height: w, right: lens.x + w / 2, bottom: lens.y + w / 2 }, k = dpr * Z, g = lens.g;
+      g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingQuality = "high";
+      g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bd-page-bg").trim() || "#0b0e16"; g.fillRect(0, 0, lens.cv.width, lens.cv.height);
+      try { if (cfg.layer !== "over") { g.save(); g.globalAlpha = Math.max(0, Math.min(1, +cfg.opacity)); drawWallpaper(g, box, k); g.restore(); } drawChartCanvases(g, box, k); } catch {}
+      const c = lens.cv.width / 2; g.strokeStyle = "rgba(255,255,255,0.55)"; g.lineWidth = Math.max(1, dpr);   // a small cross at the exact point
+      g.beginPath(); g.moveTo(c - 7 * dpr, c); g.lineTo(c - 2 * dpr, c); g.moveTo(c + 2 * dpr, c); g.lineTo(c + 7 * dpr, c); g.moveTo(c, c - 7 * dpr); g.lineTo(c, c - 2 * dpr); g.moveTo(c, c + 2 * dpr); g.lineTo(c, c + 7 * dpr); g.stroke();
+      lens.el.style.setProperty("--bd-lens", /^#[0-9a-f]{6}$/i.test(cfg.uiAccent || "") ? cfg.uiAccent : skinAccent() || upColor());
+    };
+    lens.raf = requestAnimationFrame(loop);
+  }
+  addEventListener("keydown", (e) => {
+    if (e.repeat || !cfg.enabled || (EXT && !owner)) return;
+    if (e.key === "Escape" && lens) { lensOn(false); return; }
+    if (!keyMatch(e, cfg.lensKey)) return;
+    const tag = (e.target && e.target.tagName) || ""; if (/INPUT|TEXTAREA|SELECT/.test(tag) || (e.target && e.target.isContentEditable)) return;
+    e.preventDefault(); e.stopPropagation();
+    lensOn(!lens); if (lens) flash(`Magnifier on \u00B7 ${keyLabel(cfg.lensKey)} or Esc to close`, 2200);
   }, true);
 
   // Record / snapshot: the shortcuts and the desktop app's panel buttons both land here.

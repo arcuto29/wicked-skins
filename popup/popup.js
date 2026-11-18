@@ -16,7 +16,7 @@ const DEFAULTS = {
   fps: "auto", fit: "cover", posX: 50, posY: 50, res: "standard",
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
-  react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft", musicParts: "gwfi", musicFeel: "punchy", musicSens: "normal",
+  lensKey: "Alt+Shift+KeyZ", lensZoom: 2.5, lensSize: "m", react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft", musicParts: "gwfi", musicFeel: "punchy", musicSens: "normal",
   frameOn: false, framePattern: "carbon", frameMode: "accent", frameColor: "#7c6cff", frameColor2: "#ff4df0", frameW: 8, frameAlpha: 0.5, frameSize: 1, frameRound: true, frameEdge: true, frameMove: false,
   barPatOn: false, barPattern: "zebra", barMode: "rainbow", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.25, barSize: 1, barWhere: "tlrb",
   wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
@@ -1883,7 +1883,7 @@ function renderTicker(box) {
   seg("tk-only", [[false, "Name, timeframe, exchange"], [true, "Name only"]], () => !!cfg.tkOnly, (v) => set({ tkOnly: v }));
 }
 // ---------- shortcuts ----------
-const KEY_NAMES = { focusKey: "Focus mode", privacyKey: "Streamer mode", recordKey: "Record a clip", snapKey: "Snapshot", toggleKey: "Turn everything on/off" };
+const KEY_NAMES = { focusKey: "Focus mode", privacyKey: "Streamer mode", recordKey: "Record a clip", snapKey: "Snapshot", lensKey: "Magnifier", toggleKey: "Turn everything on/off" };
 const keyLabel = (spec) => spec ? String(spec).split("+").map((k) => k.replace(/^Key/, "").replace(/^Digit/, "").replace(/^Arrow/, "")).join("+") : "Off";
 const TV_ALT = ["KeyT", "KeyH", "KeyJ", "KeyV", "KeyC", "KeyF", "KeyI", "KeyL", "KeyR", "KeyS", "KeyA", "KeyG", "KeyP", "KeyW", "KeyX", "KeyZ", "KeyK", "KeyN", "KeyO", "KeyD", "KeyB"];
 let keyListen = null;
@@ -2097,6 +2097,8 @@ function syncReact() {
   { const box = $("musicParts"), parts = String(cfg.musicParts == null ? "gwfi" : cfg.musicParts); box.innerHTML = "";
     for (const [k, n] of [["g", "Glow"], ["w", "Wallpaper"], ["f", "Chart frame"], ["i", "Interface skin"]]) { const b = document.createElement("button"); b.textContent = n; b.className = parts.includes(k) ? "on" : "";
       b.onclick = () => { set({ musicParts: parts.includes(k) ? parts.replace(k, "") : parts + k }); syncReact(); }; box.appendChild(b); } }
+  if ($("lensZoom")) { seg("lensZoom", [[2, "2\u00D7"], [2.5, "2.5\u00D7"], [3, "3\u00D7"], [4, "4\u00D7"]], () => +cfg.lensZoom || 2.5, (v) => set({ lensZoom: v }));
+    seg("lensSize", [["s", "Small"], ["m", "Medium"], ["l", "Large"]], () => cfg.lensSize || "m", (v) => set({ lensSize: v })); }
   seg("musicFeel", [["punchy", "Punchy"], ["smooth", "Smooth"]], () => cfg.musicFeel || "punchy", (v) => set({ musicFeel: v }));
   seg("musicSens", [["low", "Low"], ["normal", "Normal"], ["high", "High"]], () => cfg.musicSens || "normal", (v) => set({ musicSens: v }));
   drawMoodPreview();
@@ -2520,7 +2522,7 @@ $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
 $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cfg.wmOn || !!e.target.value });
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
-const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm"];
+const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","moodLook","moodRange","moodPulse","lensZoom","lensSize","musicParts","musicFeel","musicSens","vignette","calm"];
 const STYLE_KEYS = [...CHART_KEYS, "candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
@@ -2797,7 +2799,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["A tidier panel: Wallpaper, Chart, TradingView, Trading, Capture, Workshop, My looks and Settings. Wallpaper settings are under Wallpaper \u203a Adjust",
+const WHATS_NEW = ["A zoom lens for your chart: press Alt+Shift+Z (Settings \u203a Magnifier)",
+  "A tidier panel: Wallpaper, Chart, TradingView, Trading, Capture, Workshop, My looks and Settings. Wallpaper settings are under Wallpaper \u203a Adjust",
   "Report a bug right from the panel (Settings \u203a Report a bug)",
   "30 more candle colours, including Synth, Pastel, Luxe and Easy to read (Chart \u203a Candles)",
   "Galaxy, Holo, Stars and Twinkle for the chart frame and the interface skin",
