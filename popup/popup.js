@@ -242,7 +242,7 @@ function setupDesk() {
 
 // ---------- candles ----------
 // [id, name, up, down, group]. Ids are stored in settings; keep them stable.
-const CANDLE_GROUPS = ["Clean", "Neon", "Warm", "Cool", "Rich"];
+const CANDLE_GROUPS = ["Clean", "Neon", "Synth", "Pastel", "Luxe", "Warm", "Cool", "Rich", "Easy to read"];
 const CANDLE_PRESETS = [
   ["mono", "Mono", "#ffffff", "#2f2f35", "Clean"],
   ["ghost", "Ghost", "#f5f5f5", "#5c5c5c", "Clean"],
@@ -262,6 +262,38 @@ const CANDLE_PRESETS = [
   ["amethyst", "Amethyst", "#b388ff", "#4a5a6a", "Cool"],
   ["forest", "Forest", "#9ccc65", "#6d4c41", "Rich"],
   ["royal", "Royal", "#ffd700", "#6a1b9a", "Rich"],
+  // more (every pair is two clearly different colours that both stand out on a dark chart)
+  ["slate", "Slate", "#cfd8e3", "#6b7a90", "Clean"],
+  ["paper", "Ink & Paper", "#f4efe6", "#c8463d", "Clean"],
+  ["laser", "Laser", "#39ff14", "#ff073a", "Neon"],
+  ["plasma", "Plasma", "#00e5ff", "#ff00e5", "Neon"],
+  ["volt", "Volt", "#e6ff00", "#ff3d8b", "Neon"],
+  ["vapor", "Vaporwave", "#01cdfe", "#ff71ce", "Synth"],
+  ["outrun", "Outrun", "#fdff6a", "#ff2a6d", "Synth"],
+  ["miami", "Miami", "#05d9e8", "#ff6ec7", "Synth"],
+  ["arcade", "Arcade", "#00ff9f", "#bd00ff", "Synth"],
+  ["sunset", "Night Drive", "#ffb86b", "#7c4dff", "Synth"],
+  ["sorbet", "Sorbet", "#b5ead7", "#ffb7b2", "Pastel"],
+  ["cotton", "Cotton Candy", "#a0e7e5", "#ffaebc", "Pastel"],
+  ["peach", "Mint & Peach", "#98f5c1", "#ffc09f", "Pastel"],
+  ["lavender", "Lavender", "#cdb4ff", "#ff9fb2", "Pastel"],
+  ["lemon", "Lemonade", "#fff59d", "#90caf9", "Pastel"],
+  ["champagne", "Champagne", "#f7e7ce", "#b08d57", "Luxe"],
+  ["rosegold", "Rose Gold", "#f6d1c1", "#b76e79", "Luxe"],
+  ["platinum", "Platinum", "#eef1f5", "#8a94a6", "Luxe"],
+  ["jewel", "Emerald & Ruby", "#2ee59d", "#e0115f", "Luxe"],
+  ["sapphire", "Sapphire", "#7fb8ff", "#c9a227", "Luxe"],
+  ["inferno", "Inferno", "#ffea00", "#ff1744", "Warm"],
+  ["desert", "Desert", "#f2cc8f", "#e07a5f", "Warm"],
+  ["northern", "Northern", "#7cffcb", "#7b61ff", "Cool"],
+  ["galaxy", "Galaxy", "#22d3ee", "#a78bfa", "Cool"],
+  ["coral", "Reef", "#48cae4", "#ff7f50", "Cool"],
+  ["jungle", "Jungle", "#7bd389", "#f4a259", "Rich"],
+  ["wine", "Vintage", "#e9c46a", "#9b2242", "Rich"],
+  // easy to tell apart for everyone, also with red-green colour blindness (blue / orange, light / dark)
+  ["clear", "Clear View", "#4c9aff", "#ff9f1c", "Easy to read"],
+  ["contrast", "High Contrast", "#ffffff", "#ff8a00", "Easy to read"],
+  ["calm", "Calm Blue", "#5ab0ff", "#f06292", "Easy to read"],
 ];
 let candleGroup = "All";
 const bars = (up, down) => {
@@ -511,7 +543,7 @@ async function renderEachInd() {
         <button class="chip${e.h ? " on" : ""}" data-a="h" title="Hide it on the chart" style="margin-left:auto">${e.h ? "Hidden" : "Hide"}</button></div>
       <div class="ind-c"><span class="lbl">Glow</span><input type="range" data-a="g" min="0" max="1" step="0.05" value="${e.g === undefined || e.g === null ? 0 : e.g}" />
         ${it.kind === "line" ? `<span class="lbl">Width</span><input type="range" data-a="w" min="0" max="3" step="0.5" value="${+e.w || 0}" />` : ""}</div>
-      ${it.kind === "zone" ? ZONE_OWN.map(([key, lbl, opts]) => `<div class="ind-c wrap" title="This zone's own ${lbl.toLowerCase()}. Like all zones = Style › Indicators › Zone ${lbl.toLowerCase()}"><span class="lbl">${lbl}</span>${[["", "Like all zones"], ...opts].map(([v, n]) =>
+      ${it.kind === "zone" ? ZONE_OWN.map(([key, lbl, opts]) => `<div class="ind-c wrap" title="This zone's own ${lbl.toLowerCase()}. Like all zones = Chart › Lines, zones & labels › Zone ${lbl.toLowerCase()}"><span class="lbl">${lbl}</span>${[["", "Like all zones"], ...opts].map(([v, n]) =>
         `<button class="chip${(e[key] || "") === v ? " on" : ""}" data-a="${key}" data-v="${v}">${n}</button>`).join("")}</div>`).join("") : ""}</div>`; }).join("");
   const upd = (k, patch) => { const next = { ...(cfg.indCustom || {}) }; next[k] = { ...(next[k] || {}), ...patch }; set({ indCustom: next }); };
   box.querySelectorAll(".ind-row").forEach((row) => { const k = row.dataset.k;
@@ -810,14 +842,15 @@ function updateEmpty(n) { if ($("skinEmpty")) $("skinEmpty").hidden = n > 0 || !
 let skinView = localStorage.getItem("skinView") || "looks";
 function syncSkinView() {
   if (!$("skinView")) return;
-  seg("skinView", [["looks", "Looks"], ["walls", "Wallpapers"], ["mine", "My uploads"]], () => skinView, (v) => { skinView = v; localStorage.setItem("skinView", v); syncSkinView(); });
-  $("viewLooks").hidden = skinView !== "looks"; $("viewWalls").hidden = skinView !== "walls"; $("tab-media").hidden = skinView !== "mine";
-  if ($("skinSearch")) $("skinSearch").hidden = skinView === "mine";
+  seg("skinView", [["looks", "Looks"], ["walls", "Wallpapers"], ["mine", "My uploads"], ["tune", "Adjust"]], () => skinView, (v) => { skinView = v; localStorage.setItem("skinView", v); syncSkinView(); });
+  $("viewLooks").hidden = skinView !== "looks"; $("viewWalls").hidden = skinView !== "walls"; $("tab-media").hidden = skinView !== "mine"; $("viewTune").hidden = skinView !== "tune";
+  if ($("skinSearch")) $("skinSearch").hidden = skinView === "mine" || skinView === "tune"; $("matchPickRow").hidden = skinView === "tune";
+  if (skinView === "tune") { setTimeout(() => { wallPrev = null; try { drawWallPrev(); } catch {} }, 60); return; }
   syncMatchOnPick();
   if (skinView === "mine") return renderMedia();
   if (skinView === "looks") renderQuick(); else renderSkins();
 }
-// "Use your own wallpaper" links (Wallpapers view, Workshop): open Skins › My uploads
+// "Use your own wallpaper" links (Wallpapers view, Workshop): open Wallpaper › My uploads
 document.querySelectorAll("[data-goto-mine]").forEach((b) => b.addEventListener("click", () => {
   skinView = "mine"; localStorage.setItem("skinView", "mine");
   const t = document.querySelector('#nav button[data-tab="skins"]'); if (t) t.click();
@@ -935,10 +968,11 @@ if ($("wallOptsReset")) $("wallOptsReset").onclick = () => { const id = wallId()
   const all = { ...(cfg.skinOpts || {}) }, before = cfg.skinOpts; delete all[id];
   set({ skinOpts: all }); syncWallOpts(); refreshWallPreviews(id);
   toast(`${wallName(id)} is back to how it came.`, () => { set({ skinOpts: before }); syncWallOpts(); refreshWallPreviews(id); }); };
-{ const t = document.querySelector('#nav button[data-tab="tune"]'); if (t) t.addEventListener("click", () => setTimeout(() => { wallPrev = null; drawWallPrev(); }, 60)); }
+{ const t = document.querySelector('#nav button[data-tab="skins"]'); if (t) t.addEventListener("click", () => setTimeout(() => { wallPrev = null; drawWallPrev(); }, 60)); }
 if ($("wallOptsGrp")) $("wallOptsGrp").addEventListener("toggle", () => { if ($("wallOptsGrp").open) setTimeout(() => { wallPrev = null; drawWallPrev(); }, 30); });
 if ($("gotoWallOpts")) $("gotoWallOpts").onclick = () => {
-  const t = document.querySelector('#nav button[data-tab="tune"]'); if (t) t.click();
+  const t = document.querySelector('#nav button[data-tab="skins"]'); if (t) t.click();
+  skinView = "tune"; localStorage.setItem("skinView", "tune"); syncSkinView();
   const g = $("wallOptsGrp"); if (g) { g.open = true; setTimeout(() => g.scrollIntoView({ block: "start", behavior: "smooth" }), 60); }
   syncWallOpts(); setTimeout(drawWallPrev, 80);
 };
@@ -1900,7 +1934,7 @@ if ($("timerOn")) { $("timerOn").onchange = (e) => set({ timerOn: e.target.check
 })();
 
 // ---------- Pattern skins (TradingView tab): the chart frame + TradingView's bars ----------
-const PAT_MODES = [["accent", "Accent"], ["candles", "Candles"], ["gradient", "Gradient"], ["rainbow", "Rainbow"], ["aurora", "Aurora"], ["custom", "Custom"]];
+const PAT_MODES = [["accent", "Accent"], ["candles", "Candles"], ["gradient", "Gradient"], ["rainbow", "Rainbow"], ["aurora", "Aurora"], ["galaxy", "Galaxy"], ["holo", "Holo"], ["custom", "Custom"]];
 const patAccent = () => { const okc = (c) => /^#[0-9a-f]{6}$/i.test(c || ""); const m = cfg.wallMatch;
   return okc(m && m.accent) ? m.accent : okc(cfg.uiAccent) ? cfg.uiAccent : okc(cfg.candleUp) && cfg.candleOn ? cfg.candleUp : "#7c6cff"; };
 const patOpts = (mode, c1, c2) => ({ mode, color: c1, color2: c2, up: cfg.candleOn ? cfg.candleUp : "#26a69a", down: cfg.candleOn ? cfg.candleDown : "#ef5350", accent: patAccent(), mood: cfg.candleOn ? cfg.candleUp : "#00e08a" });
@@ -2044,7 +2078,7 @@ function syncTune() {
 }
 function syncReact() {
   $("reactOpts").hidden = cfg.react === "off";
-  seg("moodLook", [["glow", "Glow"], ["horizon", "Horizon"], ["frame", "Frame"]], () => cfg.moodLook || "glow", (v) => { set({ moodLook: v }); drawMoodPreview(); });
+  seg("moodLook", [["glow", "Glow"], ["horizon", "Horizon"], ["frame", "Outline"]], () => cfg.moodLook || "glow", (v) => { set({ moodLook: v }); drawMoodPreview(); });
   seg("moodRange", [[0.5, "High"], [1, "Normal"], [2, "Low"]], () => +cfg.moodRange || 1, (v) => set({ moodRange: v }));
   $("moodRangeRow").hidden = !["market", "momentum"].includes(cfg.react);
   seg("moodPulse", [["off", "Off"], ["soft", "Soft"], ["strong", "Strong"]], () => cfg.moodPulse || "soft", (v) => set({ moodPulse: v }));
@@ -2060,7 +2094,7 @@ function syncReact() {
   $("reactStrengthOut").textContent = Math.round(cfg.reactStrength * 100) + "%";
 
   $("reactHint").textContent = cfg.react === "momentum"
-    ? "Glows green / red with how price moved over the last 10 minutes, so it follows the market live and calms down when price goes sideways. Sensitivity sets how big a move lights it fully."
+    ? "Glows green / red with how price moved over the last 10 minutes, so it follows the market live and calms down when price goes sideways. Move sensitivity sets how big a move lights it fully."
     : cfg.react === "music"
     ? "Moves with the music you're playing, beat for beat. On the chart, tap \u201cChoose the music tab\u201d, pick the tab playing it (YouTube, Spotify, SoundCloud\u2026) and tick \u201cShare tab audio\u201d (on Windows you can share your whole screen with system audio instead). Moves: the glow, your wallpaper (a brighter, slightly bigger kick on each beat), the chart frame and the interface skin, if they're on. Punchy follows every kick; Smooth swells. Nothing is recorded or sent."
     : cfg.react === "market"
@@ -2211,7 +2245,7 @@ function syncCharts() {
   const ccNow = () => (cfg.chartColors === "auto" || !cfg.chartColors ? (cfg.matchOnPick || cfg.wallMatch ? "wallpaper" : "same") : cfg.chartColors);
   seg("chartColors", [["same", "Same as chart 1"], ["wallpaper", "Match each wallpaper"], ["custom", "Style each chart"]], ccNow, (v) => { set({ chartColors: v }); if (v !== "custom") styleChartTo(1); syncCharts(); });
   $("chartColorsHint").textContent = ccNow() === "wallpaper" ? "Charts with their own wallpaper (Mix) take candles, indicator and zone colours, the skin accent and text tints from it. Chart 1 keeps yours."
-    : ccNow() === "custom" ? "Style each chart on its own: pick a chart at the top of the Style tab, then change candles, indicators, lines, text and the price scale for that chart only." : "Every chart uses your Style settings.";
+    : ccNow() === "custom" ? "Style each chart on its own: pick a chart at the top of the Chart tab, then change candles, indicators, lines, text and the price scale for that chart only." : "Every chart uses your Chart settings.";
   renderChartBar();
   $("chartsFound").textContent = chartCount > 1 ? `${chartCount} charts on this tab.` : chartCount === 1 ? "1 chart on this tab. Open a multi-chart layout to use these." : "";
   const rows = $("chartRows"); rows.innerHTML = "";
@@ -2531,7 +2565,7 @@ async function siteBar() {
     // a Lightweight Charts platform (lw.js marks it): hide the options that only style TradingView's own interface
     chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, func: () => document.documentElement.getAttribute("data-bd-lw") === "on" })
       .then((rs) => { if (rs.some((r) => r.result)) document.body.classList.add("lw-page"); }).catch(() => {});
-    return show("on", `On for ${host}`, "Wallpaper, candles, candle looks and chart lines (Style tab) work here. The TradingView tab styles TradingView's own panels and menus; this platform's own layout around the chart stays as it is.", "Turn off", async () => {
+    return show("on", `On for ${host}`, "Wallpaper, candles, candle looks and chart lines (Chart tab) work here. The TradingView tab styles TradingView's own panels and menus; this platform's own layout around the chart stays as it is.", "Turn off", async () => {
       await WickedSites.disable(enabled.origin); chrome.tabs.reload(tab.id); window.close();
     });
   }
@@ -2728,6 +2762,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
   }
   const go = (it) => {
     const b = document.querySelector(`#nav [data-tab="${it.tab}"]`); if (b) b.click();
+    const view = { viewTune: "tune", viewWalls: "walls", viewLooks: "looks", "tab-media": "mine" }[(it.el.closest("#viewTune, #viewWalls, #viewLooks, #tab-media") || {}).id];
+    if (view && typeof skinView !== "undefined" && skinView !== view) { skinView = view; localStorage.setItem("skinView", view); syncSkinView(); }
     it.el.open = true;
     const target = it.row ? it.row.closest(".row, .cpart") || it.el : it.el;
     setTimeout(() => { target.scrollIntoView({ block: "center", behavior: "smooth" }); target.classList.add("found"); setTimeout(() => target.classList.remove("found"), 1600); }, 60);
@@ -2750,48 +2786,56 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Live mood: new looks (Glow, Horizon, Frame), Recent move, Sensitivity, a glow per chart",
+const WHATS_NEW = ["A tidier panel: Wallpaper, Chart, TradingView, Trading, Capture, Workshop, My looks and Settings. Wallpaper settings are under Wallpaper \u203a Adjust",
+  "Report a bug right from the panel (Settings \u203a Report a bug)",
+  "30 more candle colours, including Synth, Pastel, Luxe and Easy to read (Chart \u203a Candles)",
+  "Galaxy, Holo, Stars and Twinkle for the chart frame and the interface skin",
+  "nq.vision-style charts: the price and time scales look like TradingView's now",
+  "Sharpness up to 4K (Wallpaper \u203a Adjust \u203a Picture)",
+  "10 new effects for any wallpaper, some move with your music (Wallpaper \u203a Adjust \u203a This wallpaper)",
+  "Music: in time with the beat, and the wallpaper, frame and interface skin can move with it",
+  "Live mood: new looks (Glow, Horizon, Outline), Recent move, Move sensitivity, a glow per chart",
   "Your chart can move with your music (Trading \u203a Live mood \u203a Music)",
-  "Rain, storms, snow and more over any wallpaper (Adjust \u203a This wallpaper \u203a Effect)",
+  "Rain, storms, snow and more over any wallpaper (Wallpaper \u203a Adjust \u203a This wallpaper \u203a Effect)",
   "12 more fonts and 10 new candle looks",
-  "Recolour any wallpaper to your colours, plus its own settings (Adjust \u203a This wallpaper)",
-  "Candle parts: wick and border colours, hollow candles, widths (Style \u203a Candles)",
-  "Auto-match: every wallpaper you pick sets everything to match it (Skins \u203a Wallpapers)",
+  "Recolour any wallpaper to your colours, plus its own settings (Wallpaper \u203a Adjust \u203a This wallpaper)",
+  "Candle parts: wick and border colours, hollow candles, widths (Chart \u203a Candles)",
+  "Auto-match: every wallpaper you pick sets everything to match it (Wallpaper \u203a Wallpapers)",
   "4 new wallpapers: Trading Floor, Market Wall, Midnight Moon and Twinkle (OLED)",
   "Match everything now matches it all, with your own wallpapers too",
-  "Softer zones so you see the price inside them (Style \u203a Indicators \u203a Zone fill)",
+  "Softer zones so you see the price inside them (Chart \u203a Lines, zones & labels \u203a Zone fill)",
   "Your own Gradient colours",
   "A cleaner look everywhere: chart cards, clip editor, Workshop",
   "A cleaner panel in true black, with slimmer sliders",
-  "Wallpapers show their quality (4K, 1080p\u2026) and OLED, with an OLED filter (Skins \u203a OLED)",
+  "Wallpapers show their quality (4K, 1080p\u2026) and OLED, with an OLED filter (Wallpaper \u203a OLED)",
   "A Webb space photo pack in the Workshop, up to 4K",
-  "Black & white wallpapers (Adjust \u203a Picture \u203a Colour)",
+  "Black & white wallpapers (Wallpaper \u203a Adjust \u203a Picture \u203a Colour)",
   "Match everything now colours your indicators and zones from your wallpaper\u2019s own colours",
   "Clips and snapshots include your uploaded wallpaper",
-  "Chart text: your indicators\u2019 labels in any colour, with an outline, and black text is always readable (Style \u203a Chart text)",
-  "Zones look like neon boxes: a glowing edge, price still visible inside. Plus a calmer Gradient next to Rainbow (Style \u203a Indicators)",
+  "Chart text: your indicators\u2019 labels in any colour, with an outline, and black text is always readable (Chart \u203a Lines, zones & labels)",
+  "Zones look like neon boxes: a glowing edge, price still visible inside. Plus a calmer Gradient next to Rainbow (Chart \u203a Lines, zones & labels)",
   "Priism is invite only now: enter your invite code once in the panel",
   "Rainbow and the other indicator colours now reach your zones too (bands, boxes, prints)",
-  "Style your own drawings too: colour, rainbow and glow for rectangles and lines you draw (Style \u203a Indicators)",
-  "Style the legend: colour and a backing for indicator names and values, so they read on any wallpaper (Style \u203a Legend)",
+  "Style your own drawings too: colour, rainbow and glow for rectangles and lines you draw (Chart \u203a Lines, zones & labels)",
+  "Style the legend: colour and a backing for indicator names and values, so they read on any wallpaper (Chart \u203a Lines, zones & labels)",
   "O H L C letters are readable on dark wallpapers",
-  "Customise each indicator: its own colour, glow, width, or hide it, zones included (Style \u203a Indicators \u203a Each indicator)",
+  "Customise each indicator: its own colour, glow, width, or hide it, zones included (Chart \u203a Lines, zones & labels \u203a Each indicator)",
   "Live mood works on nq.vision and prop-firm platforms",
   "nq.vision: the text over the chart no longer flickers",
   "\u201cCheck this page\u201d: see why something looks wrong on a platform (top of the panel)",
   "nq.vision: charts resize cleanly when you drag the lines between them",
   "Multi-chart layouts: the wallpaper follows each chart instantly while you drag the dividers",
-  "Indicator colours: Rainbow, your candle or wallpaper colours, or any colour, plus glow (Style \u203a Indicators)",
+  "Indicator colours: Rainbow, your candle or wallpaper colours, or any colour, plus glow (Chart \u203a Lines, zones & labels)",
   "nq.vision: the wallpaper stays while you drag the chart",
   "Fixed: indicator Settings / Pine Editor sometimes not opening until a refresh",
   "Two copies installed? The one you use now always shows your background",
   "nq.vision: every 2- and 3-chart layout gets your wallpaper and colours, at any window size",
-  "Publish your saved looks to the Workshop, and see your shares with their status (Saved \u203a Publish, Workshop \u203a Mine)",
-  "Glow at the pointer in any colour (Style \u203a Crosshair \u203a Glow colour)",
+  "Publish your saved looks to the Workshop, and see your shares with their status (My looks \u203a Publish, Workshop \u203a Mine)",
+  "Glow at the pointer in any colour (Chart \u203a Lines, zones & labels \u203a Crosshair \u203a Glow colour)",
   "2 new Wow wallpapers: Cozy Room (a sleeping cat by a rainy window) and Tokyo Rooftop (neon, rain and a passing train)",
   "An \u201cUpdate ready\u201d card: see what\u2019s new and update in one tap (your charts stay open)",
-  "4 new Wow wallpapers: Koi Pond, Rain on Glass, Ringed Giant and Deep Blue, each with its own look (Skins › Wow)",
-  "Christmas pack: Christmas Eve, Tree Lights, Winter Village and Northern Noel, plus Hallows Night (Skins › Seasonal)",
+  "4 new Wow wallpapers: Koi Pond, Rain on Glass, Ringed Giant and Deep Blue, each with its own look (Wallpaper › Wow)",
+  "Christmas pack: Christmas Eve, Tree Lights, Winter Village and Northern Noel, plus Hallows Night (Wallpaper › Seasonal)",
   "Match everything: one tap sets your whole chart to your wallpaper's colours (top of Style)",
   "Recordings are now MP4, and can include music playing on your computer (Capture › Clip › Sound)",
   "\u201cDone for today\u201d: a calm reminder the instant you reach your max loss (Trading › Daily goal & limit)",
@@ -2800,9 +2844,9 @@ const WHATS_NEW = ["Live mood: new looks (Glow, Horizon, Frame), Recent move, Se
   "nq.vision and other Lightweight Charts platforms: panels, watchlist, ticker, timeframes, crosshair glow, line glow, price scale, brackets, streamer mode and Live mood",
   "TradingView's light theme is readable over your wallpaper, and one tap switches to dark",
   "Candle looks now work on more Lightweight Charts platforms (like nq.vision)",
-  "Style your ticker: colour, size, font and glow for the symbol name (Style › Chart lines, ticker & legend)",
+  "Style your ticker: colour, size, font and glow for the symbol name (Chart › Lines, zones & labels)",
   "Trading sounds: a chime at your goal, a warning near your max loss, a ping before the session opens or closes",
-  "New Nebula wallpaper: glowing gas clouds and bright stars (Skins › Cosmos)",
+  "New Nebula wallpaper: glowing gas clouds and bright stars (Wallpaper › Cosmos)",
   "Streamer mode: show P&L as ticks, points or dollars, and the order panel stays usable",
   "Trade brackets: give the lot size its own colour",
   "One click to turn on a platform, and no page refresh needed after an update",
@@ -2822,7 +2866,7 @@ const WHATS_NEW = ["Live mood: new looks (Glow, Horizon, Frame), Recent move, Se
       ["Pick a look", "One tap puts a matching wallpaper, candles and glow on your chart. Undo is one tap too.",
         ["Try a Wow look", () => { const q = wow[(Math.random() * wow.length) | 0]; if (q) applyWithUndo({ enabled: true, skin: q.skin, candleClosedLook: "", ...q.set }, `Look: ${q.name}`); }]],
       ["Make it yours", "Style has 16 candle looks, your candle colours, chart lines and the ticker. TradingView styles its own panels and menus.",
-        ["Open Style", () => go("candles")]],
+        ["Open Chart", () => go("candles")]],
       ["Your platform too", "Trade on a prop firm platform or another charting site (TopstepX, nq.vision…)? Open it, then tap Turn on here at the top of this panel.", null],
       ["Find anything", "Type in \u201cFind any setting\u201d at the top to jump straight to it. Alt+Shift+W on the chart turns everything on or off.", null],
     ];
@@ -2859,3 +2903,30 @@ function syncOffGroups() {
 document.addEventListener("change", () => setTimeout(syncOffGroups, 0), true);
 document.addEventListener("click", (e) => { if (e.target.closest && e.target.closest("button")) setTimeout(syncOffGroups, 30); }, true);
 syncOffGroups(); setTimeout(syncOffGroups, 300);
+
+// ---------- Report a bug (Settings): sent to the Priism backend, only the owner can read it (website › Workshop) ----------
+(function bugReport() {
+  const btn = $("bugSend"); if (!btn) return;
+  const msg = (t) => { $("bugMsg").textContent = t; };
+  btn.onclick = async () => {
+    const text = $("bugText").value.trim(); if (text.length < 3) return msg("Write a few words about what went wrong.");
+    const c = window.WORKSHOP_CONFIG || {}; if (!c.url || !c.anonKey) return msg("Reports can't be sent from this copy.");
+    let host = ""; try { const [t] = await new Promise((r) => chrome.tabs.query({ active: true, lastFocusedWindow: true }, r)); host = t && t.url ? new URL(t.url).hostname : ""; } catch {}
+    const app = window.wickedStore ? "desktop" : window.PriismNative ? "android" : "extension";
+    const keep = ["skin", "react", "candleOn", "candleLook", "candleClosedLook", "res", "fps", "powerSaver", "layer", "multi", "chartColors", "frameOn", "barPatOn", "panelMode", "sides", "leftBar", "zoneShape", "indMode", "scaleBg"];
+    const info = $("bugInfo").checked ? { v: APP_VER, app, host, ua: navigator.userAgent.slice(0, 160), screen: `${screen.width}x${screen.height}@${devicePixelRatio || 1}`,
+      settings: Object.fromEntries(keep.map((k) => [k, cfg[k]])) } : { v: APP_VER, app };
+    btn.disabled = true; msg("Sending…");
+    try {
+      const device = window.PriismInvite ? await PriismInvite.deviceId() : "";
+      const r = await fetch(c.url.replace(/\/$/, "") + "/rest/v1/rpc/report_bug", { method: "POST", headers: { apikey: c.anonKey, Authorization: "Bearer " + c.anonKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_message: text, p_contact: $("bugContact").value.trim(), p_info: info, p_device: device }) });
+      const v = r.ok ? await r.json() : "offline";
+      if (v === "ok") { $("bugText").value = ""; msg("Sent. Thanks for telling us."); }
+      else if (v === "slow") msg("You've sent a few already. Try again in an hour.");
+      else if (v === "invalid") msg("Couldn't send it. Check your text, then try again.");
+      else msg("Couldn't reach the server. Check your connection and try again.");
+    } catch { msg("Couldn't reach the server. Check your connection and try again."); }
+    btn.disabled = false;
+  };
+})();

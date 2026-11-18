@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 20;
+  const LW_VERSION = 21;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -122,6 +122,7 @@
       lfx = any ? {
         // price scale text + backing
         scaleText: hex(f.scaleText), scaleGlow: Math.max(0, Math.min(1, +f.scaleGlow || 0)), scaleBold: !!f.scaleBold, scaleSize: Math.max(0, Math.min(2, +f.scaleSize || 0)),
+        busy: !!f.busy, bgLight: f.bg === "light",   // the wallpaper behind the chart: busy (needs a backing) / light
         lite: !!f.lite, scaleFont: /^[a-z]{1,16}$/.test(f.scaleFont || "") ? f.scaleFont : "default", scaleFamily: typeof f.scaleFamily === "string" && /^[A-Za-z0-9 ,"'\-]{1,200}$/.test(f.scaleFamily) ? f.scaleFamily : "", fontTick: +f.fontTick || 0, scaleBg: ["auto", "glass", "color", "default"].includes(f.scaleBg) ? f.scaleBg : "auto", scaleBgColor: hex(f.scaleBgColor) || "#0b1320",
         // trade brackets = the platform's own level lines (orders / positions) and their price-scale labels
         bracketOn: !!f.bracketOn, bracketFill: hex(f.bracketFill), bracketText: hex(f.bracketText), bracketProfit: hex(f.bracketProfit), bracketLoss: hex(f.bracketLoss),
@@ -394,10 +395,12 @@
         // the price / time scale strips: a translucent dark panel instead of solid, so the wallpaper shows through but the numbers stay readable
         const t = this.getTransform(), sx = t.a || 1, sy = t.d || 1;
         if (Math.abs(w * sx) >= c.width * 0.9 && Math.abs(h * sy) >= c.height * 0.9) {
-          // Style → Price scale → Backing: Default = the app's own; Colour = your colour; Auto / Glass = this soft dark tint
+          // Chart › Price scale › Backing, the same as on TradingView: Default = the app's own; Colour = your colour; Glass = a
+          // soft neutral tint; Auto = the tint only behind a busy wallpaper, otherwise the scales are clear like the chart
           const mode = lfx ? lfx.scaleBg : "auto";
           if (mode === "default") return origFillRect.call(this, x, y, w, h);
-          const tint = mode === "color" ? `rgba(${hexToRgb(lfx.scaleBgColor).join(",")},0.72)` : "rgba(6,9,16,0.5)";
+          if (mode === "auto" && !(lfx && lfx.busy)) return this.clearRect(x, y, w, h);
+          const tint = mode === "color" ? `rgba(${hexToRgb(lfx.scaleBgColor).join(",")},0.72)` : lfx && lfx.bgLight ? "rgba(255,255,255,0.42)" : "rgba(8,11,18,0.42)";
           const prev = this.fillStyle; fillDesc.set.call(this, tint); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, prev); return;
         }
       }
