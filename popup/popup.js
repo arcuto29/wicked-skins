@@ -464,7 +464,7 @@ function syncIndicators() {
     z.oninput = () => { set({ zoneFill: +z.value }); $("zoneFillOut").textContent = Math.round(z.value * 100) + "%"; }; z.ondblclick = () => { z.value = 0.12; z.oninput(); }; }
   if ($("zoneDim")) seg("zoneDim", [[false, "Off"], [true, "On"]], () => !!cfg.zoneDim, (v) => set({ zoneDim: v }));
   // zone boxes: their shape (rounded corners, pill ends) and border design, also for zones left in their own colours
-  if ($("zoneShape")) seg("zoneShape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"]], () => cfg.zoneShape || "square", (v) => { set({ zoneShape: v }); drawZonePreview(); });
+  if ($("zoneShape")) seg("zoneShape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"], ["oval", "Oval"]], () => cfg.zoneShape || "square", (v) => { set({ zoneShape: v }); drawZonePreview(); });
   if ($("zoneStyle")) seg("zoneStyle", [["flat", "Flat"], ["fade", "Fade"], ["shine", "Shine"], ["glass", "Glass"], ["hollow", "Hollow"]], () => cfg.zoneStyle || "flat", (v) => { set({ zoneStyle: v }); drawZonePreview(); });
   if ($("zoneBorder")) seg("zoneBorder", [["line", "Line"], ["dashed", "Dashed"], ["double", "Double"], ["glow", "Glow"], ["none", "None"]], () => cfg.zoneBorder || "line", (v) => { set({ zoneBorder: v }); drawZonePreview(); });
   drawZonePreview();
@@ -488,6 +488,10 @@ const colourName = (k) => { const [r, g, b] = k.split(",").map(Number), mx = Mat
   const h = ((mx === r ? (g - b) / (mx - mn) + (g < b ? 6 : 0) : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4) * 60) % 360;
   return h < 15 || h >= 345 ? "red" : h < 40 ? "orange" : h < 65 ? "yellow" : h < 160 ? "green" : h < 195 ? "teal" : h < 250 ? "blue" : h < 290 ? "purple" : "pink"; };
 const toHex6 = (k) => "#" + k.split(",").map((n) => (+n).toString(16).padStart(2, "0")).join("");
+// a zone's own shape / border / style in Each indicator (key in indCustom, label, choices)
+const ZONE_OWN = [["s", "Shape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"], ["oval", "Oval"]]],
+  ["b", "Border", [["line", "Line"], ["dashed", "Dashed"], ["double", "Double"], ["glow", "Glow"], ["none", "None"]]],
+  ["y", "Style", [["flat", "Flat"], ["fade", "Fade"], ["shine", "Shine"], ["glass", "Glass"], ["hollow", "Hollow"]]]];
 async function renderEachInd() {
   const box = $("indEach"); if (!box) return;
   let seen = null; try { seen = (await storeGet({ indSeen: null })).indSeen; } catch {}
@@ -505,8 +509,8 @@ async function renderEachInd() {
         <button class="chip${e.h ? " on" : ""}" data-a="h" title="Hide it on the chart" style="margin-left:auto">${e.h ? "Hidden" : "Hide"}</button></div>
       <div class="ind-c"><span class="lbl">Glow</span><input type="range" data-a="g" min="0" max="1" step="0.05" value="${e.g === undefined || e.g === null ? 0 : e.g}" />
         ${it.kind === "line" ? `<span class="lbl">Width</span><input type="range" data-a="w" min="0" max="3" step="0.5" value="${+e.w || 0}" />` : ""}</div>
-      ${it.kind === "zone" ? `<div class="ind-c" title="This zone's shape. Like all zones = Style › Indicators › Zone shape"><span class="lbl">Shape</span>${[["", "Like all zones"], ["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"]].map(([v, n]) =>
-        `<button class="chip${(e.s || "") === v ? " on" : ""}" data-a="s" data-v="${v}">${n}</button>`).join("")}</div>` : ""}</div>`; }).join("");
+      ${it.kind === "zone" ? ZONE_OWN.map(([key, lbl, opts]) => `<div class="ind-c wrap" title="This zone's own ${lbl.toLowerCase()}. Like all zones = Style › Indicators › Zone ${lbl.toLowerCase()}"><span class="lbl">${lbl}</span>${[["", "Like all zones"], ...opts].map(([v, n]) =>
+        `<button class="chip${(e[key] || "") === v ? " on" : ""}" data-a="${key}" data-v="${v}">${n}</button>`).join("")}</div>`).join("") : ""}</div>`; }).join("");
   const upd = (k, patch) => { const next = { ...(cfg.indCustom || {}) }; next[k] = { ...(next[k] || {}), ...patch }; set({ indCustom: next }); };
   box.querySelectorAll(".ind-row").forEach((row) => { const k = row.dataset.k;
     row.querySelector('[data-a="c"]').oninput = (e) => upd(k, { c: e.target.value });
@@ -515,7 +519,7 @@ async function renderEachInd() {
     row.querySelector('[data-a="g"]').oninput = (e) => upd(k, { g: +e.target.value });
     const w = row.querySelector('[data-a="w"]'); if (w) w.oninput = (e) => upd(k, { w: +e.target.value });
     row.querySelector('[data-a="h"]').onclick = () => { upd(k, { h: !(cfg.indCustom[k] || {}).h }); renderEachInd(); };
-    row.querySelectorAll('[data-a="s"]').forEach((b) => { b.onclick = () => { upd(k, { s: b.dataset.v }); renderEachInd(); }; });
+    for (const [key] of ZONE_OWN) row.querySelectorAll(`[data-a="${key}"]`).forEach((b) => { b.onclick = () => { upd(k, { [key]: b.dataset.v }); renderEachInd(); }; });
     row.querySelector('[data-a="reset"]').onclick = () => { const next = { ...(cfg.indCustom || {}) }; delete next[k]; set({ indCustom: next }); renderEachInd(); };
   });
 }

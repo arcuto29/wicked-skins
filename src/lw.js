@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 19;
+  const LW_VERSION = 20;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -135,9 +135,10 @@
         indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: (() => { const o = {}; for (const [k, e] of Object.entries(f.indCustom && typeof f.indCustom === "object" ? f.indCustom : {}).slice(0, 40))
           if (/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) && e && typeof e === "object") o[k] = { c: e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "",
-            g: e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0)), w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h, s: ["square", "rounded", "pill"].includes(e.s) ? e.s : "" }; return o; })(),
+            g: e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0)), w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h, s: ["square", "rounded", "pill", "oval"].includes(e.s) ? e.s : "",
+            b: ["line", "dashed", "double", "glow", "none"].includes(e.b) ? e.b : "", y: ["flat", "fade", "shine", "glass", "hollow"].includes(e.y) ? e.y : "" }; return o; })(),
         zoneFill: Math.max(0.04, Math.min(0.45, +f.zoneFill || 0.12)), zoneDim: !!f.zoneDim,
-        zoneShape: ["square", "rounded", "pill"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
+        zoneShape: ["square", "rounded", "pill", "oval"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
         accent: hex(f.accent), wallColors: Array.isArray(f.wallColors) ? f.wallColors.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 5) : [] } : null;
       if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(lfx ? lfx.wallColors : []);
@@ -409,8 +410,9 @@
           const all = zk && lfx && lfx.indMode && lfx.indMode !== "own" && !greyish(`rgb(${zk.k})`) && candlesKnown() && !ownCandle(zk.k);
           const dim = !!(zk && lfx && lfx.zoneDim && zk.a < 0.9 && !ownCandle(zk.k));   // Dim all zones
           const dprL = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
-          const zShape = own && own.s ? own.s : lfx ? lfx.zoneShape : "square";   // this zone's own shape (Each indicator), or all zones'
-          let shaped = lfx && (zShape !== "square" || lfx.zoneBorder !== "line" || lfx.zoneStyle !== "flat") && zk && zk.a < 0.9 && !ownCandle(zk.k)
+          // this zone's own shape / border / style (Each indicator), or all zones'
+          const zShape = (own && own.s) || (lfx ? lfx.zoneShape : "square"), zBorder = (own && own.b) || (lfx ? lfx.zoneBorder : "line"), zStyle = (own && own.y) || (lfx ? lfx.zoneStyle : "flat");
+          let shaped = lfx && (zShape !== "square" || zBorder !== "line" || zStyle !== "flat") && zk && zk.a < 0.9 && !ownCandle(zk.k)
             && H >= 8 * dprL && W >= 24 * dprL && !stackedL.has(zk.k + "|" + zk.a)    // not slivers (zoomed out), not the position tool
             && (!dragL || knownL.has(zk.k + "|" + zk.a) || !(dragSkipL = true));       // nor what only shows while you drag (stop / target areas)
           if (shaped && !dragL && knownL.size < 500) knownL.add(zk.k + "|" + zk.a);
@@ -428,7 +430,7 @@
             if (shaped && L.zoneBox && H < c.height * 0.9) {                 // rounded / pill / dashed / double / glow
               const zz = { ...z, e: edge }, k = { begin: () => this.beginPath(), fill: () => origFillPathL.call(this), stroke: () => origStrokeP.call(this),
                 style: (v) => fillDesc.set.call(this, v), strokeStyle: (v) => strokeDesc.set.call(this, v) };
-              inLook = true; try { if (L.zoneBox(this, k, x, y, w, h, zz, { shape: zShape, border: lfx.zoneBorder, style: lfx.zoneStyle, px: 1 / (t.a || 1) })) return; } finally { inLook = false; } }
+              inLook = true; try { if (L.zoneBox(this, k, x, y, w, h, zz, { shape: zShape, border: zBorder, style: zStyle, px: 1 / (t.a || 1) })) return; } finally { inLook = false; } }
             fillDesc.set.call(this, z.f); if (z.glow > 0 && !edge) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
             origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, pF); this.shadowBlur = pB; this.shadowColor = pC;
             if (edge) { const pS = strokeDesc.get.call(this), pW = this.lineWidth, pD = this.getLineDash();
