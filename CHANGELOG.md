@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.73 (2026-11-18)
+- **New: Closed candles** (Candles, under Look). Choose **Own look** to give every closed candle a look of its own while the live candle (the one still forming) keeps your main look, so it stands out. For example: Matte history with a Neon live candle, or Outline history with a Solid one. Each preview card shows its last candle in your live look. Scrolled back in history, every candle on screen is closed, so none of them gets the live look. Works on tradingview.com, TradingView-based platforms and nq.vision-style charts, with or without space to the right of the newest candle. Saved in looks, and per chart with Style each chart. **Same as live** (the default) keeps everything as before. Built-in themes reset it. Not available with Cycle, which shifts the whole chart's colours.
+
 ## 0.1.72 (2026-11-18)
 - **Fixed: the stop-loss / take-profit area you see while dragging an order took the zone shape.** That area is TradingView's trading display, not a zone: while you drag, only zones that were already on the chart keep their shape.
 - **Fixed: the Long / Short position tool turned white (or your candle colours)** with Priism's candle colours on. Its profit and loss areas use TradingView's own up / down candle colours, see-through, so Priism took them for candles and painted them in your candle colours: a whitish box with light candles. They keep their own green and red now. Candles and volume bars are recoloured as before.

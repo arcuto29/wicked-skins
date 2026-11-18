@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 26;
+  const HOOK_VERSION = 27;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -62,6 +62,8 @@
       if (c && /^#[0-9a-f]{6}$/i.test(c.up) && /^#[0-9a-f]{6}$/i.test(c.down)) {
         out = { up: hexToRgb(c.up), down: hexToRgb(c.down), upHex: c.up.toLowerCase(), downHex: c.down.toLowerCase(),
           glow: Math.max(0, Math.min(1, +c.glow || 0)), look: lookIds().includes(c.look) ? c.look : "solid",
+          // Closed candles' own look ("" = the same as the live candle). Not with Cycle (that one moves the whole chart's colours).
+          closed: lookIds().includes(c.closed) && c.closed !== "shift" && c.closed !== c.look && c.look !== "shift" ? c.closed : "",
           P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null, lite: !!c.lite };   // wick / border / hollow / widths
       }
     } catch { out = null; }
@@ -1403,40 +1405,47 @@
         return this.clearRect(x, y, w, h);
       }
     }
-    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P) && h < c.height * 0.8 && isPane(c)) {
+    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P || candles.closed) && h < c.height * 0.8 && isPane(c)) {
       const fs = this.fillStyle; // already remapped, normalised to "#rrggbb" for opaque colours
       if (fs === candles.upHex || fs === candles.downHex) {
         const L = window.__bdCandleLooks, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, body = w * sx >= 3;
-        const isUp = fs === candles.upHex, look = L ? candles.look : (candles.look === "neon" ? "neon" : "solid");
+        const cd = candles, isUp = fs === cd.upHex, look0 = L ? cd.look : (cd.look === "neon" ? "neon" : "solid");
+        const split = !!(L && L.live && cd.closed);   // closed candles have a look of their own
         // TradingView draws a bordered candle as an outer rect then the body inside it, both in our colour: draw the
         // look once (on the outer rect) so outlines / glass don't double up.
-        const P = L ? candles.P : null, tr = P ? tracker() : null;
-        if (body && (look !== "solid" || P)) {
+        const P = L ? cd.P : null, tr = P ? tracker() : null;
+        if (body && (look0 !== "solid" || P || split)) {
           const lb = lastBody.get(this), X = x * sx + t.e, Y = y * sy + t.f, W = w * sx, H = h * sy;
           // either order: body-then-border or border-then-body (within ~2 device px on every side)
           const inside = (a, o) => a.x >= o.x - 0.5 && a.y >= o.y - 0.5 && a.x + a.w <= o.x + o.w + 0.5 && a.y + a.h <= o.y + o.h + 0.5;
           const near = (a, o) => Math.abs(a.x - o.x) <= 2.5 && Math.abs(a.y - o.y) <= 2.5 && Math.abs(a.x + a.w - o.x - o.w) <= 2.5 && Math.abs(a.y + a.h - o.y - o.h) <= 2.5;
           const cur = { x: X, y: Y, w: W, h: H };
-          if (lb && lb.col === fs && near(cur, lb) && (inside(cur, lb) || inside(lb, cur))) { lastBody.delete(this); return; }
+          if (lb && lb.col === fs && near(cur, lb) && (inside(cur, lb) || inside(lb, cur))) { lastBody.delete(this); if (split) L.live.touch(); return; }
           lastBody.set(this, { x: X, y: Y, w: W, h: H, col: fs });
         }
-        let col = fs;
-        if (look === "prism") col = prismColour(isUp, (x * sx) / c.width);
-        const meta = L && L.META[look], glow = Math.max(candles.glow, meta ? meta.minGlow : 0);
-        lookK.g = this; lookK.px = 1 / sx; lookK.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
-        this.save();
-        if (glow > 0) { this.shadowColor = L ? L.tone(look, col, lookK) : col; this.shadowBlur = 4 + glow * 22; }
-        if (L && body && h * sy >= 3) { if (tr) tr.note(c, true, w * sx); P ? L.candle(this, look, x, y, w, h, col, isUp, lookK, P) : L.draw(this, look, x, y, w, h, col, isUp, lookK); }
-        else {
-          // a wick (or a body too thin to style): your wick colour / width only when this chart's bodies are wide enough
-          // to tell them apart (zoomed far out, thin bodies keep the candle colour)
-          if (tr) tr.note(c, false, 0);
-          const bw = tr ? tr.bw(c) : 0, ok = P && bw >= 3 && w * sx < 3;
-          const wc = L ? (ok ? L.wickOf(look, col, isUp, lookK, P) : L.wick(look, col, lookK)) : col;
-          let wx = x, ww = w; if (ok && P.wickW) { const nw = Math.min(P.wickW, Math.max(1, bw - 2)) / sx; wx = x + w / 2 - nw / 2; ww = nw; }
-          origFillDesc.set.call(this, wc); origFill.call(this, wx, y, ww, h);
-        }
-        this.restore();
+        const g = this;
+        const part = (look) => {
+          let col = fs;
+          if (look === "prism") col = prismColour(isUp, (x * sx) / c.width);
+          const meta = L && L.META[look], glow = Math.max(cd.glow, meta ? meta.minGlow : 0);
+          lookK.g = g; lookK.px = 1 / sx; lookK.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
+          g.save();
+          if (split) { g.setTransform(t); g.setLineDash([]); g.shadowBlur = 0; g.globalCompositeOperation = "source-over"; }   // drawn a moment later: in the state it was asked for
+          if (glow > 0) { g.shadowColor = L ? L.tone(look, col, lookK) : col; g.shadowBlur = 4 + glow * 22; }
+          if (L && body && h * sy >= 3) { if (tr) tr.note(c, true, w * sx); P ? L.candle(g, look, x, y, w, h, col, isUp, lookK, P) : L.draw(g, look, x, y, w, h, col, isUp, lookK); }
+          else {
+            // a wick (or a body too thin to style): your wick colour / width only when this chart's bodies are wide enough
+            // to tell them apart (zoomed far out, thin bodies keep the candle colour)
+            if (tr) tr.note(c, false, 0);
+            const bw = tr ? tr.bw(c) : 0, ok = P && bw >= 3 && w * sx < 3;
+            const wc = L ? (ok ? L.wickOf(look, col, isUp, lookK, P) : L.wick(look, col, lookK)) : col;
+            let wx = x, ww = w; if (ok && P.wickW) { const nw = Math.min(P.wickW, Math.max(1, bw - 2)) / sx; wx = x + w / 2 - nw / 2; ww = nw; }
+            origFillDesc.set.call(g, wc); origFill.call(g, wx, y, ww, h);
+          }
+          g.restore();
+        };
+        if (split) { const ga = g.globalAlpha; L.live.add(g, Math.min(x, x + w) * sx + t.e, Math.abs(w * sx), (isLive) => { const pa = g.globalAlpha; g.globalAlpha = ga; part(isLive ? look0 : cd.closed); g.globalAlpha = pa; }, fs, y * sy + t.f, (y + h) * sy + t.f); }
+        else part(look0);
         return;
       }
     }

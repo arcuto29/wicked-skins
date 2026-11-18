@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks && window.__bdCandleLooks.ZONE_STYLES) return;   // an older copy (before an update) is replaced
+  if (window.__bdCandleLooks && window.__bdCandleLooks.live) return;   // an older copy (before an update) is replaced
   // Lite glow (slow computers / Power saver, set by hook.js / lw.js from content.js): every glow's blur is drawn
   // smaller. Canvas blur is the costliest thing on a chart without a fast graphics card.
   if (!window.__bdLiteBlur && window.CanvasRenderingContext2D) {
@@ -276,7 +276,7 @@
     const lb = last.get(g), cur = { x: X, y: Y, w: W, h: H, col };
     const inside = (a, o) => a.x >= o.x - 0.5 && a.y >= o.y - 0.5 && a.x + a.w <= o.x + o.w + 0.5 && a.y + a.h <= o.y + o.h + 0.5;
     const near = (a, o) => Math.abs(a.x - o.x) <= 2.5 && Math.abs(a.y - o.y) <= 2.5 && Math.abs(a.x + a.w - o.x - o.w) <= 2.5 && Math.abs(a.y + a.h - o.y - o.h) <= 2.5;
-    if (lb && lb.col === col && near(cur, lb) && (inside(cur, lb) || inside(lb, cur))) { last.delete(g); return true; }
+    if (lb && lb.col === col && near(cur, lb) && (inside(cur, lb) || inside(lb, cur))) { last.delete(g); live.touch(); return true; }
     last.set(g, cur); return false;
   }
 
@@ -299,20 +299,20 @@
   // ---------- previews (the panel's look cards) ----------
   // A small fixed run of candles, so every card shows the same chart and only the look differs.
   const SAMPLE = [[18, 52, 8, 60], [52, 36, 28, 58], [36, 70, 32, 78], [70, 54, 46, 76], [54, 88, 50, 96], [88, 70, 64, 92]];   // open, close, low, high (0..100)
-  function preview(canvas, look, up, down, glow, bg, partsCfg) {
+  function preview(canvas, look0, up, down, glow, bg, partsCfg, liveLook) {   // liveLook: the last (live) candle in its own look
     const g = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
     if (bg) { try { g.drawImage(bg, 0, 0, W, H); g.fillStyle = "rgba(0,0,0,0.38)"; g.fillRect(0, 0, W, H); } catch {} }   // your wallpaper, dimmed like the chart
     const dpr = W / (canvas.clientWidth || W) || 1;
     const n = SAMPLE.length, slot = W / (n + 0.6), bw = Math.max(3, slot * 0.62);
     const Y = (v) => H - 6 * dpr - (v / 100) * (H - 12 * dpr);
-    const m = META[look] || META.solid, gl = Math.max(glow || 0, m.minGlow);
     const k = { fill: (a, b, c, d) => g.fillRect(a, b, c, d), style: (v) => { g.fillStyle = v; }, stroke: (v) => { g.strokeStyle = v; },
       strokeRect: (a, b, c, d) => g.strokeRect(a, b, c, d), fillPath: () => g.fill(), px: dpr, yfrac: 0 };
     const P = parts(partsCfg), wk = P && P.wickW ? null : dpr;
     if (P && P.hollow !== "none") k.clear = (a, b, c, d) => { if (!bg) { g.clearRect(a, b, c, d); return; }
       g.save(); g.beginPath(); g.rect(a, b, c, d); g.clip(); g.shadowBlur = 0; g.drawImage(bg, 0, 0, W, H); g.fillStyle = "rgba(0,0,0,0.38)"; g.fillRect(0, 0, W, H); g.restore(); };
     SAMPLE.forEach(([o, c, l, hi], i) => {
+      const look = liveLook && i === n - 1 ? liveLook : look0, gl = Math.max(glow || 0, (META[look] || META.solid).minGlow);
       const isUp = c >= o, base = isUp ? up : down;
       let col = base;
       if (look === "prism") col = toHex(hueRotate(rgbOf(base), -70 + (i / (n - 1)) * 140));
@@ -558,5 +558,78 @@
     return true;
   }
 
-  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors };
+  // ---------- closed candles vs the live candle ----------
+  // "Closed candles" can have a look of their own, so the candle still forming stands out. Charts draw each pass of
+  // candle parts (borders, wicks, bodies) left to right, so the live candle is the LAST bar of a pass. Each bar's parts
+  // are held back until the next bar starts (then they're drawn as closed candles) or until the pass ends (something
+  // else gets drawn, the next pass starts, or the paint is over): then we know whether it was the newest bar.
+  // add(g, X, W, part): X / W in device px; part(live) draws that part (in its own saved state).
+  // The newest bar only counts as live when it's the newest bar of the data, not just the last one on screen
+  // (scrolled back in history, the bar at the right edge is an old one): there's room to its right (the chart's
+  // right margin), or its body ends on the last-price line (the line across the chart in the candle colour, at the
+  // live price; charts with no right margin).
+  const live = (() => {
+    const S = new WeakMap(), open = new Set(), painted = new Set();
+    let queued = false, busy = false, seq = 0, wrapped = false;
+    const st = (g) => { let s = S.get(g); if (!s) S.set(g, s = { grp: null, sp: 0, run: 0, liveCx: null, maxCx: -1e9, maxOk: false, cols: new Set(), priceY: null }); return s; };
+    const onPrice = (s, grp) => s.priceY !== null && grp.ys.some((y) => Math.abs(y - s.priceY) <= 2);
+    function end(g, s, runEnd) {
+      const grp = s.grp; if (!grp) return; s.grp = null; open.delete(g);
+      const W = g.canvas ? g.canvas.width : 0, ok = s.sp >= 4 && (W - grp.cx > s.sp * 1.15 + 1 || (W - grp.cx > -s.sp && onPrice(s, grp)));
+      s.run++;
+      if (grp.cx > s.maxCx) { s.maxCx = grp.cx; s.maxOk = ok; }
+      // a pass of 3+ bars ending here, or (charts that start a new path for every candle) where the live bar was last paint
+      const isLive = runEnd && ok && (s.run >= 3 || (s.liveCx !== null && Math.abs(grp.cx - s.liveCx) < s.sp * 0.6));
+      if (runEnd) s.run = 0;
+      busy = true; try { for (const p of grp.parts) { try { p(isLive); } catch (e) { const q = (window.__bdLiveErr = window.__bdLiveErr || []); if (q.length < 20) q.push(String(e && e.message || e)); } } } finally { busy = false; }
+    }
+    function settle() {
+      queued = false;
+      for (const g of [...open]) { const s = S.get(g); if (s) end(g, s, true); }
+      for (const g of painted) { const s = S.get(g); if (s) { s.liveCx = s.maxOk ? s.maxCx : null; s.maxCx = -1e9; s.maxOk = false; s.run = 0; s.cols.clear(); } }
+      painted.clear();
+    }
+    const flush = (g) => { if (!busy && open.size && open.has(g)) { const s = S.get(g); if (s) end(g, s, true); } };
+    // anything else drawn on that canvas ends the pass first (so it keeps its place on top of the candles)
+    function wrap() {
+      wrapped = true;
+      const P = CanvasRenderingContext2D.prototype;
+      for (const m of ["beginPath", "fillText", "strokeText", "drawImage", "strokeRect", "clearRect", "putImageData"]) {
+        const o = P[m]; if (typeof o !== "function") continue;
+        P[m] = function (...a) { if (open.size) flush(this); return o.apply(this, a); };
+      }
+      const oR = P.fillRect;   // a plain rect that isn't a candle part (nothing was added or recognised during it)
+      P.fillRect = function (...a) { if (!open.size || busy) return oR.apply(this, a); const n = seq, r = oR.apply(this, a); if (seq === n) flush(this); return r; };
+      // the last-price line: one straight line across the chart, in a candle colour (remembered for the next paint)
+      const oM = P.moveTo, oL = P.lineTo, oS = P.stroke;
+      P.moveTo = function (x, y) { if (!busy && S.has(this)) { const t = this.getTransform(); this.__bdPl = [x * t.a + t.e, y * t.d + t.f, 0, 0, 0]; } return oM.call(this, x, y); };
+      P.lineTo = function (x, y) { const p = this.__bdPl; if (p) { const t = this.getTransform(); p[2] = x * t.a + t.e; p[3] = y * t.d + t.f; p[4]++; } return oL.call(this, x, y); };
+      P.stroke = function (...a) { const p = this.__bdPl;
+        if (p && !a.length && p[4] === 1 && Math.abs(p[3] - p[1]) <= 1 && this.canvas && Math.abs(p[2] - p[0]) >= this.canvas.width * 0.6) {
+          const s = S.get(this); if (s && s.cols.has(String(this.strokeStyle).toLowerCase())) s.priceY = (p[1] + p[3]) / 2; }
+        return oS.apply(this, a); };
+      const oB = P.beginPath; P.beginPath = function () { if (this.__bdPl) this.__bdPl = null; return oB.call(this); };
+    }
+    return {
+      get busy() { return busy; },
+      touch() { seq++; },   // a candle part that was recognised but not drawn (the inner rect of a bordered candle)
+      // col: the candle colour; Y0 / Y1: a body's top and bottom in device px (for the last-price line)
+      add(g, X, W, part, col, Y0, Y1) {
+        if (!wrapped) wrap();
+        seq++;
+        const s = st(g), cx = X + W / 2; painted.add(g);
+        if (col && s.cols.size < 16) s.cols.add(String(col).toLowerCase());
+        if (!queued) { queued = true; queueMicrotask(settle); }
+        const grp = s.grp, body = W >= 2 && Y0 !== undefined;
+        if (grp && ((cx >= grp.l - 1 && cx <= grp.r + 1) || (grp.cx >= X - 1 && grp.cx <= X + W + 1))) {   // same bar
+          grp.parts.push(part); if (X < grp.l) grp.l = X; if (X + W > grp.r) grp.r = X + W; if (body) grp.ys.push(Y0, Y1); return;
+        }
+        if (grp) { if (cx > grp.cx) { s.sp = cx - grp.cx; end(g, s, false); } else end(g, s, true); }   // next bar / a new pass
+        s.grp = { cx, l: X, r: X + W, parts: [part], ys: body ? [Y0, Y1] : [] }; open.add(g);
+      },
+      flush,
+    };
+  })();
+
+  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
 })();

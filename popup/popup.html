@@ -103,6 +103,12 @@
         <div class="lookgrid" id="candleLook"></div>
         <div class="row" id="shiftRow" hidden><span>Cycle</span><input type="range" id="shiftSpeed" min="2" max="40" step="1" /><output id="shiftSpeedOut"></output></div>
         <p class="hint" id="lookHint"></p>
+        <div class="row" id="closedRow"><span>Closed candles</span><div class="seg" id="closedMode"></div></div>
+        <div id="closedBox" hidden>
+          <div class="looklabel">Closed look <small>every candle except the live one; the last candle in each preview is your live one</small></div>
+          <div class="lookgrid" id="closedLook"></div>
+        </div>
+        <p class="hint" id="closedHint"></p>
         <div class="row"><span>Colours</span>
           <input type="color" id="candleUp" title="Up candles" /> <input type="color" id="candleDown" title="Down candles" />
           <small class="hint" style="margin:0">up · down</small></div>
