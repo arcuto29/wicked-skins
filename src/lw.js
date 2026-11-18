@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 24;
+  const LW_VERSION = 25;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -70,9 +70,11 @@
           // closed candles' own look ("" = like the live candle; see hook.js)
           closed: (() => { const L = window.__bdCandleLooks, k = String(c.closed || ""); return L && L.META[k] && k !== "shift" && k !== c.look && c.look !== "shift" ? k : ""; })(),
           P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null,
-          F: window.__bdCandleLooks && window.__bdCandleLooks.fx ? window.__bdCandleLooks.fx(c.fx) : null };   // Candle FX light layers   // wick / border / hollow / widths
+          F: window.__bdCandleLooks && window.__bdCandleLooks.fx ? window.__bdCandleLooks.fx(c.fx) : null,   // Candle FX light layers
+          A: !!(c.spot && c.spot.live), Z: !!(c.spot && c.spot.zones) };   // where the live candle / zones are (atmosphere, zone lights)   // wick / border / hollow / widths
       } else candles = null;
       if (candles && window.__bdCandleLooks && window.__bdCandleLooks.priceLine) window.__bdCandleLooks.priceLine.setCols([candles.upHex, candles.downHex]);
+      if (rawIn === undefined && window.__bdCandleLooks && window.__bdCandleLooks.spot && !(candles && (candles.A || candles.Z))) window.__bdCandleLooks.spot.clear();
     } catch { candles = null; }
   }
   // A Lightweight Charts chart only redraws when something about the chart changes, NOT when our settings change, so
@@ -348,9 +350,10 @@
       const cd = candles, split = !!(cd && L && L.live && cd.closed);   // closed candles have a look of their own
       const P = L && cd ? cd.P : null, F = L && cd ? cd.F : null;
       const glowOf = (look) => { const meta = L && L.META[look]; return cd ? Math.max(cd.glow, meta ? meta.minGlow : 0) : 0; };
-      if (!(on && cd && (glowOf(look0) > 0 || (look0 !== "solid" && look0 !== "shift") || P || F || split) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(g.fillStyle))) return false;
+      if (!(on && cd && (glowOf(look0) > 0 || (look0 !== "solid" && look0 !== "shift") || P || F || cd.A || split) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(g.fillStyle))) return false;
       const t = g.getTransform(), sx = t.a || 1, sy = t.d || 1, col0 = toHexCol(g.fillStyle), isUp = col0 === cd.upHex;
       const isBody = Math.abs(w * sx) >= 3 && Math.abs(h * sy) >= 3, tr = P ? tracker() : null;
+      if (cd.A && L.spot) L.spot.add(c, Math.min(x, x + w) * sx + t.e, Math.abs(w * sx), y * sy + t.f, (y + h) * sy + t.f, col0, isUp);   // only noted
       // a bordered candle comes as two nested rects in the same colour: style it once
       if ((P || F || split) && isBody && L.nestedDupe(lastBodyL, g, Math.min(x, x + w) * sx + t.e, Math.min(y, y + h) * sy + t.f, Math.abs(w * sx), Math.abs(h * sy), col0)) return true;
       const part = (look) => {
@@ -431,6 +434,7 @@
           }
           // price is in this zone right now (Price in a zone)
           const ZX = Math.min(x, x + w) * (t.a || 1) + t.e, ZY = Math.min(y, y + h) * (t.d || 1) + t.f;
+          if (candles && candles.Z && L.spot && zk && zk.a < 0.9 && !ownCandle(zk.k) && H < c.height * 0.9 && H >= 4 && W >= 16) L.spot.zone(c, ZX, ZY, W, H, zk.k);   // Zone lights
           const hot = lfx && lfx.zoneReact !== "off" && zk && zk.a < 0.9 && !ownCandle(zk.k) && H < c.height * 0.9 && L.zoneHot ? L.zoneHot(c, ZX, ZY, W, H) : 0;
           let z = !(own || all || dim) && (shaped || hot) ? L.zoneOwn(this.__bdLwOrig) : own || all || dim ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow, zoneFill: lfx.zoneFill, dim, grad: lfx.indGrad }, this) : null;
           if (hot && z) z = L.zoneHeat(z, lfx.zoneReact, { ctx: this, X: ZX, Y: ZY, W, H });

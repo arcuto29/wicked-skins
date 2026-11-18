@@ -119,6 +119,16 @@
         <button class="link" id="wallOptsReset" type="button">Reset this wallpaper</button>
       </details>
     
+      <details class="grp fxmix" data-grp="clarity" open>
+        <summary>Clarity</summary>
+        <p class="hint">Keeps price easy to read over busy or bright wallpapers. Only the wallpaper changes, never the chart.</p>
+        <div class="row"><span>Smart contrast</span><div class="seg" id="clarContrast"></div></div>
+        <div class="row"><span>Cinematic focus</span><div class="seg" id="clarFocus"></div></div>
+        <div class="row"><span>Depth fog</span><div class="seg" id="clarFog"></div></div>
+        <div class="row"><span>Parallax</span><div class="seg" id="clarParallax"></div></div>
+        <p class="hint" id="clarHint">Smart contrast softly shades bright parts of the wallpaper behind each chart and leaves dark parts alone. Cinematic focus darkens the wallpaper away from the live price. Depth fog adds a low haze along the bottom. Parallax moves the wallpaper a few pixels with your mouse. Parallax pauses with Power saver or when your system asks for less motion.</p>
+      </details>
+
       <details class="grp" data-grp="motion">
         <summary>Motion</summary>
         <div class="row"><span>Calm</span><div class="seg" id="calm"></div></div>
@@ -213,9 +223,21 @@
         <div class="lookgrid" id="fxMaterial"></div>
         <div class="row"><span>Core light</span><div class="seg wrap" id="fxCore"></div></div>
         <div class="row"><span>Edge light</span><div class="seg wrap" id="fxEdge"></div></div>
-        <div class="row" id="fxAmtRow"><span>FX intensity</span><input type="range" id="fxAmt" min="0.1" max="1" step="0.05" /><output id="fxAmtOut"></output></div>
+        <div class="row" id="cfxAmtRow"><span>FX intensity</span><input type="range" id="fxAmt" min="0.1" max="1" step="0.05" /><output id="fxAmtOut"></output></div>
         <p class="hint" id="fxHint"></p>
-        <div class="looklabel" style="margin-top:10px">Quick mixes <small>a material, lights and colours together</small></div>
+        <div class="looklabel" style="margin-top:12px">Live candle atmosphere <small>drawn behind the chart, only at the live candle</small></div>
+        <canvas id="atmoPrev" class="partsprev fxprev" width="560" height="236"></canvas>
+        <div class="row"><span>Atmosphere</span><div class="seg wrap" id="atmoFx"></div></div>
+        <div class="row"><span>Motion trail</span><div class="seg" id="atmoTrail"></div></div>
+        <div class="row"><span>Live candle aura</span><div class="seg" id="atmoAura"></div></div>
+        <div id="atmoBox" hidden>
+          <div class="row"><span>Colour</span><div class="seg" id="atmoColor"></div><input type="color" id="atmoCustom" title="Atmosphere colour" /></div>
+          <div class="row"><span>Smoke opacity</span><input type="range" id="atmoOpacity" min="0.05" max="0.4" step="0.01" /><output id="atmoOpacityOut"></output></div>
+          <div class="row"><span>Trail length</span><input type="range" id="atmoLen" min="2" max="8" step="1" /><output id="atmoLenOut"></output></div>
+          <div class="row"><span>Fade duration</span><input type="range" id="atmoFade" min="200" max="1200" step="50" /><output id="atmoFadeOut"></output></div>
+        </div>
+        <p class="hint" id="atmoHint"></p>
+        <div class="looklabel" style="margin-top:10px">Quick mixes <small>a material, lights, atmosphere and colours together</small></div>
         <div class="fxpresets" id="fxPresets"></div>
         <button class="link" id="fxReset" type="button">Reset Candle FX</button>
       </details>
@@ -243,6 +265,8 @@
             <div class="row"><span>Zone border</span><div class="seg wrap" id="zoneBorder"></div></div>
             <div class="row" title="Also soften zones that keep their own colours"><span>Dim all zones</span><div class="seg" id="zoneDim"></div></div>
             <div class="row"><span>Price in a zone <small>the zone lights up</small></span><div class="seg wrap" id="zoneReact"></div></div>
+            <div class="row"><span>Zone lights <small>pick any; drawn behind the chart</small></span><div class="seg wrap multi" id="zoneFx"></div></div>
+            <p class="hint" style="margin:-2px 0 6px" id="zoneFxHint">Proximity glow lights the nearest zone edge as price gets close. Contact ripple sends one soft ripple along the edge price first touches. Liquid border runs a light round the zone price is in or near. Directional light lights the edge price came in through. Zone fusion tints the live candle's glow with the zone's colour. They follow the live candle, so they show when the newest candle is on screen.</p>
             <div class="row" title="Rectangles, zones and lines you draw with TradingView's drawing tools"><span>Your drawings</span><div class="seg" id="drawOn"></div></div>
             <h4 style="margin:12px 0 4px">Each indicator</h4>
             <p class="hint" style="margin:0 0 6px">Set any line, zone or drawing on its own: colour, glow, width, or hide it. Zones can also get their own shape, border and style. These override the settings above.</p>

@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 32;
+  const HOOK_VERSION = 33;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -54,6 +54,7 @@
   function readCandles() {
     remapCacheMain.clear();
     candles = parseCandles(htmlEl().getAttribute("data-ws-candles"));
+    try { const L = window.__bdCandleLooks; if (L && L.spot && !(candles && (candles.A || candles.Z))) L.spot.clear(); } catch {}
     try { if (candles && window.__bdCandleLooks && window.__bdCandleLooks.priceLine) window.__bdCandleLooks.priceLine.setCols([candles.upHex, candles.downHex]); } catch {}
   }
   function parseCandles(raw) {
@@ -66,7 +67,8 @@
           // Closed candles' own look ("" = the same as the live candle). Not with Cycle (that one moves the whole chart's colours).
           closed: lookIds().includes(c.closed) && c.closed !== "shift" && c.closed !== c.look && c.look !== "shift" ? c.closed : "",
           P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null, lite: !!c.lite,
-          F: window.__bdCandleLooks && window.__bdCandleLooks.fx ? window.__bdCandleLooks.fx(c.fx) : null };   // Candle FX light layers   // wick / border / hollow / widths
+          F: window.__bdCandleLooks && window.__bdCandleLooks.fx ? window.__bdCandleLooks.fx(c.fx) : null,   // Candle FX light layers
+          A: !!(c.spot && c.spot.live), Z: !!(c.spot && c.spot.zones) };   // where the live candle / zones are (for the atmosphere, zone lights)   // wick / border / hollow / widths
       }
     } catch { out = null; }
     return out;
@@ -350,6 +352,12 @@
     if (r.a >= 0.95 && H / dpr >= 8 && H / dpr <= 40 && W / dpr <= 460) return null;   // a solid label box (price tags, order pills, session labels), not a zone
     if (sides.has(r.k) || (candles && (r.k === candles.up.join(",") || r.k === candles.down.join(",")))) return null;   // candles / volume
     L.noteSeen(orig, "zone");
+    // Zone lights (content.js draws them behind the chart): where this see-through box is
+    if (candles && candles.Z && L.spot && r.a < 0.9 && H < c.height * 0.9 && H >= 4 && W >= 16) {
+      const t = ctx.getTransform(), b = w === 1e4 ? pathBox.get(ctx) : null;
+      const X = b ? b.x0 : Math.min(x, x + w) * (t.a || 1) + t.e, Y = b ? b.y0 : Math.min(y, y + h) * (t.d || 1) + t.f;
+      L.spot.zone(c, X, Y, W, H, r.k);
+    }
     // its own settings (Each indicator), or the all-indicators colour: your drawings (a rectangle, the Long / Short
     // tool) only with "Your drawings: Style them too"; greys stay grey like grey lines do
     const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && (fx.drawOn || !drawCols.has(r.k)) && glowable(`rgb(${r.k})`);
@@ -1419,11 +1427,12 @@
         return this.clearRect(x, y, w, h);
       }
     }
-    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P || candles.F || candles.closed) && h < c.height * 0.8 && isPane(c)) {
+    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P || candles.F || candles.A || candles.closed) && h < c.height * 0.8 && isPane(c)) {
       const fs = this.fillStyle; // already remapped, normalised to "#rrggbb" for opaque colours
       if (fs === candles.upHex || fs === candles.downHex) {
         const L = window.__bdCandleLooks, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, body = w * sx >= 3;
         const cd = candles, isUp = fs === cd.upHex, look0 = L ? cd.look : (cd.look === "neon" ? "neon" : "solid");
+        if (cd.A && L && L.spot) L.spot.add(c, Math.min(x, x + w) * sx + t.e, Math.abs(w * sx), y * sy + t.f, (y + h) * sy + t.f, fs, isUp);   // only noted: drawn as before
         const split = !!(L && L.live && cd.closed);   // closed candles have a look of their own
         // TradingView draws a bordered candle as an outer rect then the body inside it, both in our colour: draw the
         // look once (on the outer rect) so outlines / glass don't double up.
