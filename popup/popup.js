@@ -504,7 +504,9 @@ async function renderEachInd() {
       <div class="ind-c"><input type="color" data-a="c" value="${col}" title="Colour" /><button class="chip${e.c === "rainbow" ? " on" : ""}" data-a="rb">Rainbow</button><button class="chip${e.c === "gradient" ? " on" : ""}" data-a="gr">Gradient</button>
         <button class="chip${e.h ? " on" : ""}" data-a="h" title="Hide it on the chart" style="margin-left:auto">${e.h ? "Hidden" : "Hide"}</button></div>
       <div class="ind-c"><span class="lbl">Glow</span><input type="range" data-a="g" min="0" max="1" step="0.05" value="${e.g === undefined || e.g === null ? 0 : e.g}" />
-        ${it.kind === "line" ? `<span class="lbl">Width</span><input type="range" data-a="w" min="0" max="3" step="0.5" value="${+e.w || 0}" />` : ""}</div></div>`; }).join("");
+        ${it.kind === "line" ? `<span class="lbl">Width</span><input type="range" data-a="w" min="0" max="3" step="0.5" value="${+e.w || 0}" />` : ""}</div>
+      ${it.kind === "zone" ? `<div class="ind-c" title="This zone's shape. Like all zones = Style › Indicators › Zone shape"><span class="lbl">Shape</span>${[["", "Like all zones"], ["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"]].map(([v, n]) =>
+        `<button class="chip${(e.s || "") === v ? " on" : ""}" data-a="s" data-v="${v}">${n}</button>`).join("")}</div>` : ""}</div>`; }).join("");
   const upd = (k, patch) => { const next = { ...(cfg.indCustom || {}) }; next[k] = { ...(next[k] || {}), ...patch }; set({ indCustom: next }); };
   box.querySelectorAll(".ind-row").forEach((row) => { const k = row.dataset.k;
     row.querySelector('[data-a="c"]').oninput = (e) => upd(k, { c: e.target.value });
@@ -513,6 +515,7 @@ async function renderEachInd() {
     row.querySelector('[data-a="g"]').oninput = (e) => upd(k, { g: +e.target.value });
     const w = row.querySelector('[data-a="w"]'); if (w) w.oninput = (e) => upd(k, { w: +e.target.value });
     row.querySelector('[data-a="h"]').onclick = () => { upd(k, { h: !(cfg.indCustom[k] || {}).h }); renderEachInd(); };
+    row.querySelectorAll('[data-a="s"]').forEach((b) => { b.onclick = () => { upd(k, { s: b.dataset.v }); renderEachInd(); }; });
     row.querySelector('[data-a="reset"]').onclick = () => { const next = { ...(cfg.indCustom || {}) }; delete next[k]; set({ indCustom: next }); renderEachInd(); };
   });
 }

@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 27;
+  const HOOK_VERSION = 28;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -106,14 +106,14 @@
     bg: null, busy: false, prof: [], profs: [] };
   let fx = { ...FX0 };
   const colOpt = (v) => (v === "candle" || /^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
-  // Each indicator's own settings, by its colour: { "r,g,b": { c: "#hex" | "rainbow" | "", g: glow 0..1, w: width 0..3, h: hide } }
+  // Each indicator's own settings, by its colour: { "r,g,b": { c: "#hex" | "rainbow" | "", g: glow 0..1, w: width 0..3, h: hide, s: zone shape } }
   function cleanCustom(m) {
     const out = {}; if (!m || typeof m !== "object") return out;
     for (const [k, e] of Object.entries(m).slice(0, 40)) {
       if (!/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) || !e || typeof e !== "object") continue;
       const c = e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "";
       const g = e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0));
-      out[k] = { c, g, w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h };
+      out[k] = { c, g, w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h, s: ["square", "rounded", "pill"].includes(e.s) ? e.s : "" };   // s: this zone's own shape ("" = like all zones)
     }
     return out;
   }
@@ -351,7 +351,7 @@
     // tool) only with "Your drawings: Style them too"; greys stay grey like grey lines do
     const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && (fx.drawOn || !drawCols.has(r.k)) && glowable(`rgb(${r.k})`);
     const dim = fx.zoneDim && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k));   // Dim all zones (your drawings only with "Style them too")
-    const shaped = zoneStyled() && (w !== 1e4 || !!rectPath(ctx)) && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k))   // shape / border only
+    const shaped = zoneStyled(ctx) && (w !== 1e4 || !!rectPath(ctx)) && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k))   // shape / border only
       && H >= 8 * dpr && W >= 24 * dpr && !stackedCols.has(r.k + "|" + r.a);                                      // (not slivers, not the position tool)
     if (!own && !all && !dim && !shaped) return null;
     if (!own && !all && !dim) { const zo = L.zoneOwn(orig); if (zo && !(H < c.height * 0.9)) zo.e = null; return zo; }
@@ -934,8 +934,11 @@
     const s = shapedBox.get(ctx); if (!s || performance.now() - s.t > 200) return false;
     return Math.abs(X - s.X) <= 3 && Math.abs(Y - s.Y) <= 3 && Math.abs(W - s.W) <= 5 && Math.abs(H - s.H) <= 5;
   }
-  const zoneStyled = () => fx.zoneShape !== "square" || fx.zoneBorder !== "line" || fx.zoneStyle !== "flat";
-  const zoneSt = () => ({ shape: fx.zoneShape, border: fx.zoneBorder, style: fx.zoneStyle });
+  // the zone being drawn may have its own shape (Each indicator), else the one for all zones
+  const zoneShapeOf = (ctx) => { const m = fx.indCustom; if (!ctx || !m) return fx.zoneShape; const L = window.__bdCandleLooks;
+    const r = L && L.keyOf(String(ctx.__bdFill !== undefined ? ctx.__bdFill : ctx.fillStyle)), e = r && m[r.k]; return e && e.s ? e.s : fx.zoneShape; };
+  const zoneSt = (ctx) => ({ shape: zoneShapeOf(ctx), border: fx.zoneBorder, style: fx.zoneStyle });
+  const zoneStyled = (ctx) => zoneShapeOf(ctx) !== "square" || fx.zoneBorder !== "line" || fx.zoneStyle !== "flat";
   // Which zones may take a shape / border / style. Not:
   //  - thin or narrow ones (zoomed out, a dashed round border on a sliver looks messy): drawn as before;
   //  - the Long / Short position tool: its two areas touch edge to edge. Two zone boxes drawn on the same canvas in
@@ -1328,9 +1331,9 @@
     if (on && c && isPane(c)) { const z = zoneFor(this, 1e4, 1e4); if (z) {
       if (z.hide) return;
       // a box drawn as a path (rectangle drawings, many zone boxes): it can take the zone shape / border too
-      const L = window.__bdCandleLooks, b = !a.length && zoneStyled() && L && L.zoneBox ? rectPath(this) : null;
+      const L = window.__bdCandleLooks, b = !a.length && zoneStyled(this) && L && L.zoneBox ? rectPath(this) : null;
       if (b && b.y1 - b.y0 < c.height * 0.9 && shapeOK(this, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0)) { this.save(); this.setTransform(1, 0, 0, 1, 0, 0);
-        try { if (L.zoneBox(this, zoneKit(this), b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, z, { ...zoneSt(), px: (typeof devicePixelRatio === "number" && devicePixelRatio) || 1 })) { noteShaped(this, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); return; } } finally { this.restore(); } }
+        try { if (L.zoneBox(this, zoneKit(this), b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0, z, { ...zoneSt(this), px: (typeof devicePixelRatio === "number" && devicePixelRatio) || 1 })) { noteShaped(this, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0); return; } } finally { this.restore(); } }
       return drawZone(this, z, () => origFillPath.apply(this, a), () => (a[0] && typeof a[0] === "object" ? origStroke.call(this, a[0]) : origStroke.call(this))); } }
     if (on && c && fx.scaleGlow > 0 && isAxis(c)) {
       const col = this.fillStyle;
@@ -1393,9 +1396,9 @@
       // a shape / border of its own (rounded, pill, dashed, double, glow): drawn as a path with the real canvas calls
       const L = window.__bdCandleLooks;
       const tz = this.getTransform(), ZX = Math.min(x, x + w) * (tz.a || 1) + tz.e, ZY = Math.min(y, y + h) * (tz.d || 1) + tz.f, ZW = Math.abs(w * (tz.a || 1)), ZH = Math.abs(h * (tz.d || 1));
-      if (L && L.zoneBox && zoneStyled() && ZH < c.height * 0.9 && shapeOK(this, ZX, ZY, ZW, ZH)) {
+      if (L && L.zoneBox && zoneStyled(this) && ZH < c.height * 0.9 && shapeOK(this, ZX, ZY, ZW, ZH)) {
         const k = zoneKit(this), t = this.getTransform();
-        if (L.zoneBox(this, k, x, y, w, h, z, { ...zoneSt(), px: 1 / (t.a || 1) })) { noteShaped(this, Math.min(x, x + w) * (t.a || 1) + t.e, Math.min(y, y + h) * (t.d || 1) + t.f, Math.abs(w * (t.a || 1)), Math.abs(h * (t.d || 1))); return; } }
+        if (L.zoneBox(this, k, x, y, w, h, z, { ...zoneSt(this), px: 1 / (t.a || 1) })) { noteShaped(this, Math.min(x, x + w) * (t.a || 1) + t.e, Math.min(y, y + h) * (t.d || 1) + t.f, Math.abs(w * (t.a || 1)), Math.abs(h * (t.d || 1))); return; } }
       drawZone(this, z, () => origFill.call(this, x, y, w, h), () => origStrokeRectRaw.call(this, x, y, w, h)); return; } }
     if (on && c && c.width > 20 && c.height > 20) {
       const s = this.getTransform().a || 1;
