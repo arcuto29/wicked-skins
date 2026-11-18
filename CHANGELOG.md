@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.76 (2026-11-18)
+- **New: Pattern skins** (TradingView tab › Pattern skins), with a live preview on your wallpaper. 11 patterns, all Priism's own: Carbon, Hex, Circuit, Stripes, Dots, Grid, Waves, Chevron, Diamond, Scales and Solid.
+  - **Chart frame:** a patterned band along each chart's edges, where Live mood glows. Colours: **Accent**, **Candles** (up into down), **Gradient** (your two colours), **Rainbow** (all the way round), **Custom**, or **Live mood**, which takes the glow's colour and lights up with it. You can set the Width, Strength and Pattern size, choose Square or Rounded corners, add a fine Edge line, and turn on Slow drift. Every chart in a layout gets its own frame. The frame sits behind the chart, so candles and scales draw over it, and it's included in snapshots and clips.
+  - **TradingView's bars:** the same patterns as a faint sheet over the top bar, the drawing toolbar, the right panels and the bottom bar (pick which ones). It only tints them: every tool, button and number stays clear, and clicks go straight through to TradingView. Available on TradingView and TradingView-based platforms.
+  - Saved in looks and loadouts. Off by default.
+
 ## 0.1.75 (2026-11-18)
 - **More for each zone** (Style › Indicators › Each indicator): besides its colour (or **Rainbow** / **Gradient**), glow and shape, every zone now has its own **Border** (Line, Dashed, Double, Glow, None) and **Style** (Flat, Fade, Shine, Glass, Hollow). Each one is "Like all zones" until you pick, so a session box can be a Hollow, dashed outline while your supply / demand zones are Glass pills.
 - **New zone shape: Oval.** It always rounds fully, even on tall boxes (an upright oval), like Pill did before 0.1.74. Pill still turns the wide rectangles you draw into pills. Tall ones get rounded corners. Oval is available for all zones and for each zone on its own.

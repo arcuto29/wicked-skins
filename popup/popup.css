@@ -585,3 +585,13 @@ input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; bord
 .moodprev canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .7; }
 .moodprev i { position: absolute; inset: 0; }
 .moodprev b { position: absolute; left: 8px; top: 6px; font-size: 10.5px; color: #c9cdd9; font-weight: 600; letter-spacing: .02em; }
+
+/* Pattern skins: pattern chips (a swatch in your colours + the name) */
+.patgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0 8px; }
+body.desk .patgrid { grid-template-columns: repeat(6, 1fr); }
+.patchip { display: flex; flex-direction: column; gap: 3px; padding: 4px; border: 1px solid var(--line, #23252f); border-radius: 10px; background: var(--panel2, #0a0b0f); color: #c9ccd6; font: 600 10.5px system-ui, sans-serif; cursor: pointer; }
+.patchip i { display: block; height: 30px; border-radius: 6px; -webkit-mask-repeat: repeat; mask-repeat: repeat; }
+.patchip span { text-align: left; padding: 0 2px; }
+.patchip:hover { border-color: var(--line2, #3a3e4c); }
+.patchip.on { border-color: transparent; box-shadow: 0 0 0 2px var(--acc, #2ef2b0); color: #fff; }
+#patPrev { aspect-ratio: 560 / 150; }
