@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 24;
+  const HOOK_VERSION = 25;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -474,7 +474,10 @@
     if (out !== undefined) return out;
     out = v;
     const r = rgbKey(v);
-    const side = r && sides.get(r.key);
+    // see-through fills in the candle colour that aren't candles: the Long / Short position tool's areas use
+    // TradingView's own up / down colours at ~20%, and turned into your candle colours (a white box with light
+    // candles). Volume (50%) and other candle parts stay recoloured.
+    const side = r && !(r.a !== null && +r.a < 0.4) && sides.get(r.key);
     if (side) {
       const c = side === "up" ? candles.up : candles.down;
       out = r.a === null || r.a === "1" ? (side === "up" ? candles.upHex : candles.downHex) : `rgba(${c[0]},${c[1]},${c[2]},${r.a})`;

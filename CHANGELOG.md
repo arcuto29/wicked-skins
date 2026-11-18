@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.72 (2026-11-18)
+- **Fixed: the Long / Short position tool turned white (or your candle colours)** with Priism's candle colours on. Its profit and loss areas use TradingView's own up / down candle colours, see-through, so Priism took them for candles and painted them in your candle colours: a whitish box with light candles. They keep their own green and red now. Candles and volume bars are recoloured as before.
+
 ## 0.1.71 (2026-11-18)
 - **Fixed: zone shapes on the Long / Short position tool.** Its profit and loss areas got rounded / dashed separately, which looked broken, especially while dragging it. Priism now recognises the tool (two areas touching edge to edge) and leaves it square, as TradingView draws it. Your other zones and rectangles keep their shape.
 - **Fixed: zone shapes on thin zones when zoomed out.** Zones thinner than 8 px (or narrower than 24 px) are drawn as before, instead of as tiny dashed pills.

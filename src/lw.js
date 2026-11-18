@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 15;
+  const LW_VERSION = 16;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -285,7 +285,7 @@
     let out = remapCache.get(v);
     if (out !== undefined) return out;
     out = v;
-    const r = rgbKey(v), side = r && sides.get(r.key);
+    const r = rgbKey(v), side = r && !(r.a !== null && +r.a < 0.4) && sides.get(r.key);   // not the position tool's ~20% areas
     if (side) { const c = side === "up" ? candles.up : candles.down;
       out = r.a === null ? (side === "up" ? candles.upHex : candles.downHex) : `rgba(${c[0]},${c[1]},${c[2]},${r.a})`; }
     if (remapCache.size < 600) remapCache.set(v, out);
