@@ -2442,12 +2442,19 @@ function priismSkins(window, document) {
     ["camo", "Camo", 64, 64, '<path d="M6 8C14 2 24 6 22 14S10 22 6 18S0 12 6 8Z" opacity=".9"/><path d="M34 4C44 2 52 8 48 16S36 20 32 14S28 6 34 4Z" opacity=".5"/><path d="M40 30C50 26 60 32 58 40S46 50 40 46S32 34 40 30Z" opacity=".9"/><path d="M10 34C18 30 26 36 24 44S12 52 8 48S2 38 10 34Z" opacity=".5"/><path d="M26 50C32 48 38 52 36 58S28 62 24 58S20 52 26 50Z" opacity=".9"/><path d="M26 22C30 20 36 24 34 28S28 32 26 30S22 24 26 22Z" opacity=".3"/>'],
     ["leopard", "Leopard", 40, 40, '<g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6 8A5 5 0 0 1 14 6M15 10A5 5 0 0 1 9 15"/><path d="M26 20A5 5 0 0 1 34 19M34 24A5 5 0 0 1 27 27"/><path d="M8 28A4 4 0 0 1 15 29M14 33A4 4 0 0 1 8 33"/><path d="M27 4A3 3 0 0 1 32 6"/></g><circle cx="10" cy="11" r="1.6" opacity=".5"/><circle cx="30" cy="23" r="1.6" opacity=".5"/>'],
     ["topo", "Topo", 60, 60, '<g fill="none" stroke="#fff" stroke-width="1.1"><path d="M18 14C26 8 38 12 38 22S26 34 18 30S10 20 18 14Z"/><path d="M20 18C25 15 33 17 33 23S25 30 20 27S15 21 20 18Z"/><path d="M23 21C26 20 29 21 29 23S26 26 24 25S21 22 23 21Z"/><path d="M40 40C48 36 56 42 54 50S42 58 38 52S34 44 40 40Z"/><path d="M42 44C46 42 51 45 50 49S44 53 42 50S39 46 42 44Z"/><path d="M4 44C10 42 14 48 10 52S2 52 2 48S2 45 4 44Z"/></g>'],
+    ["stars", "Stars", 64, 64, '<circle cx="6" cy="9" r="1.1"/><circle cx="23" cy="4" r=".7" opacity=".7"/><circle cx="40" cy="14" r="1.6"/><circle cx="57" cy="7" r=".8" opacity=".6"/><circle cx="12" cy="30" r=".6" opacity=".5"/><circle cx="31" cy="26" r="1" opacity=".85"/><circle cx="50" cy="36" r=".7" opacity=".6"/><circle cx="8" cy="50" r="1.4"/><circle cx="26" cy="46" r=".7" opacity=".6"/><circle cx="44" cy="56" r="1.1" opacity=".9"/><circle cx="60" cy="52" r=".6" opacity=".5"/><circle cx="36" cy="40" r=".5" opacity=".4"/>'],
+    ["twinkle", "Twinkle", 48, 48, '<path d="M12 6Q12.6 11.4 18 12Q12.6 12.6 12 18Q11.4 12.6 6 12Q11.4 11.4 12 6Z"/><path d="M36 28Q36.4 31.6 40 32Q36.4 32.4 36 36Q35.6 32.4 32 32Q35.6 31.6 36 28Z" opacity=".8"/><circle cx="34" cy="10" r="1"/><circle cx="10" cy="38" r=".9" opacity=".7"/><circle cx="24" cy="24" r=".6" opacity=".6"/><circle cx="44" cy="44" r=".7" opacity=".6"/>'],
     ["solid", "Solid", 0, 0, ""],
   ];
   const PMETA = Object.fromEntries(PAT.map(([id, name, w, h, body]) => [id, { id, name, w, h, body }]));
   const svgOf = (p) => `<svg xmlns="http://www.w3.org/2000/svg" width="${p.w}" height="${p.h}" fill="#fff">${p.body}</svg>`;
   const urlOf = (id) => { const p = PMETA[id]; return p && p.w ? `url("data:image/svg+xml,${encodeURIComponent(svgOf(p))}")` : "none"; };
   const RAINBOW = ["#ff4d6d", "#ffb84d", "#f9f871", "#4dff9a", "#4dd8ff", "#7c6cff", "#ff4df0"];
+  const GALAXY_CSS = ["radial-gradient(1.2px 1.2px at 12% 22%, #fff 60%, transparent 62%)", "radial-gradient(1px 1px at 37% 71%, #fff 60%, transparent 62%)",
+    "radial-gradient(1.6px 1.6px at 61% 35%, #ffffffee 60%, transparent 62%)", "radial-gradient(1px 1px at 82% 64%, #dfe8ff 60%, transparent 62%)",
+    "radial-gradient(1.3px 1.3px at 90% 15%, #fff 60%, transparent 62%)", "radial-gradient(.9px .9px at 24% 88%, #fff 60%, transparent 62%)",
+    "radial-gradient(60% 80% at 20% 30%, #6a3cff99, transparent 70%)", "radial-gradient(50% 70% at 80% 70%, #ff3dae88, transparent 70%)",
+    "radial-gradient(40% 60% at 55% 40%, #3dc8ff66, transparent 70%)", "linear-gradient(135deg, #0b0630, #1a0b4a 40%, #071a3a)"].join(", ");
   const imgs = {};
   window.PriismPatterns = {
     LIST: PAT.map(([id, name]) => [id, name]), META: PMETA, RAINBOW,
@@ -2465,6 +2472,10 @@ function priismSkins(window, document) {
       if (o.mode === "custom") return ok(o.color) ? o.color : A;
       if (o.mode === "mood") return `var(--bd-mood-col, ${A})`;
       if (o.mode === "aurora") return `linear-gradient(120deg, ${A}, #4dd8ff, #7c6cff, #ff4df0, #4dffb4, ${A})`;   // slowly flowing (bd-aurora)
+      // a night sky: tiny stars over a purple / blue / pink nebula (best with the Solid pattern)
+      if (o.mode === "galaxy") return GALAXY_CSS;
+      // holographic foil: shifting pastel rainbow with a sheen
+      if (o.mode === "holo") return `linear-gradient(115deg, rgba(255,255,255,.0) 30%, rgba(255,255,255,.55) 45%, rgba(255,255,255,0) 60%), conic-gradient(from 30deg, #ffb3f0, #b3c7ff, #b3fff1, #f9ffb3, #ffcfb3, #ffb3f0)`;
       return A;
     },
     // the same colours for a canvas (snapshots, clips, panel previews), over a box
@@ -2478,6 +2489,14 @@ function priismSkins(window, document) {
       if (o.mode === "custom") return ok(o.color) ? o.color : A;
       if (o.mode === "mood") return ok(o.mood) ? o.mood : A;
       if (o.mode === "aurora") return lin([A, "#4dd8ff", "#7c6cff", "#ff4df0", "#4dffb4"]);
+      if (o.mode === "holo") return lin(["#ffb3f0", "#b3c7ff", "#b3fff1", "#f9ffb3", "#ffcfb3", "#ffb3f0"]);
+      if (o.mode === "galaxy") { const t = document.createElement("canvas"); t.width = Math.max(8, Math.ceil(w)); t.height = Math.max(8, Math.ceil(h)); const q = t.getContext("2d");
+        const bg = q.createLinearGradient(0, 0, t.width, t.height); bg.addColorStop(0, "#0b0630"); bg.addColorStop(0.4, "#1a0b4a"); bg.addColorStop(1, "#071a3a"); q.fillStyle = bg; q.fillRect(0, 0, t.width, t.height);
+        for (const [cx, cy, r, c] of [[0.2, 0.3, 0.6, "106,60,255,0.6"], [0.8, 0.7, 0.5, "255,61,174,0.55"], [0.55, 0.4, 0.4, "61,200,255,0.4"]]) {
+          const R = r * Math.max(t.width, t.height), gr = q.createRadialGradient(cx * t.width, cy * t.height, 0, cx * t.width, cy * t.height, R); gr.addColorStop(0, `rgba(${c})`); gr.addColorStop(1, "rgba(0,0,0,0)"); q.fillStyle = gr; q.fillRect(0, 0, t.width, t.height); }
+        q.fillStyle = "#fff"; let seed = 11; const rr = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+        for (let i = 0; i < (t.width * t.height) / 900; i++) { q.globalAlpha = 0.4 + rr() * 0.6; q.beginPath(); q.arc(rr() * t.width, rr() * t.height, 0.4 + rr() * 1.1, 0, Math.PI * 2); q.fill(); }
+        q.globalAlpha = 1; return g.createPattern(t, "no-repeat"); }
       return A;
     },
     // the tile as an image (loaded once) for canvas drawing; null until it has loaded

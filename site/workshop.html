@@ -91,6 +91,13 @@
       <div id="invList" class="mine-list"></div>
     </section>
 
+    <section id="bugs" hidden>
+      <h2 style="font-size:22px;margin:34px 0 6px">Bug reports <span class="adm">ADMIN</span></h2>
+      <p class="hint">Sent from the Priism panel (Settings › Report a bug). Only you can see these.</p>
+      <div class="inv-kind seg" id="bugFilter"><button type="button" data-f="open" class="on">Open</button><button type="button" data-f="done">Done</button><button type="button" data-f="all">All</button></div>
+      <div id="bugList" class="mine-list"></div>
+    </section>
+
     <section id="review" hidden>
       <h2 style="font-size:22px;margin:34px 0 12px">Review <span class="adm">ADMIN</span></h2>
       <p class="hint">Shares waiting for you. Approve to make them public, or reject with a reason the sharer sees.</p>
@@ -257,6 +264,29 @@
     // ---------- invites (admins): make, copy, turn off / on, free a device, delete ----------
     const CODE_ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
     const newCode = () => { const r = crypto.getRandomValues(new Uint32Array(8)); let s = ""; for (let i = 0; i < 8; i++) s += CODE_ABC[r[i] % CODE_ABC.length]; return "PRIISM-" + s.slice(0, 4) + "-" + s.slice(4); };
+    // ---------- bug reports (admins): read, mark done, delete ----------
+    let bugFilter = "open";
+    document.querySelectorAll("#bugFilter [data-f]").forEach((b) => (b.onclick = () => { bugFilter = b.dataset.f; document.querySelectorAll("#bugFilter [data-f]").forEach((x) => x.classList.toggle("on", x === b)); renderBugs(); }));
+    async function renderBugs() {
+      const box = $("bugs"); if (!profile || !profile.is_admin) { box.hidden = true; return; }
+      box.hidden = false; const list = $("bugList");
+      let q = sb.from("bug_reports").select("id,created_at,message,contact,info,done").order("created_at", { ascending: false }).range(0, 199);
+      if (bugFilter === "open") q = q.eq("done", false); else if (bugFilter === "done") q = q.eq("done", true);
+      const r = await q;
+      if (r.error) { list.innerHTML = /bug_reports|schema cache/i.test(r.error.message) ? "<p class='hint'>Bug reports aren't set up on the server yet: re-run supabase/schema.sql in Supabase (SQL Editor).</p>" : "<p class='hint'>Couldn't load reports: " + esc(r.error.message) + "</p>"; return; }
+      list.innerHTML = r.data.length ? "" : "<p class='hint'>" + (bugFilter === "open" ? "No open reports." : "Nothing here.") + "</p>";
+      for (const b of r.data) {
+        const i = b.info || {}, row = document.createElement("div"); row.className = "mine-row inv-row";
+        const when = new Date(b.created_at).toLocaleString(), meta = [i.v && "v" + i.v, i.app, i.host, i.screen].filter(Boolean).join(" · ");
+        row.innerHTML = `<div class="mine-t"><b style="white-space:pre-wrap;font-weight:600">${esc(b.message)}</b>
+            <small>${esc(when)}${b.contact ? " · " + esc(b.contact) : ""}${meta ? " · " + esc(meta) : ""}</small>
+            ${i.settings ? `<small style="opacity:.7">${esc(Object.entries(i.settings).map(([k, v]) => k + ": " + v).join(", ").slice(0, 600))}</small>` : ""}</div>
+          <button class="btn" data-a="done" type="button">${b.done ? "Reopen" : "Done"}</button><button class="btn" data-a="del" type="button">Delete</button>`;
+        row.querySelector('[data-a="done"]').onclick = async () => { const x = await sb.from("bug_reports").update({ done: !b.done }).eq("id", b.id); if (x.error) return alert(x.error.message); renderBugs(); };
+        row.querySelector('[data-a="del"]').onclick = async () => { if (!confirm("Delete this report?")) return; const x = await sb.from("bug_reports").delete().eq("id", b.id); if (x.error) return alert(x.error.message); renderBugs(); };
+        list.appendChild(row);
+      }
+    }
     async function renderInvites() {
       const box = $("invites"); if (!profile || !profile.is_admin) { box.hidden = true; return; }
       box.hidden = false; const list = $("invList");
@@ -353,7 +383,7 @@
       $("myShares").hidden = !user;
       if (user) { $("signout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); await refresh(); say("shareMsg", ""); }; renderMine(); }
       say("ownerNote", user && profile && profile.is_admin ? "You're the owner: what you share goes live straight away." : user ? "Shares are checked before everyone can see them (usually within a day). You'll see yours under Your shares." : "");
-      renderReview(); renderInvites();
+      renderReview(); renderInvites(); renderBugs();
     }
     sb.auth.onAuthStateChange(() => refresh());
     refresh().then(() => { if (location.hash === "#mine" && user) $("myShares").scrollIntoView(); });

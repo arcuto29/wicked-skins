@@ -1409,7 +1409,7 @@
       f.style.setProperty("--bd-fw", W + "px"); f.style.setProperty("--bd-fr", R + "px");
       f.classList.toggle("bd-fedge", !!cfg.frameEdge); f.classList.toggle("bd-fsolid", cfg.framePattern === "solid");
       f.classList.toggle("bd-fmove", !!cfg.frameMove && !liteNow() && cfg.framePattern !== "solid");
-      f.classList.toggle("bd-aurora", cfg.frameMode === "aurora" && !liteNow());
+      f.classList.toggle("bd-aurora", (cfg.frameMode === "aurora" || cfg.frameMode === "holo") && !liteNow());
       if (cfg.frameMode !== "mood") f.style.opacity = String(Math.max(0.05, Math.min(1, +cfg.frameAlpha || 0.5)));
       f.__key = "";
     }
@@ -1429,7 +1429,7 @@
     barBox.style.setProperty("--bd-bpat", m.image); barBox.style.setProperty("--bd-bps", m.size);
     barBox.style.setProperty("--bd-ba", String(Math.max(0.02, Math.min(0.8, +cfg.barAlpha || 0.25))));
     barBox.classList.toggle("bd-bsolid", cfg.barPattern === "solid");
-    barBox.classList.toggle("bd-aurora", cfg.barMode === "aurora" && !liteNow());
+    barBox.classList.toggle("bd-aurora", (cfg.barMode === "aurora" || cfg.barMode === "holo") && !liteNow());
     barBox.__sig = ""; placeBars();
   }
   function placeBars() {

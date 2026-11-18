@@ -150,5 +150,20 @@ ok("up to 10000 devices allowed, more refused", (await tryAs(ADMIN, "insert into
 const bulk = Array.from({ length: 50 }, (_, i) => `('PRIISM-BULK-${String(i).padStart(4, "0")}', 1)`).join(",");
 await as(ADMIN, "insert into public.invites (code, max_devices) values " + bulk);
 ok("50 codes made at once", (await as(ADMIN, "select count(*)::int n from public.invites where code like 'PRIISM-BULK-%'")).rows[0].n === 50);
+// ---------- bug reports ----------
+await db.exec("grant select, insert, update, delete on public.bug_reports to anon, authenticated");   // Supabase gives these by default; RLS decides
+const bug = async (msg, dev, contact = null, info = {}) => (await as(null, "select public.report_bug($1, $2, $3::jsonb, $4) r", [msg, contact, JSON.stringify(info), dev])).rows[0].r;
+ok("a device with an invite can report a bug", (await bug("Candles flicker on 4 charts", "grp-00000001", "@me", { v: "0.1.80", app: "extension" })) === "ok");
+ok("no invite on the device -> refused", (await bug("spam", "nope-0000001")) === "invalid");
+ok("a revoked code's devices can't report", (await bug("still here", "dev-00000001")) === "invalid");
+ok("empty or huge text is refused", (await bug("  ", "grp-00000001")) === "invalid" && (await bug("x".repeat(2001), "grp-00000001")) === "invalid");
+for (let i = 0; i < 4; i++) await bug("report " + i, "grp-00000001");
+ok("at most 5 an hour from one device", (await bug("one more", "grp-00000001")) === "slow");
+ok("nobody but admins can read them", (await as(U1, "select count(*)::int n from public.bug_reports")).rows[0].n === 0 && (await as(null, "select count(*)::int n from public.bug_reports")).rows[0].n === 0);
+const br = (await as(ADMIN, "select message, contact, info->>'v' v from public.bug_reports order by id limit 1")).rows[0];
+ok("the owner reads them, with contact and version", br && br.message === "Candles flicker on 4 charts" && br.contact === "@me" && br.v === "0.1.80");
+ok("nobody can write one directly (only through report_bug)", (await tryAs(U1, "insert into public.bug_reports (device, message) values ('x-00000001', 'hey')")) !== "ok" && (await tryAs(null, "insert into public.bug_reports (device, message) values ('x-00000001', 'hey')")) !== "ok");
+await as(ADMIN, "update public.bug_reports set done = true where message = 'report 0'");
+ok("the owner marks one done and deletes one", (await as(ADMIN, "select count(*)::int n from public.bug_reports where done")).rows[0].n === 1 && (await tryAs(ADMIN, "delete from public.bug_reports where message = 'report 1'")).startsWith("ok"));
 const passed = Object.values(R).filter(Boolean).length, total = Object.keys(R).length;
 console.log("SUMMARY:", passed + "/" + total); if (passed !== total) process.exit(1);

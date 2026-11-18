@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.80 (2026-11-18)
+- **A tidier panel.** The tabs are now **Wallpaper · Chart · TradingView · Trading · Capture · Workshop · My looks · Settings**, and every setting sits with what it changes:
+  - **Wallpaper** has four views: Looks, Wallpapers, My uploads and **Adjust**. Adjust holds Picture, This wallpaper, Motion, Layouts, Wallpaper by session, Wallpaper by symbol and Wallpaper layer.
+  - **Chart** holds Candles, Lines, zones & labels, Price scale and Chart frame.
+  - **TradingView** holds Bars & panels and Text & accent. **Settings** holds Shortcuts and Report a bug.
+  - Clearer names where two settings sounded the same: Menu strength, Skin strength, Recolour strength, Auto quality, Frame rate (clips), Move sensitivity, and Outline (Live mood's look, so it isn't confused with Chart frame).
+  - All the help text is rewritten to be short and plain. "Find any setting" at the top still finds everything, and opens the right view.
+- **New: Report a bug** (Settings). Write what happened and send it. Only the Priism team can read it.
+- **30 more candle colours**, with new groups **Synth**, **Pastel**, **Luxe** and **Easy to read** (clear for everyone, including red-green colour blindness), plus more in Clean, Neon, Warm, Cool and Rich.
+- **Chart frame and Interface skin:** new **Galaxy** (stars over a nebula) and **Holo** (shifting foil) colours, and **Stars** and **Twinkle** textures.
+- **nq.vision-style charts look like TradingView now:** the price and time scales show the wallpaper like the rest of the chart. Before, they always had a dark navy backing, which made the chart look bluer. The backing now follows Chart › Price scale › Backing the same way it does on TradingView.
+
 ## 0.1.79 (2026-11-18)
 - **New: Sharpness, up to 4K** (Adjust › Motion › Sharpness):
   - **Standard** is as before and the lightest.

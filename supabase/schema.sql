@@ -479,3 +479,48 @@ end;
 $$;
 revoke execute on function public.redeem_invite(text, text, text) from public;
 grant execute on function public.redeem_invite(text, text, text) to anon, authenticated;
+
+-- ---------- bug reports ----------
+-- Sent from the Priism panel (Settings › Report a bug). Only the owner / admins can read them (website › Workshop ›
+-- Bug reports). Sending goes through report_bug() only: a copy of Priism that has redeemed an invite, at most 5 an
+-- hour from one device, short text only. Nothing about the person's account or charts is included.
+create table if not exists public.bug_reports (
+  id bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  device text not null,
+  message text not null check (char_length(message) between 3 and 2000),
+  contact text check (contact is null or char_length(contact) <= 120),
+  info jsonb not null default '{}'::jsonb check (pg_column_size(info) <= 4000),
+  done boolean not null default false
+);
+create index if not exists bug_reports_created on public.bug_reports (created_at desc);
+alter table public.bug_reports enable row level security;
+drop policy if exists "bug reports: admins read" on public.bug_reports;
+create policy "bug reports: admins read" on public.bug_reports for select to authenticated using (public.is_admin((select auth.uid())));
+drop policy if exists "bug reports: admins mark done" on public.bug_reports;
+create policy "bug reports: admins mark done" on public.bug_reports for update to authenticated using (public.is_admin((select auth.uid()))) with check (public.is_admin((select auth.uid())));
+drop policy if exists "bug reports: admins delete" on public.bug_reports;
+create policy "bug reports: admins delete" on public.bug_reports for delete to authenticated using (public.is_admin((select auth.uid())));
+
+-- 'ok' | 'invalid' (no invite on this device, or the text is empty / too long) | 'slow' (too many in the last hour)
+create or replace function public.report_bug(p_message text, p_contact text, p_info jsonb, p_device text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare msg text := trim(coalesce(p_message, '')); n int;
+begin
+  if p_device is null or p_device !~ '^[A-Za-z0-9-]{8,64}$' then return 'invalid'; end if;
+  if not exists (select 1 from public.invite_devices d join public.invites i on i.code = d.code where d.device = p_device and not i.revoked) then return 'invalid'; end if;
+  if char_length(msg) < 3 or char_length(msg) > 2000 then return 'invalid'; end if;
+  select count(*) into n from public.bug_reports where device = p_device and created_at > now() - interval '1 hour';
+  if n >= 5 then return 'slow'; end if;
+  insert into public.bug_reports (device, message, contact, info)
+  values (p_device, msg, nullif(left(trim(coalesce(p_contact, '')), 120), ''),
+          case when p_info is null or jsonb_typeof(p_info) <> 'object' or pg_column_size(p_info) > 4000 then '{}'::jsonb else p_info end);
+  return 'ok';
+end;
+$$;
+revoke execute on function public.report_bug(text, text, jsonb, text) from public;
+grant execute on function public.report_bug(text, text, jsonb, text) to anon, authenticated;

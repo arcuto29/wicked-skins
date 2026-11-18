@@ -595,3 +595,6 @@ body.desk .patgrid { grid-template-columns: repeat(6, 1fr); }
 .patchip:hover { border-color: var(--line2, #3a3e4c); }
 .patchip.on { border-color: transparent; box-shadow: 0 0 0 2px var(--acc, #2ef2b0); color: #fff; }
 #patPrev, #ifPrev { aspect-ratio: 560 / 150; }
+
+/* Report a bug */
+#bugText, #bugContact { width: 100%; box-sizing: border-box; background: #0a0b0f; border: 1px solid #23252f; border-radius: 8px; color: #e9ebf2; padding: 8px 10px; font: 12px system-ui, sans-serif; margin: 4px 0 6px; resize: vertical; }
