@@ -60,6 +60,10 @@ html.bd-focus .bd-emb { opacity: 0 !important; }
   -webkit-mask: var(--bd-bpat) repeat 0 0 / var(--bd-bps, auto); mask: var(--bd-bpat) repeat 0 0 / var(--bd-bps, auto); }
 #bd-barpat.bd-bsolid > div { -webkit-mask: none; mask: none; }
 html.theme-light #bd-barpat > div { mix-blend-mode: multiply; }
+/* Aurora: the colours slowly flow (off in Power saver / slow-PC mode: content.js leaves the class off) */
+#bd-barpat.bd-aurora > div, #bd-layer .bd-frame.bd-aurora::before, .bd-emb .bd-frame.bd-aurora::before { background-size: 300% 300% !important; animation: bd-aurora 30s ease-in-out infinite alternate; }
+#bd-layer .bd-frame.bd-aurora.bd-fmove::before, .bd-emb .bd-frame.bd-aurora.bd-fmove::before { animation: bd-aurora 30s ease-in-out infinite alternate, bd-fdrift 60s linear infinite; }
+@keyframes bd-aurora { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
 #bd-layer .bd-pill { position: fixed; transform: translateX(-100%); padding: 3px 10px; border-radius: 99px; background: rgba(0,0,0,.55);
   font: 700 12px system-ui, sans-serif; letter-spacing: .02em; backdrop-filter: blur(4px); --g: .35;
   /* P&L glow: strength follows the "Lines & P&L" glow slider */

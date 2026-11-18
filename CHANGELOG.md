@@ -1,6 +1,11 @@
 # Changelog
 
 ## 0.1.77 (2026-11-18)
+- **Interface skin, now in TradingView tab › TradingView interface** (it was under Pattern skins before, which was easy to miss). Choose **Skin it** to put a texture or colours across TradingView itself: the top bar, the drawing toolbar, the right panels and the bottom bar.
+  - **New textures:** **Zebra**, **Camo**, **Leopard** and **Topo** (contour lines), plus Carbon, Hex, Circuit, Stripes, Dots, Grid, Waves, Chevron, Diamond, Scales and Solid.
+  - **New colour: Aurora**, soft colours that slowly flow (still in Power saver). Also Rainbow, Gradient, Candles, Accent or Custom.
+  - **Bolder if you want it:** Strength goes up to 80% (it was 35%), and the default is now 25%, Rainbow Zebra. It's blended in, so icons, buttons and numbers stay readable, and clicks go straight through.
+  - The chart frame is its own section now (**Chart frame**), with the same textures and Aurora.
 - **Fixed: Live mood's "Glow follows" choices were cut off** ("O…", "My po…", "M…") in the panel. They now wrap onto two rows, so Off, Day's move, Recent move, My position and Music are all readable.
 
 ## 0.1.76 (2026-11-18)

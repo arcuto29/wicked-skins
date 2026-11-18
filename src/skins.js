@@ -2437,6 +2437,11 @@ function priismSkins(window, document) {
     ["chevron", "Chevron", 16, 10, '<path d="M0 8L8 2L16 8" fill="none" stroke="#fff" stroke-width="1.7"/>'],
     ["diamond", "Diamond", 16, 16, '<path d="M8 1L15 8L8 15L1 8Z" fill="none" stroke="#fff" stroke-width="1.2"/>'],
     ["scales", "Scales", 20, 10, '<path d="M0 10A10 10 0 0 1 20 10 M-10 0A10 10 0 0 1 10 0 M10 0A10 10 0 0 1 30 0" fill="none" stroke="#fff" stroke-width="1.2"/>'],
+    // textures (organic, made to tile seamlessly: what leaves one edge comes back on the other)
+    ["zebra", "Zebra", 48, 48, '<path d="M0 6C12 0 20 12 32 6S44 2 48 6V12C40 10 30 18 18 13S6 10 0 12Z"/><path d="M0 22C10 18 22 27 34 21S44 19 48 22V27C38 26 30 33 20 29S8 25 0 28Z"/><path d="M0 38C14 33 20 44 30 39S42 35 48 38V43C40 42 34 47 24 45S10 41 0 44Z"/><path d="M30 13C34 16 38 15 40 18C36 18 33 17 30 13Z"/><path d="M8 29C12 32 15 31 17 34C13 34 10 33 8 29Z"/>'],
+    ["camo", "Camo", 64, 64, '<path d="M6 8C14 2 24 6 22 14S10 22 6 18S0 12 6 8Z" opacity=".9"/><path d="M34 4C44 2 52 8 48 16S36 20 32 14S28 6 34 4Z" opacity=".5"/><path d="M40 30C50 26 60 32 58 40S46 50 40 46S32 34 40 30Z" opacity=".9"/><path d="M10 34C18 30 26 36 24 44S12 52 8 48S2 38 10 34Z" opacity=".5"/><path d="M26 50C32 48 38 52 36 58S28 62 24 58S20 52 26 50Z" opacity=".9"/><path d="M26 22C30 20 36 24 34 28S28 32 26 30S22 24 26 22Z" opacity=".3"/>'],
+    ["leopard", "Leopard", 40, 40, '<g fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6 8A5 5 0 0 1 14 6M15 10A5 5 0 0 1 9 15"/><path d="M26 20A5 5 0 0 1 34 19M34 24A5 5 0 0 1 27 27"/><path d="M8 28A4 4 0 0 1 15 29M14 33A4 4 0 0 1 8 33"/><path d="M27 4A3 3 0 0 1 32 6"/></g><circle cx="10" cy="11" r="1.6" opacity=".5"/><circle cx="30" cy="23" r="1.6" opacity=".5"/>'],
+    ["topo", "Topo", 60, 60, '<g fill="none" stroke="#fff" stroke-width="1.1"><path d="M18 14C26 8 38 12 38 22S26 34 18 30S10 20 18 14Z"/><path d="M20 18C25 15 33 17 33 23S25 30 20 27S15 21 20 18Z"/><path d="M23 21C26 20 29 21 29 23S26 26 24 25S21 22 23 21Z"/><path d="M40 40C48 36 56 42 54 50S42 58 38 52S34 44 40 40Z"/><path d="M42 44C46 42 51 45 50 49S44 53 42 50S39 46 42 44Z"/><path d="M4 44C10 42 14 48 10 52S2 52 2 48S2 45 4 44Z"/></g>'],
     ["solid", "Solid", 0, 0, ""],
   ];
   const PMETA = Object.fromEntries(PAT.map(([id, name, w, h, body]) => [id, { id, name, w, h, body }]));
@@ -2451,6 +2456,7 @@ function priismSkins(window, document) {
       return { image: urlOf(p.id), size: p.w ? `${(p.w * s).toFixed(1)}px ${(p.h * s).toFixed(1)}px` : "auto", w: p.w * s, h: p.h * s }; },
     // CSS background for a colour choice. o = { mode, color, color2, up, down, accent, mood, round }
     // mode: accent | candles (up → down) | gradient (your two colours) | rainbow | custom | mood (the Live mood colour)
+    //       | aurora (soft colours that slowly flow; the moving part is CSS, class bd-aurora)
     paint(o) {
       const ok = (c) => /^#[0-9a-f]{6}$/i.test(c || ""), A = ok(o.accent) ? o.accent : "#7c6cff";
       if (o.mode === "candles") return `linear-gradient(135deg, ${ok(o.up) ? o.up : "#26a69a"}, ${ok(o.down) ? o.down : "#ef5350"})`;
@@ -2458,6 +2464,7 @@ function priismSkins(window, document) {
       if (o.mode === "rainbow") return o.round ? `conic-gradient(from 200deg, ${RAINBOW.join(", ")}, ${RAINBOW[0]})` : `linear-gradient(90deg, ${RAINBOW.join(", ")})`;
       if (o.mode === "custom") return ok(o.color) ? o.color : A;
       if (o.mode === "mood") return `var(--bd-mood-col, ${A})`;
+      if (o.mode === "aurora") return `linear-gradient(120deg, ${A}, #4dd8ff, #7c6cff, #ff4df0, #4dffb4, ${A})`;   // slowly flowing (bd-aurora)
       return A;
     },
     // the same colours for a canvas (snapshots, clips, panel previews), over a box
@@ -2470,6 +2477,7 @@ function priismSkins(window, document) {
         const gr = g.createLinearGradient(x, 0, x + w, 0); RAINBOW.forEach((c, i) => gr.addColorStop(i / (RAINBOW.length - 1), c)); return gr; }
       if (o.mode === "custom") return ok(o.color) ? o.color : A;
       if (o.mode === "mood") return ok(o.mood) ? o.mood : A;
+      if (o.mode === "aurora") return lin([A, "#4dd8ff", "#7c6cff", "#ff4df0", "#4dffb4"]);
       return A;
     },
     // the tile as an image (loaded once) for canvas drawing; null until it has loaded
