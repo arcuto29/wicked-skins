@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 22;
+  const LW_VERSION = 23;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -140,7 +140,7 @@
             g: e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0)), w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h, s: ["square", "rounded", "pill", "oval"].includes(e.s) ? e.s : "",
             b: ["line", "dashed", "double", "glow", "none"].includes(e.b) ? e.b : "", y: ["flat", "fade", "shine", "glass", "hollow"].includes(e.y) ? e.y : "" }; return o; })(),
         zoneFill: Math.max(0.04, Math.min(0.45, +f.zoneFill || 0.12)), zoneDim: !!f.zoneDim,
-        zoneReact: ["glow", "strong"].includes(f.zoneReact) ? f.zoneReact : "off",
+        zoneReact: ["glow", "strong", "edge", "spotlight", "shimmer"].includes(f.zoneReact) ? f.zoneReact : "off",
         zoneShape: ["square", "rounded", "pill", "oval"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
         accent: hex(f.accent), wallColors: Array.isArray(f.wallColors) ? f.wallColors.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 5) : [] } : null;
@@ -431,7 +431,7 @@
           const ZX = Math.min(x, x + w) * (t.a || 1) + t.e, ZY = Math.min(y, y + h) * (t.d || 1) + t.f;
           const hot = lfx && lfx.zoneReact !== "off" && zk && zk.a < 0.9 && !ownCandle(zk.k) && H < c.height * 0.9 && L.zoneHot ? L.zoneHot(c, ZX, ZY, W, H) : 0;
           let z = !(own || all || dim) && (shaped || hot) ? L.zoneOwn(this.__bdLwOrig) : own || all || dim ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow, zoneFill: lfx.zoneFill, dim, grad: lfx.indGrad }, this) : null;
-          if (hot && z) z = L.zoneHeat(z, lfx.zoneReact);
+          if (hot && z) z = L.zoneHeat(z, lfx.zoneReact, { ctx: this, X: ZX, Y: ZY, W, H });
           if (z && W <= candleMaxW(c) && H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
           if (z) { if (z.hide) return; const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
             // the neon edge (see candlelooks zone()): boxes and bands only, not full-height shading or slivers

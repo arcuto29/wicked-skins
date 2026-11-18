@@ -8,7 +8,18 @@
   - **Panel:** Glass makes the order ticket frosted and see-through.
   - Text stays readable on TradingView's light theme too. Only the look changes: every click goes to TradingView exactly as before.
 - **New: Panel style** (TradingView tab › Bars & panels): **Glass** (your wallpaper frosted behind the panels), **Neon edge**, **Outline** or **Aurora edge** (a thin ring of slowly turning colours), plus **Rounded** corners. It covers the watchlist and right panels, the order ticket and the bottom panel, and can include TradingView's settings windows and menus. The layout never moves, and everything stays clickable.
-- **New: Price in a zone** (Chart › Lines, zones & labels): a zone price is in right now lights up, with a brighter fill and a lit edge that pulses softly with each price update. It works on zones from indicators and on rectangles you draw yourself, on TradingView, TradingView-based platforms and nq.vision-style charts. **Glow** or **Strong**, off by default.
+- **New: Price in a zone** (Chart › Lines, zones & labels): a zone price is in right now lights up. It works on zones from indicators and on rectangles you draw yourself, on TradingView, TradingView-based platforms and nq.vision-style charts. Off by default. Choose how it reacts:
+  - **Glow** / **Strong:** brighter, with a lit edge that pulses softly.
+  - **Edge:** only the border lights up, and the inside stays as it was.
+  - **Spotlight:** a soft band of light right at the price inside the zone.
+  - **Shimmer:** a slow sheen sliding across it.
+  The candles always stay clear.
+- **Zone shapes: Oval is gone.** It looked the same as Pill, so there's just one now. If you had Oval picked, it shows as Pill.
+- **Sharper snapshots and clips:**
+  - Chart clips were shrunk to about 900 px wide. Now they keep the chart's full size, up to 1920 px on Balanced and 2560 on High (4K with Sharpness › Ultra).
+  - Clips use about twice the bitrate, so thin lines and small numbers stay crisp.
+  - While a snapshot or clip is being made, the wallpaper is drawn with every real pixel, so it's as sharp as the chart.
+  - Auto trade clips go up to 1280 px.
 
 ## 0.1.82 (2026-11-18)
 - **New: Magnifier.** Press **Alt+Shift+Z** on your chart for a round zoom lens that follows your cursor, so you can see exact wicks, levels and entries without changing the chart's zoom. Clicks go straight through it, so you can place a drawing or order right where it shows. A small cross marks the exact point. Press the shortcut again or **Esc** to close it. Settings › Magnifier sets the zoom (2× to 4×) and the lens size. The ring takes your accent colour. It only changes what you see.
