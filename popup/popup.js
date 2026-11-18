@@ -9,14 +9,14 @@ const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="tru
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const CHART_KEYS = ["indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
-const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
+const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
   fps: "auto", fit: "cover", posX: 50, posY: 50,
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
-  react: "off", reactStrength: 0.6,
+  react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft",
   wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
@@ -1922,22 +1922,37 @@ function syncTune() {
   seg("uiAccentMode", [["off", "Default"], ["custom", "Custom"]], () => (cfg.uiAccent ? "custom" : "off"),
     (v) => { set({ uiAccent: v === "custom" ? ($("uiAccent").value || "#2ef2b0") : "" }); syncTune(); });
   $("uiAccent").value = cfg.uiAccent || "#2ef2b0"; $("uiAccent").hidden = !cfg.uiAccent;
-  seg("react", [["off", "Off"], ["market", "Day\u2019s move"], ["pnl", "My position"], ["music", "Music"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
+  seg("react", [["off", "Off"], ["market", "Day\u2019s move"], ["momentum", "Recent move"], ["pnl", "My position"], ["music", "Music"]], () => cfg.react, (v) => { set({ react: v }); syncReact(); });
   syncReact();
 }
 function syncReact() {
   $("reactOpts").hidden = cfg.react === "off";
+  seg("moodLook", [["glow", "Glow"], ["horizon", "Horizon"], ["frame", "Frame"]], () => cfg.moodLook || "glow", (v) => { set({ moodLook: v }); drawMoodPreview(); });
+  seg("moodRange", [[0.5, "High"], [1, "Normal"], [2, "Low"]], () => +cfg.moodRange || 1, (v) => set({ moodRange: v }));
+  $("moodRangeRow").hidden = !["market", "momentum"].includes(cfg.react);
+  seg("moodPulse", [["off", "Off"], ["soft", "Soft"], ["strong", "Strong"]], () => cfg.moodPulse || "soft", (v) => set({ moodPulse: v }));
+  drawMoodPreview();
 
   $("reactStrength").value = cfg.reactStrength;
   $("reactStrengthOut").textContent = Math.round(cfg.reactStrength * 100) + "%";
 
-  $("reactHint").textContent = cfg.react === "music"
+  $("reactHint").textContent = cfg.react === "momentum"
+    ? "Glows green / red with how price moved over the last 10 minutes, so it follows the market live and calms down when price goes sideways. Sensitivity sets how big a move lights it fully."
+    : cfg.react === "music"
     ? "The glow and your wallpaper move with the music you're playing. On the chart, tap \u201cChoose the music tab\u201d, pick the tab playing it (YouTube, Spotify, SoundCloud\u2026) and tick \u201cShare tab audio\u201d. On Windows you can also share the whole screen with its sound. Priism only measures how loud the beat is: nothing is recorded or sent anywhere. Stop sharing any time from the browser's bar."
     : cfg.react === "market"
     ? "Chart edges glow green/red with the day's move and pulse on every tick. Skins speed up when price moves."
     : "Glows green/red with the open P&L shown on your chart's position line (broker, prop platform or paper trading). Nothing is sent anywhere.";
 }
-$("reactStrength").oninput = (e) => { set({ reactStrength: +e.target.value }); $("reactStrengthOut").textContent = Math.round(+e.target.value * 100) + "%"; };
+// the Live mood look, up and down, on your wallpaper (the same CSS as on the chart)
+function drawMoodPreview() {
+  const box = $("moodPrev"), M = window.PriismMood; if (!box || !M) return;
+  const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") && cfg.candleOn ? cfg.candleUp : "#00e08a", dn = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") && cfg.candleOn ? cfg.candleDown : "#ff3355";
+  box.querySelectorAll(".mp").forEach((el, i) => { const c = M.css(cfg.moodLook || "glow", i ? dn : up, 0.75 * (+cfg.reactStrength || 0.6) + 0.2, i ? -1 : 1);
+    const g = el.querySelector("i"); g.style.boxShadow = c.shadow; g.style.background = c.bg; g.style.opacity = String(c.op); });
+  if (!box.dataset.bg) { box.dataset.bg = "1"; try { if (WickedSkins[cfg.skin]) box.querySelectorAll(".mp canvas").forEach((cv) => { const s = makeSkin(cfg.skin, cv.getContext("2d")); s.resize(cv.width, cv.height); s.frame(3, 0.016); }); } catch {} }
+}
+$("reactStrength").oninput = (e) => { set({ reactStrength: +e.target.value }); $("reactStrengthOut").textContent = Math.round(+e.target.value * 100) + "%"; drawMoodPreview(); };
 
 // ---------- session skins ----------
 const SESSIONS = [["asia", "Asia", "6pm–3am"], ["london", "London", "3am–8am"], ["ny", "New York", "8am–5pm"], ["off", "After-hours", "5–6pm, weekends"]];
@@ -2337,7 +2352,7 @@ $("wmOn").onchange = (e) => set({ wmOn: e.target.checked });
 $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cfg.wmOn || !!e.target.value });
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
-const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","vignette","calm"];
+const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","moodLook","moodRange","moodPulse","vignette","calm"];
 const STYLE_KEYS = [...CHART_KEYS, "candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
@@ -2612,7 +2627,8 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Your chart can move with your music (Trading \u203a Live mood \u203a Music)",
+const WHATS_NEW = ["Live mood: new looks (Glow, Horizon, Frame), Recent move, Sensitivity, a glow per chart",
+  "Your chart can move with your music (Trading \u203a Live mood \u203a Music)",
   "Rain, storms, snow and more over any wallpaper (Adjust \u203a This wallpaper \u203a Effect)",
   "12 more fonts and 10 new candle looks",
   "Recolour any wallpaper to your colours, plus its own settings (Adjust \u203a This wallpaper)",
