@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Priism Skins for TradingView",
-  "version": "0.1.71",
+  "version": "0.1.72",
   "description": "Live wallpapers, candle colours, glow and watermarks for TradingView charts — and platforms that embed them.",
   "permissions": [
     "activeTab",

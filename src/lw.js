@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 15;
+  const LW_VERSION = 17;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -285,7 +285,7 @@
     let out = remapCache.get(v);
     if (out !== undefined) return out;
     out = v;
-    const r = rgbKey(v), side = r && sides.get(r.key);
+    const r = rgbKey(v), side = r && !(r.a !== null && +r.a < 0.4) && sides.get(r.key);   // not the position tool's ~20% areas
     if (side) { const c = side === "up" ? candles.up : candles.down;
       out = r.a === null ? (side === "up" ? candles.upHex : candles.downHex) : `rgba(${c[0]},${c[1]},${c[2]},${r.a})`; }
     if (remapCache.size < 600) remapCache.set(v, out);
@@ -327,6 +327,9 @@
       stroke(v) { strokeDesc.set.call(lk.g, v); }, strokeRect(x, y, w, h) { origStrokeRectL.call(lk.g, x, y, w, h); },
       fillPath() { origFillPathL.call(lk.g); }, clear(x, y, w, h) { origClearL.call(lk.g, x, y, w, h); } };
     const origClearL = proto.clearRect, lastBodyL = new WeakMap(), paintL = new WeakMap(), stackedL = new Set();
+    let dragL = false, dragSkipL = false; const knownL = new Set();
+    addEventListener("pointerdown", () => { dragL = true; dragSkipL = false; }, true);
+    for (const ev of ["pointerup", "pointercancel", "blur"]) addEventListener(ev, () => { if (dragL) { dragL = false; if (dragSkipL) { dragSkipL = false; setTimeout(repaint, 30); } } }, true);
     let partsTrack = null;   // were the last paint's bodies wide enough to tell them from wicks?
     const tracker = () => partsTrack || (window.__bdCandleLooks && window.__bdCandleLooks.paintTracker ? (partsTrack = window.__bdCandleLooks.paintTracker(() => { try { repaint(); } catch {} })) : null);
     // Draw a candle body / wick in the chosen look (glow, neon, glass…). Used for fillRect bodies and for bodies some
@@ -398,7 +401,9 @@
           const dim = !!(zk && lfx && lfx.zoneDim && zk.a < 0.9 && !ownCandle(zk.k));   // Dim all zones
           const dprL = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
           let shaped = lfx && (lfx.zoneShape !== "square" || lfx.zoneBorder !== "line" || lfx.zoneStyle !== "flat") && zk && zk.a < 0.9 && !ownCandle(zk.k)
-            && H >= 8 * dprL && W >= 24 * dprL && !stackedL.has(zk.k + "|" + zk.a);   // not slivers (zoomed out), not the position tool
+            && H >= 8 * dprL && W >= 24 * dprL && !stackedL.has(zk.k + "|" + zk.a)    // not slivers (zoomed out), not the position tool
+            && (!dragL || knownL.has(zk.k + "|" + zk.a) || !(dragSkipL = true));       // nor what only shows while you drag (stop / target areas)
+          if (shaped && !dragL && knownL.size < 500) knownL.add(zk.k + "|" + zk.a);
           if (shaped) {                      // two zone boxes touching edge to edge in one paint = a Long / Short tool: square
             const X = Math.min(x, x + w) * (t.a || 1) + t.e, Y = Math.min(y, y + h) * (t.d || 1) + t.f, key = zk.k + "|" + zk.a;
             let PB = paintL.get(c); if (!PB) { PB = []; paintL.set(c, PB); queueMicrotask(() => paintL.delete(c)); }
