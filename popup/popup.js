@@ -9,7 +9,7 @@ const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="tru
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const CHART_KEYS = ["pnStyle","pnRound","pnWindows","tpOn","tpColors","tpBuy","tpSell","tpShape","tpStyle","tpPanel","frameOn","framePattern","frameMode","frameColor","frameColor2","frameW","frameAlpha","frameSize","frameRound","frameEdge","frameMove","barPatOn","barPattern","barMode","barColor","barColor2","barAlpha","barSize","barWhere","indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","zoneReact","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
-const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
+const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","candleFxCore","candleFxEdge","candleFxAmt","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -23,7 +23,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", candleClosedLook: "", shiftSpeed: 10,
-  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",
+  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, candleFxCore: "off", candleFxEdge: "off", candleFxAmt: 0.65, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",
   indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -59,7 +59,7 @@ function fontPicker(boxId, key) {
 }
 // ---------- Style each chart: while you style chart 2, 3... the Style tab's changes are saved for that chart only ----------
 // (TradingView's panels, the ticker, the legend and dialogs are one per page, so they stay shared.)
-const PER_CHART_KEYS = new Set(["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW",
+const PER_CHART_KEYS = new Set(["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","candleFxCore","candleFxEdge","candleFxAmt",
   "lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW",
   "indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle"]);
 let styleChart = 1, baseStyle = null;
@@ -182,7 +182,7 @@ function renderHero() {
     g.save(); if (glow > 0) { g.shadowColor = col; g.shadowBlur = (4 + glow * 18) * dpr * 0.7; }
     const P = CL && cfg.candleOn && CL.parts ? CL.parts(partsCfg()) : null, [wx, ww] = P ? CL.wickRect(cx - dpr / 2, dpr, k, P) : [Math.round(cx - dpr / 2), dpr];
     g.fillStyle = CL ? (P ? CL.wickOf(look, col, isUp, k, P) : CL.wick(look, col, k)) : col; g.fillRect(wx, Y(h), ww, Y(l) - Y(h));
-    if (CL) CL.candle(g, look, Math.round(cx - bw / 2), t0, Math.round(bw), Math.max(dpr, t1 - t0), col, isUp, k, P); else { g.fillStyle = col; g.fillRect(cx - bw / 2, t0, bw, t1 - t0); }
+    k.xfrac = cx / fg.width; if (CL) CL.candle(g, look, Math.round(cx - bw / 2), t0, Math.round(bw), Math.max(dpr, t1 - t0), col, isUp, k, P, CL.fx && cfg.candleOn ? CL.fx(fxCfg()) : null); else { g.fillStyle = col; g.fillRect(cx - bw / 2, t0, bw, t1 - t0); }
     g.restore();
   });
   // your look, at a glance
@@ -317,8 +317,10 @@ function renderLookGrid() {
   setTimeout(renderHero, 0);
   const CL = window.__bdCandleLooks; if (!$("candleLook") || !CL) return;
   const live = cfg.candleLook || "solid";
-  fillLookGrid($("candleLook"), CL.LOOKS.map((l) => l[0]), live, null,
+  // the classic looks here; the Candle FX materials have their own grid (Candle FX), same setting
+  fillLookGrid($("candleLook"), CL.CLASSIC || CL.LOOKS.map((l) => l[0]), live, null,
     (id) => { set({ candleLook: id, candleOn: true, ...(id === "shift" || id === cfg.candleClosedLook ? { candleClosedLook: "" } : {}) }); $("candleOn").checked = true; renderCandles(); });
+  renderFx();
   // Closed candles: a look of their own (Cycle moves the whole chart's colours, so it isn't one of them)
   const own = !!cfg.candleClosedLook && live !== "shift";
   $("closedRow").hidden = live === "shift";
@@ -331,7 +333,7 @@ function renderLookGrid() {
 function fillLookGrid(box, ids, cur, liveLook, pick) {
   const CL = window.__bdCandleLooks;
   const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
-  const sig = up + down + (+cfg.candleGlow || 0) + "|" + (cfg.skin || "") + "|" + JSON.stringify(partsCfg()) + "|" + JSON.stringify((cfg.skinOpts || {})[cfg.skin] || {}) + "|" + (liveLook || "") + "|" + ids.join(",");
+  const sig = up + down + (+cfg.candleGlow || 0) + "|" + (cfg.skin || "") + "|" + JSON.stringify(partsCfg()) + JSON.stringify(fxCfg()) + "|" + JSON.stringify((cfg.skinOpts || {})[cfg.skin] || {}) + "|" + (liveLook || "") + "|" + ids.join(",");
   if (box.dataset.sig !== sig) {
     box.dataset.sig = sig; box.textContent = "";
     // one still frame of YOUR current wallpaper, used behind every look preview
@@ -343,11 +345,71 @@ function fillLookGrid(box, ids, cur, liveLook, pick) {
       const lab = document.createElement("span"); lab.textContent = CL.META[id].name;
       b.append(cv, lab); box.appendChild(b);
       b.onclick = () => pick(id);
-      requestAnimationFrame(() => { try { CL.preview(cv, id, up, down, +cfg.candleGlow || 0, bgc, partsCfg(), liveLook || undefined); } catch {} });
+      requestAnimationFrame(() => { try { CL.preview(cv, id, up, down, +cfg.candleGlow || 0, bgc, partsCfg(), liveLook || undefined, fxCfg()); } catch {} });
     }
   }
   for (const b of box.children) b.classList.toggle("on", b.dataset.look === cur);
 }
+// ---------- Candle FX (Chart › Candle FX): materials + core light + edge light, drawn by candlelooks.js ----------
+const FX_CORE_OPTS = [["off", "Off"], ["soft", "Soft"], ["plasma", "Plasma"], ["beam", "Beam"]];
+const FX_EDGE_OPTS = [["off", "Off"], ["laser", "Laser"], ["rim", "Rim"], ["glint", "Glint"]];
+// quick mixes: a material, its lights and colours that suit it
+const FX_PRESETS = [
+  ["aurora", "Aurora Flow", { candleLook: "hologram", candleFxCore: "soft", candleFxEdge: "laser", candleFxAmt: 0.6, candleUp: "#34f5c5", candleDown: "#a46bff", candleGlow: 0.2 }],
+  ["void", "Void Chrome", { candleLook: "liquid", candleFxCore: "off", candleFxEdge: "rim", candleFxAmt: 0.7, candleUp: "#d6f7ff", candleDown: "#8f7bff", candleGlow: 0.1 }],
+  ["icevapor", "Ice Vapor", { candleLook: "crystal", candleFxCore: "beam", candleFxEdge: "glint", candleFxAmt: 0.55, candleUp: "#9fe8ff", candleDown: "#c3a6ff", candleGlow: 0.15 }],
+  ["synth", "Synth Pulse", { candleLook: "plasma", candleFxCore: "plasma", candleFxEdge: "laser", candleFxAmt: 0.65, candleUp: "#ff5fd2", candleDown: "#5b8cff", candleGlow: 0.25 }],
+];
+const FX_DEF = { candleFxCore: "off", candleFxEdge: "off", candleFxAmt: 0.65 };
+// one still frame of your wallpaper at a size (behind the previews)
+function wallStill(w, h) {
+  try { const sk = WickedSkins[cfg.skin]; if (!sk) return null; const c = document.createElement("canvas"); c.width = w; c.height = h; const s0 = makeSkin(cfg.skin, c.getContext("2d")); s0.resize(w, h); s0.frame(3, 0.016); return c; } catch { return null; }
+}
+const setFx = (o) => { set({ ...o, ...(cfg.candleOn ? {} : { candleOn: true }) }); $("candleOn").checked = true; renderCandles(); };
+function renderFx() {
+  const CL = window.__bdCandleLooks; if (!$("fxMaterial") || !CL || !CL.MATERIALS) return;
+  fillLookGrid($("fxMaterial"), CL.MATERIALS, cfg.candleLook || "solid", null,
+    (id) => { set({ candleLook: id, candleOn: true, ...(id === cfg.candleClosedLook ? { candleClosedLook: "" } : {}) }); $("candleOn").checked = true; renderCandles(); });
+  seg("fxCore", FX_CORE_OPTS, () => cfg.candleFxCore || "off", (v) => setFx({ candleFxCore: v }));
+  seg("fxEdge", FX_EDGE_OPTS, () => cfg.candleFxEdge || "off", (v) => setFx({ candleFxEdge: v }));
+  const amt = +cfg.candleFxAmt >= 0 ? +cfg.candleFxAmt : 0.65, lit = (cfg.candleFxCore || "off") !== "off" || (cfg.candleFxEdge || "off") !== "off";
+  $("fxAmt").value = amt; $("fxAmtOut").textContent = Math.round(amt * 100) + "%"; $("fxAmtRow").hidden = !lit;
+  { const m = CL.META[cfg.candleLook] || CL.META.solid, name = (o, v) => (o.find((x) => x[0] === v) || [, ""])[1];
+    const bits = [m.name + (m.fx ? "" : " look")];
+    if ((cfg.candleFxCore || "off") !== "off") bits.push(name(FX_CORE_OPTS, cfg.candleFxCore) + " core");
+    if ((cfg.candleFxEdge || "off") !== "off") bits.push(name(FX_EDGE_OPTS, cfg.candleFxEdge) + " edge");
+    $("fxHint").textContent = !cfg.candleOn ? "Candles are off. Picking anything here turns them on."
+      : bits.join(" + ") + ". Core and edge light work with every look, Closed candles and Candle parts."; }
+  const box = $("fxPresets"), sig = (cfg.skin || "") + JSON.stringify(FX_PRESETS.map((p) => p[0]));
+  if (box.dataset.sig !== sig) {
+    box.dataset.sig = sig; box.textContent = "";
+    const bg = wallStill(200, 104);
+    for (const [id, nm, o] of FX_PRESETS) {
+      const b = document.createElement("button"); b.className = "lookcard"; b.dataset.mix = id; b.title = nm;
+      const cv = document.createElement("canvas"); cv.width = 200; cv.height = 104;
+      const lab = document.createElement("span"); lab.textContent = nm; b.append(cv, lab); box.appendChild(b);
+      b.onclick = () => applyWithUndo({ candleOn: true, candlePreset: "custom", ...o, ...(cfg.candleClosedLook === o.candleLook ? { candleClosedLook: "" } : {}) }, `Candle FX: ${nm}.`);
+      requestAnimationFrame(() => { try { CL.preview(cv, o.candleLook, o.candleUp, o.candleDown, o.candleGlow, bg, null, undefined, { core: o.candleFxCore, edge: o.candleFxEdge, amt: o.candleFxAmt }); } catch {} });
+    }
+  }
+  for (const b of box.children) { const o = (FX_PRESETS.find((p) => p[0] === b.dataset.mix) || [])[2];
+    b.classList.toggle("on", !!o && cfg.candleOn && Object.keys(o).every((k) => k === "candleGlow" || cfg[k] === o[k])); }
+  drawFxPreview();
+}
+// the big Candle FX preview: your mix on your wallpaper (with Closed candles, the last candle is your live one)
+function drawFxPreview() {
+  const cv = $("fxPreview"), CL = window.__bdCandleLooks; if (!cv || !CL) return;
+  const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
+  const live = cfg.candleLook || "solid", closed = cfg.candleClosedLook && live !== "shift" && CL.META[cfg.candleClosedLook] ? cfg.candleClosedLook : "";
+  const key = cfg.skin + "|" + cv.width; if (!drawFxPreview.bg || drawFxPreview.key !== key) { drawFxPreview.bg = wallStill(cv.width, cv.height); drawFxPreview.key = key; }
+  try { CL.preview(cv, closed || live, up, down, +cfg.candleGlow || 0, drawFxPreview.bg, partsCfg(), closed ? live : undefined, fxCfg()); } catch {}
+}
+if ($("fxAmt")) {
+  $("fxAmt").oninput = (e) => { set({ candleFxAmt: +e.target.value }); $("fxAmtOut").textContent = Math.round(+e.target.value * 100) + "%"; drawFxPreview(); };
+  $("fxAmt").onchange = () => renderLookGrid();
+}
+if ($("fxReset")) $("fxReset").onclick = () => applyWithUndo({ ...FX_DEF, ...(lookIsFx() ? { candleLook: "solid" } : {}) }, "Candle FX reset.");
+function lookIsFx() { const CL = window.__bdCandleLooks, m = CL && CL.META[cfg.candleLook]; return !!(m && m.fx); }
 // a calm closed look that lets the live candle stand out
 const closedSuggest = (live) => (live === "matte" ? "outline" : "matte");
 function renderCandles() {
@@ -438,10 +500,12 @@ function renderCandles() {
 $("candleOn").onchange = (e) => set({ candleOn: e.target.checked });
 // ---------- Candle parts: wick / border colours, hollow bodies, widths (drawn by candlelooks.js on every platform) ----------
 // a candle style = colours + look + glow + parts (what a saved "Yours" preset keeps)
-const CANDLE_STYLE_KEYS = ["candleUp", "candleDown", "candleLook","candleClosedLook", "candleGlow", "candleWick", "candleWickUp", "candleWickDown", "candleBorder", "candleBorderUp", "candleBorderDown", "candleBorderW", "candleHollow", "candleWickW", "candleBodyW"];
+const CANDLE_STYLE_KEYS = ["candleUp", "candleDown", "candleLook","candleClosedLook", "candleGlow", "candleWick", "candleWickUp", "candleWickDown", "candleBorder", "candleBorderUp", "candleBorderDown", "candleBorderW", "candleHollow", "candleWickW", "candleBodyW", "candleFxCore", "candleFxEdge", "candleFxAmt"];
 const candleStyleNow = () => Object.fromEntries(CANDLE_STYLE_KEYS.map((k) => [k, cfg[k]]));
 const candleStyleOf = (m) => Object.fromEntries(CANDLE_STYLE_KEYS.map((k) => [k, k in m ? m[k] : DEFAULTS[k]]));
 const PARTS_DEF = { candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1 };
+// Candle FX light layers (Chart › Candle FX), as candlelooks.js reads them
+const fxCfg = () => ({ core: cfg.candleFxCore, edge: cfg.candleFxEdge, amt: cfg.candleFxAmt });
 const partsCfg = () => ({ wick: cfg.candleWick, wickUp: cfg.candleWickUp, wickDown: cfg.candleWickDown, border: cfg.candleBorder, borderUp: cfg.candleBorderUp,
   borderDown: cfg.candleBorderDown, borderW: cfg.candleBorderW, hollow: cfg.candleHollow, wickW: cfg.candleWickW, bodyW: cfg.candleBodyW });
 // any part changed turns candles on (parts are part of Priism's candles)
@@ -469,7 +533,7 @@ function drawPartsPreview() {
   const cv = $("partsPreview"), CL = window.__bdCandleLooks; if (!cv || !CL || cv.hidden) return;
   const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
   let bgc = null; try { const sk = WickedSkins[cfg.skin]; if (sk) { bgc = document.createElement("canvas"); bgc.width = cv.width; bgc.height = cv.height; const s0 = makeSkin(cfg.skin, bgc.getContext("2d")); s0.resize(cv.width, cv.height); s0.frame(3, 0.016); } } catch { bgc = null; }
-  try { CL.preview(cv, cfg.candleLook || "solid", up, down, +cfg.candleGlow || 0, bgc, partsCfg()); } catch {}
+  try { CL.preview(cv, cfg.candleLook || "solid", up, down, +cfg.candleGlow || 0, bgc, partsCfg(), undefined, fxCfg()); } catch {}
 }
 $("shiftSpeed").oninput = (e) => { set({ shiftSpeed: +e.target.value }); $("shiftSpeedOut").textContent = e.target.value + "s"; };
 $("lineGlow").oninput = (e) => { set({ lineGlow: +e.target.value }); $("lineGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
@@ -2544,7 +2608,7 @@ $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cf
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
 const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","moodLook","moodRange","moodPulse","lensZoom","lensSize","musicParts","musicFeel","musicSens","vignette","calm"];
-const STYLE_KEYS = [...CHART_KEYS, "candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
+const STYLE_KEYS = [...CHART_KEYS, "candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","candleFxCore","candleFxEdge","candleFxAmt","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
 

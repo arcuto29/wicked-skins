@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+- **New: Candle FX** (Chart › Candle FX), with a live preview on your wallpaper:
+  - **8 materials:** Liquid Chrome, Diamond Cut, Plasma Core, Obsidian Glass, Hologram Shift, Fiber Optic, Ice Crystal and Nebula Glow. They're looks like the others (same setting), so Closed candles, Candle parts and saved candle styles work with them. All 26 looks are unchanged.
+  - **Core light** (Soft, Plasma, Beam) and **Edge light** (Laser, Rim, Glint), with **FX intensity**. They work on any look.
+  - **Quick mixes:** Aurora Flow, Void Chrome, Ice Vapor and Synth Pulse (with Undo).
+  - Only light is added: prices, wicks and candle sizes stay as the chart draws them. Dojis stay plain. Power saver and Auto quality draw a cheaper version, and Hologram Shift holds still with reduced motion.
+
 ## 0.1.83 (2026-11-18)
 - **New: Trade panel** (TradingView tab › Trade panel), with a live preview:
   - Covers TradingView's Buy and Sell buttons on the chart, and the order ticket that opens from them (its Buy / Sell switch and the big order button).
