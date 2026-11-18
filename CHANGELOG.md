@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.83 (2026-11-18)
+- **New: Trade panel** (TradingView tab › Trade panel), with a live preview:
+  - Covers TradingView's Buy and Sell buttons on the chart, and the order ticket that opens from them (its Buy / Sell switch and the big order button).
+  - **Colours:** your candle colours (so Match everything changes them too) or Custom.
+  - **Style:** Solid, Glass, Outline or Neon. **Shape:** Rounded, Pill or Square.
+  - **Panel:** Glass makes the order ticket frosted and see-through.
+  - Text stays readable on TradingView's light theme too. Only the look changes: every click goes to TradingView exactly as before.
+- **New: Panel style** (TradingView tab › Bars & panels): **Glass** (your wallpaper frosted behind the panels), **Neon edge**, **Outline** or **Aurora edge** (a thin ring of slowly turning colours), plus **Rounded** corners. It covers the watchlist and right panels, the order ticket and the bottom panel, and can include TradingView's settings windows and menus. The layout never moves, and everything stays clickable.
+- **New: Price in a zone** (Chart › Lines, zones & labels): a zone price is in right now lights up, with a brighter fill and a lit edge that pulses softly with each price update. It works on zones from indicators and on rectangles you draw yourself, on TradingView, TradingView-based platforms and nq.vision-style charts. **Glow** or **Strong**, off by default.
+
 ## 0.1.82 (2026-11-18)
 - **New: Magnifier.** Press **Alt+Shift+Z** on your chart for a round zoom lens that follows your cursor, so you can see exact wicks, levels and entries without changing the chart's zoom. Clicks go straight through it, so you can place a drawing or order right where it shows. A small cross marks the exact point. Press the shortcut again or **Esc** to close it. Settings › Magnifier sets the zoom (2× to 4×) and the lens size. The ring takes your accent colour. It only changes what you see.
 

@@ -383,3 +383,7 @@ html.bd-on:not(.bd-over-mode) [data-bd-lwroot] > table, html.bd-on:not(.bd-over-
   box-shadow: 0 0 0 2px var(--bd-lens, #2ef2b0), 0 0 18px -2px var(--bd-lens, #2ef2b0), 0 12px 32px rgba(0,0,0,.55); will-change: transform; }
 #bd-lens[hidden] { display: none; }
 #bd-lens canvas { width: 100%; height: 100%; display: block; }
+
+/* Panel style › Aurora edge: the ring's colours turn (a registered angle, so it animates smoothly) */
+@property --bd-pn-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes bd-pn-spin { to { --bd-pn-a: 360deg; } }
