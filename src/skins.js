@@ -2524,6 +2524,23 @@ function priismSkins(window, document) {
       const pa = g.globalAlpha; g.globalAlpha = pa * Math.max(0, Math.min(1, +o.alpha || 0.5)); g.drawImage(oc, x, y); g.globalAlpha = pa;
     },
   };
+  // ---------- trade panel: TradingView's Buy / Sell buttons (shared by the chart and the panel's preview) ----------
+  // o = { buy, sell (#hex), shape: rounded | pill | square, style: solid | glass | outline | neon }. Returns the CSS
+  // declarations for a Buy button and a Sell button (only how they look; what they do is TradingView's own).
+  window.PriismTradeLook = (o) => {
+    const ok = (c) => /^#[0-9a-f]{6}$/i.test(c || ""), rgb = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+    const lum = (c) => rgb(c).reduce((a, v, i) => a + (v / 255) * [0.2126, 0.7152, 0.0722][i], 0);
+    const a = (c, x) => `rgba(${rgb(c).join(",")},${x})`;
+    const rad = o.shape === "pill" ? "999px" : o.shape === "square" ? "2px" : "8px";
+    const one = (c) => {
+      const s = o.style || "solid", txt = lum(c) > 0.6 ? "#0b0e14" : "#ffffff";
+      if (s === "glass") return { background: a(c, 0.28), color: "#ffffff", border: `1px solid ${a(c, 0.75)}`, "border-radius": rad, "backdrop-filter": "blur(10px) saturate(1.3)", "box-shadow": `inset 0 1px 0 rgba(255,255,255,.25)` };
+      if (s === "outline") return { background: a(c, 0.08), color: c, border: `1.5px solid ${c}`, "border-radius": rad, "box-shadow": "none" };
+      if (s === "neon") return { background: a(c, 0.14), color: "#ffffff", border: `1.5px solid ${c}`, "border-radius": rad, "box-shadow": `0 0 12px ${a(c, 0.7)}, inset 0 0 8px ${a(c, 0.35)}`, "text-shadow": `0 0 6px ${a(c, 0.9)}` };
+      return { background: c, color: txt, border: `1px solid ${c}`, "border-radius": rad, "box-shadow": "none" };
+    };
+    return { buy: one(ok(o.buy) ? o.buy : "#2962ff"), sell: one(ok(o.sell) ? o.sell : "#f23645"), rad };
+  };
   // ---------- fonts for the price scale, the ticker and TradingView's panels ----------
   // [id, label, bundled file in src/fonts (null = the computer's own), CSS family]. Bundled fonts are all SIL Open Font
   // Licence (see src/fonts/LICENSES.md) and load from Priism itself, never from the internet.

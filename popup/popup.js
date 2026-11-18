@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["frameOn","framePattern","frameMode","frameColor","frameColor2","frameW","frameAlpha","frameSize","frameRound","frameEdge","frameMove","barPatOn","barPattern","barMode","barColor","barColor2","barAlpha","barSize","barWhere","indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["pnStyle","pnRound","pnWindows","tpOn","tpColors","tpBuy","tpSell","tpShape","tpStyle","tpPanel","frameOn","framePattern","frameMode","frameColor","frameColor2","frameW","frameAlpha","frameSize","frameRound","frameEdge","frameMove","barPatOn","barPattern","barMode","barColor","barColor2","barAlpha","barSize","barWhere","indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","zoneReact","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -16,7 +16,7 @@ const DEFAULTS = {
   fps: "auto", fit: "cover", posX: 50, posY: 50, res: "standard",
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
-  lensKey: "Alt+Shift+KeyZ", lensZoom: 2.5, lensSize: "m", react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft", musicParts: "gwfi", musicFeel: "punchy", musicSens: "normal",
+  lensKey: "Alt+Shift+KeyZ", lensZoom: 2.5, lensSize: "m", zoneReact: "off", pnStyle: "flat", pnRound: false, pnWindows: true, tpOn: false, tpColors: "candles", tpBuy: "#2962ff", tpSell: "#f23645", tpShape: "rounded", tpStyle: "solid", tpPanel: "keep", react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft", musicParts: "gwfi", musicFeel: "punchy", musicSens: "normal",
   frameOn: false, framePattern: "carbon", frameMode: "accent", frameColor: "#7c6cff", frameColor2: "#ff4df0", frameW: 8, frameAlpha: 0.5, frameSize: 1, frameRound: true, frameEdge: true, frameMove: false,
   barPatOn: false, barPattern: "zebra", barMode: "rainbow", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.25, barSize: 1, barWhere: "tlrb",
   wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
@@ -498,6 +498,7 @@ function syncIndicators() {
     z.oninput = () => { set({ zoneFill: +z.value }); $("zoneFillOut").textContent = Math.round(z.value * 100) + "%"; }; z.ondblclick = () => { z.value = 0.12; z.oninput(); }; }
   if ($("zoneDim")) seg("zoneDim", [[false, "Off"], [true, "On"]], () => !!cfg.zoneDim, (v) => set({ zoneDim: v }));
   // zone boxes: their shape (rounded corners, pill ends) and border design, also for zones left in their own colours
+  if ($("zoneReact")) seg("zoneReact", [["off", "Off"], ["glow", "Glow"], ["strong", "Strong"]], () => cfg.zoneReact || "off", (v) => set({ zoneReact: v }));
   if ($("zoneShape")) seg("zoneShape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"], ["oval", "Oval"]], () => cfg.zoneShape || "square", (v) => { set({ zoneShape: v }); drawZonePreview(); });
   if ($("zoneStyle")) seg("zoneStyle", [["flat", "Flat"], ["fade", "Fade"], ["shine", "Shine"], ["glass", "Glass"], ["hollow", "Hollow"]], () => cfg.zoneStyle || "flat", (v) => { set({ zoneStyle: v }); drawZonePreview(); });
   if ($("zoneBorder")) seg("zoneBorder", [["line", "Line"], ["dashed", "Dashed"], ["double", "Double"], ["glow", "Glow"], ["none", "None"]], () => cfg.zoneBorder || "line", (v) => { set({ zoneBorder: v }); drawZonePreview(); });
@@ -669,7 +670,7 @@ function applyWithUndo(changes, label) {
   set(changes); refreshAll();
   toast(label, () => { set(before); refreshAll(); });
 }
-function refreshAll() { renderChartStyle(); syncPanels(); syncPatterns(); syncShortcuts(); syncTimer(); syncExtras(); syncSkinView(); renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode(); }
+function refreshAll() { renderChartStyle(); syncPanels(); syncPatterns(); syncTradePanel(); syncShortcuts(); syncTimer(); syncExtras(); syncSkinView(); renderSkins(); renderMedia(); renderCandles(); syncTune(); syncWatermark(); renderQuick(); renderLoadouts(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode(); }
 
 // ---------- one-click looks: skin + candles + glow + price scale in one tap ----------
 // Look groups (shown as chips). New looks: add the id here or they land in "Classic".
@@ -2022,6 +2023,23 @@ for (const [id, key, fmt] of [["frameW", "frameW", (v) => v + "px"], ["frameAlph
   const el = $(id); if (el) el.oninput = (e) => { set({ [key]: +e.target.value }); $(id + "Out").textContent = fmt(+e.target.value); drawPatPreview(); };
 }
 for (const id of ["frameColor", "frameColor2", "barColor", "barColor2"]) { const el = $(id); if (el) el.oninput = (e) => { set({ [id]: e.target.value }); syncPatterns(); }; }
+// ---------- Trade panel (TradingView tab) ----------
+function syncTradePanel() {
+  if (!$("tpOn")) return;
+  seg("tpOn", [[false, "TradingView's"], [true, "Style it"]], () => !!cfg.tpOn, (v) => { set({ tpOn: v }); syncTradePanel(); });
+  $("tpBox").hidden = !cfg.tpOn;
+  seg("tpColors", [["candles", "Candles"], ["custom", "Custom"]], () => cfg.tpColors || "candles", (v) => { set({ tpColors: v }); syncTradePanel(); });
+  $("tpColRow").hidden = cfg.tpColors !== "custom"; $("tpBuy").value = cfg.tpBuy || "#2962ff"; $("tpSell").value = cfg.tpSell || "#f23645";
+  seg("tpStyle", [["solid", "Solid"], ["glass", "Glass"], ["outline", "Outline"], ["neon", "Neon"]], () => cfg.tpStyle || "solid", (v) => { set({ tpStyle: v }); syncTradePanel(); });
+  seg("tpShape", [["rounded", "Rounded"], ["pill", "Pill"], ["square", "Square"]], () => cfg.tpShape || "rounded", (v) => { set({ tpShape: v }); syncTradePanel(); });
+  seg("tpPanel", [["keep", "TradingView's"], ["glass", "Glass"]], () => cfg.tpPanel || "keep", (v) => { set({ tpPanel: v }); syncTradePanel(); });
+  // the preview: the same look the chart gets, on your wallpaper
+  const L = window.PriismTradeLook && window.PriismTradeLook({ buy: cfg.tpColors === "custom" ? cfg.tpBuy : (cfg.candleOn ? cfg.candleUp : "#26a69a"), sell: cfg.tpColors === "custom" ? cfg.tpSell : (cfg.candleOn ? cfg.candleDown : "#ef5350"), shape: cfg.tpShape, style: cfg.tpStyle });
+  const box = $("tpPrev");
+  if (L && box) { for (const [cls, st] of [["tp-b", L.buy], ["tp-s", L.sell]]) { const b = box.querySelector("." + cls); b.removeAttribute("style"); for (const [k, v] of Object.entries(st)) b.style.setProperty(k, v); }
+    if (!box.dataset.bg) { try { const c = document.createElement("canvas"); c.width = 280; c.height = 70; if (WickedSkins[cfg.skin]) { const s0 = makeSkin(cfg.skin, c.getContext("2d")); s0.resize(280, 70); s0.frame(3, 0.016); box.style.backgroundImage = `url(${c.toDataURL()})`; box.dataset.bg = "1"; } } catch {} } }
+}
+for (const id of ["tpBuy", "tpSell"]) { const el = $(id); if (el) el.oninput = (e) => { set({ [id]: e.target.value }); syncTradePanel(); }; }
 function syncPanels() {
   if (!$("panelMode")) return;
   if ($("dlgMode")) {
@@ -2031,6 +2049,9 @@ function syncPanels() {
     $("dlgAlpha").value = cfg.dlgAlpha; $("dlgAlphaOut").textContent = Math.round(cfg.dlgAlpha * 100) + "%";
   }
   seg("panelMode", [["off", "TradingView"], ["skin", "Skin"], ["color", "Colour"]], () => cfg.panelMode || "off", (v) => { set({ panelMode: v }); syncPanels(); });
+  if ($("pnStyle")) { seg("pnStyle", [["flat", "Flat"], ["glass", "Glass"], ["neon", "Neon edge"], ["outline", "Outline"], ["aurora", "Aurora edge"]], () => cfg.pnStyle || "flat", (v) => { set({ pnStyle: v }); syncPanels(); });
+    seg("pnRound", [[false, "Square"], [true, "Rounded"]], () => !!cfg.pnRound, (v) => { set({ pnRound: v }); syncPanels(); });
+    seg("pnWindows", [[true, "Panels + windows & menus"], [false, "Panels only"]], () => cfg.pnWindows !== false, (v) => { set({ pnWindows: v }); syncPanels(); }); }
   $("panelColor").hidden = cfg.panelMode !== "color"; $("panelColor").value = cfg.panelColor || "#10131c";
 }
 if ($("dlgColor")) $("dlgColor").oninput = (e) => set({ dlgColor: e.target.value, dlgMode: "color" });
@@ -2738,7 +2759,7 @@ $("enabled").onchange = (e) => { set({ enabled: e.target.checked }); $("status")
 chrome.storage.local.get(DEFAULTS, (stored) => {
   cfg = { ...DEFAULTS, ...stored };
   $("enabled").checked = cfg.enabled; $("status").textContent = cfg.enabled ? "On" : "Off";
-  renderChartStyle(); syncPanels(); syncPatterns(); syncSkinView(); syncShortcuts(); syncTimer(); syncExtras();
+  renderChartStyle(); syncPanels(); syncPatterns(); syncTradePanel(); syncSkinView(); syncShortcuts(); syncTimer(); syncExtras();
   if (+cfg.clipLen) clipSecs = [5, 10, 30, 60, 120].includes(+cfg.clipLen) ? +cfg.clipLen : clipSecs;
   renderSkins(); renderMedia(); renderLoadouts(); syncTune(); renderCandles(); syncWatermark(); renderQuick(); initWorkshop(); syncSessions(); syncSymbols(); syncCharts(); syncPnl(); syncBracket(); syncGoal(); renderJournal(); if ($("clipMode")) syncClipMode();
   siteBar();
@@ -2799,7 +2820,10 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["A zoom lens for your chart: press Alt+Shift+Z (Settings \u203a Magnifier)",
+const WHATS_NEW = ["Zones light up when price is in them (Chart \u203a Lines, zones & labels \u203a Price in a zone)",
+  "Style the Buy / Sell buttons and the order ticket (TradingView \u203a Trade panel)",
+  "Glass, Neon and Aurora edges for TradingView's panels and windows (TradingView \u203a Bars & panels)",
+  "A zoom lens for your chart: press Alt+Shift+Z (Settings \u203a Magnifier)",
   "A tidier panel: Wallpaper, Chart, TradingView, Trading, Capture, Workshop, My looks and Settings. Wallpaper settings are under Wallpaper \u203a Adjust",
   "Report a bug right from the panel (Settings \u203a Report a bug)",
   "30 more candle colours, including Synth, Pastel, Luxe and Easy to read (Chart \u203a Candles)",

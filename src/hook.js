@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 29;
+  const HOOK_VERSION = 30;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -54,6 +54,7 @@
   function readCandles() {
     remapCacheMain.clear();
     candles = parseCandles(htmlEl().getAttribute("data-ws-candles"));
+    try { if (candles && window.__bdCandleLooks && window.__bdCandleLooks.priceLine) window.__bdCandleLooks.priceLine.setCols([candles.upHex, candles.downHex]); } catch {}
   }
   function parseCandles(raw) {
     let out = null;
@@ -95,7 +96,7 @@
     bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
     indMode: "own", indColor: "", indCustom: {}, drawOn: false, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0, wallColors: [],
-    zoneFill: 0.12, zoneDim: false, indGrad: [], zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",
+    zoneFill: 0.12, zoneDim: false, indGrad: [], zoneShape: "square", zoneBorder: "line", zoneStyle: "flat", zoneReact: "off",
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -159,7 +160,7 @@
         indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: cleanCustom(f.indCustom), drawOn: !!f.drawOn,
         zoneFill: Math.max(0.04, Math.min(0.45, +f.zoneFill || 0.12)), zoneDim: !!f.zoneDim,
-        zoneShape: ["square", "rounded", "pill", "oval"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
+        zoneReact: ["glow", "strong"].includes(f.zoneReact) ? f.zoneReact : "off", zoneShape: ["square", "rounded", "pill", "oval"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
         txtMode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", txtColor: /^#[0-9a-f]{6}$/i.test(f.txtColor || "") ? f.txtColor : "", txtOutline: Math.max(0, Math.min(2, +f.txtOutline || 0)), txtSize: Math.max(0, Math.min(2, +f.txtSize || 0)),
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
@@ -180,7 +181,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont, fx.scaleFamily, fx.fontTick, fx.lite,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.zoneShape, fx.zoneBorder, fx.zoneStyle, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.zoneShape, fx.zoneBorder, fx.zoneStyle, fx.zoneReact, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(fx.wallColors);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
@@ -337,7 +338,7 @@
   const tally = new Map();
   // Is this fill an indicator's zone? (not a candle, not the background, at least a few px across). Notes it for the
   // panel and returns your settings for it (Each indicator), or null to draw it as it is.
-  function zoneFor(ctx, w, h) {
+  function zoneFor(ctx, w, h, x, y) {
     const L = window.__bdCandleLooks; if (!L || !L.zone) return null;
     const c = ctx.canvas; let W, H;
     if (w === 1e4) { const b = pathBox.get(ctx); if (!b) return null; W = b.x1 - b.x0; H = b.y1 - b.y0; }   // a path: its drawn box
@@ -354,12 +355,20 @@
     const dim = fx.zoneDim && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k));   // Dim all zones (your drawings only with "Style them too")
     const shaped = zoneStyled(ctx) && (w !== 1e4 || !!rectPath(ctx)) && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k))   // shape / border only
       && H >= 8 * dpr && W >= 24 * dpr && !stackedCols.has(r.k + "|" + r.a);                                      // (not slivers, not the position tool)
-    if (!own && !all && !dim && !shaped) return null;
-    if (!own && !all && !dim) { const zo = L.zoneOwn(orig); if (zo && !(H < c.height * 0.9)) zo.e = null; return zo; }
+    // price is in this zone right now (Price in a zone: Glow), and it's a box, not full-height shading
+    let hot = 0;
+    if (fx.zoneReact && fx.zoneReact !== "off" && r.a < 0.9 && H < c.height * 0.9 && L.zoneHot) {
+      const t = ctx.getTransform(), b = w === 1e4 ? pathBox.get(ctx) : null;
+      const X = b ? b.x0 : Math.min(x, x + w) * (t.a || 1) + t.e, Y = b ? b.y0 : Math.min(y, y + h) * (t.d || 1) + t.f;
+      hot = isFinite(X) && isFinite(Y) ? L.zoneHot(c, X, Y, W, H) : 0;
+    }
+    const heat = (z) => (hot && z ? L.zoneHeat(z, fx.zoneReact) : z);
+    if (!own && !all && !dim && !shaped && !hot) return null;
+    if (!own && !all && !dim) { const zo = L.zoneOwn(orig); if (zo && !(H < c.height * 0.9)) zo.e = null; return heat(zo); }
     const z = L.zone(orig, { mode: all ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom, glow: fx.lineGlow, zoneFill: fx.zoneFill, dim, grad: fx.indGrad }, ctx);
     // the neon edge only on boxes / bands, not full-height shading (a session background, bgcolor) or slivers
     if (z && z.e && !(H < c.height * 0.9 && W >= 6 && H >= 3)) z.e = null;
-    return z;
+    return heat(z);
   }
   // An indicator's LEVEL line (prints, pivots, session levels): straight horizontal lines in a solid stroke. Never the
   // grid (TradingView's grid colour, or any grey when that isn't known), the crosshair (top canvas), the dotted price
@@ -1392,7 +1401,7 @@
       if (fill) { const pF = this.fillStyle; origFillDesc.set.call(this, fill); origFill.call(this, x, y, w, h); origFillDesc.set.call(this, pF); return; }
     }
     // an indicator's zone (a filled box / band on the chart that isn't a candle): Each indicator's colour / glow / hide
-    if (on && c && isPane(c)) { const z = zoneFor(this, w, h); if (z) {
+    if (on && c && isPane(c)) { const z = zoneFor(this, w, h, x, y); if (z) {
       if (z.hide) return;
       // a shape / border of its own (rounded, pill, dashed, double, glow): drawn as a path with the real canvas calls
       const L = window.__bdCandleLooks;

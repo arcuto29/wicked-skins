@@ -598,3 +598,8 @@ body.desk .patgrid { grid-template-columns: repeat(6, 1fr); }
 
 /* Report a bug */
 #bugText, #bugContact { width: 100%; box-sizing: border-box; background: #0a0b0f; border: 1px solid #23252f; border-radius: 8px; color: #e9ebf2; padding: 8px 10px; font: 12px system-ui, sans-serif; margin: 4px 0 6px; resize: vertical; }
+
+/* Trade panel preview */
+.tpprev { display: flex; gap: 8px; padding: 12px; margin: 6px 0 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); background: #0b0e14 center / cover; }
+.tpprev button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 4px; font: 700 12px system-ui, sans-serif; cursor: default; }
+.tpprev button small { font-weight: 500; font-size: 10px; opacity: .9; }

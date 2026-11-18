@@ -223,10 +223,11 @@
             <div class="row" title="How see-through recoloured zones are, so you still see the price inside them"><span>Zone fill</span><input type="range" id="zoneFill" min="0.04" max="0.45" step="0.01" /><output id="zoneFillOut"></output></div>
             <canvas id="zonePrev" class="partsprev" width="560" height="124"></canvas>
             <div class="row"><span>Zone shape</span><div class="seg" id="zoneShape"></div></div>
-            <p class="hint" style="margin:-2px 0 6px">Applies to every zone and every rectangle you draw. Pill rounds the ends of wide boxes and gives tall boxes rounded corners. Oval always rounds fully. To set one zone on its own, use Each indicator below.</p>
+            <p class="hint" style="margin:-2px 0 6px">Applies to every zone and every rectangle you draw. Pill rounds the ends of wide boxes and gives tall boxes rounded corners. Oval always rounds fully. Price in a zone makes a zone, or a rectangle you drew, light up and pulse softly while price is inside it. To set one zone on its own, use Each indicator below.</p>
             <div class="row"><span>Zone style</span><div class="seg wrap" id="zoneStyle"></div></div>
             <div class="row"><span>Zone border</span><div class="seg wrap" id="zoneBorder"></div></div>
             <div class="row" title="Also soften zones that keep their own colours"><span>Dim all zones</span><div class="seg" id="zoneDim"></div></div>
+            <div class="row"><span>Price in a zone <small>the zone lights up</small></span><div class="seg" id="zoneReact"></div></div>
             <div class="row" title="Rectangles, zones and lines you draw with TradingView's drawing tools"><span>Your drawings</span><div class="seg" id="drawOn"></div></div>
             <h4 style="margin:12px 0 4px">Each indicator</h4>
             <p class="hint" style="margin:0 0 6px">Set any line, zone or drawing on its own: colour, glow, width, or hide it. Zones can also get their own shape, border and style. These override the settings above.</p>
@@ -281,6 +282,10 @@
         <p class="hint" data-tvonly>Glass lets the wallpaper show through the bars with a frosted tint. Clear makes them fully see-through.</p>
         <div class="row"><span>Panels</span><div class="seg" id="panelMode"></div><input type="color" id="panelColor" title="Panel colour" hidden /></div>
         <p class="hint">The watchlist, toolbars and side panels. Skin tints them with your wallpaper's colour.</p>
+        <div class="row" data-tvonly><span>Panel style</span><div class="seg wrap" id="pnStyle"></div></div>
+        <div class="row" data-tvonly><span>Corners</span><div class="seg" id="pnRound"></div></div>
+        <div class="row" data-tvonly><span>Also on</span><div class="seg" id="pnWindows"></div></div>
+        <p class="hint" data-tvonly>For the watchlist and right panels, the order ticket and the bottom panel, and (if you like) TradingView's settings windows and menus. Glass shows your wallpaper through, frosted. Neon edge and Outline use your accent. Aurora edge is a thin ring of slowly turning colours.</p>
         <div class="row" data-tvonly><span>Windows &amp; menus</span><div class="seg" id="dlgMode"></div><input type="color" id="dlgColor" title="Window colour" hidden /></div>
         <div class="row" id="dlgAlphaRow" data-tvonly><span>Menu strength</span><input type="range" id="dlgAlpha" min="0.4" max="1" step="0.02" /><output id="dlgAlphaOut"></output></div>
         <p class="hint" data-tvonly>TradingView's settings window, dialogs and dropdown menus. Glass is frosted, so the wallpaper shows through.</p>
@@ -295,6 +300,20 @@
           <div class="row"><span>Texture size</span><input type="range" id="barSize" min="0.5" max="2.5" step="0.1" /><output id="barSizeOut"></output></div>
           <div class="row"><span>On</span><div class="seg" id="barWhere"></div></div>
           <p class="hint">Sits on top of TradingView's bars as a tint. Icons, buttons and numbers stay readable and clicks go straight through. Try Zebra in Rainbow, or Solid in Aurora. Keep Strength low for a calm look.</p>
+        </div>
+      </details>
+      <details class="grp" data-grp="tradepanel" data-tvonly>
+        <summary>Trade panel</summary>
+        <p class="hint">TradingView's Buy and Sell buttons on the chart, and the order ticket that opens from them. Only the look changes; orders work exactly as before.</p>
+        <div class="row"><span>Trade panel</span><div class="seg" id="tpOn"></div></div>
+        <div id="tpBox" hidden>
+          <div class="tpprev" id="tpPrev"><button type="button" class="tp-s"><b>SELL</b><small>27,845.00</small></button><button type="button" class="tp-b"><b>BUY</b><small>27,845.25</small></button></div>
+          <div class="row"><span>Colours</span><div class="seg" id="tpColors"></div></div>
+          <div class="row" id="tpColRow" hidden><span>Buy · Sell</span><input type="color" id="tpBuy" title="Buy" /> <input type="color" id="tpSell" title="Sell" /></div>
+          <div class="row"><span>Style</span><div class="seg wrap" id="tpStyle"></div></div>
+          <div class="row"><span>Shape</span><div class="seg" id="tpShape"></div></div>
+          <div class="row"><span>Panel</span><div class="seg" id="tpPanel"></div></div>
+          <p class="hint">Candles uses your up and down candle colours, so Match everything changes these too. Glass makes the order ticket see-through with a frosted blur.</p>
         </div>
       </details>
       <details class="grp" data-grp="ui">

@@ -54,7 +54,11 @@
     clipAudio: "none",        // sound in clips: none | mic (your voice) | computer (what's playing: music, videos) | both
     // Shortcuts (changeable in Adjust > Shortcuts). Stored as "Alt+Shift+KeyF" (modifiers + the key's code).
     toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS",
-    lensKey: "Alt+Shift+KeyZ", lensZoom: 2.5, lensSize: "m",   // Magnifier: its shortcut, how much it zooms, how big the lens is
+    lensKey: "Alt+Shift+KeyZ", lensZoom: 2.5, lensSize: "m",
+    // Trade panel (TradingView tab): Buy / Sell buttons + the order ticket. Colours: candles (your up / down) | custom
+    zoneReact: "off",      // Chart › Lines, zones & labels › Price in a zone: off | glow | strong (a zone price is in lights up)
+    pnStyle: "flat", pnRound: false, pnWindows: true,   // Bars & panels › Panel style: flat | glass | neon | outline | aurora, rounded corners, also on windows & menus
+    tpOn: false, tpColors: "candles", tpBuy: "#2962ff", tpSell: "#f23645", tpShape: "rounded", tpStyle: "solid", tpPanel: "keep",   // Magnifier: its shortcut, how much it zooms, how big the lens is
     clipLen: 10,              // seconds a shortcut recording lasts (the Clip section's length)
     focus: false, focusHides: "wallpaper",   // Focus mode: hide just the wallpaper, or the wallpaper AND all styling
     // Session timer: a slim countdown to the next market open / close, styled to match your look.
@@ -1103,9 +1107,12 @@
   }
   let panelApplied = null;
   function applyPanels() {
-    const h = document.documentElement, col = cfg.enabled ? panelColour() : "";
-    if (col === panelApplied) return;            // nothing changed: never restyle the page for nothing (keeps it smooth)
-    panelApplied = col;
+    const h = document.documentElement, glass = cfg.enabled && cfg.pnStyle === "glass";
+    // Glass needs a colour to make see-through: TradingView's own dark / light panel colour if Panels is TradingView's
+    const col = cfg.enabled ? (panelColour() || (glass ? (h.classList.contains("theme-light") ? "#ffffff" : "#10131c") : "") ) : "";
+    applyPanelDeco();
+    if (col + glass === panelApplied) return;    // nothing changed: never restyle the page for nothing (keeps it smooth)
+    panelApplied = col + glass;
     applyAppPanels(col);
     h.classList.toggle("bd-panels", !!col && !focusAll());
     // ONE stylesheet holds every override, written in a single update (setting hundreds of properties one by one made
@@ -1117,10 +1124,10 @@
     const lum = (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255, dark = lum < 0.5;
     const shade = (f) => "#" + rgb.map((v) => Math.max(0, Math.min(255, Math.round(dark ? v + (255 - v) * f : v * (1 - f)))).toString(16).padStart(2, "0")).join("");
     const text = dark ? "#e6e9f0" : "#14161c";
-    const decl = [];
-    PANEL_VARS.forEach((n) => decl.push(`${n}:${col}!important`));
-    PANEL_VARS2.forEach((n) => decl.push(`${n}:${shade(0.05)}!important`));
-    PANEL_HOVER.forEach((n) => decl.push(`${n}:${shade(0.12)}!important`));
+    const decl = [], see = (hex, a) => glass ? `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(",")},${a})` : hex;   // Glass: the panel colours see-through
+    PANEL_VARS.forEach((n) => decl.push(`${n}:${see(col, 0.55)}!important`));
+    PANEL_VARS2.forEach((n) => decl.push(`${n}:${see(shade(0.05), 0.45)}!important`));
+    PANEL_HOVER.forEach((n) => decl.push(`${n}:${see(shade(0.12), 0.6)}!important`));
     PANEL_TEXT.forEach((n) => decl.push(`${n}:${text}!important`));
     // TradingView's neutral text / icon colours that would vanish on this panel colour (read once per theme, cached)
     for (const [n, L] of panelTextCandidates()) {
@@ -1135,6 +1142,76 @@
   // One stylesheet: a tinted (optionally frosted) background on each window, and TradingView's own colour variables
   // re-pointed INSIDE those windows only, so every field, tab and label inside follows, and text stays readable.
   let dlgApplied = null;
+  // ---------- Trade panel: TradingView's Buy / Sell buttons on the chart, the order ticket's Buy / Sell switch and its
+  // big order button, and the panel behind them. Only how they look (colours, shape, glass / outline / neon); every
+  // click still goes to TradingView exactly as before.
+  function applyTradePanel() {
+    const h = document.documentElement, on = !!(cfg.enabled && cfg.tpOn && window.PriismTradeLook);
+    h.classList.toggle("bd-tp", on);
+    let st = document.getElementById("bd-tp-css");
+    if (!on) { if (st) st.remove(); return; }
+    const buy = cfg.tpColors === "custom" ? cfg.tpBuy : upColor(), sell = cfg.tpColors === "custom" ? cfg.tpSell : downColor();
+    const L = window.PriismTradeLook({ buy, sell, shape: cfg.tpShape, style: cfg.tpStyle });
+    const decl = (o) => Object.entries(o).map(([k, v]) => `${k}: ${v} !important;` + (k === "backdrop-filter" ? ` -webkit-backdrop-filter: ${v} !important;` : "")).join(" ");
+    const B = '[data-name="buy-order-button"], [data-name="place-and-modify-button"][class*="blue-"], [data-name="place-and-modify-button"][class*="green-"]';
+    const S = '[data-name="sell-order-button"], [data-name="place-and-modify-button"][class*="red-"]';
+    const scope = (sel) => sel.split(",").map((x) => "html.bd-tp " + x.trim()).join(", ");
+    const tint = (c, x) => { const n = parseInt(String(c).slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${x})`; };
+    const dark = !h.classList.contains("theme-light");
+    let css = `${scope(B)} { ${decl(L.buy)} } ${scope(S)} { ${decl(L.sell)} }
+      ${scope(B + ", " + S)} { transition: filter .15s; } ${scope(B + ", " + S).split(", ").map((x) => x + ":hover").join(", ")} { filter: brightness(1.12); }
+      html.bd-tp [data-name="buy-order-button"] *, html.bd-tp [data-name="sell-order-button"] *, html.bd-tp [data-name="place-and-modify-button"] * { color: inherit !important; }
+      html.bd-tp [data-name="side-control-buy"][class*="active-"] { background: ${tint(buy, 0.22)} !important; color: ${buy} !important; }
+      html.bd-tp [data-name="side-control-sell"][class*="active-"] { background: ${tint(sell, 0.22)} !important; color: ${sell} !important; }
+      html.bd-tp [data-name="side-control-buy"], html.bd-tp [data-name="side-control-sell"] { border-radius: 0 !important; }
+      html.bd-tp [data-name="side-control-sell"] { border-radius: ${L.rad} 0 0 ${L.rad} !important; } html.bd-tp [data-name="side-control-buy"] { border-radius: 0 ${L.rad} ${L.rad} 0 !important; }`;
+    // on TradingView's light theme the order ticket is pale: its text in a deep shade of your colours (not white), so
+    // it stays readable in every style
+    if (!dark) { const deep = (c) => { const n = parseInt(String(c).slice(1), 16); return `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v * 0.45)).join(",")})`; };
+      css += `
+      html.bd-tp [data-name="side-control-buy"][class*="active-"], html.bd-tp [data-name="side-control-buy"][class*="active-"] * { color: ${deep(buy)} !important; }
+      html.bd-tp [data-name="side-control-sell"][class*="active-"], html.bd-tp [data-name="side-control-sell"][class*="active-"] * { color: ${deep(sell)} !important; }`;
+      if ((cfg.tpStyle || "solid") !== "solid") css += `
+      html.bd-tp [data-name="place-and-modify-button"][class*="blue-"], html.bd-tp [data-name="place-and-modify-button"][class*="green-"] { color: ${deep(buy)} !important; text-shadow: none !important; background: ${tint(buy, 0.3)} !important; }
+      html.bd-tp [data-name="place-and-modify-button"][class*="red-"] { color: ${deep(sell)} !important; text-shadow: none !important; background: ${tint(sell, 0.3)} !important; }`; }
+    if (cfg.tpPanel === "glass") css += `
+      html.bd-tp [class*="layout__area--tradingpanel"], html.bd-tp [data-name="order-panel"] { background: ${dark ? "rgba(10,13,20,.58)" : "rgba(255,255,255,.62)"} !important;
+        -webkit-backdrop-filter: blur(18px) saturate(1.2) !important; backdrop-filter: blur(18px) saturate(1.2) !important; }`;
+    if (!st) { st = document.createElement("style"); st.id = "bd-tp-css"; st.dataset.bdOwner = ME.token; (document.head || document.documentElement).appendChild(st); }
+    if (st.textContent !== css) st.textContent = css;
+  }
+  // Panel style (Bars & panels): the watchlist / right panels, the order ticket and the bottom panel (Account Manager)
+  // as frosted Glass (the panel colours above go see-through and the wallpaper blurs behind), with a Neon edge or a
+  // fine Outline in your accent, and Rounded corners. Only how they look.
+  const PANEL_AREAS = ['[class*="layout__area--right"]', '[class*="layout__area--tradingpanel"]', '[class*="layout__area--bottom"]'];
+  // TradingView's Settings window, other dialogs and dropdown menus (the same windows Windows & menus styles)
+  const WINDOWS = ['#overlap-manager-root [class^="dialog-"]', '#overlap-manager-root [class^="menuWrap-"]', '[data-dialog-name][class^="dialog-"]'];
+  function applyPanelDeco() {
+    const h = document.documentElement, s = cfg.enabled ? cfg.pnStyle || "flat" : "flat", round = cfg.enabled && !!cfg.pnRound;
+    let st = document.getElementById("bd-pndeco-css");
+    if (s === "flat" && !round) { if (st) st.remove(); return; }
+    const acc = /^#[0-9a-f]{6}$/i.test(cfg.uiAccent || "") ? cfg.uiAccent : skinAccent() || upColor(), n = parseInt(acc.slice(1), 16), a = (x) => `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${x})`;
+    const areas = [...PANEL_AREAS, ...(cfg.pnWindows !== false ? WINDOWS : [])], sel = areas.map((x) => "html.bd-on " + x).join(", ");
+    const d = [];
+    if (s === "glass") d.push("-webkit-backdrop-filter: blur(16px) saturate(1.2) !important", "backdrop-filter: blur(16px) saturate(1.2) !important");
+    if (s === "neon") d.push(`box-shadow: inset 0 0 0 1px ${a(0.85)}, inset 0 0 16px -2px ${a(0.55)}, 0 0 14px -4px ${a(0.6)} !important`);
+    if (s === "outline") d.push(`box-shadow: inset 0 0 0 1px ${a(0.55)} !important`);
+    if (round) d.push("border-radius: 12px !important", "overflow: hidden !important");
+    let css = `${sel} { ${d.join("; ")} }`;
+    // Aurora edge: a thin ring of slowly turning colours (your accent, cyan, violet, pink) around each panel / window
+    if (s === "aurora") {
+      css += `
+      ${areas.map((x) => "html.bd-on " + x + "::after").join(", ")} { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2147483000; border-radius: inherit; padding: 1.5px;
+        background: conic-gradient(from var(--bd-pn-a, 0deg), ${acc}, #4dd8ff, #7c6cff, #ff4df0, ${acc}); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor; mask-composite: exclude; opacity: .85; animation: bd-pn-spin ${liteNow() ? "0s" : "14s"} linear infinite; filter: drop-shadow(0 0 6px ${a(0.5)}); }`;
+    }
+    if (!st) { st = document.createElement("style"); st.id = "bd-pndeco-css"; st.dataset.bdOwner = ME.token; (document.head || h).appendChild(st); }
+    if (st.textContent !== css) st.textContent = css;
+  }
+  // TradingView's light / dark theme switch: the order ticket's text follows it
+  { let was = document.documentElement.classList.contains("theme-light");
+    new MutationObserver(() => { const now = document.documentElement.classList.contains("theme-light"); if (now !== was) { was = now; if (cfg.tpOn) applyTradePanel(); } })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ["class"] }); }
   function applyDialogs() {
     const mode = cfg.enabled && ["glass", "color"].includes(cfg.dlgMode) ? cfg.dlgMode : "off";
     const base = mode === "color" && /^#[0-9a-f]{6}$/i.test(cfg.dlgColor || "") ? cfg.dlgColor
@@ -1328,7 +1405,7 @@
       if (bg && bg !== "rgba(0, 0, 0, 0)") document.documentElement.style.setProperty("--bd-page-bg", bg);
     }
     document.documentElement.classList.toggle("bd-on", cfg.enabled && !focusAll());
-    applySides(); applyUiStyle(); applyPanels(); applyDialogs(); applyTicker(); applyLegend(); ensureFonts();
+    applySides(); applyUiStyle(); applyPanels(); applyDialogs(); applyTicker(); applyLegend(); applyTradePanel(); ensureFonts();
     if (!cfg.enabled) document.documentElement.classList.remove("bd-over-mode");
     if (was !== cfg.enabled) repaint();
     if (!cfg.enabled) return;
@@ -1718,7 +1795,7 @@
   const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
-    "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "zoneShape", "zoneBorder", "zoneStyle", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
+    "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "zoneShape", "zoneBorder", "zoneStyle", "zoneReact", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
@@ -2032,13 +2109,14 @@
     const candleKeys = keys.filter((k) => k.startsWith("candle"));
     if (candleKeys.length || keys.includes("enabled")) pushCandles();
     if (keys.some((k) => k.startsWith("wm")) || keys.includes("enabled")) renderWatermark();
-    if (keys.some((k) => k === "panelMode" || k === "panelColor" || k === "candleUp")) applyPanels();
+    if (keys.some((k) => k === "panelMode" || k === "panelColor" || k === "candleUp" || k.startsWith("pn") || k === "uiAccent")) applyPanels();
     if (keys.some((k) => k.startsWith("tk") || k === "candleUp" || k === "enabled")) applyTicker();
     if (keys.includes("wallMatch")) pushFx();
     if (keys.some((k) => k.startsWith("lg") || k === "candleUp" || k === "enabled")) applyLegend();
     if (keys.some((k) => k.startsWith("dlg") || k === "panelMode" || k === "panelColor")) applyDialogs();
     if (keys.includes("sides") || keys.includes("leftBar") || keys.includes("enabled") || keys.includes("layer")) applySides();
     if (keys.some((k) => k.startsWith("ui")) || keys.includes("enabled")) applyUiStyle();
+    if (keys.some((k) => k.startsWith("tp") || k === "candleUp" || k === "candleDown" || k === "candleOn" || k === "enabled")) applyTradePanel();
     if (keys.some((k) => k.startsWith("frame") || k === "candleUp" || k === "candleDown" || k === "candleOn" || k === "powerSaver")) applyFrame();
     if (keys.some((k) => k.startsWith("barPat") || k === "powerSaver" || k === "barMode" || k === "barColor" || k === "barColor2" || k === "barAlpha" || k === "barSize" || k === "barWhere" || k === "candleUp" || k === "candleDown" || k === "candleOn")) applyBars();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
@@ -2056,7 +2134,7 @@
     // a wallpaper's own settings / Recolour: rebuilt in place (unless the whole layer is rebuilt anyway)
     const optsChanged = keys.includes("skinOpts"); keys = keys.filter((k) => k !== "skinOpts");
     if (optsChanged && !keys.some((k) => REBUILD.has(k))) updateSkinOpts();
-    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !k.startsWith("frame") && !k.startsWith("bar") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound", "welcomePending"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !k.startsWith("tp") && !k.startsWith("pn") && !k.startsWith("frame") && !k.startsWith("bar") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound", "welcomePending"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));

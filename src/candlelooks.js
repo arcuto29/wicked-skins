@@ -634,5 +634,41 @@
     };
   })();
 
-  window.__bdCandleLooks = { LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
+  // ---------- zones that react to price (Chart › Lines, zones & labels › Price in a zone) ----------
+  // Where is the live price? The chart's last-price line: one straight line across the chart in a candle colour
+  // (your candle colours, or the platform's own). Remembered per canvas from its last paint.
+  const priceLine = (() => {
+    const Y = new WeakMap(); let installed = false, cols = new Set(["#089981", "#f23645", "#26a69a", "#ef5350", "#22ab94", "#f7525f"]);
+    function install() {
+      if (installed || typeof CanvasRenderingContext2D === "undefined") return; installed = true;
+      const P = CanvasRenderingContext2D.prototype, oM = P.moveTo, oL = P.lineTo, oS = P.stroke, oB = P.beginPath;
+      P.moveTo = function (x, y) { const t = this.getTransform(); this.__bdPx = [x * t.a + t.e, y * t.d + t.f, 0, 0, 0]; return oM.call(this, x, y); };
+      P.lineTo = function (x, y) { const p = this.__bdPx; if (p) { const t = this.getTransform(); p[2] = x * t.a + t.e; p[3] = y * t.d + t.f; p[4]++; } return oL.call(this, x, y); };
+      P.stroke = function (...a) { const p = this.__bdPx, c = this.canvas;
+        if (p && !a.length && p[4] === 1 && c && Math.abs(p[3] - p[1]) <= 1 && Math.abs(p[2] - p[0]) >= c.width * 0.75 && cols.has(String(this.strokeStyle).toLowerCase()))
+          Y.set(c, { y: (p[1] + p[3]) / 2, t: performance.now() });
+        return oS.apply(this, a); };
+      P.beginPath = function () { if (this.__bdPx) this.__bdPx = null; return oB.call(this); };
+    }
+    return { install, setCols(list) { for (const x of list || []) if (/^#[0-9a-f]{6}$/i.test(x || "")) cols.add(x.toLowerCase()); },
+      at(c) { const v = Y.get(c); return v && performance.now() - v.t < 120000 ? v.y : null; } };
+  })();
+  // is price inside this zone right now? box in device px. Only zones that reach the recent part of the chart count
+  // (a box far back in history isn't where price is now).
+  function zoneHot(c, X, Y, W, H) {
+    if (!c) return 0; priceLine.install();
+    const py = priceLine.at(c); if (py === null || W < 8 || H < 3) return 0;
+    if (X + W < c.width * 0.55) return 0;
+    return py >= Y - 1.5 && py <= Y + H + 1.5 ? 1 : 0;
+  }
+  // a zone price is in: brighter, a lit edge, and a slow soft pulse (it moves with each price update)
+  function zoneHeat(z, how) {
+    if (!z || z.hide) return z;
+    const k = how === "strong" ? 1 : 0.6, pulse = 0.75 + 0.25 * Math.sin(performance.now() / 1000 * Math.PI * 1.2);
+    const rk = typeof z.f === "string" ? keyOf(z.f) : null, f = rk ? `rgba(${rk.k},${Math.min(0.6, Math.max(rk.a, 0.08) * (1.5 + k)).toFixed(3)})` : z.f;
+    const base = rk ? rk.k : null;
+    return { ...z, f, glow: Math.max(z.glow || 0, (0.45 + 0.45 * k) * pulse), e: base ? `rgba(${base},${(0.75 + 0.25 * pulse).toFixed(3)})` : z.e, g: base ? `rgb(${base})` : z.g, hot: true };
+  }
+
+  window.__bdCandleLooks = { zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
 })();

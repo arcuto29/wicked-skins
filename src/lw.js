@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 21;
+  const LW_VERSION = 22;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -71,6 +71,7 @@
           closed: (() => { const L = window.__bdCandleLooks, k = String(c.closed || ""); return L && L.META[k] && k !== "shift" && k !== c.look && c.look !== "shift" ? k : ""; })(),
           P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null };   // wick / border / hollow / widths
       } else candles = null;
+      if (candles && window.__bdCandleLooks && window.__bdCandleLooks.priceLine) window.__bdCandleLooks.priceLine.setCols([candles.upHex, candles.downHex]);
     } catch { candles = null; }
   }
   // A Lightweight Charts chart only redraws when something about the chart changes, NOT when our settings change, so
@@ -115,7 +116,7 @@
     try {
       const f = JSON.parse((rawIn !== undefined ? rawIn : htmlEl().getAttribute("data-ws-fx")) || "null");
       const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
-      const any = f && (f.lineGlow > 0 || f.zoneDim || (f.zoneShape && f.zoneShape !== "square") || (f.zoneBorder && f.zoneBorder !== "line") || (f.zoneStyle && f.zoneStyle !== "flat") || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
+      const any = f && (f.lineGlow > 0 || f.zoneDim || (f.zoneReact && f.zoneReact !== "off") || (f.zoneShape && f.zoneShape !== "square") || (f.zoneBorder && f.zoneBorder !== "line") || (f.zoneStyle && f.zoneStyle !== "flat") || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
       // Chart text: read whenever Priism is on (its "Own" setting still lightens black text on a dark wallpaper)
       ltx = f ? { mode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", color: hex(f.txtColor), outline: Math.max(0, Math.min(2, +f.txtOutline || 0)),
         size: Math.max(0, Math.min(2, +f.txtSize || 0)), bg: f.bg === "light" ? "light" : "dark" } : null;
@@ -139,6 +140,7 @@
             g: e.g === undefined || e.g === null || e.g === "" ? undefined : Math.max(0, Math.min(1, +e.g || 0)), w: Math.max(0, Math.min(3, +e.w || 0)), h: !!e.h, s: ["square", "rounded", "pill", "oval"].includes(e.s) ? e.s : "",
             b: ["line", "dashed", "double", "glow", "none"].includes(e.b) ? e.b : "", y: ["flat", "fade", "shine", "glass", "hollow"].includes(e.y) ? e.y : "" }; return o; })(),
         zoneFill: Math.max(0.04, Math.min(0.45, +f.zoneFill || 0.12)), zoneDim: !!f.zoneDim,
+        zoneReact: ["glow", "strong"].includes(f.zoneReact) ? f.zoneReact : "off",
         zoneShape: ["square", "rounded", "pill", "oval"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
         accent: hex(f.accent), wallColors: Array.isArray(f.wallColors) ? f.wallColors.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 5) : [] } : null;
@@ -425,7 +427,11 @@
             for (const b of PB) if (b.k !== key && Math.abs(b.X - X) <= 3 && Math.abs(b.X + b.W - X - W) <= 3 && (Math.abs(b.Y + b.H - Y) <= 2.5 || Math.abs(Y + H - b.Y) <= 2.5)) { stackedL.add(key); stackedL.add(b.k); shaped = false; setTimeout(repaint, 0); }
             PB.push({ X, Y, W, H, k: key });
           }
-          const z = !(own || all || dim) && shaped ? L.zoneOwn(this.__bdLwOrig) : own || all || dim ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow, zoneFill: lfx.zoneFill, dim, grad: lfx.indGrad }, this) : null;
+          // price is in this zone right now (Price in a zone)
+          const ZX = Math.min(x, x + w) * (t.a || 1) + t.e, ZY = Math.min(y, y + h) * (t.d || 1) + t.f;
+          const hot = lfx && lfx.zoneReact !== "off" && zk && zk.a < 0.9 && !ownCandle(zk.k) && H < c.height * 0.9 && L.zoneHot ? L.zoneHot(c, ZX, ZY, W, H) : 0;
+          let z = !(own || all || dim) && (shaped || hot) ? L.zoneOwn(this.__bdLwOrig) : own || all || dim ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow, zoneFill: lfx.zoneFill, dim, grad: lfx.indGrad }, this) : null;
+          if (hot && z) z = L.zoneHeat(z, lfx.zoneReact);
           if (z && W <= candleMaxW(c) && H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
           if (z) { if (z.hide) return; const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
             // the neon edge (see candlelooks zone()): boxes and bands only, not full-height shading or slivers
