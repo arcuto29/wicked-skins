@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 14;
+  const LW_VERSION = 15;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -326,7 +326,7 @@
       fill(x, y, w, h) { origFillRect.call(lk.g, x, y, w, h); }, style(v) { fillDesc.set.call(lk.g, v); },
       stroke(v) { strokeDesc.set.call(lk.g, v); }, strokeRect(x, y, w, h) { origStrokeRectL.call(lk.g, x, y, w, h); },
       fillPath() { origFillPathL.call(lk.g); }, clear(x, y, w, h) { origClearL.call(lk.g, x, y, w, h); } };
-    const origClearL = proto.clearRect, lastBodyL = new WeakMap();
+    const origClearL = proto.clearRect, lastBodyL = new WeakMap(), paintL = new WeakMap(), stackedL = new Set();
     let partsTrack = null;   // were the last paint's bodies wide enough to tell them from wicks?
     const tracker = () => partsTrack || (window.__bdCandleLooks && window.__bdCandleLooks.paintTracker ? (partsTrack = window.__bdCandleLooks.paintTracker(() => { try { repaint(); } catch {} })) : null);
     // Draw a candle body / wick in the chosen look (glow, neon, glass…). Used for fillRect bodies and for bodies some
@@ -396,7 +396,15 @@
           const zk = L.keyOf(this.__bdLwOrig), own = zk && lfx && lfx.indCustom && lfx.indCustom[zk.k];
           const all = zk && lfx && lfx.indMode && lfx.indMode !== "own" && !greyish(`rgb(${zk.k})`) && candlesKnown() && !ownCandle(zk.k);
           const dim = !!(zk && lfx && lfx.zoneDim && zk.a < 0.9 && !ownCandle(zk.k));   // Dim all zones
-          const shaped = lfx && (lfx.zoneShape !== "square" || lfx.zoneBorder !== "line" || lfx.zoneStyle !== "flat") && zk && zk.a < 0.9 && !ownCandle(zk.k);
+          const dprL = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
+          let shaped = lfx && (lfx.zoneShape !== "square" || lfx.zoneBorder !== "line" || lfx.zoneStyle !== "flat") && zk && zk.a < 0.9 && !ownCandle(zk.k)
+            && H >= 8 * dprL && W >= 24 * dprL && !stackedL.has(zk.k + "|" + zk.a);   // not slivers (zoomed out), not the position tool
+          if (shaped) {                      // two zone boxes touching edge to edge in one paint = a Long / Short tool: square
+            const X = Math.min(x, x + w) * (t.a || 1) + t.e, Y = Math.min(y, y + h) * (t.d || 1) + t.f, key = zk.k + "|" + zk.a;
+            let PB = paintL.get(c); if (!PB) { PB = []; paintL.set(c, PB); queueMicrotask(() => paintL.delete(c)); }
+            for (const b of PB) if (b.k !== key && Math.abs(b.X - X) <= 3 && Math.abs(b.X + b.W - X - W) <= 3 && (Math.abs(b.Y + b.H - Y) <= 2.5 || Math.abs(Y + H - b.Y) <= 2.5)) { stackedL.add(key); stackedL.add(b.k); shaped = false; setTimeout(repaint, 0); }
+            PB.push({ X, Y, W, H, k: key });
+          }
           const z = !(own || all || dim) && shaped ? L.zoneOwn(this.__bdLwOrig) : own || all || dim ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow, zoneFill: lfx.zoneFill, dim, grad: lfx.indGrad }, this) : null;
           if (z && W <= candleMaxW(c) && H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
           if (z) { if (z.hide) return; const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
