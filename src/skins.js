@@ -2613,6 +2613,169 @@ function priismSkins(window, document) {
       },
     };
   };
+  // the music right now (set by content.js every frame while Music is on): effects can swell with it. 0 when silent.
+  const beatNow = () => { const b = typeof window !== "undefined" && window.PriismBeat; return b && b.on ? b : null; };
+  const fxFireflies = (ctx, o = {}) => {
+    let w = 0, h = 0, k = 1, spr = null, f = [];
+    const mk = () => ({ x: rnd(0, 1), y: rnd(0.15, 1), vx: rnd(-0.02, 0.02), vy: rnd(-0.015, 0.015), p: rnd(0, T2), s: rnd(0.5, 1.4), r: rnd(0.8, 1.6) });
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); spr = offscreen(32, 32); glowDot(spr.getContext("2d"), 16, 16, 16, "200,255,140", 1);
+        f = Array.from({ length: Math.round(34 * (o.amount || 1) * area(w, h)) + 6 }, mk); },
+      frame(t, dt) {
+        const b = beatNow(), boost = b ? 1 + b.kick * 0.8 : 1;
+        ctx.globalCompositeOperation = "lighter";
+        for (const p of f) {
+          p.vx += Math.sin(t * 0.4 * p.s + p.p) * 0.004 * dt; p.vy += Math.cos(t * 0.33 * p.s + p.p * 2) * 0.004 * dt;
+          p.vx = Math.max(-0.03, Math.min(0.03, p.vx)); p.vy = Math.max(-0.025, Math.min(0.025, p.vy));
+          p.x = ((p.x + p.vx * dt) % 1 + 1) % 1; p.y = Math.max(0.05, Math.min(1, p.y + p.vy * dt));
+          const blink = Math.max(0, Math.sin(t * 1.3 * p.s + p.p)) ** 2, R = p.r * k * 11 * (0.7 + 0.3 * boost);
+          ctx.globalAlpha = Math.min(1, (0.12 + 0.88 * blink) * boost); ctx.drawImage(spr, p.x * w - R, p.y * h - R, R * 2, R * 2); }
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
+  const fxBokeh = (ctx, o = {}) => {
+    let w = 0, h = 0, k = 1, sp = [], b = [];
+    const COLS = ["255,190,120", "120,200,255", "255,120,200", "180,140,255", "140,255,210"];
+    const mk = (init) => ({ x: rnd(0, 1), y: init ? rnd(0, 1) : 1.15, r: rnd(18, 60), v: rnd(0.004, 0.014), c: (Math.random() * COLS.length) | 0, a: rnd(0.12, 0.3), p: rnd(0, T2) });
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h);
+        sp = COLS.map((c) => { const s = offscreen(96, 96), g = s.getContext("2d"), gr = g.createRadialGradient(48, 48, 0, 48, 48, 48);
+          gr.addColorStop(0, `rgba(${c},0.55)`); gr.addColorStop(0.7, `rgba(${c},0.35)`); gr.addColorStop(0.86, `rgba(${c},0.6)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(0, 0, 96, 96); return s; });
+        b = Array.from({ length: Math.round(16 * (o.amount || 1) * area(w, h)) + 4 }, () => mk(true)); },
+      frame(t, dt) {
+        const bt = beatNow(), boost = bt ? 1 + bt.level * 0.9 : 1;
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < b.length; i++) { const q = b[i]; q.y -= q.v * dt; q.x += Math.sin(t * 0.15 + q.p) * 0.003 * dt;
+          if (q.y < -0.15) { b[i] = mk(false); continue; }
+          const R = q.r * k * (0.9 + 0.1 * Math.sin(t * 0.5 + q.p)); ctx.globalAlpha = Math.min(1, q.a * boost * (0.7 + 0.3 * Math.sin(t * 0.4 + q.p)));
+          ctx.drawImage(sp[q.c], q.x * w - R, q.y * h - R, R * 2, R * 2); }
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
+  const fxRays = (ctx, o = {}) => {
+    let w = 0, h = 0;
+    return {
+      resize(W, H) { w = W; h = H; },
+      frame(t) {
+        const b = beatNow(), boost = b ? 1 + b.level * 0.7 : 1, n = Math.round(5 + 3 * (o.amount || 1)), ox = w * 0.18, oy = -h * 0.08;
+        ctx.globalCompositeOperation = "lighter";
+        for (let i = 0; i < n; i++) {
+          const ang = 0.35 + i * (0.9 / n) + Math.sin(t * 0.07 + i * 1.7) * 0.05, spread = 0.035 + 0.02 * Math.sin(t * 0.11 + i), L = Math.hypot(w, h) * 1.2;
+          const a = (0.035 + 0.03 * Math.sin(t * 0.2 + i * 2.3)) * boost * Math.min(1.5, o.amount || 1);
+          const gr = ctx.createLinearGradient(ox, oy, ox + Math.cos(ang) * L, oy + Math.sin(ang) * L); gr.addColorStop(0, `rgba(255,236,200,${a.toFixed(3)})`); gr.addColorStop(1, "rgba(255,236,200,0)");
+          ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + Math.cos(ang - spread) * L, oy + Math.sin(ang - spread) * L); ctx.lineTo(ox + Math.cos(ang + spread) * L, oy + Math.sin(ang + spread) * L); ctx.closePath(); ctx.fill(); }
+        ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
+  const fxGrain = (ctx, o = {}) => {
+    let w = 0, h = 0, tiles = [], f = 0, acc = 0;
+    return {
+      resize(W, H) { w = W; h = H; tiles = [0, 1, 2, 3].map(() => { const s = offscreen(128, 128), g = s.getContext("2d"), im = g.createImageData(128, 128);
+        for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } g.putImageData(im, 0, 0); return s; }); },
+      frame(t, dt) {
+        acc += dt; if (acc > 1 / 24) { acc = 0; f = (f + 1) % tiles.length; }                // film runs at 24 frames a second
+        ctx.globalCompositeOperation = "overlay"; ctx.globalAlpha = 0.06 + 0.06 * Math.min(2, o.amount || 1);
+        const pat = ctx.createPattern(tiles[f], "repeat"); ctx.fillStyle = pat; ctx.fillRect(0, 0, w, h);
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
+  const fxScan = (ctx, o = {}) => {
+    let w = 0, h = 0, k = 1, lines = null;
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); lines = offscreen(4, 4); const g = lines.getContext("2d"); g.fillStyle = "rgba(0,0,0,0.5)"; g.fillRect(0, 2, 4, 2); },
+      frame(t) {
+        ctx.globalAlpha = 0.18 + 0.14 * Math.min(1.5, o.amount || 1); ctx.fillStyle = ctx.createPattern(lines, "repeat"); ctx.fillRect(0, 0, w, h);
+        const y = ((t * 0.08) % 1.2 - 0.1) * h, gr = ctx.createLinearGradient(0, y - 60 * k, 0, y + 60 * k);   // a slow bright band rolls down
+        gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(0.5, "rgba(255,255,255,0.05)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.globalAlpha = 1; ctx.fillStyle = gr; ctx.fillRect(0, y - 60 * k, w, 120 * k);
+        const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,0.35)");
+        ctx.fillStyle = v; ctx.fillRect(0, 0, w, h);
+      },
+    };
+  };
+  const fxStars = (ctx, o = {}) => {
+    let w = 0, h = 0, k = 1, s = [];
+    const mk = () => ({ x: rnd(-1, 1), y: rnd(-1, 1), z: rnd(0.15, 1) });
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); s = Array.from({ length: Math.round(260 * (o.amount || 1) * area(w, h)) + 40 }, mk); },
+      frame(t, dt) {
+        const b = beatNow(), sp = 0.07 * (b ? 1 + b.kick * 3 : 1);
+        ctx.strokeStyle = "rgba(225,235,255,0.95)"; ctx.lineCap = "round";
+        for (let i = 0; i < s.length; i++) { const p = s[i], z0 = p.z; p.z -= sp * dt; if (p.z < 0.05) { s[i] = mk(); s[i].z = 1; continue; }
+          const X = w / 2 + (p.x / p.z) * w * 0.4, Y = h / 2 + (p.y / p.z) * h * 0.4; if (X < 0 || X > w || Y < 0 || Y > h) { s[i] = mk(); s[i].z = 1; continue; }
+          const zt = Math.min(1, z0 + sp * 0.12), X0 = w / 2 + (p.x / zt) * w * 0.4, Y0 = h / 2 + (p.y / zt) * h * 0.4;   // a short streak behind it
+          ctx.lineWidth = Math.max(0.8, (1 - p.z) * 3) * k; ctx.globalAlpha = Math.min(1, (1 - p.z) * 1.5); ctx.beginPath(); ctx.moveTo(X0, Y0); ctx.lineTo(X + 0.01, Y); ctx.stroke(); }
+        ctx.globalAlpha = 1;
+      },
+    };
+  };
+  const fxPetals = (ctx, o = {}) => {
+    let w = 0, h = 0, k = 1, p = [];
+    const mk = (init) => ({ x: rnd(-0.1, 1), y: init ? rnd(0, 1) : -0.05, v: rnd(0.025, 0.06), r: rnd(0, T2), vr: rnd(-1.2, 1.2), s: rnd(6, 12), sw: rnd(0, T2), c: Math.random() < 0.5 ? "255,183,206" : "255,214,226" });
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); p = Array.from({ length: Math.round(40 * (o.amount || 1) * area(w, h)) + 6 }, () => mk(true)); },
+      frame(t, dt) {
+        for (let i = 0; i < p.length; i++) { const q = p[i]; q.y += q.v * dt; q.x += (0.015 + Math.sin(t * 0.7 + q.sw) * 0.02) * dt; q.r += q.vr * dt;
+          if (q.y > 1.06 || q.x > 1.1) { p[i] = mk(false); continue; }
+          const S = q.s * k; ctx.save(); ctx.translate(q.x * w, q.y * h); ctx.rotate(q.r); ctx.scale(1, 0.55 + 0.45 * Math.sin(t * 2 + q.sw));
+          ctx.fillStyle = `rgba(${q.c},0.75)`; ctx.beginPath(); ctx.moveTo(0, -S); ctx.quadraticCurveTo(S, 0, 0, S); ctx.quadraticCurveTo(-S, 0, 0, -S); ctx.fill(); ctx.restore(); }
+      },
+    };
+  };
+  const fxBubbles = (ctx, o = {}) => {
+    let w = 0, h = 0, k = 1, b = [];
+    const mk = (init) => ({ x: rnd(0, 1), y: init ? rnd(0, 1) : 1.05, r: rnd(3, 13), v: rnd(0.02, 0.06), p: rnd(0, T2) });
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); b = Array.from({ length: Math.round(36 * (o.amount || 1) * area(w, h)) + 6 }, () => mk(true)); },
+      frame(t, dt) {
+        const bt = beatNow(), lift = bt ? 1 + bt.kick * 1.5 : 1;
+        ctx.lineWidth = Math.max(1, 1.1 * k);
+        for (let i = 0; i < b.length; i++) { const q = b[i]; q.y -= q.v * dt * lift; q.x += Math.sin(t * 1.2 + q.p) * 0.006 * dt;
+          if (q.y < -0.05) { b[i] = mk(false); continue; }
+          const R = q.r * k, X = q.x * w, Y = q.y * h; ctx.strokeStyle = "rgba(200,235,255,0.45)"; ctx.beginPath(); ctx.arc(X, Y, R, 0, T2); ctx.stroke();
+          ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.beginPath(); ctx.arc(X - R * 0.35, Y - R * 0.35, Math.max(0.6, R * 0.22), 0, T2); ctx.fill(); }
+      },
+    };
+  };
+  const fxSparkle = (ctx, o = {}) => {
+    let w = 0, h = 0, k = 1, s = [];
+    const mk = () => ({ x: rnd(0, 1), y: rnd(0, 1), p: rnd(0, T2), sp: rnd(0.6, 1.6), r: rnd(4, 10) });
+    let spr = null;
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); spr = offscreen(32, 32); glowDot(spr.getContext("2d"), 16, 16, 16, "255,240,210", 1); s = Array.from({ length: Math.round(60 * (o.amount || 1) * area(w, h)) + 10 }, mk); },
+      frame(t) {
+        const b = beatNow(), boost = b ? 1 + b.hat * 1.2 + b.kick * 0.5 : 1;
+        ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = "rgb(255,248,225)";
+        for (let i = 0; i < s.length; i++) { const q = s[i], a = Math.max(0, Math.sin(t * q.sp + q.p)) ** 3 * boost; if (a < 0.02) { if (Math.sin(t * q.sp + q.p) < -0.99) s[i] = mk(); continue; }
+          const R = q.r * k * (0.6 + 0.6 * Math.min(1.4, a)), X = q.x * w, Y = q.y * h; ctx.globalAlpha = Math.min(1, a) * 0.5; ctx.drawImage(spr, X - R * 1.6, Y - R * 1.6, R * 3.2, R * 3.2); ctx.globalAlpha = Math.min(1, a);
+          ctx.beginPath(); ctx.moveTo(X, Y - R); ctx.quadraticCurveTo(X, Y, X + R, Y); ctx.quadraticCurveTo(X, Y, X, Y + R); ctx.quadraticCurveTo(X, Y, X - R, Y); ctx.quadraticCurveTo(X, Y, X, Y - R); ctx.fill(); }
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
+  const fxAurora = (ctx, o = {}) => {
+    let w = 0, h = 0;
+    const RIB = [["80,255,190", 0.2, 0], ["120,150,255", 0.3, 2.1], ["220,120,255", 0.4, 4.2]];
+    return {
+      resize(W, H) { w = W; h = H; },
+      frame(t) {
+        const b = beatNow(), boost = b ? 1 + b.level * 0.8 : 1, A = Math.min(1.6, o.amount || 1), cols = Math.max(48, Math.min(120, Math.round(w / 12))), dx = w / cols;
+        ctx.globalCompositeOperation = "lighter";
+        for (const [c, y0, ph] of RIB) {
+          for (let i = 0; i < cols; i++) { const x = Math.round(i * dx), x2 = Math.round((i + 1) * dx), u = (x + x2) / 2 / w;   // whole-pixel columns: no seams
+            const yc = h * (y0 + 0.07 * Math.sin(u * 5 + t * 0.25 + ph) + 0.04 * Math.sin(u * 11 - t * 0.17 + ph)), th = h * (0.09 + 0.05 * Math.sin(u * 3 + t * 0.3 + ph));
+            const a = (0.09 + 0.06 * Math.sin(u * 7 + t * 0.4 + ph)) * A * boost;
+            const gr = ctx.createLinearGradient(0, yc - th * 2.2, 0, yc + th); gr.addColorStop(0, `rgba(${c},0)`); gr.addColorStop(0.7, `rgba(${c},${a.toFixed(3)})`); gr.addColorStop(1, `rgba(${c},0)`);
+            ctx.fillStyle = gr; ctx.fillRect(x, yc - th * 2.2, x2 - x, th * 3.2); }
+        }
+        ctx.globalCompositeOperation = "source-over";
+      },
+    };
+  };
   window.PriismEffects = {
     rain:   { name: "Rain",         create: (c, o) => fxRain(c, o, false) },
     storm:  { name: "Thunderstorm", create: fxStorm, opts: [{ k: "lightning", label: "Lightning", type: "toggle", def: true }] },
@@ -2620,6 +2783,17 @@ function priismSkins(window, document) {
     fog:    { name: "Fog",          create: fxFog },
     dust:   { name: "Dust",         create: (c, o) => fxMotes(c, o, false) },
     embers: { name: "Embers",       create: (c, o) => fxMotes(c, o, true) },
+    // the cool ones (the starred ones also swell with your music when Live mood follows Music)
+    fireflies: { name: "Fireflies",   create: fxFireflies, music: true },
+    bokeh:   { name: "Bokeh",         create: fxBokeh, music: true },
+    rays:    { name: "Light rays",    create: fxRays, music: true },
+    aurora:  { name: "Aurora",        create: fxAurora, music: true },
+    stars:   { name: "Warp stars",    create: fxStars, music: true },
+    sparkle: { name: "Sparkles",      create: fxSparkle, music: true },
+    bubbles: { name: "Bubbles",       create: fxBubbles, music: true },
+    petals:  { name: "Petals",        create: fxPetals },
+    grain:   { name: "Film grain",    create: fxGrain },
+    retro:   { name: "Retro screen",  create: fxScan },
   };
 
   // ---------- each wallpaper's own settings + Recolour ----------
