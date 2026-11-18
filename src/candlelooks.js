@@ -837,5 +837,91 @@
     return { ...z, f, glow: Math.max(z.glow || 0, (0.45 + 0.45 * k) * pulse), e: edge, g, hot: true };
   }
 
-  window.__bdCandleLooks = { fxv: 1, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
+  // ---------- where the live candle is (Candle FX › Live candle atmosphere, Zone lights) ----------
+  // hook.js / lw.js hand every candle part (body or wick) and every see-through zone of a paint to spot. After the paint
+  // we know, for each chart canvas: the newest bar on screen, the spacing between bars, and the zones. The newest bar
+  // only counts as the live candle when it's the newest bar of the data (room to its right, or its body ends on the
+  // last-price line), like Closed candles. The result is put on <html data-ws-live> in page (CSS px) coordinates, so
+  // content.js can draw smoke / aura / zone lights in the wallpaper layer, behind the chart. Nothing about the chart is
+  // changed: this only reads what was drawn.
+  const spot = (() => {
+    const cur = new Map(), last = new Map();
+    let queued = false, pubQ = false, sent = "", wrapped = false;
+    const pane = (c) => { let p = cur.get(c); if (!p) { p = { parts: [], zones: [], hasParts: false, cleared: false }; cur.set(c, p); if (!queued) { queued = true; queueMicrotask(settle); } } return p; };
+    // a canvas we know being cleared whole = a new paint of it (so a zone or drawing that's gone stops counting)
+    function wrap() {
+      if (wrapped || typeof CanvasRenderingContext2D === "undefined") return; wrapped = true;
+      const P = CanvasRenderingContext2D.prototype, o = P.clearRect;
+      P.clearRect = function (x, y, w, h) { const c = this.canvas;
+        if (last.size && c && last.has(c)) { const t = this.getTransform(); if (Math.abs(w * (t.a || 1)) >= c.width * 0.95 && Math.abs(h * (t.d || 1)) >= c.height * 0.95) pane(c).cleared = true; }
+        return o.call(this, x, y, w, h); };
+    }
+    function add(c, X, W, Y0, Y1, col, up) {
+      if (!c || !isFinite(X) || !isFinite(Y0) || !isFinite(Y1)) return; priceLine.install(); wrap();
+      if (W <= 2.5 && Math.abs(Y1 - Y0) <= 2.5) return;   // a dot (a dotted price line in a candle colour), not a candle part
+      const p = pane(c); p.hasParts = true; if (p.parts.length < 6000) p.parts.push([X + W / 2, W, Math.min(Y0, Y1), Math.max(Y0, Y1), col, !!up]);
+    }
+    function zone(c, X, Y, W, H, k) {
+      if (!c || !isFinite(X) || !isFinite(Y)) return; wrap();
+      const p = pane(c); if (p.zones.length < 60) p.zones.push([X, Y, W, H, k]);
+    }
+    // Which bars are on screen? Bodies (3+ px wide) set the bars; a flat body (a doji, or a candle that barely moved)
+    // only counts if a wick runs through it (the dashes of a price line in a candle colour have none); wicks and
+    // the platform's border lines join the bar they belong to. Zoomed far out (no wide bodies), bars are the wicks.
+    function newest(c, parts) {
+      const thin = [], tall = [], flat = [];
+      for (const q of parts) (q[1] < 3 ? thin : q[3] - q[2] > 2.5 ? tall : flat).push(q);
+      const bars = [], byX = (a, b) => a[0] - b[0];
+      const join = (b, q, body) => { if (body && q[1] > b.bw) { b.bw = q[1]; b.y0 = q[2]; b.y1 = q[3]; b.c = q[4]; b.up = q[5]; } b.hi = Math.min(b.hi, q[2]); b.lo = Math.max(b.lo, q[3]); };
+      const mk = (q) => ({ cx: q[0], bw: q[1], y0: q[2], y1: q[3], hi: q[2], lo: q[3], c: q[4], up: q[5] });
+      const near = (x, tol) => { let best = null, d = tol; for (const b of bars) { const e = Math.abs(b.cx - x); if (e <= d) { d = e; best = b; } } return best; };
+      tall.sort(byX);
+      for (const q of tall) { const b = bars[bars.length - 1]; if (b && Math.abs(q[0] - b.cx) <= 1.5) join(b, q, true); else bars.push(mk(q)); }
+      for (const q of flat) { const b = near(q[0], 1.5); if (b) { join(b, q, false); continue; }
+        if (thin.some((t) => Math.abs(t[0] - q[0]) <= q[1] / 2 && t[2] <= q[3] + 1 && t[3] >= q[2] - 1)) bars.push(mk(q)); }
+      if (bars.length) { bars.sort((a, b) => a.cx - b.cx); for (const q of thin) { const b = near(q[0], 1.5 + (bars[0] ? bars[0].bw / 2 : 0)); if (b) join(b, q, false); } }
+      else { thin.sort(byX); for (const q of thin) { const b = bars[bars.length - 1]; if (b && Math.abs(q[0] - b.cx) <= 1.5) join(b, q, true); else bars.push(mk(q)); } }
+      if (bars.length < 3) return null;
+      bars.sort((a, b) => a.cx - b.cx);
+      const n = bars.length, gaps = []; for (let i = Math.max(1, n - 6); i < n; i++) gaps.push(bars[i].cx - bars[i - 1].cx);
+      gaps.sort((a, b) => a - b); const sp = gaps[gaps.length >> 1], b = bars[n - 1];
+      if (!(sp >= 3)) return null;
+      const py = priceLine.at(c), onPrice = py !== null && (Math.abs(py - b.y0) <= 2 || Math.abs(py - b.y1) <= 2);
+      const room = c.width - b.cx > sp * 1.15 + 1;
+      return room || (c.width - b.cx > -sp && onPrice) ? { ...b, sp } : null;
+    }
+    function settle() {
+      queued = false;
+      for (const [c, p] of cur) {
+        const e = last.get(c) || { live: null, zones: [] };
+        if (p.hasParts || p.cleared) e.live = p.hasParts ? newest(c, p.parts) : null;
+        // the zones of this paint (only boxes that reach the recent part of the chart)
+        if (p.hasParts || p.zones.length || p.cleared) e.zones = p.zones.filter((z) => z[0] + z[2] >= c.width * 0.55).slice(0, 24);
+        last.set(c, e);
+      }
+      cur.clear();
+      if (!pubQ) { pubQ = true; requestAnimationFrame(publish); }
+    }
+    function publish() {
+      pubQ = false;
+      const out = new Map();
+      for (const [c, e] of last) {
+        if (!c.isConnected) { last.delete(c); continue; }
+        const r = c.getBoundingClientRect(); if (r.width < 60 || r.height < 40 || !c.width) continue;
+        const kx = r.width / c.width, ky = r.height / c.height, key = [r.left, r.top, r.width, r.height].map(Math.round).join(",");
+        let o = out.get(key);
+        if (!o) { o = { l: +r.left.toFixed(1), t: +r.top.toFixed(1), w: +r.width.toFixed(1), h: +r.height.toFixed(1), live: null, zones: [] }; out.set(key, o); }
+        if (e.live) { const b = e.live; o.live = { x: +(r.left + b.cx * kx).toFixed(1), bw: +(b.bw * kx).toFixed(1), sp: +(b.sp * kx).toFixed(1),
+          y0: +(r.top + b.y0 * ky).toFixed(1), y1: +(r.top + b.y1 * ky).toFixed(1), hi: +(r.top + b.hi * ky).toFixed(1), lo: +(r.top + b.lo * ky).toFixed(1), c: b.c, up: b.up }; }
+        for (const z of e.zones) if (o.zones.length < 24) o.zones.push([+(r.left + z[0] * kx).toFixed(1), +(r.top + z[1] * ky).toFixed(1), +(z[2] * kx).toFixed(1), +(z[3] * ky).toFixed(1), z[4]]);
+      }
+      const list = [...out.values()].filter((o) => o.live || o.zones.length), s = JSON.stringify(list);
+      if (s !== sent) { sent = s; try { document.documentElement.setAttribute("data-ws-live", s); } catch {} }
+    }
+    // turned off: forget everything (so content.js stops drawing)
+    function clear() { cur.clear(); last.clear(); if (sent !== "[]") { sent = "[]"; try { document.documentElement.setAttribute("data-ws-live", "[]"); } catch {} } }
+    return { add, zone, clear, newest };
+  })();
+
+  window.__bdCandleLooks = { fxv: 2, spot, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
 })();

@@ -9,7 +9,7 @@ const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="tru
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
 const CHART_KEYS = ["pnStyle","pnRound","pnWindows","tpOn","tpColors","tpBuy","tpSell","tpShape","tpStyle","tpPanel","frameOn","framePattern","frameMode","frameColor","frameColor2","frameW","frameAlpha","frameSize","frameRound","frameEdge","frameMove","barPatOn","barPattern","barMode","barColor","barColor2","barAlpha","barSize","barWhere","indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","zoneReact","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
-const LOOK_KEYS = [...CHART_KEYS, "opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","candleFxCore","candleFxEdge","candleFxAmt","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
+const LOOK_KEYS = [...CHART_KEYS, "atmoFx","atmoTrail","atmoAura","atmoColor","atmoCustom","atmoOpacity","atmoLen","atmoFade","zoneFx","clarContrast","clarFocus","clarFog","clarParallax","opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","candleFxCore","candleFxEdge","candleFxAmt","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
@@ -23,7 +23,7 @@ const DEFAULTS = {
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", candleClosedLook: "", shiftSpeed: 10,
-  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, candleFxCore: "off", candleFxEdge: "off", candleFxAmt: 0.65, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",
+  candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, candleFxCore: "off", candleFxEdge: "off", candleFxAmt: 0.65, atmoFx: "off", atmoTrail: false, atmoAura: false, atmoColor: "candle", atmoCustom: "#7df9ff", atmoOpacity: 0.15, atmoLen: 4, atmoFade: 450, zoneFx: [], clarContrast: "soft", clarFocus: false, clarFog: false, clarParallax: false, skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",
   indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -355,12 +355,12 @@ const FX_CORE_OPTS = [["off", "Off"], ["soft", "Soft"], ["plasma", "Plasma"], ["
 const FX_EDGE_OPTS = [["off", "Off"], ["laser", "Laser"], ["rim", "Rim"], ["glint", "Glint"]];
 // quick mixes: a material, its lights and colours that suit it
 const FX_PRESETS = [
-  ["aurora", "Aurora Flow", { candleLook: "hologram", candleFxCore: "soft", candleFxEdge: "laser", candleFxAmt: 0.6, candleUp: "#34f5c5", candleDown: "#a46bff", candleGlow: 0.2 }],
-  ["void", "Void Chrome", { candleLook: "liquid", candleFxCore: "off", candleFxEdge: "rim", candleFxAmt: 0.7, candleUp: "#d6f7ff", candleDown: "#8f7bff", candleGlow: 0.1 }],
-  ["icevapor", "Ice Vapor", { candleLook: "crystal", candleFxCore: "beam", candleFxEdge: "glint", candleFxAmt: 0.55, candleUp: "#9fe8ff", candleDown: "#c3a6ff", candleGlow: 0.15 }],
-  ["synth", "Synth Pulse", { candleLook: "plasma", candleFxCore: "plasma", candleFxEdge: "laser", candleFxAmt: 0.65, candleUp: "#ff5fd2", candleDown: "#5b8cff", candleGlow: 0.25 }],
+  ["aurora", "Aurora Flow", { candleLook: "hologram", candleFxCore: "soft", candleFxEdge: "laser", candleFxAmt: 0.6, candleUp: "#34f5c5", candleDown: "#a46bff", candleGlow: 0.2, atmoFx: "mist", atmoTrail: false, atmoAura: true }],
+  ["void", "Void Chrome", { candleLook: "liquid", candleFxCore: "off", candleFxEdge: "rim", candleFxAmt: 0.7, candleUp: "#d6f7ff", candleDown: "#8f7bff", candleGlow: 0.1, atmoFx: "off", atmoTrail: true, atmoAura: false }],
+  ["icevapor", "Ice Vapor", { candleLook: "crystal", candleFxCore: "beam", candleFxEdge: "glint", candleFxAmt: 0.55, candleUp: "#9fe8ff", candleDown: "#c3a6ff", candleGlow: 0.15, atmoFx: "vapor", atmoTrail: false, atmoAura: false }],
+  ["synth", "Synth Pulse", { candleLook: "plasma", candleFxCore: "plasma", candleFxEdge: "laser", candleFxAmt: 0.65, candleUp: "#ff5fd2", candleDown: "#5b8cff", candleGlow: 0.25, atmoFx: "smoke", atmoTrail: false, atmoAura: true }],
 ];
-const FX_DEF = { candleFxCore: "off", candleFxEdge: "off", candleFxAmt: 0.65 };
+const FX_DEF = { candleFxCore: "off", candleFxEdge: "off", candleFxAmt: 0.65, atmoFx: "off", atmoTrail: false, atmoAura: false, atmoColor: "candle", atmoOpacity: 0.15, atmoLen: 4, atmoFade: 450 };
 // one still frame of your wallpaper at a size (behind the previews)
 function wallStill(w, h) {
   try { const sk = WickedSkins[cfg.skin]; if (!sk) return null; const c = document.createElement("canvas"); c.width = w; c.height = h; const s0 = makeSkin(cfg.skin, c.getContext("2d")); s0.resize(w, h); s0.frame(3, 0.016); return c; } catch { return null; }
@@ -373,7 +373,7 @@ function renderFx() {
   seg("fxCore", FX_CORE_OPTS, () => cfg.candleFxCore || "off", (v) => setFx({ candleFxCore: v }));
   seg("fxEdge", FX_EDGE_OPTS, () => cfg.candleFxEdge || "off", (v) => setFx({ candleFxEdge: v }));
   const amt = +cfg.candleFxAmt >= 0 ? +cfg.candleFxAmt : 0.65, lit = (cfg.candleFxCore || "off") !== "off" || (cfg.candleFxEdge || "off") !== "off";
-  $("fxAmt").value = amt; $("fxAmtOut").textContent = Math.round(amt * 100) + "%"; $("fxAmtRow").hidden = !lit;
+  $("fxAmt").value = amt; $("fxAmtOut").textContent = Math.round(amt * 100) + "%"; $("cfxAmtRow").hidden = !lit;
   { const m = CL.META[cfg.candleLook] || CL.META.solid, name = (o, v) => (o.find((x) => x[0] === v) || [, ""])[1];
     const bits = [m.name + (m.fx ? "" : " look")];
     if ((cfg.candleFxCore || "off") !== "off") bits.push(name(FX_CORE_OPTS, cfg.candleFxCore) + " core");
@@ -394,7 +394,99 @@ function renderFx() {
   }
   for (const b of box.children) { const o = (FX_PRESETS.find((p) => p[0] === b.dataset.mix) || [])[2];
     b.classList.toggle("on", !!o && cfg.candleOn && Object.keys(o).every((k) => k === "candleGlow" || cfg[k] === o[k])); }
-  drawFxPreview();
+  drawFxPreview(); syncAtmo();
+}
+// ---------- Live candle atmosphere (Candle FX): drawn on the chart page behind the chart, by PriismAtmo (skins.js) ----------
+const ATMO_FX = [["off", "Off"], ["smoke", "Phantom Smoke"], ["vapor", "Liquid Vapor"], ["mist", "Spectral Mist"]];
+const atmoAny = () => (cfg.atmoFx || "off") !== "off" || !!cfg.atmoTrail || !!cfg.atmoAura;
+// any atmosphere turns Priism candles on (it follows your candles on the chart)
+const setAtmo = (o) => { set({ ...o, ...(cfg.candleOn ? {} : { candleOn: true }) }); $("candleOn").checked = true; syncAtmo(); };
+function syncAtmo() {
+  if (!$("atmoFx")) return;
+  seg("atmoFx", ATMO_FX, () => cfg.atmoFx || "off", (v) => setAtmo({ atmoFx: v }));
+  seg("atmoTrail", [[false, "Off"], [true, "Afterimage"]], () => !!cfg.atmoTrail, (v) => setAtmo({ atmoTrail: v }));
+  seg("atmoAura", [[false, "Off"], [true, "On"]], () => !!cfg.atmoAura, (v) => setAtmo({ atmoAura: v }));
+  seg("atmoColor", [["candle", "Candle"], ["wallpaper", "Wallpaper"], ["custom", "Custom"]], () => cfg.atmoColor || "candle", (v) => setAtmo({ atmoColor: v }));
+  $("atmoCustom").value = /^#[0-9a-f]{6}$/i.test(cfg.atmoCustom || "") ? cfg.atmoCustom : "#7df9ff"; $("atmoCustom").hidden = cfg.atmoColor !== "custom";
+  $("atmoBox").hidden = !atmoAny();
+  const op = +cfg.atmoOpacity || 0.15, len = +cfg.atmoLen || 4, fade = +cfg.atmoFade || 450;
+  $("atmoOpacity").value = op; $("atmoOpacityOut").textContent = Math.round(op * 100) + "%";
+  $("atmoLen").value = len; $("atmoLenOut").textContent = len + " candles";
+  $("atmoFade").value = fade; $("atmoFadeOut").textContent = fade + " ms";
+  $("atmoHint").textContent = cfg.layer === "over" ? "The atmosphere needs the wallpaper under the chart (Wallpaper › Adjust › Layer › Under chart)."
+    : cfg.powerSaver ? "Power saver is on, so the atmosphere is paused." : !atmoAny() ? "Smoke, a light trail or a soft glow at the live candle. It stays behind the candles and price labels, and only shows while the newest candle is on screen."
+    : "Follows the live candle on every chart. It stays behind the candles, wicks and price labels, and fades out when you scroll back in history." + (cfg.atmoFx === "mist" && cfg.atmoColor === "candle" ? " Spectral Mist uses cyan and violet unless you pick a colour." : "");
+  atmoPrevStart();
+}
+if ($("atmoOpacity")) {
+  for (const [id, fmt] of [["atmoOpacity", (v) => Math.round(v * 100) + "%"], ["atmoLen", (v) => v + " candles"], ["atmoFade", (v) => v + " ms"]]) {
+    $(id).oninput = (e) => { set({ [id]: +e.target.value }); $(id + "Out").textContent = fmt(+e.target.value); };
+    $(id).ondblclick = () => { $(id).value = DEFAULTS[id]; $(id).oninput({ target: $(id) }); };
+  }
+  $("atmoCustom").oninput = (e) => set({ atmoCustom: e.target.value });
+}
+// the preview: a small chart with a live candle that ticks, your atmosphere drawn behind it (the same code as the chart)
+const atmoPrev = { raf: 0, eng: null, t0: 0, last: 0, bg: null, key: "" };
+function atmoPrevStart() { if (!atmoPrev.raf && $("atmoPrev")) atmoPrev.raf = requestAnimationFrame(atmoPrevFrame); }
+function atmoPrevFrame(now) {
+  atmoPrev.raf = 0;
+  const cv = $("atmoPrev"), A = window.PriismAtmo, CL = window.__bdCandleLooks; if (!cv || !A || !CL) return;
+  const vis = !document.hidden && !$("tab-candles").hidden && cv.getBoundingClientRect().height > 0 && cv.closest("details").open;
+  const moving = atmoAny() || (cfg.zoneFx || []).length > 0;
+  if (!vis) { if (moving) setTimeout(atmoPrevStart, 500); return; }
+  if (now - atmoPrev.last < 33) { atmoPrevStart(); return; }
+  const dt = atmoPrev.last ? (now - atmoPrev.last) / 1000 : 0.016; atmoPrev.last = now;
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const key = cfg.skin + "|" + W; if (atmoPrev.key !== key) { atmoPrev.bg = wallStill(W, H); atmoPrev.key = key; }
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+  if (atmoPrev.bg) { g.drawImage(atmoPrev.bg, 0, 0); g.fillStyle = "rgba(0,0,0,0.45)"; g.fillRect(0, 0, W, H); } else { g.fillStyle = "#07080d"; g.fillRect(0, 0, W, H); }
+  const up = /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") ? cfg.candleUp : "#00ffa3", down = /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "") ? cfg.candleDown : "#ff2e97";
+  // 14 candles; the live one's close wanders, so the effects have something to follow
+  const n = 14, sp = W / (n + 2.5), bw = sp * 0.6, T = now / 1000, seq = [50, 54, 48, 57, 61, 55, 63, 66, 60, 68, 72, 67, 74];
+  const live = 74 + Math.sin(T * 0.9) * 5 + Math.sin(T * 2.3) * 2, vals = [...seq, live], Y = (v) => H * 0.9 - ((v - 40) / 45) * H * 0.8;
+  const zone = [Y(71), Y(66)];   // a zone near the live price
+  const o = { fx: cfg.atmoFx || "off", trail: !!cfg.atmoTrail, aura: !!cfg.atmoAura, color: cfg.atmoColor === "custom" ? cfg.atmoCustom : cfg.atmoColor === "wallpaper" ? (wallAccentPrev() || null) : null,
+    op: +cfg.atmoOpacity || 0.15, len: +cfg.atmoLen || 4, fade: +cfg.atmoFade || 450,
+    zfx: Object.fromEntries(["near", "ripple", "flow", "dir", "fusion"].map((k) => [k, (cfg.zoneFx || []).includes(k)])), reduce: matchMedia("(prefers-reduced-motion: reduce)").matches, lite: false };
+  const lx = sp * (n - 0.5), o0 = vals[n - 2], c0 = live, isUp = c0 >= o0, top = Y(Math.max(o0, c0)), bot = Y(Math.min(o0, c0));
+  const pane = { l: 0, t: 0, w: W, h: H, zones: (cfg.zoneFx || []).length ? [[sp * 2, zone[0], W - sp * 2, zone[1] - zone[0], "164,107,255"]] : [],
+    live: { x: lx, bw, sp, y0: top, y1: bot, hi: top - 6, lo: bot + 6, c: isUp ? up : down, up: isUp } };
+  if (!atmoPrev.eng) atmoPrev.eng = A.engine();
+  try { atmoPrev.eng.frame(g, [pane], o, now, dt); } catch {}
+  if (pane.zones.length) { g.fillStyle = "rgba(164,107,255,0.12)"; g.fillRect(sp * 2, zone[0], W - sp * 2, zone[1] - zone[0]); g.strokeStyle = "rgba(164,107,255,0.8)"; g.lineWidth = 1; g.strokeRect(sp * 2 + 0.5, zone[0] + 0.5, W - sp * 2 - 1, zone[1] - zone[0] - 1); }
+  // the candles on top, in your look and Candle FX
+  const k = { fill: (a, b, c, d) => g.fillRect(a, b, c, d), style: (v) => { g.fillStyle = v; }, stroke: (v) => { g.strokeStyle = v; }, strokeRect: (a, b, c, d) => g.strokeRect(a, b, c, d), fillPath: () => g.fill(), px: 1, yfrac: 0 };
+  const look = cfg.candleOn ? cfg.candleLook || "solid" : "solid", F = CL.fx ? CL.fx(fxCfg()) : null;
+  for (let i = 0; i < n; i++) {
+    const op_ = i ? vals[i - 1] : vals[0] - 3, cl = vals[i], u = cl >= op_, col = u ? up : down, cx = sp * (i + 0.5);
+    const x = i === n - 1 ? lx : cx, t0 = Y(Math.max(op_, cl)), t1 = Y(Math.min(op_, cl));
+    g.fillStyle = col; g.fillRect(Math.round(x - 0.5), t0 - 6, 1, t1 - t0 + 12); k.xfrac = x / W;
+    CL.candle(g, look, Math.round(x - bw / 2), t0, Math.round(bw), Math.max(1, t1 - t0), col, u, k, null, F);
+  }
+  if (moving) atmoPrevStart();
+}
+const wallAccentPrev = () => { try { const p = window.PriismPalette && atmoPrev.bg ? window.PriismPalette.fromData(atmoPrev.bg.getContext("2d").getImageData(0, 0, atmoPrev.bg.width, atmoPrev.bg.height).data) : null; return p && p.accent; } catch { return null; } };
+// ---------- Zone lights (Lines, zones & labels): pick any of them ----------
+const ZONE_FX = [["near", "Proximity glow"], ["ripple", "Contact ripple"], ["flow", "Liquid border"], ["dir", "Directional light"], ["fusion", "Zone fusion"]];
+function syncZoneFx() {
+  const box = $("zoneFx"); if (!box) return;
+  const cur = Array.isArray(cfg.zoneFx) ? cfg.zoneFx : [];
+  box.innerHTML = "";
+  for (const [id, label] of ZONE_FX) {
+    const b = document.createElement("button"); b.textContent = label; b.dataset.z = id; b.className = cur.includes(id) ? "on" : "";
+    b.setAttribute("aria-pressed", String(cur.includes(id)));
+    b.onclick = () => { const now = Array.isArray(cfg.zoneFx) ? cfg.zoneFx : [], next = now.includes(id) ? now.filter((x) => x !== id) : [...now, id];
+      set({ zoneFx: next, ...(cfg.candleOn ? {} : { candleOn: true }) }); $("candleOn").checked = true; syncZoneFx(); atmoPrevStart(); };
+    box.appendChild(b);
+  }
+}
+// ---------- Clarity (Wallpaper › Adjust) ----------
+function syncClarity() {
+  if (!$("clarContrast")) return;
+  seg("clarContrast", [["off", "Off"], ["soft", "Soft"], ["strong", "Strong"]], () => cfg.clarContrast || "off", (v) => set({ clarContrast: v }));
+  seg("clarFocus", [[false, "Off"], [true, "On"]], () => !!cfg.clarFocus, (v) => set({ clarFocus: v }));
+  seg("clarFog", [[false, "Off"], [true, "On"]], () => !!cfg.clarFog, (v) => set({ clarFog: v }));
+  seg("clarParallax", [[false, "Off"], [true, "On"]], () => !!cfg.clarParallax, (v) => set({ clarParallax: v }));
 }
 // the big Candle FX preview: your mix on your wallpaper (with Closed candles, the last candle is your live one)
 function drawFxPreview() {
@@ -562,6 +654,7 @@ function syncIndicators() {
     z.oninput = () => { set({ zoneFill: +z.value }); $("zoneFillOut").textContent = Math.round(z.value * 100) + "%"; }; z.ondblclick = () => { z.value = 0.12; z.oninput(); }; }
   if ($("zoneDim")) seg("zoneDim", [[false, "Off"], [true, "On"]], () => !!cfg.zoneDim, (v) => set({ zoneDim: v }));
   // zone boxes: their shape (rounded corners, pill ends) and border design, also for zones left in their own colours
+  syncZoneFx();
   if ($("zoneReact")) seg("zoneReact", [["off", "Off"], ["glow", "Glow"], ["strong", "Strong"], ["edge", "Edge"], ["spotlight", "Spotlight"], ["shimmer", "Shimmer"]], () => cfg.zoneReact || "off", (v) => set({ zoneReact: v }));
   if ($("zoneShape")) seg("zoneShape", [["square", "Square"], ["rounded", "Rounded"], ["pill", "Pill"]], () => (cfg.zoneShape === "oval" ? "pill" : cfg.zoneShape || "square"), (v) => { set({ zoneShape: v }); drawZonePreview(); });
   if ($("zoneStyle")) seg("zoneStyle", [["flat", "Flat"], ["fade", "Fade"], ["shine", "Shine"], ["glass", "Glass"], ["hollow", "Hollow"]], () => cfg.zoneStyle || "flat", (v) => { set({ zoneStyle: v }); drawZonePreview(); });
@@ -2158,6 +2251,7 @@ function syncTune() {
   seg("calm", [[false, "Off"], [true, "On"]], () => cfg.calm, (v) => set({ calm: v }));
   seg("motion", [[false, "On"], [true, "Paused"]], () => cfg.paused, (v) => set({ paused: v }));
   seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => { set({ layer: v }); syncTune(); });
+  syncClarity();
   // Sides only makes sense under the chart (On top already floats over everything).
   $("sidesRow").hidden = cfg.layer === "over"; if ($("leftBarRow")) $("leftBarRow").hidden = cfg.layer === "over";
   if ($("sidesHint")) $("sidesHint").hidden = cfg.layer === "over";
@@ -2608,7 +2702,7 @@ $("wmText").oninput = (e) => set({ wmText: e.target.value.slice(0, 40), wmOn: cf
 $("wmOpacity").oninput = (e) => { set({ wmOpacity: +e.target.value }); $("wmOpacityOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 
 const ADJUST_KEYS = ["opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","sides","leftBar","uiFont","uiSize","uiAccent","react","reactStrength","moodLook","moodRange","moodPulse","lensZoom","lensSize","musicParts","musicFeel","musicSens","vignette","calm"];
-const STYLE_KEYS = [...CHART_KEYS, "candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","candleFxCore","candleFxEdge","candleFxAmt","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
+const STYLE_KEYS = [...CHART_KEYS, "atmoFx","atmoTrail","atmoAura","atmoColor","atmoCustom","atmoOpacity","atmoLen","atmoFade","zoneFx","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","candleFxCore","candleFxEdge","candleFxAmt","shiftSpeed","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW"];
 $("reset").onclick = () => applyWithUndo(Object.fromEntries(ADJUST_KEYS.map((k) => [k, DEFAULTS[k]])), "Adjustments reset.");
 $("resetStyle").onclick = () => applyWithUndo(Object.fromEntries(STYLE_KEYS.map((k) => [k, DEFAULTS[k]])), "Style reset.");
 
@@ -2884,7 +2978,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Candle FX: 8 new materials plus core and edge lights (Chart \u203a Candle FX)", "Zones light up when price is in them (Chart \u203a Lines, zones & labels \u203a Price in a zone)",
+const WHATS_NEW = ["Live candle atmosphere: smoke, a light trail and an aura at the live candle (Chart \u203a Candle FX)", "Zone lights: proximity glow, contact ripple, liquid border and more (Chart \u203a Lines, zones & labels)", "Smart contrast keeps price clear on bright wallpapers (Wallpaper \u203a Adjust \u203a Clarity)", "Candle FX: 8 new materials plus core and edge lights (Chart \u203a Candle FX)", "Zones light up when price is in them (Chart \u203a Lines, zones & labels \u203a Price in a zone)",
   "Style the Buy / Sell buttons and the order ticket (TradingView \u203a Trade panel)",
   "Glass, Neon and Aurora edges for TradingView's panels and windows (TradingView \u203a Bars & panels)",
   "A zoom lens for your chart: press Alt+Shift+Z (Settings \u203a Magnifier)",

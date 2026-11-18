@@ -2948,3 +2948,191 @@ function priismSkins(window, document) {
 priismSkins(window, document);
 window.__priismSkinsSrc = "(" + priismSkins.toString() + ")";   // for the off-main-thread wallpaper worker
 })();
+
+// ---------- Live candle atmosphere, zone lights and wallpaper clarity (window.PriismAtmo) ----------
+// Drawn by content.js on two canvases in each wallpaper tile: BEHIND the chart (the chart's own canvases sit on top),
+// so smoke and light never cover a candle, a wick, a price label or an order. Positions come from the chart itself
+// (hook.js / lw.js publish where the live candle and the zones are, after each paint). The panel uses the same code
+// for its preview. Coordinates are page (CSS px) coordinates.
+(function () {
+  if (window.PriismAtmo) return;
+  const rgbHex = (h) => (/^#[0-9a-f]{6}$/i.test(h || "") ? [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) : null);
+  const rgbAny = (v) => (Array.isArray(v) ? v : typeof v === "string" && /^\d{1,3},\d{1,3},\d{1,3}$/.test(v) ? v.split(",").map(Number) : rgbHex(v));
+  const mix = (a, b, f) => [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * f);
+  const rgba = (c, a) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${Math.max(0, Math.min(1, a)).toFixed(3)})`;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const WHITE = [255, 255, 255], CYAN = [94, 231, 255], VIOLET = [164, 107, 255];
+  // a soft round light in one colour (made once, then just stretched and placed: no blur, no per-frame gradients)
+  const SPR = new Map();
+  function sprite(c) {
+    const q = c.map((v) => Math.round(v / 8) * 8), key = q.join(",");
+    let s = SPR.get(key); if (s) return s;
+    if (SPR.size > 64) SPR.clear();
+    s = document.createElement("canvas"); s.width = s.height = 64;
+    const g = s.getContext("2d"), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, rgba(q, 1)); gr.addColorStop(0.35, rgba(q, 0.55)); gr.addColorStop(0.7, rgba(q, 0.14)); gr.addColorStop(1, rgba(q, 0));
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64); SPR.set(key, s); return s;
+  }
+  // a horizontal band of light along one zone edge
+  function strip(g, x, y, w, c, a, th) {
+    if (a <= 0.01 || w <= 0) return;
+    const gr = g.createLinearGradient(0, y - th, 0, y + th);
+    gr.addColorStop(0, rgba(c, 0)); gr.addColorStop(0.5, rgba(c, a * 0.55)); gr.addColorStop(1, rgba(c, 0));
+    g.fillStyle = gr; g.fillRect(x, y - th, w, 2 * th);
+    g.fillStyle = rgba(mix(c, WHITE, 0.35), a * 0.85); g.fillRect(x, y - 0.5, w, 1);
+  }
+  function perim(x, y, w, h, d) {             // a point d px along a box's outline (clockwise from the top-left)
+    const P = 2 * (w + h); d = ((d % P) + P) % P;
+    if (d < w) return [x + d, y]; d -= w; if (d < h) return [x + w, y + d]; d -= h; if (d < w) return [x + w - d, y + h]; d -= w; return [x, y + h - d];
+  }
+  // o (settings): { fx: off|smoke|vapor|mist, trail, aura, color (hex or null = the candle's), op 0..1, len (candles),
+  //   fade (ms), zfx: { near, ripple, flow, dir, fusion }, reduce (reduced motion), lite }
+  function engine() {
+    const S = new Map();
+    const st = (p) => { const key = Math.round(p.l) + "," + Math.round(p.t); let s = S.get(key);
+      if (!s) S.set(key, (s = { parts: [], ghosts: [], emit: 0, lastG: 0, zs: new Map(), aura: null, anchor: null, col: null, seen: 0 })); return s; };
+    function zones(g, p, s, L, cy, o, now) {
+      const D = Math.max(36, p.h * 0.1), T = now / 1000, Z = o.zfx || {}, seen = new Set();
+      let fuse = null, busy = false;
+      for (const z of p.zones || []) {
+        const [x, y, w, h, k] = z, c = rgbAny(k); if (!c || w < 16 || h < 4) continue;
+        const key = Math.round(y) + "|" + Math.round(h) + "|" + k; seen.add(key);
+        const inside = cy >= y - 1 && cy <= y + h + 1;
+        let zs = s.zs.get(key);
+        if (!zs) { zs = { inside, from: null, rip: null, ripT: 0, y, h, t: now, pc: cy }; s.zs.set(key, zs); }
+        else {
+          // only a real touch counts: the zone didn't move or resize (no zoom / rescale) and we saw price a moment ago
+          const stable = Math.abs(zs.y - y) <= 1.5 && Math.abs(zs.h - h) <= 1.5 && now - zs.t < 2000;
+          if (!zs.inside && inside && stable) {
+            zs.from = zs.pc < y ? "top" : "bottom";
+            if (Z.ripple && !o.reduce && now - zs.ripT > 3000) { zs.rip = { t: now, x: clamp(L.x, x + 8, x + w - 8) }; zs.ripT = now; }
+          }
+          if (!inside) zs.from = null;
+          Object.assign(zs, { inside, y, h, t: now, pc: cy });
+        }
+        const breath = o.reduce ? 1 : 0.82 + 0.18 * Math.sin(T * 2.1);
+        const d = inside ? 0 : cy < y ? y - cy : cy - (y + h), near = !inside && d < D;
+        if (inside) {
+          if (Z.fusion && !fuse) fuse = c;
+          if (Z.dir && zs.from) { strip(g, x, zs.from === "top" ? y : y + h, w, c, 0.75 * breath, 8); busy = busy || !o.reduce; }
+        } else if (Z.near && near) strip(g, x, cy < y ? y : y + h, w, c, Math.pow(1 - d / D, 1.6) * 0.8, 7);
+        if (Z.flow && (inside || near) && !o.reduce) {           // a soft light travelling round the outline
+          const P = 2 * (w + h), head = ((T / 3.6) % 1) * P, spr = sprite(mix(c, WHITE, 0.3));
+          for (let i = 0; i < 16; i++) { const [px, py] = perim(x, y, w, h, head - i * 5); g.globalAlpha = 0.7 * (1 - i / 16) * (inside ? 1 : 0.6); g.drawImage(spr, px - 5, py - 5, 10, 10); }
+          g.globalAlpha = 1; busy = true;
+        }
+        if (zs.rip) {                                            // one ripple along the touched edge
+          const u = (now - zs.rip.t) / 1100, ey = zs.from === "bottom" ? y + h : y;
+          if (u >= 1) zs.rip = null;
+          else { busy = true; g.lineWidth = 1.6;
+            for (const uu of [u, u - 0.2]) { if (uu <= 0) continue; const rx = 6 + uu * Math.min(w * 0.45, 180);
+              g.strokeStyle = rgba(mix(c, WHITE, 0.3), 0.7 * Math.pow(1 - uu, 1.5)); g.beginPath(); g.ellipse(zs.rip.x, ey, rx, rx * 0.18 + 2, 0, 0, Math.PI * 2); g.stroke(); } }
+        }
+      }
+      for (const [key, zs] of s.zs) if (!seen.has(key) && now - zs.t > 3000) s.zs.delete(key);
+      return { fuse, busy };
+    }
+    // draws every pane's effects; returns true while something is still moving (the caller keeps animating)
+    function frame(g, panes, o, now, dt) {
+      let busy = false; dt = clamp(dt || 0.016, 0, 0.1);
+      const seenKeys = new Set();
+      for (const p of panes) {
+        const s = st(p); seenKeys.add(Math.round(p.l) + "," + Math.round(p.t)); s.seen = now;
+        const L = p.live, base = L ? rgbAny(o.color) || rgbAny(L.c) || CYAN : s.col || CYAN;
+        if (L) s.col = base;
+        const cy = L ? (L.up ? L.y0 : L.y1) : 0, len = clamp(+o.len || 4, 1, 12), fade = clamp(+o.fade || 450, 150, 3000), op = clamp(o.op === undefined ? 0.15 : +o.op, 0, 1);
+        g.save(); g.beginPath(); g.rect(p.l, p.t, p.w, p.h); g.clip();
+        let fuse = null;
+        if (L && o.zfx && (o.zfx.near || o.zfx.ripple || o.zfx.flow || o.zfx.dir || o.zfx.fusion)) { const r = zones(g, p, s, L, cy, o, now); fuse = r.fuse; busy = busy || r.busy; }
+        if (L && o.fx === "mist") {                                 // soft cyan / violet mist round the live price
+          const T = o.reduce ? 0 : now / 1000, cA = rgbAny(o.color), cols = cA ? [cA, mix(cA, WHITE, 0.3)] : [CYAN, VIOLET];
+          const cx0 = L.x - len * L.sp * 0.45, R = Math.max(30, L.sp * 3.2), n = o.lite ? 3 : 6;
+          for (let j = 0; j < n; j++) { const a = T * 0.22 * (j % 2 ? 1 : -1) + j * 1.05, x = cx0 + Math.cos(a) * len * L.sp * 0.55, y = cy + Math.sin(a * 1.3) * R * 0.45, r = R * (0.8 + 0.35 * Math.sin(j * 1.7));
+            g.globalAlpha = op * 0.9; g.drawImage(sprite(cols[j % 2]), x - r, y - r, 2 * r, 2 * r); }
+          g.globalAlpha = 1; busy = busy || !o.reduce;
+        }
+        if (L && o.fx === "vapor") {                                // smooth ribbons drifting back from the live candle
+          const T = o.reduce ? 0 : now / 1000, ln = len * L.sp * 1.4, n = o.lite ? 2 : 3; g.lineCap = "round";
+          for (let i = 0; i < n; i++) { const amp = Math.max(4, L.sp * 0.55) * (1 - i * 0.2), gr = g.createLinearGradient(L.x, 0, L.x - ln, 0);
+            gr.addColorStop(0, rgba(mix(base, WHITE, 0.2), op * 1.5 * (1 - i * 0.25))); gr.addColorStop(1, rgba(base, 0));
+            g.strokeStyle = gr; g.lineWidth = Math.max(2, L.bw * 0.75) * (1 - i * 0.25); g.beginPath();
+            for (let k = 0; k <= 20; k++) { const f = k / 20, x = L.x - f * ln, y = cy - f * L.sp * 0.6 * (i + 0.5) + Math.sin(f * 5 + T * 1.7 + i * 2.1) * amp * f; k ? g.lineTo(x, y) : g.moveTo(x, y); }
+            g.stroke(); }
+          busy = busy || !o.reduce;
+        }
+        // Phantom Smoke: puffs leave the live candle's close and drift back (to the left) and up, then fade
+        if (L && o.fx === "smoke" && !o.reduce) {
+          s.emit += (o.lite ? 14 : 36) * dt;
+          const cap = o.lite ? 16 : 48;
+          while (s.emit >= 1 && s.parts.length < cap) { s.emit -= 1;
+            s.parts.push({ dx: (Math.random() - 0.5) * L.bw * 0.7, dy: (Math.random() - 0.5) * Math.max(2, L.bw * 0.3), mx: -len * L.sp * (0.75 + 0.5 * Math.random()),
+              my: -(L.sp * 0.9 + 6) * (0.3 + 0.6 * Math.random()), life: fade * (0.8 + 0.4 * Math.random()), age: 0, s0: L.bw * 0.55 + 2, s1: L.bw * 1.2 + L.sp * 0.7 + 6 }); }
+          s.emit = Math.min(s.emit, 2);
+        }
+        if (s.parts.length) {
+          if (L) s.anchor = { x: L.x, y: cy }; const A = s.anchor, spr = sprite(mix(base, WHITE, 0.25));
+          for (let i = s.parts.length - 1; i >= 0; i--) { const q = s.parts[i]; q.age += dt * 1000; const u = q.age / q.life;
+            if (u >= 1 || !A) { s.parts.splice(i, 1); continue; }
+            const e = 1 - (1 - u) * (1 - u), r = q.s0 + (q.s1 - q.s0) * u;
+            g.globalAlpha = op * (u < 0.12 ? u / 0.12 : 1) * Math.pow(1 - u, 1.4);
+            g.drawImage(spr, A.x + q.dx + q.mx * e - r, A.y + q.dy + q.my * e - r, 2 * r, 2 * r); }
+          g.globalAlpha = 1; busy = true;
+        }
+        // Afterimage: fading copies of the live body, sliding back
+        if (L && o.trail && !o.reduce && now - s.lastG > (o.lite ? 120 : 70)) { s.lastG = now; s.ghosts.push({ t: now, y0: L.y0, y1: L.y1, bw: L.bw }); }
+        if (s.ghosts.length) {
+          for (let i = s.ghosts.length - 1; i >= 0; i--) { const q = s.ghosts[i], u = (now - q.t) / fade;
+            if (u >= 1 || !L) { s.ghosts.splice(i, 1); continue; }
+            const x = L.x - u * len * L.sp, a = Math.min(0.9, op * 1.6) * Math.pow(1 - u, 2), hh = Math.max(1, q.y1 - q.y0);
+            g.fillStyle = rgba(base, a * 0.4); g.fillRect(x - q.bw / 2 - 2, q.y0 - 2, q.bw + 4, hh + 4);
+            g.fillStyle = rgba(mix(base, WHITE, 0.15), a); g.fillRect(x - q.bw / 2, q.y0, q.bw, hh); }
+          busy = true;
+        }
+        // Live candle aura (and Zone fusion: the glow takes the colour of the zone price is in)
+        if (L && (o.aura || fuse)) {
+          const target = fuse ? mix(base, fuse, 0.7) : base;
+          s.aura = s.aura ? mix(s.aura, target, Math.min(1, dt * 5)) : target;
+          if (Math.abs(s.aura[0] - target[0]) + Math.abs(s.aura[1] - target[1]) + Math.abs(s.aura[2] - target[2]) > 3) busy = true;
+          const k = o.reduce ? 1 : 0.88 + 0.12 * Math.sin(now / 1000 * 2.2), R = Math.max(L.bw * 2.4, (L.lo - L.hi) * 0.7, 16), my = (L.y0 + L.y1) / 2;
+          g.globalCompositeOperation = "lighter"; g.globalAlpha = (o.aura ? 0.32 : 0.24) * k;
+          g.drawImage(sprite(s.aura), L.x - R, my - R * 0.9, 2 * R, 1.8 * R);
+          g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; busy = busy || !o.reduce;
+        } else s.aura = null;
+        g.restore();
+      }
+      for (const [key, s] of S) if (!seenKeys.has(key) && now - s.seen > 4000) S.delete(key);
+      return busy;
+    }
+    return { frame, reset() { S.clear(); } };
+  }
+  // ----- clarity: drawn once per change (not animated) -----
+  // tile = { x, y, w, h, grid (32x18 brightness of the wallpaper, 0..1), vis (how much of it shows: opacity x (1 - dim)) }
+  // rects = the charts' price areas (the canvases candles are drawn on), panes = the published live data (for Focus)
+  // o = { contrast: off|soft|strong, focus, fog, fogColor }
+  const GW = 32, GH = 18, mapC = document.createElement("canvas"); mapC.width = GW; mapC.height = GH;
+  const mapG = mapC.getContext("2d");
+  function clarity(g, tile, rects, panes, o) {
+    if (o.contrast && o.contrast !== "off" && tile.grid && tile.grid.length === GW * GH) {
+      // Smart contrast: only where the wallpaper is bright, a soft shade behind the chart (none where it's already dark)
+      const img = mapG.createImageData(GW, GH), k = o.contrast === "strong" ? 0.72 : 0.5, vis = clamp(tile.vis === undefined ? 1 : tile.vis, 0, 1);
+      let any = false;
+      for (let i = 0; i < GW * GH; i++) { const e = clamp((tile.grid[i] * vis - 0.36) / 0.38, 0, 1), a = Math.round(255 * e * k); img.data[i * 4 + 3] = a; if (a > 4) any = true; }
+      if (any) { mapG.putImageData(img, 0, 0); g.imageSmoothingEnabled = true; if (g.imageSmoothingQuality) g.imageSmoothingQuality = "high";
+        for (const r of rects) { g.save(); g.beginPath(); g.rect(r.l, r.t, r.w, r.h); g.clip(); g.drawImage(mapC, tile.x, tile.y, tile.w, tile.h); g.restore(); } }
+    }
+    for (const r of rects) {
+      if (o.focus) {   // Cinematic focus: the wallpaper darkens softly away from the live price
+        const p = panes.find((q) => q.live && q.live.x >= r.l && q.live.x <= r.l + r.w && q.live.y0 >= r.t && q.live.y0 <= r.t + r.h);
+        const cx = p ? p.live.x : r.l + r.w * 0.62, cy = p ? (p.live.y0 + p.live.y1) / 2 : r.t + r.h * 0.45, D = Math.hypot(r.w, r.h);
+        const gr = g.createRadialGradient(cx, cy, D * 0.1, cx, cy, D * 0.72);
+        gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(1, "rgba(0,0,0,0.5)");
+        g.fillStyle = gr; g.fillRect(r.l, r.t, r.w, r.h);
+      }
+      if (o.fog) {     // Depth fog: a low haze along the bottom of the chart
+        const c = rgbAny(o.fogColor) || [150, 170, 205], gr = g.createLinearGradient(0, r.t + r.h * 0.5, 0, r.t + r.h);
+        gr.addColorStop(0, rgba(c, 0)); gr.addColorStop(1, rgba(c, 0.2)); g.fillStyle = gr; g.fillRect(r.l, r.t + r.h * 0.5, r.w, r.h * 0.5);
+      }
+    }
+  }
+  window.PriismAtmo = { engine, clarity, sprite, GW, GH };
+})();

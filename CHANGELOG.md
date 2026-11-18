@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.85 (2026-11-04)
+- **New: Live candle atmosphere** (Chart › Candle FX): **Phantom Smoke**, **Liquid Vapor** or **Spectral Mist**, plus a **Motion trail** (Afterimage) and a **Live candle aura**. Each can be combined with any material or look.
+  - Controls: **Colour** (candle, wallpaper or custom), **Smoke opacity** (15%), **Trail length** (4 candles) and **Fade duration** (450 ms).
+  - It's placed at the real live candle, read from the chart after every paint, on TradingView, TradingView-based platforms and Lightweight Charts apps, on each chart of a layout.
+  - It's drawn behind the chart, so it never covers a candle, wick, price label or order. It stays inside the price area and clicks go straight through.
+  - Scrolled back in history, it fades out. Power saver turns it off, Auto quality draws less, and with reduced motion nothing moves.
+- **New: Zone lights** (Chart › Lines, zones & labels): **Proximity glow**, **Contact ripple**, **Liquid border**, **Directional light** and **Zone fusion**. Pick any of them. They work on indicator zones and on rectangles you draw. A touch only counts when price really crosses into a zone that hasn't moved or resized, so zooming or rescaling doesn't set them off. Zone fills stay see-through.
+- **New: Clarity** (Wallpaper › Adjust): **Smart contrast** (on by default, Soft) softly shades only the bright parts of the wallpaper behind each chart's price area. Also new: **Cinematic focus**, **Depth fog** and **Parallax**.
+- Quick mixes now include an atmosphere, and Reset Candle FX turns it off.
+- Fixed: the Candle FX intensity row shared an ID with the wallpaper Effect › Amount row, so changing one could show or hide the other.
+
 ## 0.1.84 (2026-11-04)
 - **New: Candle FX** (Chart › Candle FX), with a live preview on your wallpaper:
   - **8 materials:** Liquid Chrome, Diamond Cut, Plasma Core, Obsidian Glass, Hologram Shift, Fiber Optic, Ice Crystal and Nebula Glow. They're looks like the others (same setting), so Closed candles, Candle parts and saved candle styles work with them. All 26 looks are unchanged.
