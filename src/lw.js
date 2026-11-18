@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 23;
+  const LW_VERSION = 24;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -69,7 +69,8 @@
           glow: Math.max(0, Math.min(1, +c.glow || 0)), look: String(c.look || "solid"),
           // closed candles' own look ("" = like the live candle; see hook.js)
           closed: (() => { const L = window.__bdCandleLooks, k = String(c.closed || ""); return L && L.META[k] && k !== "shift" && k !== c.look && c.look !== "shift" ? k : ""; })(),
-          P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null };   // wick / border / hollow / widths
+          P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null,
+          F: window.__bdCandleLooks && window.__bdCandleLooks.fx ? window.__bdCandleLooks.fx(c.fx) : null };   // Candle FX light layers   // wick / border / hollow / widths
       } else candles = null;
       if (candles && window.__bdCandleLooks && window.__bdCandleLooks.priceLine) window.__bdCandleLooks.priceLine.setCols([candles.upHex, candles.downHex]);
     } catch { candles = null; }
@@ -345,25 +346,26 @@
       if (inLook) return false;
       const L = window.__bdCandleLooks, look0 = candles && L && L.META[candles.look] ? candles.look : "solid";
       const cd = candles, split = !!(cd && L && L.live && cd.closed);   // closed candles have a look of their own
-      const P = L && cd ? cd.P : null;
+      const P = L && cd ? cd.P : null, F = L && cd ? cd.F : null;
       const glowOf = (look) => { const meta = L && L.META[look]; return cd ? Math.max(cd.glow, meta ? meta.minGlow : 0) : 0; };
-      if (!(on && cd && (glowOf(look0) > 0 || (look0 !== "solid" && look0 !== "shift") || P || split) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(g.fillStyle))) return false;
+      if (!(on && cd && (glowOf(look0) > 0 || (look0 !== "solid" && look0 !== "shift") || P || F || split) && c && isChart(c) && Math.abs(h) < c.height * 0.8 && isCandleCol(g.fillStyle))) return false;
       const t = g.getTransform(), sx = t.a || 1, sy = t.d || 1, col0 = toHexCol(g.fillStyle), isUp = col0 === cd.upHex;
       const isBody = Math.abs(w * sx) >= 3 && Math.abs(h * sy) >= 3, tr = P ? tracker() : null;
       // a bordered candle comes as two nested rects in the same colour: style it once
-      if ((P || split) && isBody && L.nestedDupe(lastBodyL, g, Math.min(x, x + w) * sx + t.e, Math.min(y, y + h) * sy + t.f, Math.abs(w * sx), Math.abs(h * sy), col0)) return true;
+      if ((P || F || split) && isBody && L.nestedDupe(lastBodyL, g, Math.min(x, x + w) * sx + t.e, Math.min(y, y + h) * sy + t.f, Math.abs(w * sx), Math.abs(h * sy), col0)) return true;
       const part = (look) => {
         // Rainbow: the colours fan out across the chart, left to right (as on TradingView)
         let col = col0;
         if (look === "prism" && L.hueRotate && c.width) { const step = Math.max(0, Math.min(31, Math.floor(((x * sx + t.e) / c.width) * 32)));
           col = L.toHex(L.hueRotate(L.rgbOf(col0), -70 + (step / 31) * 140)); }
         const glow = glowOf(look);
-        lk.g = g; lk.px = 1 / sx; lk.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
+        lk.g = g; lk.px = 1 / sx; lk.yfrac = c.height ? (y * sy + t.f) / c.height : 0; lk.xfrac = c.width ? (x * sx + t.e) / c.width : 0;
         g.save(); inLook = true;
         try {
           if (split) { g.setTransform(t); g.setLineDash([]); g.shadowBlur = 0; g.globalCompositeOperation = "source-over"; }   // drawn a moment later: in the state it was asked for
           if (glow > 0) { g.shadowColor = L ? L.tone(look, col, lk) : col; g.shadowBlur = 3 + glow * 16; }
-          if (L && P && isBody) { if (tr) tr.note(c, true, Math.abs(w * sx)); L.candle(g, look, x, y, w, h, col, isUp, lk, P); }
+          if (L && P && isBody) { if (tr) tr.note(c, true, Math.abs(w * sx)); L.candle(g, look, x, y, w, h, col, isUp, lk, P, F); }
+          else if (L && F && isBody) L.candle(g, look, x, y, w, h, col, isUp, lk, null, F);
           else if (L && look !== "solid" && isBody) L.draw(g, look, x, y, w, h, col, isUp, lk);
           else {
             // a wick: your wick colour / width only when this chart's bodies are wide enough to tell them apart

@@ -205,6 +205,21 @@
         <button class="link" id="partsReset" type="button">Reset candle parts</button>
       </details>
 
+      <details class="grp fxmix" data-grp="candlefx" open>
+        <summary>Candle FX</summary>
+        <p class="hint">Mix a material with a core light and an edge light. It only adds light: prices, wicks and candle sizes stay as the chart draws them.</p>
+        <canvas id="fxPreview" class="partsprev fxprev" width="560" height="236"></canvas>
+        <div class="looklabel">Material <small>takes the place of your look; pick a look above to go back</small></div>
+        <div class="lookgrid" id="fxMaterial"></div>
+        <div class="row"><span>Core light</span><div class="seg wrap" id="fxCore"></div></div>
+        <div class="row"><span>Edge light</span><div class="seg wrap" id="fxEdge"></div></div>
+        <div class="row" id="fxAmtRow"><span>FX intensity</span><input type="range" id="fxAmt" min="0.1" max="1" step="0.05" /><output id="fxAmtOut"></output></div>
+        <p class="hint" id="fxHint"></p>
+        <div class="looklabel" style="margin-top:10px">Quick mixes <small>a material, lights and colours together</small></div>
+        <div class="fxpresets" id="fxPresets"></div>
+        <button class="link" id="fxReset" type="button">Reset Candle FX</button>
+      </details>
+
 
       <details class="grp" data-grp="chart">
         <summary>Lines, zones &amp; labels</summary>

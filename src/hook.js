@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 31;
+  const HOOK_VERSION = 32;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -65,7 +65,8 @@
           glow: Math.max(0, Math.min(1, +c.glow || 0)), look: lookIds().includes(c.look) ? c.look : "solid",
           // Closed candles' own look ("" = the same as the live candle). Not with Cycle (that one moves the whole chart's colours).
           closed: lookIds().includes(c.closed) && c.closed !== "shift" && c.closed !== c.look && c.look !== "shift" ? c.closed : "",
-          P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null, lite: !!c.lite };   // wick / border / hollow / widths
+          P: window.__bdCandleLooks && window.__bdCandleLooks.parts ? window.__bdCandleLooks.parts(c.parts) : null, lite: !!c.lite,
+          F: window.__bdCandleLooks && window.__bdCandleLooks.fx ? window.__bdCandleLooks.fx(c.fx) : null };   // Candle FX light layers   // wick / border / hollow / widths
       }
     } catch { out = null; }
     return out;
@@ -1418,7 +1419,7 @@
         return this.clearRect(x, y, w, h);
       }
     }
-    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P || candles.closed) && h < c.height * 0.8 && isPane(c)) {
+    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P || candles.F || candles.closed) && h < c.height * 0.8 && isPane(c)) {
       const fs = this.fillStyle; // already remapped, normalised to "#rrggbb" for opaque colours
       if (fs === candles.upHex || fs === candles.downHex) {
         const L = window.__bdCandleLooks, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, body = w * sx >= 3;
@@ -1426,8 +1427,8 @@
         const split = !!(L && L.live && cd.closed);   // closed candles have a look of their own
         // TradingView draws a bordered candle as an outer rect then the body inside it, both in our colour: draw the
         // look once (on the outer rect) so outlines / glass don't double up.
-        const P = L ? cd.P : null, tr = P ? tracker() : null;
-        if (body && (look0 !== "solid" || P || split)) {
+        const P = L ? cd.P : null, F = L ? cd.F : null, tr = P ? tracker() : null;
+        if (body && (look0 !== "solid" || P || F || split)) {
           const lb = lastBody.get(this), X = x * sx + t.e, Y = y * sy + t.f, W = w * sx, H = h * sy;
           // either order: body-then-border or border-then-body (within ~2 device px on every side)
           const inside = (a, o) => a.x >= o.x - 0.5 && a.y >= o.y - 0.5 && a.x + a.w <= o.x + o.w + 0.5 && a.y + a.h <= o.y + o.h + 0.5;
@@ -1441,11 +1442,11 @@
           let col = fs;
           if (look === "prism") col = prismColour(isUp, (x * sx) / c.width);
           const meta = L && L.META[look], glow = Math.max(cd.glow, meta ? meta.minGlow : 0);
-          lookK.g = g; lookK.px = 1 / sx; lookK.yfrac = c.height ? (y * sy + t.f) / c.height : 0;
+          lookK.g = g; lookK.px = 1 / sx; lookK.yfrac = c.height ? (y * sy + t.f) / c.height : 0; lookK.xfrac = c.width ? (x * sx + t.e) / c.width : 0;
           g.save();
           if (split) { g.setTransform(t); g.setLineDash([]); g.shadowBlur = 0; g.globalCompositeOperation = "source-over"; }   // drawn a moment later: in the state it was asked for
           if (glow > 0) { g.shadowColor = L ? L.tone(look, col, lookK) : col; g.shadowBlur = 4 + glow * 22; }
-          if (L && body && h * sy >= 3) { if (tr) tr.note(c, true, w * sx); P ? L.candle(g, look, x, y, w, h, col, isUp, lookK, P) : L.draw(g, look, x, y, w, h, col, isUp, lookK); }
+          if (L && body && h * sy >= 3) { if (tr) tr.note(c, true, w * sx); P || F ? L.candle(g, look, x, y, w, h, col, isUp, lookK, P, F) : L.draw(g, look, x, y, w, h, col, isUp, lookK); }
           else {
             // a wick (or a body too thin to style): your wick colour / width only when this chart's bodies are wide enough
             // to tell them apart (zoomed far out, thin bodies keep the candle colour)

@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks && window.__bdCandleLooks.live) return;   // an older copy (before an update) is replaced
+  if (window.__bdCandleLooks && window.__bdCandleLooks.fxv >= 1) return;   // an older copy (before an update) is replaced
   // Lite glow (slow computers / Power saver, set by hook.js / lw.js from content.js): every glow's blur is drawn
   // smaller. Canvas blur is the costliest thing on a chart without a fast graphics card.
   if (!window.__bdLiteBlur && window.CanvasRenderingContext2D) {
@@ -50,9 +50,24 @@
     ["heat", "Heat", "Colours warm up the higher price goes on the chart.", 0],
     ["prism", "Rainbow", "Colours fan out across the chart, left to right.", 0],
     ["shift", "Cycle", "Colours keep flowing over time. Indicator lines cycle too.", 0],
+    // Candle FX materials (Chart › Candle FX). Same setting as the looks above, shown in their own grid there.
+    ["liquid", "Liquid Chrome", "Polished metal with a wet highlight running down each body.", 0, "fx"],
+    ["diamond", "Diamond Cut", "Cut facets that catch the light, with a small glint.", 0, "fx"],
+    ["plasma", "Plasma Core", "Dark bodies lit softly from the centre.", 0.2, "fx"],
+    ["obsidian", "Obsidian Glass", "Near-black glass with a sharp edge in your colour.", 0, "fx"],
+    ["hologram", "Hologram Shift", "Iridescent bodies whose tint drifts slowly across the chart.", 0, "fx"],
+    ["fiber", "Fiber Optic", "Fine strands of light inside a faint body.", 0.15, "fx"],
+    ["crystal", "Ice Crystal", "Frosted, see-through ice with small facets.", 0, "fx"],
+    ["nebula", "Nebula Glow", "Soft cosmic colour with a light inside and a few specks.", 0.12, "fx"],
   ];
   const IDS = LOOKS.map((l) => l[0]);
-  const META = Object.fromEntries(LOOKS.map(([id, name, hint, minGlow]) => [id, { id, name, hint, minGlow }]));
+  const META = Object.fromEntries(LOOKS.map(([id, name, hint, minGlow, grp]) => [id, { id, name, hint, minGlow, fx: grp === "fx" }]));
+  const CLASSIC = LOOKS.filter((l) => l[4] !== "fx").map((l) => l[0]), MATERIALS = LOOKS.filter((l) => l[4] === "fx").map((l) => l[0]);
+  // reduced motion: Hologram Shift holds its tint still
+  let still = false;
+  try { const mq = matchMedia("(prefers-reduced-motion: reduce)"); still = mq.matches; if (mq.addEventListener) mq.addEventListener("change", (e) => { still = e.matches; }); } catch {}
+  // a small repeatable random sequence per candle (frost specks, stars), so a candle looks the same on every paint
+  const seeded = (s) => () => { s = (Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9) | 0; return ((s >>> 0) % 10000) / 10000; };
 
   // ---------- colour helpers ----------
   const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
@@ -81,10 +96,25 @@
   }
   // Wick colour for a look (most keep the candle colour).
   function wick(look, col, k) {
-    if (look === "ice") return memo("iw" + col, () => css(mixc(rgbOf(col), WHITE, 0.5)));
+    if (look === "ice" || look === "crystal") return memo("iw" + col, () => css(mixc(rgbOf(col), WHITE, 0.5)));
     if (look === "ghost" || look === "glass") return memo("gw" + col, () => css(rgbOf(col), 0.7));
     return tone(look, col, k || {});
   }
+
+  // ---------- Candle FX helpers ----------
+  // ug() describes a gradient (dir 0 = across, 1 = down, 2 = corner to corner, 3 = a soft light near the top); uf() fills a
+  // candle's rectangle with it. (A gradient fill costs the same however it's made, so it's made per candle.)
+  const ug = (dir, stops) => ({ dir, stops });
+  function uf(g, k, x, y, w, h, d) {
+    if (w <= 0 || h <= 0) return;
+    const gr = d.dir === 3 ? g.createRadialGradient(x + w / 2, y + h * 0.38, 0, x + w / 2, y + h * 0.38, Math.max(w, Math.min(h, w * 3) * 0.6))
+      : g.createLinearGradient(x, y, d.dir === 1 ? x : x + w, d.dir === 0 ? y : y + h);
+    for (const [o, col] of d.stops()) gr.addColorStop(o, col);
+    k.style(gr); k.fill(x, y, w, h);
+  }
+  const tri = (g, k, a, b, c2, d2, e, f, s) => { k.style(s); g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d2); g.lineTo(e, f); g.closePath(); k.fillPath(); };
+  // Lite: each material drawn as its closest classic look
+  const LITE_OF = { liquid: "chrome", diamond: "gem", plasma: "core", obsidian: "core", hologram: "holo", fiber: "lines", crystal: "ice", nebula: "dusk" };
 
   // ---------- bodies ----------
   function draw(g, look, x, y, w, h, col, isUp, k) {
@@ -221,6 +251,71 @@
         for (let i = 0; i < n; i++) { const yy = y + i * b, hh = Math.min(b - gap, y + h - yy); if (hh > 0) k.fill(x, yy, w, hh); }
         return;
       }
+      // ----- Candle FX materials. Every one stays inside the body's own rectangle. Lite (Power saver / Auto quality
+      // on a slow computer) draws each one as its closest classic look. -----
+      case "liquid": case "diamond": case "plasma": case "obsidian": case "hologram": case "fiber": case "crystal": case "nebula": {
+        if (k.lite || window.__bdLite) return draw(g, LITE_OF[look], x, y, w, h, col, isUp, k);
+        if (look === "liquid") {
+          uf(g, k, x, y, w, h, ug(0, () => [[0, css(mixc(c, BLACK, 0.5))], [0.22, css(c)], [0.42, css(mixc(c, WHITE, 0.78))], [0.58, css(c)], [1, css(mixc(c, BLACK, 0.6))]]));
+          uf(g, k, x, y, w, h, ug(1, () => [[0, "rgba(255,255,255,0.4)"], [0.2, "rgba(255,255,255,0.07)"], [0.7, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0.26)"]]));
+          if (w >= 5 * px) { k.style("rgba(255,255,255,0.6)"); k.fill(x + Math.round(w * 0.3 / px) * px, y + px, px, Math.max(px, h - 2 * px)); }   // a fine specular line
+          return;
+        }
+        if (look === "diamond") {
+          const m = x + w / 2, d = Math.min(h, w * 0.9);
+          k.style(css(mixc(c, WHITE, 0.2))); k.fill(x, y, w / 2, h);
+          k.style(css(mixc(c, BLACK, 0.22))); k.fill(m, y, w - w / 2, h);
+          tri(g, k, x, y, x + w, y, m, y + d, css(mixc(c, WHITE, 0.55), 0.85));            // the crown
+          tri(g, k, x, y + h, x + w, y + h, m, y + h - d, css(mixc(c, BLACK, 0.35), 0.8));  // the pavilion
+          if (w >= 6 * px && h >= 8 * px) {                                                  // a small glint
+            const gx = Math.round((x + w * 0.28) / px) * px, gy = Math.round((y + d * 0.35) / px) * px;
+            k.style("rgba(255,255,255,0.9)"); k.fill(gx - px, gy, 3 * px, px); k.fill(gx, gy - px, px, 3 * px);
+          }
+          k.stroke(css(mixc(c, WHITE, 0.4), 0.8)); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px); return;
+        }
+        if (look === "plasma") {
+          k.style(css(mixc(c, BLACK, 0.58))); k.fill(x, y, w, h);
+          uf(g, k, x, y, w, h, ug(0, () => [[0, css(c, 0)], [0.28, css(c, 0.5)], [0.5, css(mixc(c, WHITE, 0.5))], [0.72, css(c, 0.5)], [1, css(c, 0)]]));
+          k.stroke(css(c, 0.9)); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px); return;
+        }
+        if (look === "obsidian") {
+          uf(g, k, x, y, w, h, ug(1, () => [[0, css(mixc(c, BLACK, 0.7))], [1, css(mixc(c, BLACK, 0.9))]]));
+          if (w >= 4 * px && h >= 6 * px) tri(g, k, x, y, x + w * 0.6, y, x, y + Math.min(h, w * 1.6), "rgba(255,255,255,0.08)");   // a faint reflection
+          k.stroke(css(c, 0.95)); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px);
+          k.style(css(mixc(c, WHITE, 0.65))); k.fill(x, y, w, px);                     // the precision highlight on top
+          return;
+        }
+        if (look === "hologram") {
+          const sh = still ? 0 : Math.round(Math.sin(performance.now() / 1000 * 0.35 + (k.xfrac || 0) * 5) * 7) * 5;   // in 5° steps
+          uf(g, k, x, y, w, h, ug(2, () => [[0, css(hueRotate(c, sh - 55))], [0.32, css(mixc(hueRotate(c, sh), WHITE, 0.4))], [0.65, css(c)], [1, css(hueRotate(c, sh + 55))]]));
+          if (h >= 8 * px && w >= 4 * px) { k.style("rgba(255,255,255,0.1)"); const n = Math.min(10, Math.floor(h / (4 * px))), st = h / n; for (let i = 1; i < n; i++) k.fill(x, Math.round((y + i * st) / px) * px, w, px); }
+          k.stroke(css(mixc(c, WHITE, 0.5), 0.7)); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px); return;
+        }
+        if (look === "fiber") {
+          k.style(css(c, 0.14)); k.fill(x, y, w, h);
+          const n = Math.max(1, Math.min(4, Math.floor(w / (3 * px)))), gap = w / (n + 1), sx = (i) => Math.round((x + gap * i) / px) * px - px / 2;
+          k.style(css(c, 0.8)); for (let i = 1; i <= n; i++) k.fill(sx(i), y, px, h);
+          k.style(css(mixc(c, WHITE, 0.9))); for (let i = 1; i <= n; i++) k.fill(sx(i), isUp ? y : y + h - 2 * px, px, 2 * px);   // lit tips at the close
+          k.stroke(css(c, 0.5)); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px); return;
+        }
+        if (look === "crystal") {
+          k.style(css(mixc(c, WHITE, 0.55), 0.9)); k.fill(x, y, w, h);
+          uf(g, k, x, y, w, h, ug(1, () => [[0, "rgba(255,255,255,0.6)"], [0.55, "rgba(255,255,255,0)"]]));
+          tri(g, k, x, y + h * 0.35, x + w, y, x + w, y + h * 0.18, "rgba(255,255,255,0.22)");
+          tri(g, k, x, y + h, x + w, y + h * 0.62, x, y + h * 0.78, "rgba(255,255,255,0.12)");
+          const n = Math.min(6, Math.floor((w * h) / (px * px * 90)));
+          if (n > 0) { const r = seeded(Math.round((x + w / 2) / px) * 7919 + Math.round(h / px)); k.style("rgba(255,255,255,0.75)");
+            for (let i = 0; i < n; i++) k.fill(x + px + r() * Math.max(0, w - 3 * px), y + px + r() * Math.max(0, h - 3 * px), px, px); }
+          k.stroke(css(mixc(c, WHITE, 0.8))); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px); return;
+        }
+        // nebula
+        uf(g, k, x, y, w, h, ug(1, () => [[0, css(mixc(c, WHITE, 0.15))], [0.5, css(c)], [1, css(mixc(hueRotate(c, isUp ? 40 : -40), [60, 20, 120], 0.35))]]));
+        uf(g, k, x, y, w, h, ug(3, () => [[0, css(mixc(c, WHITE, 0.6), 0.55)], [1, css(c, 0)]]));
+        { const n = w >= 4 * px ? Math.min(4, Math.floor(h / (10 * px))) : 0;
+          if (n > 0) { const r = seeded(Math.round((x + w / 2) / px) * 104729 + Math.round(h / px)); k.style("rgba(255,255,255,0.8)");
+            for (let i = 0; i < n; i++) k.fill(x + px + r() * Math.max(0, w - 3 * px), y + px + r() * Math.max(0, h - 3 * px), px, px); } }
+        return;
+      }
       default: k.style(col); k.fill(x, y, w, h);
     }
   }
@@ -253,8 +348,9 @@
   }
   // One candle body with your parts. The hollow body clears what's under it on the chart canvas (the bit of wick
   // inside it) so the wallpaper shows through, then draws its outline.
-  function candle(g, look, x, y, w, h, col, isUp, k, P) {
-    if (!P) return draw(g, look, x, y, w, h, col, isUp, k);
+  // F = Candle FX light layers (fx() below), or null.
+  function candle(g, look, x, y, w, h, col, isUp, k, P, F) {
+    if (!P) { draw(g, look, x, y, w, h, col, isUp, k); if (F) fxOver(g, x, y, w, h, col, isUp, k, F); return; }
     if (h < 0) { y += h; h = -h; }
     if (w < 0) { x += w; w = -w; }
     const px = k.px || 1;
@@ -264,10 +360,61 @@
     const bw = Math.min(P.borderW * px, Math.max(px, Math.min(w, h) / 3));
     if (hollow && w > 2.5 * bw && h > 2.5 * bw) {
       if (k.clear) k.clear(x, y, w, h);
-      k.stroke(bc); g.lineWidth = bw; k.strokeRect(x + bw / 2, y + bw / 2, w - bw, h - bw); return;
+      k.stroke(bc); g.lineWidth = bw; k.strokeRect(x + bw / 2, y + bw / 2, w - bw, h - bw);
+      if (F && F.edge !== "off") fxOver(g, x, y, w, h, col, isUp, k, { ...F, core: "off" });   // a hollow body has no inside to light
+      return;
     }
     draw(g, look, x, y, w, h, col, isUp, k);
+    if (F) fxOver(g, x, y, w, h, col, isUp, k, F);
     if (bc) { k.stroke(bc); g.lineWidth = bw; k.strokeRect(x + bw / 2, y + bw / 2, w - bw, h - bw); }
+  }
+
+  // ---------- Candle FX: light layered on top of any look (Chart › Candle FX) ----------
+  // core: off | soft (a gentle light down the middle) | plasma (a coloured glowing centre) | beam (one fine bright line)
+  // edge: off | laser (a lit outline) | rim (light on the top and left, shade on the right) | glint (lit corners)
+  // amt 0..1 = FX intensity. Everything stays inside the body (the Laser edge's faint outer line aside: 2 px), never on the wick.
+  const FX_CORE = ["off", "soft", "plasma", "beam"], FX_EDGE = ["off", "laser", "rim", "glint"];
+  function fx(o) {
+    if (!o || typeof o !== "object") return null;
+    const amt = o.amt === undefined || o.amt === null || o.amt === "" || !isFinite(+o.amt) ? 0.65 : Math.max(0, Math.min(1, +o.amt));
+    const F = { core: FX_CORE.includes(o.core) ? o.core : "off", edge: FX_EDGE.includes(o.edge) ? o.edge : "off", amt };
+    return (F.core !== "off" || F.edge !== "off") && amt > 0 ? F : null;
+  }
+  function fxOver(g, x, y, w, h, col, isUp, k, F) {
+    if (!F) return;
+    if (h < 0) { y += h; h = -h; }
+    if (w < 0) { x += w; w = -w; }
+    const px = k.px || 1, a = F.amt, A = (v) => +(v * a).toFixed(2);
+    if (h < 3 * px || w < 3 * px) return;                 // dojis and squeezed candles stay plain
+    const c = rgbOf(col), pSB = g.shadowBlur, pW = g.lineWidth, lite = !!(k.lite || window.__bdLite);
+    g.shadowBlur = 0;                                     // light layers never take the candle's glow (blur is costly)
+    if (F.core !== "off" && lite) {                     // Lite: one flat strip down the middle
+      const cw = Math.max(px, Math.round(w * (F.core === "beam" ? 0.14 : 0.34) / px) * px);
+      k.style(F.core === "plasma" ? css(mixc(c, WHITE, 0.55), A(0.6)) : `rgba(255,255,255,${A(0.3)})`); k.fill(x + (w - cw) / 2, y, cw, h);
+    } else if (F.core === "soft") {
+      uf(g, k, x, y, w, h, ug(0, () => [[0, "rgba(255,255,255,0)"], [0.5, `rgba(255,255,255,${A(0.34)})`], [1, "rgba(255,255,255,0)"]]));
+    } else if (F.core === "plasma") {
+      const cw = Math.max(px, w * 0.5);
+      uf(g, k, x + (w - cw) / 2, y, cw, h, ug(0, () => [[0, css(c, 0)], [0.5, css(mixc(c, WHITE, 0.55), A(0.85))], [1, css(c, 0)]]));
+      if (w >= 5 * px) { k.style(css(mixc(c, WHITE, 0.85), A(0.7))); k.fill(Math.round((x + w / 2) / px) * px - px / 2, y + px, px, Math.max(px, h - 2 * px)); }
+    } else if (F.core === "beam") {
+      const bw = Math.max(px, Math.round(w * 0.14 / px) * px);
+      uf(g, k, x + (w - bw) / 2, y, bw, h, ug(1, () => [[0, "rgba(255,255,255,0)"], [0.18, `rgba(255,255,255,${A(0.8)})`], [0.82, `rgba(255,255,255,${A(0.8)})`], [1, "rgba(255,255,255,0)"]]));
+    }
+    if (F.edge === "laser") {
+      // a bright inner line plus a faint line just outside it (a cheap glow, no blur)
+      if (!lite) { k.stroke(css(c, A(0.32))); g.lineWidth = 2 * px; k.strokeRect(x - px, y - px, w + 2 * px, h + 2 * px); }
+      k.stroke(css(mixc(c, WHITE, 0.55), +(0.5 + 0.5 * a).toFixed(2))); g.lineWidth = px; k.strokeRect(x + px / 2, y + px / 2, w - px, h - px);
+    } else if (F.edge === "rim") {
+      k.style(`rgba(255,255,255,${A(0.6)})`); k.fill(x, y, w, px);
+      k.style(`rgba(255,255,255,${A(0.38)})`); k.fill(x, y + px, px, h - px);
+      k.style(`rgba(0,0,0,${A(0.4)})`); k.fill(x + w - px, y + px, px, h - px);
+    } else if (F.edge === "glint") {
+      const L = Math.max(2 * px, Math.min(w, h) * 0.38);
+      k.style(`rgba(255,255,255,${A(0.85)})`); k.fill(x, y, L, px); k.fill(x, y, px, L);
+      k.style(`rgba(255,255,255,${A(0.5)})`); k.fill(x + w - L, y + h - px, L, px); k.fill(x + w - px, y + h - L, px, L);
+    }
+    g.shadowBlur = pSB; g.lineWidth = pW;
   }
   // A bordered candle is drawn by the platform as two nested rects in the same colour (border, then the body inside
   // it, or the other way round). true = this rect is the second of such a pair: skip it, the candle is already drawn.
@@ -299,7 +446,7 @@
   // ---------- previews (the panel's look cards) ----------
   // A small fixed run of candles, so every card shows the same chart and only the look differs.
   const SAMPLE = [[18, 52, 8, 60], [52, 36, 28, 58], [36, 70, 32, 78], [70, 54, 46, 76], [54, 88, 50, 96], [88, 70, 64, 92]];   // open, close, low, high (0..100)
-  function preview(canvas, look0, up, down, glow, bg, partsCfg, liveLook) {   // liveLook: the last (live) candle in its own look
+  function preview(canvas, look0, up, down, glow, bg, partsCfg, liveLook, fxCfg) {   // liveLook: the last (live) candle in its own look; fxCfg: Candle FX
     const g = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
     g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
     if (bg) { try { g.drawImage(bg, 0, 0, W, H); g.fillStyle = "rgba(0,0,0,0.38)"; g.fillRect(0, 0, W, H); } catch {} }   // your wallpaper, dimmed like the chart
@@ -308,7 +455,7 @@
     const Y = (v) => H - 6 * dpr - (v / 100) * (H - 12 * dpr);
     const k = { fill: (a, b, c, d) => g.fillRect(a, b, c, d), style: (v) => { g.fillStyle = v; }, stroke: (v) => { g.strokeStyle = v; },
       strokeRect: (a, b, c, d) => g.strokeRect(a, b, c, d), fillPath: () => g.fill(), px: dpr, yfrac: 0 };
-    const P = parts(partsCfg), wk = P && P.wickW ? null : dpr;
+    const P = parts(partsCfg), F = fx(fxCfg), wk = P && P.wickW ? null : dpr;
     if (P && P.hollow !== "none") k.clear = (a, b, c, d) => { if (!bg) { g.clearRect(a, b, c, d); return; }
       g.save(); g.beginPath(); g.rect(a, b, c, d); g.clip(); g.shadowBlur = 0; g.drawImage(bg, 0, 0, W, H); g.fillStyle = "rgba(0,0,0,0.38)"; g.fillRect(0, 0, W, H); g.restore(); };
     SAMPLE.forEach(([o, c, l, hi], i) => {
@@ -318,12 +465,12 @@
       if (look === "prism") col = toHex(hueRotate(rgbOf(base), -70 + (i / (n - 1)) * 140));
       if (look === "shift") col = toHex(hueRotate(rgbOf(base), i * 14));
       const cx = slot * (i + 0.8), top = Y(Math.max(o, c)), bot = Y(Math.min(o, c));
-      k.yfrac = top / H;
+      k.yfrac = top / H; k.xfrac = cx / W;
       g.save();
       if (gl > 0) { g.shadowColor = tone(look, col, k); g.shadowBlur = (4 + gl * 18) * dpr * 0.6; }
       { const [wx, ww] = wk ? [Math.round(cx - dpr / 2), dpr] : wickRect(cx - dpr / 2, dpr, k, P);
         g.fillStyle = wickOf(look, col, isUp, k, P); g.fillRect(wx, Y(hi), ww, Y(l) - Y(hi)); }
-      candle(g, look, Math.round(cx - bw / 2), top, Math.round(bw), Math.max(dpr, bot - top), col, isUp, k, P);
+      candle(g, look, Math.round(cx - bw / 2), top, Math.round(bw), Math.max(dpr, bot - top), col, isUp, k, P, F);
       g.restore();
     });
   }
@@ -690,5 +837,5 @@
     return { ...z, f, glow: Math.max(z.glow || 0, (0.45 + 0.45 * k) * pulse), e: edge, g, hot: true };
   }
 
-  window.__bdCandleLooks = { zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
+  window.__bdCandleLooks = { fxv: 1, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
 })();

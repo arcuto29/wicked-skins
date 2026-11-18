@@ -19,7 +19,7 @@
     candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
     candleLook: "solid", candleClosedLook: "", shiftSpeed: 10, // solid | neon | prism | shift
     // Candle parts (Candles > Candle parts): wick / border colours, hollow bodies, widths
-    candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1,
+    candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, candleFxCore: "off", candleFxEdge: "off", candleFxAmt: 0.65,
     chartColors: "auto",   // several charts: "same" | "wallpaper" (each matches its own) | "custom" (chartCustom) | "auto" (wallpaper once Match is used)
     chartStyle: {},        // Style each chart: { 2: { candleUp, candleLook, indMode... }, ... } (only what differs from yours)
     skinOpts: {},          // each built-in wallpaper's own settings + recolour: { twinkle: { amount: 1.4, rc: { c: [...], s: 0.8 } } }
@@ -1788,7 +1788,8 @@
     if (!(c.enabled && c.candleOn)) return null;
     const parts = { wick: c.candleWick, wickUp: c.candleWickUp, wickDown: c.candleWickDown, border: c.candleBorder, borderUp: c.candleBorderUp,
       borderDown: c.candleBorderDown, borderW: c.candleBorderW, hollow: c.candleHollow, wickW: c.candleWickW, bodyW: c.candleBodyW };
-    return JSON.stringify({ up: c.candleUp, down: c.candleDown, glow: c.candleGlow, look: c.candleLook, closed: c.candleClosedLook || "", parts, lite: liteNow() });
+    return JSON.stringify({ up: c.candleUp, down: c.candleDown, glow: c.candleGlow, look: c.candleLook, closed: c.candleClosedLook || "", parts, lite: liteNow(),
+      fx: { core: c.candleFxCore, edge: c.candleFxEdge, amt: c.candleFxAmt } });
   }
   function pushCandles() {
     const h = document.documentElement;

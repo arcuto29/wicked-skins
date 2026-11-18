@@ -603,3 +603,17 @@ body.desk .patgrid { grid-template-columns: repeat(6, 1fr); }
 .tpprev { display: flex; gap: 8px; padding: 12px; margin: 6px 0 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); background: #0b0e14 center / cover; }
 .tpprev button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 4px; font: 700 12px system-ui, sans-serif; cursor: default; }
 .tpprev button small { font-weight: 500; font-size: 10px; opacity: .9; }
+
+/* ---------- Chart › Candle FX: glass panel with a thin cyan-violet edge ---------- */
+details.grp.fxmix { position: relative; border-color: transparent; background:
+  linear-gradient(#0d0f16, #0b0c12) padding-box,
+  linear-gradient(120deg, rgba(25,211,255,.55), rgba(140,110,255,.45) 55%, rgba(25,211,255,.18)) border-box; }
+details.grp.fxmix > summary { color: #e9f6ff; }
+details.grp.fxmix > summary { text-shadow: 0 0 10px rgba(25,211,255,.45); }
+.partsprev.fxprev { height: 110px; border: 1px solid rgba(140,110,255,.25); }
+#fxMaterial, .fxpresets { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#fxMaterial .lookcard span, .fxpresets .lookcard span { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15; min-height: 2.3em; text-align: center; font-size: 10px; letter-spacing: -.01em; }
+.fxpresets { display: grid; gap: 6px; margin-bottom: 6px; }
+#fxMaterial .lookcard canvas, .fxpresets .lookcard canvas { height: 46px; }
+.fxmix .lookcard.on { box-shadow: 0 0 0 2px #19d3ff, 0 0 18px -6px rgba(140,110,255,.8); }
+.fxmix input[type="range"] { accent-color: #19d3ff; }
