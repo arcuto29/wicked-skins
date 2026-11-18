@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.84 (2026-11-04)
 - **New: Candle FX** (Chart › Candle FX), with a live preview on your wallpaper:
   - **8 materials:** Liquid Chrome, Diamond Cut, Plasma Core, Obsidian Glass, Hologram Shift, Fiber Optic, Ice Crystal and Nebula Glow. They're looks like the others (same setting), so Closed candles, Candle parts and saved candle styles work with them. All 26 looks are unchanged.
   - **Core light** (Soft, Plasma, Beam) and **Edge light** (Laser, Rim, Glint), with **FX intensity**. They work on any look.

@@ -2884,7 +2884,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Zones light up when price is in them (Chart \u203a Lines, zones & labels \u203a Price in a zone)",
+const WHATS_NEW = ["Candle FX: 8 new materials plus core and edge lights (Chart \u203a Candle FX)", "Zones light up when price is in them (Chart \u203a Lines, zones & labels \u203a Price in a zone)",
   "Style the Buy / Sell buttons and the order ticket (TradingView \u203a Trade panel)",
   "Glass, Neon and Aurora edges for TradingView's panels and windows (TradingView \u203a Bars & panels)",
   "A zoom lens for your chart: press Alt+Shift+Z (Settings \u203a Magnifier)",
