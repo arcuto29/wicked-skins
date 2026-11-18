@@ -192,11 +192,15 @@ html.bd-left-glass [class*="layout__area--left"] [class*="drawingToolbar"] {
 html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="button-"] { color: rgba(226,232,244,.92) !important; }
 html.bd-left-clear [class*="layout__area--left"] [class*="drawingToolbar"] svg { filter: drop-shadow(0 0 2px rgba(0,0,0,.85)); }
 html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="button-"]:hover { background: rgba(255,255,255,.1) !important; }
-html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="isActive"],
-html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="isActive"] [class*="bg-"],
-html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="active-"] { background: rgba(255,255,255,.18) !important; color: #fff !important; }
+/* the tool that's picked (TradingView's "isActive-…" class). Not "active-": every button is "isInteractive-…", which
+   contains it, so all of them looked picked and you couldn't tell which tool was on. */
+html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="isActive-"],
+html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="isActive-"] [class*="bg-"] { background: rgba(255,255,255,.18) !important; color: #fff !important; }
+/* with an accent (Text & accent, or Match everything), the picked tool lights up in it */
+html.bd-left.bd-ui-accent [class*="layout__area--left"] [class*="drawingToolbar"] [class*="isActive-"] { background: color-mix(in srgb, var(--bd-ui-accent) 26%, transparent) !important; color: var(--bd-ui-accent) !important; box-shadow: inset 2px 0 0 var(--bd-ui-accent); }
+html.bd-ui-accent:not(.bd-left) [class*="layout__area--left"] [class*="drawingToolbar"] [class*="isActive-"] { color: var(--bd-ui-accent) !important; }
 /* TradingView paints the selected / hovered tool's square with a ::before layer */
-html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="button-"]::before { background-color: rgba(255,255,255,.16) !important; }
+html.bd-left [class*="layout__area--left"] [class*="drawingToolbar"] [class*="isActive-"]::before { background-color: rgba(255,255,255,.16) !important; }
 /* Soften the hairline borders on just those bars. */
 html.bd-sides [class*="layout__area--top"] { border-color: rgba(255,255,255,.08) !important; }
 
