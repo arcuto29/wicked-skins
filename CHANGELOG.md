@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.86 (2026-11-04)
+Cleanup: every option now has one place. Nothing you set is lost; your settings, saved looks, saved candle styles and each chart's own style are updated to match.
+- **Materials** are in the main look grid (Chart › Candles), under a Materials label. The separate Material grid in Candle FX is gone.
+- **Quick mixes** (Aurora Flow, Void Chrome, Ice Vapor, Synth Pulse) are in the candle preset cards, under Candle FX, with a Candle FX filter.
+- **Laser edge light** is now **Candle parts › Borders › Light**. Edge light keeps Rim and Glint.
+- **Live candle aura** moved next to the candle Glow slider.
+- **Price and zones:** Inside a zone (Glow, Strong, Edge, Spotlight, Shimmer) and Near, touch, enter (Proximity glow, Contact ripple, Liquid border, Directional light, Zone fusion) sit together under one heading, with one explanation.
+- **Cinematic focus** is now **Vignette centre › Live price** (Wallpaper › Adjust › Picture). It's the same vignette, centred on the live candle.
+- **Smart contrast** is now **Smart dim** in Picture, next to Dim. It's **off by default** now, so it doesn't change how your wallpaper looked before. If you had picked Soft or Strong, that's kept.
+- Removed **Depth fog** (the Fog wallpaper effect covers it) and **Parallax**.
+- The Clarity group is gone. Its options are in Picture.
+
 ## 0.1.85 (2026-11-04)
 - **New: Live candle atmosphere** (Chart › Candle FX): **Phantom Smoke**, **Liquid Vapor** or **Spectral Mist**, plus a **Motion trail** (Afterimage) and a **Live candle aura**. Each can be combined with any material or look.
   - Controls: **Colour** (candle, wallpaper or custom), **Smoke opacity** (15%), **Trail length** (4 candles) and **Fade duration** (450 ms).

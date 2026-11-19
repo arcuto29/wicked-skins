@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks && window.__bdCandleLooks.fxv >= 1) return;   // an older copy (before an update) is replaced
+  if (window.__bdCandleLooks && window.__bdCandleLooks.fxv >= 3) return;   // an older copy (before an update) is replaced
   // Lite glow (slow computers / Power saver, set by hook.js / lw.js from content.js): every glow's blur is drawn
   // smaller. Canvas blur is the costliest thing on a chart without a fast graphics card.
   if (!window.__bdLiteBlur && window.CanvasRenderingContext2D) {
@@ -329,7 +329,7 @@
     if (!o || typeof o !== "object") return null;
     const hx = (v) => (HEX.test(v || "") ? String(v).toLowerCase() : "");
     const P = { wick: ["soft", "custom"].includes(o.wick) ? o.wick : "same", wickUp: hx(o.wickUp), wickDown: hx(o.wickDown),
-      border: o.border === "custom" ? "custom" : "none", borderUp: hx(o.borderUp), borderDown: hx(o.borderDown),
+      border: o.border === "custom" || o.border === "light" ? o.border : "none", borderUp: hx(o.borderUp), borderDown: hx(o.borderDown),
       borderW: Math.max(1, Math.min(3, Math.round(+o.borderW || 1))), hollow: ["up", "down", "both"].includes(o.hollow) ? o.hollow : "none",
       wickW: Math.max(0, Math.min(4, Math.round(+o.wickW || 0))), bodyW: Math.max(0.4, Math.min(1, +o.bodyW || 1)) };
     const any = P.wick !== "same" || P.border !== "none" || P.hollow !== "none" || P.wickW > 0 || P.bodyW < 0.99;
@@ -356,24 +356,28 @@
     const px = k.px || 1;
     if (P.bodyW < 0.99) { const nw = Math.max(3 * px, w * P.bodyW); x += (w - nw) / 2; w = nw; }
     const hollow = P.hollow === "both" || P.hollow === (isUp ? "up" : "down");
-    const bc = (P.border === "custom" && (isUp ? P.borderUp : P.borderDown)) || (hollow ? col : "");
+    // Light: a lit outline in the candle's own colour (a faint line just outside it, no blur)
+    const lit = P.border === "light", bc = (P.border === "custom" && (isUp ? P.borderUp : P.borderDown)) || (hollow ? col : "");
     const bw = Math.min(P.borderW * px, Math.max(px, Math.min(w, h) / 3));
     if (hollow && w > 2.5 * bw && h > 2.5 * bw) {
       if (k.clear) k.clear(x, y, w, h);
       k.stroke(bc); g.lineWidth = bw; k.strokeRect(x + bw / 2, y + bw / 2, w - bw, h - bw);
       if (F && F.edge !== "off") fxOver(g, x, y, w, h, col, isUp, k, { ...F, core: "off" });   // a hollow body has no inside to light
+      if (lit) fxOver(g, x, y, w, h, col, isUp, k, { core: "off", edge: "laser", amt: F ? F.amt : 0.7 });
       return;
     }
     draw(g, look, x, y, w, h, col, isUp, k);
     if (F) fxOver(g, x, y, w, h, col, isUp, k, F);
+    if (lit) fxOver(g, x, y, w, h, col, isUp, k, { core: "off", edge: "laser", amt: F ? F.amt : 0.7 });
     if (bc) { k.stroke(bc); g.lineWidth = bw; k.strokeRect(x + bw / 2, y + bw / 2, w - bw, h - bw); }
   }
 
   // ---------- Candle FX: light layered on top of any look (Chart › Candle FX) ----------
   // core: off | soft (a gentle light down the middle) | plasma (a coloured glowing centre) | beam (one fine bright line)
-  // edge: off | laser (a lit outline) | rim (light on the top and left, shade on the right) | glint (lit corners)
+  // edge: off | rim (light on the top and left, shade on the right) | glint (lit corners). (A lit outline is
+  // Candle parts › Borders › Light, which uses the same drawing: fxOver with edge "laser".)
   // amt 0..1 = FX intensity. Everything stays inside the body (the Laser edge's faint outer line aside: 2 px), never on the wick.
-  const FX_CORE = ["off", "soft", "plasma", "beam"], FX_EDGE = ["off", "laser", "rim", "glint"];
+  const FX_CORE = ["off", "soft", "plasma", "beam"], FX_EDGE = ["off", "rim", "glint"];
   function fx(o) {
     if (!o || typeof o !== "object") return null;
     const amt = o.amt === undefined || o.amt === null || o.amt === "" || !isFinite(+o.amt) ? 0.65 : Math.max(0, Math.min(1, +o.amt));
@@ -923,5 +927,5 @@
     return { add, zone, clear, newest };
   })();
 
-  window.__bdCandleLooks = { fxv: 2, spot, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
+  window.__bdCandleLooks = { fxv: 3, spot, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
 })();

@@ -3107,31 +3107,18 @@ window.__priismSkinsSrc = "(" + priismSkins.toString() + ")";   // for the off-m
   }
   // ----- clarity: drawn once per change (not animated) -----
   // tile = { x, y, w, h, grid (32x18 brightness of the wallpaper, 0..1), vis (how much of it shows: opacity x (1 - dim)) }
-  // rects = the charts' price areas (the canvases candles are drawn on), panes = the published live data (for Focus)
-  // o = { contrast: off|soft|strong, focus, fog, fogColor }
+  // rects = the charts' price areas (the canvases candles are drawn on). o = { contrast: off | soft | strong }
+  // (Picture › Smart dim)
   const GW = 32, GH = 18, mapC = document.createElement("canvas"); mapC.width = GW; mapC.height = GH;
   const mapG = mapC.getContext("2d");
   function clarity(g, tile, rects, panes, o) {
     if (o.contrast && o.contrast !== "off" && tile.grid && tile.grid.length === GW * GH) {
-      // Smart contrast: only where the wallpaper is bright, a soft shade behind the chart (none where it's already dark)
+      // Smart dim: only where the wallpaper is bright, a soft shade behind the chart (none where it's already dark)
       const img = mapG.createImageData(GW, GH), k = o.contrast === "strong" ? 0.72 : 0.5, vis = clamp(tile.vis === undefined ? 1 : tile.vis, 0, 1);
       let any = false;
       for (let i = 0; i < GW * GH; i++) { const e = clamp((tile.grid[i] * vis - 0.36) / 0.38, 0, 1), a = Math.round(255 * e * k); img.data[i * 4 + 3] = a; if (a > 4) any = true; }
       if (any) { mapG.putImageData(img, 0, 0); g.imageSmoothingEnabled = true; if (g.imageSmoothingQuality) g.imageSmoothingQuality = "high";
         for (const r of rects) { g.save(); g.beginPath(); g.rect(r.l, r.t, r.w, r.h); g.clip(); g.drawImage(mapC, tile.x, tile.y, tile.w, tile.h); g.restore(); } }
-    }
-    for (const r of rects) {
-      if (o.focus) {   // Cinematic focus: the wallpaper darkens softly away from the live price
-        const p = panes.find((q) => q.live && q.live.x >= r.l && q.live.x <= r.l + r.w && q.live.y0 >= r.t && q.live.y0 <= r.t + r.h);
-        const cx = p ? p.live.x : r.l + r.w * 0.62, cy = p ? (p.live.y0 + p.live.y1) / 2 : r.t + r.h * 0.45, D = Math.hypot(r.w, r.h);
-        const gr = g.createRadialGradient(cx, cy, D * 0.1, cx, cy, D * 0.72);
-        gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(1, "rgba(0,0,0,0.5)");
-        g.fillStyle = gr; g.fillRect(r.l, r.t, r.w, r.h);
-      }
-      if (o.fog) {     // Depth fog: a low haze along the bottom of the chart
-        const c = rgbAny(o.fogColor) || [150, 170, 205], gr = g.createLinearGradient(0, r.t + r.h * 0.5, 0, r.t + r.h);
-        gr.addColorStop(0, rgba(c, 0)); gr.addColorStop(1, rgba(c, 0.2)); g.fillStyle = gr; g.fillRect(r.l, r.t + r.h * 0.5, r.w, r.h * 0.5);
-      }
     }
   }
   window.PriismAtmo = { engine, clarity, sprite, GW, GH };

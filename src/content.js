@@ -42,9 +42,9 @@
     // Zone lights (Chart › Lines, zones & labels): any of near (Proximity glow), ripple (Contact ripple), flow (Liquid
     // border), dir (Directional light), fusion (Zone fusion)
     zoneFx: [],
-    // Clarity (Wallpaper › Adjust): Smart contrast off | soft | strong (on by default: it only shades bright wallpaper
-    // behind the chart), Cinematic focus, Depth fog, Parallax
-    clarContrast: "soft", clarFocus: false, clarFog: false, clarParallax: false,
+    // Picture: Smart dim off | soft | strong (shades only the bright parts of the wallpaper, behind each chart's price
+    // area; adds to Dim). Vignette centred on the screen, or on the live price (vignetteAt: screen | live)
+    smartDim: "off", vignetteAt: "screen",
     // ...and over TradingView's bars (top bar, drawing toolbar, right panels, bottom bar): faint, never in the way of a
     // click, so every tool stays clear. barWhere: any of t l r b
     barPatOn: false, barPattern: "zebra", barMode: "rainbow", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.25, barSize: 1, barWhere: "tlrb",
@@ -843,7 +843,7 @@
     if (cfg.bw) f.push("grayscale(1)");
     for (const v of views) {
       v.dim.style.opacity = String(Math.min(0.95, cfg.dim + (cfg.calm && calmActive ? 0.3 : 0)));
-      v.vg.style.background = cfg.vignette > 0 ? `radial-gradient(ellipse at center, transparent ${Math.round(70 - cfg.vignette * 40)}%, rgba(0,0,0,${(0.35 + cfg.vignette * 0.55).toFixed(2)}) 100%)` : "none";
+      v.vg.__css = vgCss(v); v.vg.style.background = v.vg.__css;
       const content = v.content;
       content.style.filter = f.join(" ");
       if (content.tagName !== "CANVAS") {
@@ -1466,20 +1466,22 @@
   }
 
   // ---------- Live candle atmosphere, zone lights and clarity (drawn by PriismAtmo, skins.js) ----------
-  // Two canvases in each wallpaper tile, above the wallpaper and its dim, under the chart: clarity (Smart contrast,
-  // Cinematic focus, Depth fog; redrawn only when something changes) and the live layer (smoke, trails, aura, zone
+  // Two canvases in each wallpaper tile, above the wallpaper and its dim, under the chart: Smart dim (redrawn only
+  // when something changes) and the live layer (smoke, trails, aura, zone
   // lights; animated while something moves). hook.js / lw.js tell us where the live candle and the zones are
   // (<html data-ws-live>), after every chart paint. Never in "On top" mode (it would cover the candles).
-  const ATMO_KEYS = new Set(["zoneFx", "enabled", "layer", "powerSaver", "autoQuality", "dim", "opacity", "overOpacity", "skin", "mediaId"]);
+  const ATMO_KEYS = new Set(["zoneFx", "smartDim", "vignette", "vignetteAt", "enabled", "layer", "powerSaver", "autoQuality", "dim", "opacity", "overOpacity", "skin", "mediaId"]);
   const reduceMQ = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)"); } catch { return { matches: false }; } })();
   const ZFX = ["near", "ripple", "flow", "dir", "fusion"];
   const zoneFxList = () => (Array.isArray(cfg.zoneFx) ? cfg.zoneFx.filter((k) => ZFX.includes(k)) : []);
   const atmoBehind = () => cfg.enabled && cfg.layer !== "over" && !!window.PriismAtmo;
-  // power saver turns the moving effects off (Smart contrast, Focus and Fog are still: they stay)
+  // power saver turns the moving effects off (Smart dim is still: it stays)
   const atmoLiveOn = () => atmoBehind() && !cfg.powerSaver && (cfg.atmoFx !== "off" || !!cfg.atmoTrail || !!cfg.atmoAura || zoneFxList().length > 0);
-  const clarOn = () => atmoBehind() && ((cfg.clarContrast && cfg.clarContrast !== "off") || !!cfg.clarFocus || !!cfg.clarFog);
+  const clarOn = () => atmoBehind() && ["soft", "strong"].includes(cfg.smartDim);
+  // Vignette centred on the live price (Picture › Vignette › Centre): needs to know where the live candle is
+  const vgLive = () => cfg.enabled && cfg.vignetteAt === "live" && +cfg.vignette > 0;
   // what hook.js / lw.js should track (sent with the candle settings)
-  const spotWanted = () => ({ live: atmoLiveOn() || !!(atmoBehind() && cfg.clarFocus), zones: atmoLiveOn() && zoneFxList().length > 0 });
+  const spotWanted = () => ({ live: atmoLiveOn() || vgLive(), zones: atmoLiveOn() && zoneFxList().length > 0 });
   let atmoData = [], atmoEng = null, atmoRaf = 0, atmoT = 0, atmoStaticSig = "", atmoStaticT = 0;
   function atmoCanvases(v) {
     if (!v.tile) return;
@@ -1516,12 +1518,11 @@
     }
     if (!on) { atmoStaticSig = ""; return; }
     const vis = (cfg.layer === "over" ? cfg.overOpacity : cfg.opacity) * (1 - Math.min(0.95, +cfg.dim || 0));
-    const focusAt = cfg.clarFocus ? atmoData.map((p) => (p.live ? [p.live.x, p.live.y0].map((n) => Math.round(n / 12)).join(",") : "")).join("|") : "";
-    const sig = [cfg.clarContrast, cfg.clarFocus, cfg.clarFog, vis.toFixed(2), focusAt, views.map((v) => [v.x, v.y, v.w, v.h].map(Math.round).join(",") + ":" + (v.lum && v.lum.grid ? Math.round(v.lum.mean * 400) + "," + Math.round(v.lum.std * 400) : "-")).join("|"),
+    const sig = [cfg.smartDim, vis.toFixed(2), views.map((v) => [v.x, v.y, v.w, v.h].map(Math.round).join(",") + ":" + (v.lum && v.lum.grid ? Math.round(v.lum.mean * 400) + "," + Math.round(v.lum.std * 400) : "-")).join("|"),
       atmoData.map((p) => [p.l, p.t, p.w, p.h].map(Math.round).join(",")).join("|"), skinAccent() || ""].join(";");
     if (!force && sig === atmoStaticSig) return;
     atmoStaticSig = sig;
-    const o = { contrast: cfg.clarContrast, focus: !!cfg.clarFocus, fog: !!cfg.clarFog, fogColor: skinAccent() || null };
+    const o = { contrast: cfg.smartDim };
     for (const v of views) {
       const g = atmoCtx(v, "atmoS"); g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, v.atmoS.width, v.atmoS.height); g.restore();
       try { window.PriismAtmo.clarity(g, { x: v.x, y: v.y, w: v.w, h: v.h, grid: v.lum && v.lum.grid, vis }, atmoRects(v), atmoData, o); } catch {}
@@ -1549,28 +1550,29 @@
   function applyAtmo() {
     if (!atmoLiveOn()) { cancelAnimationFrame(atmoRaf); atmoRaf = 0; for (const v of views) if (v.atmoL) { v.atmoL.hidden = true; } if (atmoEng) atmoEng.reset(); }
     else { for (const v of views) atmoCanvases(v); atmoKick(); }
-    atmoStatic(true); applyParallax();
+    atmoStatic(true); placeVignette();
   }
   // the chart told us where its live candle / zones are now
   new MutationObserver(() => {
     try { const a = JSON.parse(document.documentElement.getAttribute("data-ws-live") || "[]"); atmoData = Array.isArray(a) ? a.slice(0, 12) : []; } catch { atmoData = []; }
-    if (layer) { atmoKick(); if (clarOn() && performance.now() - atmoStaticT > 250) { atmoStaticT = performance.now(); atmoStatic(); } }
+    if (layer) { atmoKick(); placeVignette(); if (clarOn() && performance.now() - atmoStaticT > 250) { atmoStaticT = performance.now(); atmoStatic(); } }
   }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-ws-live"] });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) atmoKick(); });
   try { reduceMQ.addEventListener("change", () => { applyAtmo(); }); } catch {}
-  // Parallax: the wallpaper shifts a few px with the mouse (never with reduced motion or Power saver)
-  const plx = { x: 0, y: 0, tx: 0, ty: 0, raf: 0, on: false };
-  const plxOn = () => cfg.enabled && !!cfg.clarParallax && !reduceMQ.matches && !liteNow();
-  function plxStep() {
-    plx.raf = 0; plx.x += (plx.tx - plx.x) * 0.12; plx.y += (plx.ty - plx.y) * 0.12;
-    for (const v of views) if (v.content) { v.content.style.translate = `${plx.x.toFixed(2)}px ${plx.y.toFixed(2)}px`; v.content.style.scale = "1.04"; }
-    if (Math.abs(plx.tx - plx.x) + Math.abs(plx.ty - plx.y) > 0.05) plx.raf = requestAnimationFrame(plxStep);
+  // Vignette › Centre › Live price: the vignette's centre is the live candle of the chart in that tile (or the middle
+  // when it isn't on screen). Same look as before, only its centre moves; updated when the live candle moves.
+  function vgCentre(v) {
+    if (!vgLive()) return null;
+    const p = atmoData.find((q) => q.live && q.live.x >= v.x && q.live.x <= v.x + v.w && q.live.y0 >= v.y && q.live.y0 <= v.y + v.h);
+    if (!p || !v.w || !v.h) return null;
+    return [Math.max(0, Math.min(100, ((p.live.x - v.x) / v.w) * 100)), Math.max(0, Math.min(100, (((p.live.y0 + p.live.y1) / 2 - v.y) / v.h) * 100))];
   }
-  function applyParallax() {
-    plx.on = plxOn();
-    if (!plx.on) { plx.x = plx.y = plx.tx = plx.ty = 0; for (const v of views) if (v.content) { v.content.style.translate = ""; v.content.style.scale = ""; } }
+  function vgCss(v) {
+    if (!(cfg.vignette > 0)) return "none";
+    const c = vgCentre(v), at = c ? `${c[0].toFixed(1)}% ${c[1].toFixed(1)}%` : "center";
+    return `radial-gradient(ellipse at ${at}, transparent ${Math.round(70 - cfg.vignette * 40)}%, rgba(0,0,0,${(0.35 + cfg.vignette * 0.55).toFixed(2)}) 100%)`;
   }
-  addEventListener("pointermove", (e) => { if (!plx.on) return; plx.tx = (e.clientX / Math.max(1, innerWidth) - 0.5) * -14; plx.ty = (e.clientY / Math.max(1, innerHeight) - 0.5) * -9; if (!plx.raf) plx.raf = requestAnimationFrame(plxStep); }, { passive: true, capture: true });
+  function placeVignette() { for (const v of views) if (v.vg) { const css = vgCss(v); if (v.vg.__css !== css) { v.vg.__css = css; v.vg.style.background = css; } } }
 
   // ---------- Pattern skins ----------
   // Chart frame: a band along each chart's edges, in a pattern (PriismPatterns) and colours of your choice. It sits in
@@ -1904,10 +1906,11 @@
   // the candle settings hook.js / lw.js draw with, for a config (yours, or one chart's own: Style each chart)
   function candlesJSON(c) {
     if (!(c.enabled && c.candleOn)) return null;
-    const parts = { wick: c.candleWick, wickUp: c.candleWickUp, wickDown: c.candleWickDown, border: c.candleBorder, borderUp: c.candleBorderUp,
+    const laser = c.candleFxEdge === "laser";   // 0.1.84-0.1.85's Laser edge light is Borders › Light now (settings not migrated yet)
+    const parts = { wick: c.candleWick, wickUp: c.candleWickUp, wickDown: c.candleWickDown, border: laser && (!c.candleBorder || c.candleBorder === "none") ? "light" : c.candleBorder, borderUp: c.candleBorderUp,
       borderDown: c.candleBorderDown, borderW: c.candleBorderW, hollow: c.candleHollow, wickW: c.candleWickW, bodyW: c.candleBodyW };
     return JSON.stringify({ up: c.candleUp, down: c.candleDown, glow: c.candleGlow, look: c.candleLook, closed: c.candleClosedLook || "", parts, lite: liteNow(),
-      fx: { core: c.candleFxCore, edge: c.candleFxEdge, amt: c.candleFxAmt }, spot: spotWanted() });
+      fx: { core: c.candleFxCore, edge: laser ? "off" : c.candleFxEdge, amt: c.candleFxAmt }, spot: spotWanted() });
   }
   function pushCandles() {
     const h = document.documentElement;
@@ -2250,8 +2253,8 @@
     if (keys.some((k) => k.startsWith("frame") || k === "candleUp" || k === "candleDown" || k === "candleOn" || k === "powerSaver")) applyFrame();
     if (keys.some((k) => k.startsWith("barPat") || k === "powerSaver" || k === "barMode" || k === "barColor" || k === "barColor2" || k === "barAlpha" || k === "barSize" || k === "barWhere" || k === "candleUp" || k === "candleDown" || k === "candleOn")) applyBars();
     if (keys.some((k) => FX_KEYS.includes(k)) || keys.includes("enabled") || keys.includes("layer")) pushFx();
-    if (keys.some((k) => k.startsWith("atmo") || k === "zoneFx" || k === "clarFocus" || k === "layer" || k === "powerSaver")) pushCandles();   // what the chart should track
-    if (keys.some((k) => k.startsWith("atmo") || k.startsWith("clar") || ATMO_KEYS.has(k))) applyAtmo();
+    if (keys.some((k) => k.startsWith("atmo") || k === "zoneFx" || k === "vignette" || k === "vignetteAt" || k === "layer" || k === "powerSaver")) pushCandles();   // what the chart should track
+    if (keys.some((k) => k.startsWith("atmo") || ATMO_KEYS.has(k))) applyAtmo();
     if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
     if (keys.includes("res")) views.forEach(sizeCanvas);
     if (keys.includes("enabled") && !cfg.enabled) lensOn(false);
@@ -2266,7 +2269,7 @@
     // a wallpaper's own settings / Recolour: rebuilt in place (unless the whole layer is rebuilt anyway)
     const optsChanged = keys.includes("skinOpts"); keys = keys.filter((k) => k !== "skinOpts");
     if (optsChanged && !keys.some((k) => REBUILD.has(k))) updateSkinOpts();
-    keys = keys.filter((k) => !k.startsWith("atmo") && !k.startsWith("clar") && k !== "zoneFx" && !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !k.startsWith("tp") && !k.startsWith("pn") && !k.startsWith("frame") && !k.startsWith("bar") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound", "welcomePending"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
+    keys = keys.filter((k) => !k.startsWith("atmo") && k !== "smartDim" && k !== "vignetteAt" && k !== "zoneFx" && !k.startsWith("candle") && !k.startsWith("wm") && !k.startsWith("ui") && !k.startsWith("pnl") && !k.startsWith("goal") && !k.startsWith("panel") && !k.startsWith("dlg") && !k.startsWith("timer") && !k.startsWith("privacy") && !k.startsWith("tradeClip") && !k.startsWith("tk") && !k.startsWith("tp") && !k.startsWith("pn") && !k.startsWith("frame") && !k.startsWith("bar") && !/Key$/.test(k) && !["focus", "focusHides", "clipLen", "clipMode", "clipFps", "clipQuality", "clipEdit", "clipAudio", "sessionSound", "welcomePending"].includes(k) && k !== "journalOn" && !FX_KEYS.includes(k));
     if (!keys.length) return;
     const needsRebuild = keys.some((k) => REBUILD.has(k)) ||
       (keys.includes("media") && (cfg.skin === "media" || cfg.multi === "mix"));
@@ -2356,7 +2359,8 @@
       if (!over) for (const k of ["atmoS", "atmoL"]) { const ac = v[k]; if (ac && !ac.hidden && ac.isConnected) try { g.drawImage(ac, dx, dy, dw, dh); } catch {} }   // clarity, smoke and zone lights
       if (cfg.vignette > 0) {       // CSS: radial-gradient(ellipse at center, transparent X%, rgba(0,0,0,a) 100%)
         const inner = (70 - cfg.vignette * 40) / 100, a = 0.35 + cfg.vignette * 0.55;
-        g.translate(dx + dw / 2, dy + dh / 2); g.scale(dw / 2 * Math.SQRT2, dh / 2 * Math.SQRT2);
+        const vc = vgCentre(v), fx = vc ? vc[0] / 100 : 0.5, fy = vc ? vc[1] / 100 : 0.5;   // centred on the live price (Vignette › Centre)
+        g.translate(dx + dw * fx, dy + dh * fy); g.scale(dw * Math.max(fx, 1 - fx) * Math.SQRT2, dh * Math.max(fy, 1 - fy) * Math.SQRT2);
         const vg = g.createRadialGradient(0, 0, 0, 0, 0, 1); vg.addColorStop(inner, "rgba(0,0,0,0)"); vg.addColorStop(1, `rgba(0,0,0,${a})`);
         g.fillStyle = vg; g.fillRect(-1, -1, 2, 2);
       }
