@@ -834,9 +834,31 @@ const LOOK_GROUP = {
   horizon: "Wow", bloom: "Wow", ink: "Wow", kaleido: "Wow", slick: "Wow", hypercube: "Wow", helix: "Wow", synapse: "Wow", "koi-pond": "Wow", "rainy-night": "Wow", "ringed-giant": "Wow", "deep-blue": "Wow", "cozy-room": "Wow", "tokyo-night": "Wow", "trading-floor": "Wow",
   "xmas-spirit": "Seasonal", "hallows-eve": "Seasonal", "cozy-lights": "Seasonal", "silent-night": "Seasonal", "northern-noel": "Seasonal",
 };
-const LOOK_GROUPS = ["All", "Wow", "Seasonal", "Calm", "Glow", "Classic"];
-const groupOf = (q) => LOOK_GROUP[q.id] || "Classic";
+const LOOK_GROUPS = ["All", "Signature", "Wow", "Seasonal", "Calm", "Glow", "Classic"];
+const groupOf = (q) => q.group || LOOK_GROUP[q.id] || "Classic";
 const QUICK_LOOKS = [
+  // ----- Signature: the painted collection, each with candles, scale and glow made for it. A look can carry its
+  // wallpaper's own settings (wallOpts: Orion is Storm with mountains and a violet recolour). -----
+  { id: "sig-imperial", group: "Signature", name: "Imperial", sub: "Black silk · Gold", skin: "silk",
+    set: { candleOn: true, candleUp: "#f2cf86", candleDown: "#8d7a63", candleLook: "chrome", candleGlow: 0.12, candlePreset: "custom", lineGlow: 0.15, scaleText: "#f3dca8", scaleGlow: 0.15, scaleBg: "auto", dim: 0.2 } },
+  { id: "sig-eclipse", group: "Signature", name: "Eclipse", sub: "Totality · Corona gold", skin: "eclipse",
+    set: { candleOn: true, candleUp: "#ffd27a", candleDown: "#e0675a", candleLook: "glass", candleGlow: 0.2, candlePreset: "custom", lineGlow: 0.2, scaleText: "#ffe3b0", scaleGlow: 0.2, scaleBg: "auto", dim: 0.18 } },
+  { id: "sig-orion", group: "Signature", name: "Orion", sub: "Storm · Violet lightning", skin: "storm", wallOpts: { lightning: true, ground: true, rc: { c: ["#7b3cff", "#c26bff", "#3a2a8a"], s: 0.85 } },
+    set: { candleOn: true, candleUp: "#c9a2ff", candleDown: "#5f6bff", candleLook: "neon", candleGlow: 0.35, candlePreset: "custom", lineGlow: 0.3, scaleText: "#e3d2ff", scaleGlow: 0.25, scaleBg: "auto", dim: 0.2 } },
+  { id: "sig-glacier", group: "Signature", name: "Glacier", sub: "Icy peaks · Mist", skin: "mountains", wallOpts: { moon: false, fog: 0.9 },
+    set: { candleOn: true, candleUp: "#bfefff", candleDown: "#7b93c9", candleLook: "crystal", candleGlow: 0.15, candlePreset: "custom", lineGlow: 0.15, scaleText: "#e3f4ff", scaleGlow: 0.15, scaleBg: "glass", dim: 0.3 } },
+  { id: "sig-void", group: "Signature", name: "Void", sub: "Energy waves · Violet", skin: "void",
+    set: { candleOn: true, candleUp: "#d58bff", candleDown: "#5b6bff", candleLook: "plasma", candleGlow: 0.3, candlePreset: "custom", lineGlow: 0.3, scaleText: "#ead2ff", scaleGlow: 0.25, scaleBg: "auto", dim: 0.15 } },
+  { id: "sig-aurora", group: "Signature", name: "Aurora", sub: "Northern lights · Lake", skin: "aurora",
+    set: { candleOn: true, candleUp: "#5dffc0", candleDown: "#a07bff", candleLook: "hologram", candleGlow: 0.25, candlePreset: "custom", lineGlow: 0.25, scaleText: "#c9fff0", scaleGlow: 0.2, scaleBg: "auto", dim: 0.15 } },
+  { id: "sig-neoncity", group: "Signature", name: "Neon City", sub: "Night skyline · Neon", skin: "neoncity",
+    set: { candleOn: true, candleUp: "#2ff0ff", candleDown: "#ff4fd0", candleLook: "fiber", candleGlow: 0.3, candlePreset: "custom", lineGlow: 0.3, scaleText: "#bff8ff", scaleGlow: 0.25, scaleBg: "auto", dim: 0.25 } },
+  { id: "sig-obsidian", group: "Signature", name: "Obsidian", sub: "Black metal · Gold edges", skin: "obsidian",
+    set: { candleOn: true, candleUp: "#e8c27a", candleDown: "#6f6a64", candleLook: "obsidian", candleGlow: 0.1, candlePreset: "custom", lineGlow: 0.12, scaleText: "#efd9a8", scaleGlow: 0.1, scaleBg: "auto", dim: 0.1 } },
+  { id: "sig-storm", group: "Signature", name: "Storm", sub: "Thunderclouds · Lightning", skin: "storm", wallOpts: { lightning: true, ground: false },
+    set: { candleOn: true, candleUp: "#9fc4ff", candleDown: "#8a93a8", candleLook: "liquid", candleGlow: 0.15, candlePreset: "custom", lineGlow: 0.15, scaleText: "#d8e6ff", scaleGlow: 0.15, scaleBg: "auto", dim: 0.15 } },
+  { id: "sig-bloodmoon", group: "Signature", name: "Blood Moon", sub: "Red moon · Dark clouds", skin: "bloodmoon",
+    set: { candleOn: true, candleUp: "#ffb08a", candleDown: "#b0263a", candleLook: "nebula", candleGlow: 0.2, candlePreset: "custom", lineGlow: 0.2, scaleText: "#ffd1bd", scaleGlow: 0.15, scaleBg: "auto", dim: 0.15 } },
   // ----- Seasonal drops: offered in their month (see SEASONS), available all year under Seasonal -----
   { id: "xmas-spirit", name: "Christmas Spirit", sub: "Christmas Eve · Glass candles", skin: "christmas",
     set: { candleOn: true, candleUp: "#4ee59a", candleDown: "#ff4d5e", candleLook: "glass", candleGlow: 0.35, candlePreset: "custom", lineGlow: 0.3, scaleText: "#ffe6b3", scaleGlow: 0.2, scaleBg: "auto", dim: 0.12 } },
@@ -895,7 +917,7 @@ const QUICK_LOOKS = [
     set: { candleOn: true, candleUp: "#ffb300", candleDown: "#ff3d00", candleLook: "solid", candleGlow: 0.6, candlePreset: "lava", lineGlow: 0.3, scaleText: "#ffcc80", scaleGlow: 0.35, scaleBg: "auto", dim: 0.3 } },
   { id: "ocean-calm", name: "Ocean Calm", sub: "Tide · Glacier", skin: "ocean",
     set: { candleOn: true, candleUp: "#8be9ff", candleDown: "#3d5afe", candleLook: "solid", candleGlow: 0.2, candlePreset: "ice", lineGlow: 0.15, scaleText: "", scaleGlow: 0, scaleBg: "auto", dim: 0.3 } },
-  { id: "flow", name: "Colour Flow", sub: "Polar Lights · Cycle", skin: "aurora",
+  { id: "flow", name: "Colour Flow", sub: "Aurora · Cycle", skin: "aurora",
     set: { candleOn: true, candleUp: "#00ffa3", candleDown: "#ff2e97", candleLook: "shift", shiftSpeed: 12, candleGlow: 0.3, candlePreset: "neon", lineGlow: 0.3, scaleText: "", scaleGlow: 0.2, scaleBg: "auto", dim: 0.3 } },
   // Nexus Match: dark Deep Field so Nexus "Priisma Neon" glass zones pop; candles + scale in the same cyan→magenta family.
   { id: "nexus-match", name: "Nexus Match", sub: "Deep Field · for Priisma Neon zones", skin: "starfield",
@@ -928,7 +950,7 @@ const QUICK_LOOKS = [
   { id: "firefly", name: "Firefly", sub: "Glowbugs · Amber", skin: "fireflies",
     set: { candleOn: true, candleUp: "#e8b864", candleDown: "#5f7a4e", candleLook: "solid", candleGlow: 0.15, candlePreset: "custom", lineGlow: 0.12, scaleText: "#e8cf9a", scaleGlow: 0.1, scaleBg: "glass", dim: 0.45 } },
   // Harbor: steel-blue up / slate-grey down on Thunderstorm, toned right down. Moody but calm, not flashy.
-  { id: "harbor", name: "Harbor", sub: "Thunderstorm · Steel", skin: "storm",
+  { id: "harbor", name: "Harbor", sub: "Storm · Steel", skin: "storm",
     set: { candleOn: true, candleUp: "#7fa8c9", candleDown: "#566273", candleLook: "solid", candleGlow: 0.1, candlePreset: "custom", lineGlow: 0.08, scaleText: "#b9c6d6", scaleGlow: 0, scaleBg: "auto", dim: 0.5 } },
   // Dune: a loud skin (Retro Sun) deliberately made CALM — warm sand up / terracotta down, low glow. The surprise one.
   { id: "dune", name: "Dune", sub: "Retro Sun · Sand", skin: "synthwave",
@@ -943,7 +965,7 @@ const QUICK_LOOKS = [
   { id: "blacklight", name: "Blacklight", sub: "Circuit · UV glow", skin: "circuit",
     set: { candleOn: true, candleUp: "#9b5cff", candleDown: "#2bf5d0", candleLook: "neon", candleGlow: 0.65, candlePreset: "custom", lineGlow: 0.5, scaleText: "#c6a3ff", scaleGlow: 0.5, scaleBg: "auto", dim: 0.5 } },
   // Vaporwave: pink + cyan on a neon skyline, glowing. The aesthetic people love.
-  { id: "vaporwave", name: "Vaporwave", sub: "Skyline · Pink & Cyan", skin: "neoncity",
+  { id: "vaporwave", name: "Vaporwave", sub: "Neon City · Pink & Cyan", skin: "neoncity",
     set: { candleOn: true, candleUp: "#2ff0ff", candleDown: "#ff4fd0", candleLook: "neon", candleGlow: 0.6, candlePreset: "custom", lineGlow: 0.45, scaleText: "#8ff6ff", scaleGlow: 0.45, scaleBg: "auto", dim: 0.4 } },
   // Molten: glowing lava orange up / deep ember red down on Lava Lamp. Warm, radiant.
   { id: "molten", name: "Molten", sub: "Lava Lamp · Lava glow", skin: "lavalamp",
@@ -994,10 +1016,10 @@ function renderQuick() {
     const card = document.createElement("button");
     card.className = "card" + (on ? " on" : "");
     const cv = document.createElement("canvas"); cv.width = 160; cv.height = 64;
-    const sk = makeSkin(q.skin, cv.getContext("2d")); sk.resize(160, 64); quickPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));
+    const sk = makeSkin(q.skin, cv.getContext("2d"), q.wallOpts ? q : undefined); sk.resize(160, 64); quickPreviews.push(watchPreview({ skin: sk, t: 0 }, cv));   // a look with its own wallpaper settings shows them
     card.append(cv);
     card.insertAdjacentHTML("beforeend", `<div class="bars">${bars(q.set.candleUp, q.set.candleDown)}</div><div class="label"><span>${esc(q.name)}<small>${esc(q.sub)}</small></span></div>`);
-    card.onclick = () => applyWithUndo($("keepBg") && $("keepBg").checked ? { enabled: true, candleClosedLook: "", ...q.set } : { enabled: true, skin: q.skin, candleClosedLook: "", ...q.set },
+    card.onclick = () => applyWithUndo($("keepBg") && $("keepBg").checked ? { enabled: true, candleClosedLook: "", ...q.set } : { enabled: true, skin: q.skin, candleClosedLook: "", ...q.set, ...(q.wallOpts ? { wallOpts: q.wallOpts } : {}) },
       $("keepBg") && $("keepBg").checked ? `Applied ${q.name} (kept your wallpaper).` : `Applied ${q.name}.`);
     box.appendChild(card);
   }
@@ -2975,7 +2997,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Tidier settings: each option is in one place now, and your saved looks were updated to match", "Live candle atmosphere: smoke, a light trail and an aura at the live candle (Chart \u203a Candle FX)", "Price and zones: zones react as price gets near, touches or enters them (Chart \u203a Lines, zones & labels)", "8 candle materials, in the look grid under Materials (Chart \u203a Candles)", "Zones light up when price is in them (Chart \u203a Lines, zones & labels \u203a Price in a zone)",
+const WHATS_NEW = ["Signature wallpapers: Imperial, Eclipse, Orion, Glacier, Void, Blood Moon and more (Wallpaper \u203a Looks \u203a Signature)", "Tidier settings: each option is in one place now, and your saved looks were updated to match", "Live candle atmosphere: smoke, a light trail and an aura at the live candle (Chart \u203a Candle FX)", "Price and zones: zones react as price gets near, touches or enters them (Chart \u203a Lines, zones & labels)", "8 candle materials, in the look grid under Materials (Chart \u203a Candles)", "Zones light up when price is in them (Chart \u203a Lines, zones & labels \u203a Price in a zone)",
   "Style the Buy / Sell buttons and the order ticket (TradingView \u203a Trade panel)",
   "Glass, Neon and Aurora edges for TradingView's panels and windows (TradingView \u203a Bars & panels)",
   "A zoom lens for your chart: press Alt+Shift+Z (Settings \u203a Magnifier)",
