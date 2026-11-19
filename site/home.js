@@ -9,7 +9,7 @@
   document.querySelectorAll(".reveal").forEach((el) => (io ? io.observe(el) : el.classList.add("in")));
 
   // ---------- playground ----------
-  const WALLS = [["blackhole", "Event Horizon"], ["inkflow", "Ink Flow"], ["aurora", "Polar Lights"], ["cybergrid", "Cyber Grid"], ["oilslick", "Oil Slick"], ["ocean", "Tide"]].filter(([k]) => SK[k]);
+  const WALLS = [["blackhole", "Event Horizon"], ["inkflow", "Ink Flow"], ["aurora", "Aurora"], ["cybergrid", "Cyber Grid"], ["oilslick", "Oil Slick"], ["ocean", "Tide"]].filter(([k]) => SK[k]);
   const LOOKS = ["solid", "neon", "glass", "chrome", "holo", "lava", "pill"].filter((k) => !CL || CL.META[k]);
   const COLS = [["#ffd27a", "#8c6bff"], ["#00ffa3", "#ff2e97"], ["#26a69a", "#ef5350"], ["#7df9ff", "#ff5ec8"], ["#ffffff", "#5c5f6e"]];
   const st = { wall: WALLS[0] ? WALLS[0][0] : null, look: "glass", col: 0, stream: false };
