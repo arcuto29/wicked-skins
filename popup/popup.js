@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
 const MAX_MB = 50;
-const CHART_KEYS = ["pnStyle","pnRound","pnWindows","tpOn","tpColors","tpBuy","tpSell","tpShape","tpStyle","tpPanel","frameOn","framePattern","frameMode","frameColor","frameColor2","frameW","frameAlpha","frameSize","frameRound","frameEdge","frameMove","barPatOn","barPattern","barMode","barColor","barColor2","barAlpha","barSize","barWhere","indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","zoneReact","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
+const CHART_KEYS = ["pnStyle","pnRound","pnWindows","tpOn","tpColors","tpBuy","tpSell","tpShape","tpStyle","tpPanel","frameOn","framePattern","frameMode","frameColor","frameColor2","frameW","frameAlpha","frameSize","frameRound","frameEdge","frameMove","barPatOn","barPattern","barMode","barColor","barColor2","barAlpha","barSize","barWhere","indMode","indColor","markMode","markColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","zoneReact","indGrad","txtMode","txtColor","txtOutline","txtSize","tkOn","tkColor","tkSize","tkFont","tkGlow","tkOnly","lgOn","lgColor","lgVals","lgBack","dlgMode","dlgColor","dlgAlpha","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle","panelMode","panelColor"];
 const LOOK_KEYS = [...CHART_KEYS, "atmoFx","atmoTrail","atmoAura","atmoColor","atmoCustom","atmoOpacity","atmoLen","atmoFade","zoneFx","smartDim","vignetteAt","opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","candleFxCore","candleFxEdge","candleFxAmt","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
@@ -24,7 +24,7 @@ const DEFAULTS = {
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", candleClosedLook: "", shiftSpeed: 10,
   candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, candleFxCore: "off", candleFxEdge: "off", candleFxAmt: 0.65, atmoFx: "off", atmoTrail: false, atmoAura: false, atmoColor: "candle", atmoCustom: "#7df9ff", atmoOpacity: 0.15, atmoLen: 4, atmoFade: 450, zoneFx: [], smartDim: "off", vignetteAt: "screen", skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",
-  indMode: "own", indColor: "", indCustom: {}, drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
+  indMode: "own", indColor: "", indCustom: {}, markMode: "own", markColor: "#ffd166", drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
   gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
   chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
   plOn: false, plColor: "", plW: 0, plStyle: "dotted",
@@ -61,7 +61,7 @@ function fontPicker(boxId, key) {
 // (TradingView's panels, the ticker, the legend and dialogs are one per page, so they stay shared.)
 const PER_CHART_KEYS = new Set(["candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","candleFxCore","candleFxEdge","candleFxAmt",
   "lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW",
-  "indMode","indColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle"]);
+  "indMode","indColor","markMode","markColor","indCustom","drawOn","zoneFill","zoneDim","zoneShape","zoneBorder","zoneStyle","indGrad","txtMode","txtColor","txtOutline","txtSize","sbOn","sbColor","sbW","sbStyle","axOn","axColor","axW","axStyle","gridOn","gridColor","gridAlpha","gridW","gridStyle","chOn","chColor","chW","chStyle","chGlow","chGlowColor","chLabels","plOn","plColor","plW","plStyle"]);
 let styleChart = 1, baseStyle = null;
 function routeChartStyle(obj) {
   if (styleChart < 2 || !baseStyle) return obj;
@@ -657,7 +657,10 @@ function syncIndicators() {
   if ($("zoneBorder")) seg("zoneBorder", [["line", "Line"], ["dashed", "Dashed"], ["double", "Double"], ["glow", "Glow"], ["none", "None"]], () => cfg.zoneBorder || "line", (v) => { set({ zoneBorder: v }); drawZonePreview(); });
   drawZonePreview();
   // Gradient colours: your own 2-3, or the built-in gradients
-  if ($("gradRow")) { $("gradRow").hidden = cfg.indMode !== "gradient";
+  // Markers: the small shapes on the chart (signal arrows, your trade arrows, an app's markers), in any colour
+  if ($("markMode")) { seg("markMode", [["own", "Own"], ["custom", "Colour"], ["candles", "Candles"], ["rainbow", "Rainbow"], ["gradient", "Gradient"], ["wallpaper", "Wallpaper"]], () => cfg.markMode || "own", (v) => { set({ markMode: v }); syncIndicators(); });
+    $("markColor").value = /^#[0-9a-f]{6}$/i.test(cfg.markColor || "") ? cfg.markColor : "#ffd166"; $("markColor").hidden = cfg.markMode !== "custom"; }
+  if ($("gradRow")) { $("gradRow").hidden = cfg.indMode !== "gradient" && cfg.markMode !== "gradient";
     const g = Array.isArray(cfg.indGrad) ? cfg.indGrad : [], DEF = ["#2fe6c8", "#3a9bff", "#8a6cff"];
     ["g1", "g2", "g3"].forEach((idk, k) => { const inp = $(idk); inp.value = g[k] || DEF[k];
       inp.oninput = () => set({ indGrad: ["g1", "g2", "g3"].map((x) => $(x).value) }); });
@@ -669,6 +672,7 @@ function syncIndicators() {
   $("indColor").value = /^#[0-9a-f]{6}$/i.test(cfg.indColor || "") ? cfg.indColor : "#ffd166";
 }
 if ($("indColor")) $("indColor").oninput = (e) => set({ indColor: e.target.value });
+if ($("markColor")) $("markColor").oninput = (e) => set({ markColor: e.target.value });
 // Each indicator: the lines and zones Priism has seen on your chart (by their own colour), each with its own colour,
 // glow, thickness (lines) and a hide switch. Settings are by colour, so they follow that indicator on every chart.
 const colourName = (k) => { const [r, g, b] = k.split(",").map(Number), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
@@ -689,7 +693,7 @@ async function renderEachInd() {
   if (!items.length) { box.innerHTML = `<p class="hint">Open a chart with your indicators on it (with Priism on). They show up here within a few seconds.</p>`; return; }
   box.innerHTML = (seen && seen.host ? `<p class="hint" style="margin:0 0 6px">On ${esc(seen.host)}:</p>` : "") + items.map((it) => {
     const e = cust[it.k] || {}, col = /^#/.test(e.c || "") ? e.c : toHex6(it.k), set = !!cust[it.k];
-    const label = it.name || `${it.kind === "zone" ? "Zone" : "Line"} (${colourName(it.k)})`;
+    const label = it.name || `${it.kind === "zone" ? "Zone" : it.kind === "marker" ? "Marker" : "Line"} (${colourName(it.k)})`;
     return `<div class="ind-row${set ? " set" : ""}${it.off ? " off" : ""}" data-k="${it.k}">
       <div class="ind-h"><i class="sw" style="background:${toHex6(it.k)}${it.kind === "zone" ? ";border-radius:2px" : ""}"></i><b>${esc(label)}</b>${it.off ? "<small>not on this chart</small>" : ""}
         <button class="link" data-a="reset" ${set ? "" : "hidden"}>Reset</button></div>
@@ -792,7 +796,7 @@ async function matchEverything(auto) {
     panelMode: "skin", dlgMode: "glass", uiAccent: soft,
     // indicators, their zones and your drawings take the wallpaper's own colours (each one its own; the same reading as
     // the candles), zones soft so the price reads through them; the legend and indicator text stay readable
-    indMode: "wallpaper", wallMatch: { src: String(cfg.skin) + "|" + String(cfg.mediaId || ""), colors }, zoneFill: Math.min(+cfg.zoneFill || 0.12, 0.14),
+    markMode: "wallpaper", indMode: "wallpaper", wallMatch: { src: String(cfg.skin) + "|" + String(cfg.mediaId || ""), colors }, zoneFill: Math.min(+cfg.zoneFill || 0.12, 0.14),
     drawOn: true, lgOn: true, lgColor: light, lgVals: "own", txtMode: "custom", txtColor: light,   // legend names in a light (or, on bright wallpapers, deep) tint of the wallpaper
     // everything means everything: indicators you'd given their own colour (Each indicator) take the wallpaper's too
     // (hidden ones stay hidden, and their shapes, borders, styles and widths stay), and the chart frame and interface
@@ -2997,7 +3001,7 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
 })();
 
 // ---------- welcome tour (first install) + "what's new" (once after each update) ----------
-const WHATS_NEW = ["Signature wallpapers: Imperial, Eclipse, Orion, Glacier, Void, Blood Moon and more (Wallpaper \u203a Looks \u203a Signature)", "Tidier settings: each option is in one place now, and your saved looks were updated to match", "Live candle atmosphere: smoke, a light trail and an aura at the live candle (Chart \u203a Candle FX)", "Price and zones: zones react as price gets near, touches or enters them (Chart \u203a Lines, zones & labels)", "8 candle materials, in the look grid under Materials (Chart \u203a Candles)", "Zones light up when price is in them (Chart \u203a Lines, zones & labels \u203a Price in a zone)",
+const WHATS_NEW = ["Markers in any colour: signal arrows, trade arrows and app markers, even Rainbow or Gradient (Chart \u203a Lines, zones & labels)", "Signature wallpapers: Imperial, Eclipse, Orion, Glacier, Void, Blood Moon and more (Wallpaper \u203a Looks \u203a Signature)", "Tidier settings: each option is in one place now, and your saved looks were updated to match", "Live candle atmosphere: smoke, a light trail and an aura at the live candle (Chart \u203a Candle FX)", "Price and zones: zones react as price gets near, touches or enters them (Chart \u203a Lines, zones & labels)", "8 candle materials, in the look grid under Materials (Chart \u203a Candles)", "Zones light up when price is in them (Chart \u203a Lines, zones & labels \u203a Price in a zone)",
   "Style the Buy / Sell buttons and the order ticket (TradingView \u203a Trade panel)",
   "Glass, Neon and Aurora edges for TradingView's panels and windows (TradingView \u203a Bars & panels)",
   "A zoom lens for your chart: press Alt+Shift+Z (Settings \u203a Magnifier)",

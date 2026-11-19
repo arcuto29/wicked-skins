@@ -934,5 +934,60 @@
     return { add, zone, clear, newest };
   })();
 
-  window.__bdCandleLooks = { fxv: 3, spot, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
+  // ---------- markers (Chart › Lines, zones & labels › Markers) ----------
+  // The small filled shapes on a chart: an indicator's signal arrows / triangles / circles / labels, your trade
+  // arrows, the markers an app puts on candles. Shared by hook.js and lw.js. shapeBox tracks the box of the path being
+  // built (device px); marker() decides whether a fill is a marker and what to fill it with. Only the colour changes:
+  // a marker's place, shape and text stay as the platform draws them.
+  // Tracked per piece of the path (each moveTo / rect starts a piece): TradingView draws all of one plot's shapes as
+  // one path with many small pieces, so a path counts as markers when its biggest piece is marker-sized.
+  const shapeBox = (() => {
+    const B = new WeakMap(); let installed = false;
+    const piece = (b) => { const w = b.cx1 - b.cx0, h = b.cy1 - b.cy0; if (w > b.mw) b.mw = w; if (h > b.mh) b.mh = h; };
+    const grow = (g, x, y, r, fresh) => { const t = g.getTransform(), X = x * t.a + t.e, Y = y * t.d + t.f, R = (r || 0) * Math.abs(t.a);
+      let b = B.get(g); if (!b) { b = { x0: X - R, y0: Y - R, x1: X + R, y1: Y + R, n: 0, mw: 0, mh: 0, cx0: X - R, cy0: Y - R, cx1: X + R, cy1: Y + R }; B.set(g, b); fresh = false; }
+      if (fresh) { piece(b); b.n++; b.cx0 = X - R; b.cy0 = Y - R; b.cx1 = X + R; b.cy1 = Y + R; }
+      else { if (X - R < b.cx0) b.cx0 = X - R; if (X + R > b.cx1) b.cx1 = X + R; if (Y - R < b.cy0) b.cy0 = Y - R; if (Y + R > b.cy1) b.cy1 = Y + R; }
+      if (X - R < b.x0) b.x0 = X - R; if (X + R > b.x1) b.x1 = X + R; if (Y - R < b.y0) b.y0 = Y - R; if (Y + R > b.y1) b.y1 = Y + R; };
+    function install() {
+      if (installed || typeof CanvasRenderingContext2D === "undefined") return; installed = true;
+      const P = CanvasRenderingContext2D.prototype, w = (m, f) => { const o = P[m]; if (typeof o === "function") P[m] = function (...a) { f(this, a); return o.apply(this, a); }; };
+      w("beginPath", (g) => B.delete(g));
+      w("moveTo", (g, a) => grow(g, a[0], a[1], 0, true)); w("lineTo", (g, a) => grow(g, a[0], a[1]));
+      w("arc", (g, a) => grow(g, a[0], a[1], a[2])); w("ellipse", (g, a) => grow(g, a[0], a[1], Math.max(a[2], a[3])));
+      w("rect", (g, a) => { grow(g, a[0], a[1], 0, true); grow(g, a[0] + a[2], a[1] + a[3]); }); w("roundRect", (g, a) => { grow(g, a[0], a[1], 0, true); grow(g, a[0] + a[2], a[1] + a[3]); });
+      w("quadraticCurveTo", (g, a) => { grow(g, a[0], a[1]); grow(g, a[2], a[3]); }); w("bezierCurveTo", (g, a) => { grow(g, a[0], a[1]); grow(g, a[2], a[3]); grow(g, a[4], a[5]); });
+    }
+    // the path's box, and its biggest piece (pw x ph, device px)
+    const get = (g) => { const b = B.get(g); if (!b) return null; piece(b); return { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y1, pw: b.mw, ph: b.mh, n: b.n + 1 }; };
+    return { install, get };
+  })();
+  const MARK_MODES = ["own", "custom", "candles", "rainbow", "gradient", "wallpaper"];
+  // o = { mode, color, up, down, accent, custom (Each indicator), grad, glow }. orig = the marker's own colour.
+  // box = its box in device px (null = use the path being built). Returns null (leave it) or { s, g, glow, hide }.
+  function marker(g, orig, o, box) {
+    if (!o) return null;
+    const c = g.canvas; if (!c) return null;
+    const b = box || shapeBox.get(g); if (!b) return null;
+    const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1, W = (b.pw !== undefined ? b.pw : b.x1 - b.x0) / dpr, H = (b.ph !== undefined ? b.ph : b.y1 - b.y0) / dpr;
+    if (W < 1.8 || H < 1.8 || W > 46 || H > 46 || W > H * 2.6 || H > W * 2.6) return null;   // small (each piece: TradingView's tiny shapes are ~3 px), not a long label or a level line's tag
+    if (b.n > 1 && b.n < 3 && (b.x1 - b.x0) / dpr > 60) return null;   // two pieces far apart: a drawing's handles, not a run of markers
+    const r = keyOf(String(orig)); if (!r || r.a < 0.35) return null;
+    const [R, G, Bl] = r.k.split(",").map(Number); if (Math.max(R, G, Bl) - Math.min(R, G, Bl) < 26) return null;   // greys (text boxes, handles) stay as they are
+    const e = o.custom && o.custom[r.k];
+    if (e && e.h) return { hide: true };
+    const gl = e && e.g !== undefined && e.g !== null && e.g !== "" ? +e.g || 0 : o.mode !== "own" ? +o.glow || 0 : 0;
+    // its own colour (Each indicator) wins, then the Markers colour
+    if (e && /^#[0-9a-f]{6}$/i.test(e.c || "")) return { s: withAlpha(e.c, r.a), g: e.c, glow: gl };
+    const kind = e && (e.c === "rainbow" || e.c === "gradient") ? e.c : o.mode;
+    if (kind === "own") return gl > 0 ? { s: orig, g: `rgb(${r.k})`, glow: gl } : null;
+    if (kind === "custom") return /^#[0-9a-f]{6}$/i.test(o.color || "") ? { s: withAlpha(o.color, r.a), g: o.color, glow: gl } : null;   // exactly your colour
+    if (kind === "candles" && /^#[0-9a-f]{6}$/i.test(o.up || "") && /^#[0-9a-f]{6}$/i.test(o.down || "")) {   // green-ish (buy / up) markers take your up colour
+      const col = G >= R ? o.up : o.down; return { s: withAlpha(col, r.a), g: col, glow: gl }; }
+    const grad = kind === "rainbow" || kind === "gradient";
+    const a = indicatorAll(g, orig, { ...o, mode: kind }, grad ? kind : false, r.a >= 0.99 ? undefined : r.a, true);
+    return a ? { s: a.s, g: a.g, glow: gl } : null;
+  }
+
+  window.__bdCandleLooks = { fxv: 4, spot, shapeBox, marker, MARK_MODES, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
 })();

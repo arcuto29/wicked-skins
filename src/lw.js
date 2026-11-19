@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 26;
+  const LW_VERSION = 27;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -119,7 +119,7 @@
     try {
       const f = JSON.parse((rawIn !== undefined ? rawIn : htmlEl().getAttribute("data-ws-fx")) || "null");
       const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
-      const any = f && (f.lineGlow > 0 || f.zoneDim || (f.zoneReact && f.zoneReact !== "off") || (f.zoneShape && f.zoneShape !== "square") || (f.zoneBorder && f.zoneBorder !== "line") || (f.zoneStyle && f.zoneStyle !== "flat") || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
+      const any = f && ((f.markMode && f.markMode !== "own") || f.lineGlow > 0 || f.zoneDim || (f.zoneReact && f.zoneReact !== "off") || (f.zoneShape && f.zoneShape !== "square") || (f.zoneBorder && f.zoneBorder !== "line") || (f.zoneStyle && f.zoneStyle !== "flat") || (f.indMode && f.indMode !== "own") || (f.indCustom && Object.keys(f.indCustom).length > 0) || f.gridOn || f.chOn || f.plOn || f.bracketOn || f.privacy || f.scaleText || f.scaleGlow > 0 || f.scaleBold || f.scaleSize > 0 || (f.scaleFont && f.scaleFont !== "default") || (f.scaleBg && f.scaleBg !== "auto"));
       // Chart text: read whenever Priism is on (its "Own" setting still lightens black text on a dark wallpaper)
       ltx = f ? { mode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", color: hex(f.txtColor), outline: Math.max(0, Math.min(2, +f.txtOutline || 0)),
         size: Math.max(0, Math.min(2, +f.txtSize || 0)), bg: f.bg === "light" ? "light" : "dark" } : null;
@@ -137,6 +137,7 @@
         chOn: !!f.chOn, chColor: colOk(f.chColor), chW: Math.max(0, Math.min(2, +f.chW || 0)), chStyle: styleOk(f.chStyle, "dashed"), chGlow: !!f.chGlow, chGlowColor: colOk(f.chGlowColor), chLabels: !!f.chLabels,
         plOn: !!f.plOn, plColor: colOk(f.plColor), plW: Math.max(0, Math.min(2, +f.plW || 0)), plStyle: styleOk(f.plStyle, "dotted"),
         lineGlow: Math.max(0, Math.min(1, +f.lineGlow || 0)),   // Style → Line glow: indicator lines and drawings
+        markMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.markMode) ? f.markMode : "own", markColor: /^#[0-9a-f]{6}$/i.test(f.markColor || "") ? f.markColor : "",
         indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: (() => { const o = {}; for (const [k, e] of Object.entries(f.indCustom && typeof f.indCustom === "object" ? f.indCustom : {}).slice(0, 40))
           if (/^\d{1,3},\d{1,3},\d{1,3}$/.test(k) && e && typeof e === "object") o[k] = { c: e.c === "rainbow" || e.c === "gradient" || /^#[0-9a-f]{6}$/i.test(e.c || "") ? e.c : "",
@@ -395,6 +396,17 @@
     // zone. Used for boxes drawn with fillRect AND as a one-rectangle path (rect / roundRect + fill), as plugins and apps
     // draw them both ways. plain() draws the box the way the platform asked (in the new colour); restore() puts the
     // platform's own path back after a shaped zone (so a stroke it draws next outlines its own box). true = handled.
+    // Markers: on when a Markers colour is picked, or Each indicator has something set up
+    const markOn = () => !!(lfx && (lfx.markMode !== "own" || (lfx.indCustom && Object.keys(lfx.indCustom).length)));
+    function markDraw(g, box, draw) {
+      const L = window.__bdCandleLooks; if (!L || !L.marker) return false; L.shapeBox.install();
+      const m = L.marker(g, g.__bdLwOrig, { mode: lfx.markMode, color: lfx.markColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, grad: lfx.indGrad, glow: lfx.lineGlow }, box);
+      if (!m) return false; L.noteSeen(g.__bdLwOrig, "marker"); (g.__bdMark || (g.__bdMark = new Map())).set(g.__bdLwOrig, { m, t: performance.now() }); if (m.hide) return true;
+      const pF = g.fillStyle, pB = g.shadowBlur, pC = g.shadowColor; fillDesc.set.call(g, m.s);
+      if (m.glow > 0) { g.shadowColor = m.g; g.shadowBlur = 3 + m.glow * 14; }
+      inLook = true; try { draw(); } finally { inLook = false; fillDesc.set.call(g, pF); g.shadowBlur = pB; g.shadowColor = pC; }
+      return true;
+    }
     function zoneDraw(g, c, x, y, w, h, plain, restore) {
       if (!(on && c && isChart(c) && c.width > 200 && c.height > 120 && typeof g.__bdLwOrig === "string" && !isCandleCol(g.__bdLwOrig) && !isCandleCol(remap(g.__bdLwOrig)))) return false;
         const L = window.__bdCandleLooks, t = g.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
@@ -464,6 +476,12 @@
           const prev = this.fillStyle; fillDesc.set.call(this, tint); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, prev); return;
         }
       }
+      // a small square marker (some apps draw square markers as a rect)
+      if (on && c && isPaneC(c) && typeof this.__bdLwOrig === "string" && markOn() && !isCandleCol(this.__bdLwOrig) && !isCandleCol(remap(this.__bdLwOrig))) {
+        const t = this.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
+        // (candles are told apart by their colour, not their size: a square marker can be as wide as a candle)
+        if (W >= 4 && H >= 4 && W <= 30 && H <= 30 && W >= H * 0.75 && H >= W * 0.75) { const X = Math.min(x, x + w) * (t.a || 1) + t.e, Y = Math.min(y, y + h) * (t.d || 1) + t.f;
+          if (markDraw(this, { x0: X, y0: Y, x1: X + W, y1: Y + H }, () => origFillRect.call(this, x, y, w, h))) return; } }
       if (zoneDraw(this, c, x, y, w, h, () => origFillRect.call(this, x, y, w, h))) return;
       drawCalls.fillRect++;
       if (on && c) noteSolidHook(this, x, y, w, h);
@@ -514,6 +532,9 @@
       }
       if (on && candles && c && !a.length && !inLook) { const b = pbox.get(this);
         if (b && candleLook(this, c, b.x, b.y, b.w, b.h)) { drawCalls.pathLook = (drawCalls.pathLook || 0) + 1; return; } }
+      // a marker (an app's or indicator's arrows / circles / labels on candles): Markers colour, glow, Each indicator
+      if (on && c && !a.length && !inLook && isPaneC(c) && typeof this.__bdLwOrig === "string" && markOn() && !isCandleCol(this.__bdLwOrig)) { const p = pbox.get(this);
+        if (!(p && p.w * (this.getTransform().a || 1) <= candleMaxW(c) + 1)) { const r = markDraw(this, null, () => origFillP.apply(this, a)); if (r) return; } }   // (a one-rect path the width of a candle is a candle)
       // a zone drawn as one rectangle path (rect / roundRect + fill): styled like a fillRect zone
       if (on && c && !a.length && !inLook) { const b = pbox.get(this);
         if (b && zoneDraw(this, c, b.x, b.y, b.w, b.h, () => origFillP.call(this), () => { oBegin.call(this); oRect.call(this, b.x, b.y, b.w, b.h); pbox.set(this, { ...b }); })) return; }
@@ -694,6 +715,10 @@
     proto.fillText = function (t, x, y, ...rest) {
       const c = this.canvas;
       if (!on || !c || inLook) return oText.call(this, t, x, y, ...rest);
+      // a marker's own text ("B", "S", a short label), in the marker's colour: it takes the marker's new colour too
+      // (apps draw every marker's shape, then every marker's text: remembered by colour for this paint)
+      { const mk = this.__bdMark && this.__bdMark.get(this.__bdLwOrig); if (mk && typeof t === "string" && t.length <= 24 && performance.now() - mk.t < 60) { if (mk.m.hide) return;
+        const pF = this.fillStyle; fillDesc.set.call(this, mk.m.s); const r = oText.call(this, t, x, y, ...rest); fillDesc.set.call(this, pF); return r; } }
       if (isPaneC(c)) {                                   // text on the chart itself: a P&L readout (for Live mood: P&L)
         const m = typeof t === "string" && t.length < 40 && t.trim().match(PNL_RE);
         if (m && (m[1] || m[2] || m[3] || m[6] || /^p/i.test(t.trim()))) {

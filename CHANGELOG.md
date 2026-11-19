@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: marker colours
+- **New: Markers** (Chart › Lines, zones & labels, under Indicators): the small shapes on a chart, in any colour. That covers an indicator's signal arrows, triangles, circles and labels, your trade arrows, and the markers an app like nq.vision puts on candles.
+  - Choose Own, Colour (any colour, exactly), Candles (buy / up markers in your up colour, the rest your down colour), Rainbow, Gradient (the same gradient colours as Indicators) or Wallpaper.
+  - Glow follows the existing Glow slider.
+  - A marker's text ("B", "S") takes the marker's new colour.
+  - Each marker colour shows up in Each indicator, where you can give it its own colour or hide it.
+  - Match everything covers markers too.
+  - Only the colour changes: where a marker sits, its shape and its text stay as the platform draws them. Candles and zones are untouched.
+
 ## 0.1.86 (2026-11-04)
 
 ### Signature wallpaper collection
