@@ -733,20 +733,17 @@
     const S = new WeakMap(), open = new Set(), painted = new Set();
     let queued = false, busy = false, seq = 0, wrapped = false;
     let hint = null;   // the platform's own answer, where it has one: (canvas) => newest bar's x (device px) | null (off screen) | undefined (don't know)
-    const st = (g) => { let s = S.get(g); if (!s) S.set(g, s = { grp: null, sp: 0, run: 0, liveCx: null, maxCx: -1e9, maxOk: false, cols: new Set(), priceY: null, paintMax: -1e9 }); return s; };
+    const st = (g) => { let s = S.get(g); if (!s) S.set(g, s = { grp: null, sp: 0, run: 0, liveCx: null, maxCx: -1e9, maxOk: false, cols: new Set(), priceY: null }); return s; };
     const onPrice = (s, grp) => s.priceY !== null && grp.ys.some((y) => Math.abs(y - s.priceY) <= 2);
     function end(g, s, runEnd) {
       const grp = s.grp; if (!grp) return; s.grp = null; open.delete(g);
       // Is this the newest bar of the data? The platform says so where it can (TradingView: its chart model knows the
-      // newest bar's place, also in replay and on every timeframe). Otherwise: the rightmost bar drawn on this canvas in
-      // this paint, with room to its right or its body on the last-price line. (Charts draw wicks, borders and bodies
-      // in separate passes: when the newest visible bar is cut off at the right edge, its body isn't drawn, so the
-      // bodies' pass ends one bar earlier. That bar is not the newest, and checking "rightmost in this paint" stops it
-      // counting as live.)
+      // newest bar's place, for each chart, also when scrolled, zoomed, on any timeframe and in replay). Otherwise:
+      // room to its right, or its body on the last-price line.
       const W = g.canvas ? g.canvas.width : 0, h = hint && g.canvas ? hint(g.canvas) : undefined;
       const ok = typeof h === "number" ? Math.abs(grp.cx - h) <= Math.max(2.5, s.sp * 0.6)
         : h === null ? false
-        : s.sp >= 4 && grp.cx >= s.paintMax - s.sp * 0.5 && (W - grp.cx > s.sp * 1.15 + 1 || (W - grp.cx > -s.sp && onPrice(s, grp)));
+        : s.sp >= 4 && (W - grp.cx > s.sp * 1.15 + 1 || (W - grp.cx > -s.sp && onPrice(s, grp)));
       s.run++;
       if (grp.cx > s.maxCx) { s.maxCx = grp.cx; s.maxOk = ok; }
       // a pass of 3+ bars ending here, or (charts that start a new path for every candle) where the live bar was last paint
@@ -757,7 +754,7 @@
     function settle() {
       queued = false;
       for (const g of [...open]) { const s = S.get(g); if (s) end(g, s, true); }
-      for (const g of painted) { const s = S.get(g); if (s) { s.liveCx = s.maxOk ? s.maxCx : null; s.maxCx = -1e9; s.maxOk = false; s.run = 0; s.cols.clear(); s.paintMax = -1e9; } }
+      for (const g of painted) { const s = S.get(g); if (s) { s.liveCx = s.maxOk ? s.maxCx : null; s.maxCx = -1e9; s.maxOk = false; s.run = 0; s.cols.clear(); } }
       painted.clear();
     }
     const flush = (g) => { if (!busy && open.size && open.has(g)) { const s = S.get(g); if (s) end(g, s, true); } };
@@ -788,7 +785,7 @@
       add(g, X, W, part, col, Y0, Y1) {
         if (!wrapped) wrap();
         seq++;
-        const s = st(g), cx = X + W / 2; painted.add(g); if (cx > s.paintMax) s.paintMax = cx;
+        const s = st(g), cx = X + W / 2; painted.add(g);
         if (col && s.cols.size < 16) s.cols.add(String(col).toLowerCase());
         if (!queued) { queued = true; queueMicrotask(settle); }
         const grp = s.grp, body = W >= 2 && Y0 !== undefined;
