@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 34;
+  const HOOK_VERSION = 35;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -371,7 +371,7 @@
     if (fx.zoneReact && fx.zoneReact !== "off" && r.a < 0.9 && H < c.height * 0.9 && L.zoneHot) {
       const t = ctx.getTransform(), b = w === 1e4 ? pathBox.get(ctx) : null;
       const X = b ? b.x0 : Math.min(x, x + w) * (t.a || 1) + t.e, Y = b ? b.y0 : Math.min(y, y + h) * (t.d || 1) + t.f;
-      hot = isFinite(X) && isFinite(Y) ? L.zoneHot(c, X, Y, W, H) : 0; at = { ctx, X, Y, W, H };
+      hot = isFinite(X) && isFinite(Y) ? L.zoneHot(c, X, Y, W, H) : 0; at = { ctx, X, Y, W, H }; if (hot) zoneAnimAt = performance.now();
     }
     const heat = (z) => (hot && z ? L.zoneHeat(z, fx.zoneReact, at) : z);
     if (!own && !all && !dim && !shaped && !hot && !glowOwn) return null;
@@ -765,6 +765,14 @@
   // toneOnly: only the wallpaper's brightness behind the scale moved (e.g. while a chart is moved or resized). On
   // platforms without TradingView's own redraw (prop firms, nq.vision) that never triggers a rebuild: they redraw
   // themselves a moment later anyway, and rebuilding on every step of a divider drag hid the charts over and over.
+  // Price in a zone animates (a soft pulse, the Spotlight, the Shimmer sheen), but TradingView only redraws a still
+  // chart when something changes. While a zone price is in was drawn in the last second, ask for TradingView's own
+  // light redraw ~8 times a second (4 on Lite); it stops by itself when price leaves the zone. Never with reduced motion.
+  let zoneAnimAt = -1e9;
+  const reduceZ = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)"); } catch { return { matches: false }; } })();
+  (function zoneAnim() { const lite = !!window.__bdLite;
+    setTimeout(zoneAnim, lite ? 250 : 125);
+    if (on && fx.zoneReact && fx.zoneReact !== "off" && !reduceZ.matches && !document.hidden && performance.now() - zoneAnimAt < 1000) apiRepaint(); })();
   function forceRepaint(softOnly, toneOnly) {
     if (!softRaf) softRaf = requestAnimationFrame(() => {
       softRaf = 0; stats.soft++;

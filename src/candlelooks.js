@@ -825,7 +825,7 @@
   // position). Never covers the candles: fills stay see-through.
   function zoneHeat(z, how, at) {
     if (!z || z.hide) return z;
-    const now = performance.now() / 1000, pulse = 0.75 + 0.25 * Math.sin(now * Math.PI * 1.2);
+    const now = still ? 0.42 : performance.now() / 1000, pulse = still ? 0.9 : 0.75 + 0.25 * Math.sin(now * Math.PI * 1.2);   // reduced motion: held still
     const rk = typeof z.f === "string" ? keyOf(z.f) : null, base = rk ? rk.k : null, a0 = rk ? Math.max(rk.a, 0.06) : 0.12;
     const edge = base ? `rgba(${base},${(0.75 + 0.25 * pulse).toFixed(3)})` : z.e, g = base ? `rgb(${base})` : z.g;
     if (how === "edge") return { ...z, e: edge, g, glow: Math.max(z.glow || 0, 0.35 * pulse), hot: true };
