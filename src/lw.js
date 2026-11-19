@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 25;
+  const LW_VERSION = 26;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -391,6 +391,59 @@
     if (oRound) proto.roundRect = function (x, y, w, h, ...r) { if (on) { const b = pbox.get(this); pbox.set(this, b === undefined ? { x, y, w, h } : null); } return oRound.call(this, x, y, w, h, ...r); };
     const origStrokeRectLw = proto.strokeRect;
     const toHexCol = (v) => { const r = rgbKey(v); return r ? "#" + r.key.split(",").map((n) => (+n).toString(16).padStart(2, "0")).join("") : v; };
+    // An indicator's zone (a see-through box): your colours, shape, border, style, glow, dim, Each indicator, Price in a
+    // zone. Used for boxes drawn with fillRect AND as a one-rectangle path (rect / roundRect + fill), as plugins and apps
+    // draw them both ways. plain() draws the box the way the platform asked (in the new colour); restore() puts the
+    // platform's own path back after a shaped zone (so a stroke it draws next outlines its own box). true = handled.
+    function zoneDraw(g, c, x, y, w, h, plain, restore) {
+      if (!(on && c && isChart(c) && c.width > 200 && c.height > 120 && typeof g.__bdLwOrig === "string" && !isCandleCol(g.__bdLwOrig) && !isCandleCol(remap(g.__bdLwOrig)))) return false;
+        const L = window.__bdCandleLooks, t = g.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
+        if (L && L.zone && W >= 12 && H >= 2 && W * H >= 150) {
+          L.noteSeen(g.__bdLwOrig, "zone");
+          // its own settings (Each indicator), or the all-indicators colour (greys stay grey, like grey lines)
+          const zk = L.keyOf(g.__bdLwOrig), own = zk && lfx && lfx.indCustom && lfx.indCustom[zk.k];
+          const all = zk && lfx && lfx.indMode && lfx.indMode !== "own" && !greyish(`rgb(${zk.k})`) && candlesKnown() && !ownCandle(zk.k);
+          const dim = !!(zk && lfx && lfx.zoneDim && zk.a < 0.9 && !ownCandle(zk.k));   // Dim all zones
+          // the Glow slider (Indicators) also glows zones left in their own colours: on their edge
+          const glowOwn = !!(zk && lfx && lfx.lineGlow > 0 && zk.a < 0.9 && !ownCandle(zk.k) && !greyish(`rgb(${zk.k})`) && H < c.height * 0.9 && W >= 16 && H >= 4);
+          const dprL = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
+          // this zone's own shape / border / style (Each indicator), or all zones'
+          const zShape = (own && own.s) || (lfx ? lfx.zoneShape : "square"), zBorder = (own && own.b) || (lfx ? lfx.zoneBorder : "line"), zStyle = (own && own.y) || (lfx ? lfx.zoneStyle : "flat");
+          let shaped = lfx && (zShape !== "square" || zBorder !== "line" || zStyle !== "flat") && zk && zk.a < 0.9 && !ownCandle(zk.k)
+            && H >= 8 * dprL && W >= 24 * dprL && !stackedL.has(zk.k + "|" + zk.a)    // not slivers (zoomed out), not the position tool
+            && (!dragL || knownL.has(zk.k + "|" + zk.a) || !(dragSkipL = true));       // nor what only shows while you drag (stop / target areas)
+          if (shaped && !dragL && knownL.size < 500) knownL.add(zk.k + "|" + zk.a);
+          if (shaped) {                      // two zone boxes touching edge to edge in one paint = a Long / Short tool: square
+            const X = Math.min(x, x + w) * (t.a || 1) + t.e, Y = Math.min(y, y + h) * (t.d || 1) + t.f, key = zk.k + "|" + zk.a;
+            let PB = paintL.get(c); if (!PB) { PB = []; paintL.set(c, PB); queueMicrotask(() => paintL.delete(c)); }
+            for (const b of PB) if (b.k !== key && Math.abs(b.X - X) <= 3 && Math.abs(b.X + b.W - X - W) <= 3 && (Math.abs(b.Y + b.H - Y) <= 2.5 || Math.abs(Y + H - b.Y) <= 2.5)) { stackedL.add(key); stackedL.add(b.k); shaped = false; setTimeout(repaint, 0); }
+            PB.push({ X, Y, W, H, k: key });
+          }
+          // price is in this zone right now (Price in a zone)
+          const ZX = Math.min(x, x + w) * (t.a || 1) + t.e, ZY = Math.min(y, y + h) * (t.d || 1) + t.f;
+          if (candles && candles.Z && L.spot && zk && zk.a < 0.9 && !ownCandle(zk.k) && H < c.height * 0.9 && H >= 4 && W >= 16) L.spot.zone(c, ZX, ZY, W, H, zk.k);   // Zone lights
+          const hot = lfx && lfx.zoneReact !== "off" && zk && zk.a < 0.9 && !ownCandle(zk.k) && H < c.height * 0.9 && L.zoneHot ? L.zoneHot(c, ZX, ZY, W, H) : 0;
+          let z = !(own || all || dim) && (shaped || hot || glowOwn) ? ((zo) => (zo && glowOwn ? { ...zo, glow: lfx.lineGlow } : zo))(L.zoneOwn(g.__bdLwOrig)) : own || all || dim ? L.zone(g.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow, zoneFill: lfx.zoneFill, dim, grad: lfx.indGrad }, g) : null;
+          if (hot && z) z = L.zoneHeat(z, lfx.zoneReact, { ctx: g, X: ZX, Y: ZY, W, H });
+          if (z && W <= candleMaxW(c) && H < c.height * 0.8) noteShape(g.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
+          if (z) { if (z.hide) return true; const pF = g.fillStyle, pB = g.shadowBlur, pC = g.shadowColor;
+            // the neon edge (see candlelooks zone()): boxes and bands only, not full-height shading or slivers
+            const edge = z.e && H < c.height * 0.9 && W >= 6 && H >= 3 ? z.e : null;
+            if (shaped && L.zoneBox && H < c.height * 0.9) {                 // rounded / pill / dashed / double / glow
+              const zz = { ...z, e: edge }, k = { begin: () => g.beginPath(), fill: () => origFillPathL.call(g), stroke: () => origStrokeP.call(g),
+                style: (v) => fillDesc.set.call(g, v), strokeStyle: (v) => strokeDesc.set.call(g, v) };
+              inLook = true; try { if (L.zoneBox(g, k, x, y, w, h, zz, { shape: zShape, border: zBorder, style: zStyle, px: 1 / (t.a || 1) })) { if (restore) restore(); return true; } } finally { inLook = false; } }
+            fillDesc.set.call(g, z.f); if (z.glow > 0 && !edge) { g.shadowColor = z.g; g.shadowBlur = 3 + z.glow * 22; }
+            plain(); fillDesc.set.call(g, pF); g.shadowBlur = pB; g.shadowColor = pC;
+            if (edge) { const pS = strokeDesc.get.call(g), pW = g.lineWidth, pD = g.getLineDash();
+              strokeDesc.set.call(g, edge); g.lineWidth = Math.max(1, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1) / (t.a || 1); g.setLineDash([]);
+              if (z.glow > 0) { g.shadowColor = z.g; g.shadowBlur = 3 + z.glow * 18; }
+              origStrokeRectLw.call(g, x, y, w, h);
+              strokeDesc.set.call(g, pS); g.lineWidth = pW; g.setLineDash(pD); g.shadowBlur = pB; g.shadowColor = pC; }
+            return true; }
+        }
+            return false;
+    }
     proto.fillRect = function (x, y, w, h) {
       const c = this.canvas;
       if (on && c && typeof this.__bdLwOrig === "string" && Math.abs(w) < c.width * 0.5 && Math.abs(h) < c.height * 0.5 && (inLwTable(c) || isChart(c))) noteFill(this.__bdLwOrig);
@@ -411,51 +464,7 @@
           const prev = this.fillStyle; fillDesc.set.call(this, tint); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, prev); return;
         }
       }
-      if (on && c && isChart(c) && c.width > 200 && c.height > 120 && typeof this.__bdLwOrig === "string" && !isCandleCol(this.__bdLwOrig) && !isCandleCol(remap(this.__bdLwOrig))) {
-        const L = window.__bdCandleLooks, t = this.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
-        if (L && L.zone && W >= 12 && H >= 2 && W * H >= 150) {
-          L.noteSeen(this.__bdLwOrig, "zone");
-          // its own settings (Each indicator), or the all-indicators colour (greys stay grey, like grey lines)
-          const zk = L.keyOf(this.__bdLwOrig), own = zk && lfx && lfx.indCustom && lfx.indCustom[zk.k];
-          const all = zk && lfx && lfx.indMode && lfx.indMode !== "own" && !greyish(`rgb(${zk.k})`) && candlesKnown() && !ownCandle(zk.k);
-          const dim = !!(zk && lfx && lfx.zoneDim && zk.a < 0.9 && !ownCandle(zk.k));   // Dim all zones
-          const dprL = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1;
-          // this zone's own shape / border / style (Each indicator), or all zones'
-          const zShape = (own && own.s) || (lfx ? lfx.zoneShape : "square"), zBorder = (own && own.b) || (lfx ? lfx.zoneBorder : "line"), zStyle = (own && own.y) || (lfx ? lfx.zoneStyle : "flat");
-          let shaped = lfx && (zShape !== "square" || zBorder !== "line" || zStyle !== "flat") && zk && zk.a < 0.9 && !ownCandle(zk.k)
-            && H >= 8 * dprL && W >= 24 * dprL && !stackedL.has(zk.k + "|" + zk.a)    // not slivers (zoomed out), not the position tool
-            && (!dragL || knownL.has(zk.k + "|" + zk.a) || !(dragSkipL = true));       // nor what only shows while you drag (stop / target areas)
-          if (shaped && !dragL && knownL.size < 500) knownL.add(zk.k + "|" + zk.a);
-          if (shaped) {                      // two zone boxes touching edge to edge in one paint = a Long / Short tool: square
-            const X = Math.min(x, x + w) * (t.a || 1) + t.e, Y = Math.min(y, y + h) * (t.d || 1) + t.f, key = zk.k + "|" + zk.a;
-            let PB = paintL.get(c); if (!PB) { PB = []; paintL.set(c, PB); queueMicrotask(() => paintL.delete(c)); }
-            for (const b of PB) if (b.k !== key && Math.abs(b.X - X) <= 3 && Math.abs(b.X + b.W - X - W) <= 3 && (Math.abs(b.Y + b.H - Y) <= 2.5 || Math.abs(Y + H - b.Y) <= 2.5)) { stackedL.add(key); stackedL.add(b.k); shaped = false; setTimeout(repaint, 0); }
-            PB.push({ X, Y, W, H, k: key });
-          }
-          // price is in this zone right now (Price in a zone)
-          const ZX = Math.min(x, x + w) * (t.a || 1) + t.e, ZY = Math.min(y, y + h) * (t.d || 1) + t.f;
-          if (candles && candles.Z && L.spot && zk && zk.a < 0.9 && !ownCandle(zk.k) && H < c.height * 0.9 && H >= 4 && W >= 16) L.spot.zone(c, ZX, ZY, W, H, zk.k);   // Zone lights
-          const hot = lfx && lfx.zoneReact !== "off" && zk && zk.a < 0.9 && !ownCandle(zk.k) && H < c.height * 0.9 && L.zoneHot ? L.zoneHot(c, ZX, ZY, W, H) : 0;
-          let z = !(own || all || dim) && (shaped || hot) ? L.zoneOwn(this.__bdLwOrig) : own || all || dim ? L.zone(this.__bdLwOrig, { mode: all ? lfx.indMode : "own", color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, glow: lfx.lineGlow, zoneFill: lfx.zoneFill, dim, grad: lfx.indGrad }, this) : null;
-          if (hot && z) z = L.zoneHeat(z, lfx.zoneReact, { ctx: this, X: ZX, Y: ZY, W, H });
-          if (z && W <= candleMaxW(c) && H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // keep learning the candles' shape
-          if (z) { if (z.hide) return; const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
-            // the neon edge (see candlelooks zone()): boxes and bands only, not full-height shading or slivers
-            const edge = z.e && H < c.height * 0.9 && W >= 6 && H >= 3 ? z.e : null;
-            if (shaped && L.zoneBox && H < c.height * 0.9) {                 // rounded / pill / dashed / double / glow
-              const zz = { ...z, e: edge }, k = { begin: () => this.beginPath(), fill: () => origFillPathL.call(this), stroke: () => origStrokeP.call(this),
-                style: (v) => fillDesc.set.call(this, v), strokeStyle: (v) => strokeDesc.set.call(this, v) };
-              inLook = true; try { if (L.zoneBox(this, k, x, y, w, h, zz, { shape: zShape, border: zBorder, style: zStyle, px: 1 / (t.a || 1) })) return; } finally { inLook = false; } }
-            fillDesc.set.call(this, z.f); if (z.glow > 0 && !edge) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 22; }
-            origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, pF); this.shadowBlur = pB; this.shadowColor = pC;
-            if (edge) { const pS = strokeDesc.get.call(this), pW = this.lineWidth, pD = this.getLineDash();
-              strokeDesc.set.call(this, edge); this.lineWidth = Math.max(1, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1) / (t.a || 1); this.setLineDash([]);
-              if (z.glow > 0) { this.shadowColor = z.g; this.shadowBlur = 3 + z.glow * 18; }
-              origStrokeRectLw.call(this, x, y, w, h);
-              strokeDesc.set.call(this, pS); this.lineWidth = pW; this.setLineDash(pD); this.shadowBlur = pB; this.shadowColor = pC; }
-            return; }
-        }
-      }
+      if (zoneDraw(this, c, x, y, w, h, () => origFillRect.call(this, x, y, w, h))) return;
       drawCalls.fillRect++;
       if (on && c) noteSolidHook(this, x, y, w, h);
       if (on && c && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle) && labelBox(this, w, h)) {
@@ -505,6 +514,9 @@
       }
       if (on && candles && c && !a.length && !inLook) { const b = pbox.get(this);
         if (b && candleLook(this, c, b.x, b.y, b.w, b.h)) { drawCalls.pathLook = (drawCalls.pathLook || 0) + 1; return; } }
+      // a zone drawn as one rectangle path (rect / roundRect + fill): styled like a fillRect zone
+      if (on && c && !a.length && !inLook) { const b = pbox.get(this);
+        if (b && zoneDraw(this, c, b.x, b.y, b.w, b.h, () => origFillP.call(this), () => { oBegin.call(this); oRect.call(this, b.x, b.y, b.w, b.h); pbox.set(this, { ...b }); })) return; }
       if (on && candles && candles.glow > 0 && c && isChart(c) && isCandleCol(this.fillStyle)) {
         const pB = this.shadowBlur, pC = this.shadowColor;
         this.shadowColor = this.fillStyle; this.shadowBlur = 3 + candles.glow * 16;

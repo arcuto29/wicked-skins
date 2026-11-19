@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: zone fixes (Chart › Lines, zones & labels)
+Every zone option was checked against what's actually drawn, on TradingView and Lightweight Charts apps (nq.vision-style). Fixed:
+- **Lightweight Charts / nq.vision: zones drawn as shapes got no zone options at all.** Many apps and plugins draw a zone as a rectangle path (rect + fill, or roundRect) rather than with fillRect. Those zones now get every option: colour, gradient, fill, shape, border, style, glow, Dim, Each indicator and Price in a zone.
+- **Glow** now glows zones that keep their own colours too, not only recoloured ones.
+- **Custom colour** keeps every zone in your colour. Zones are told apart by lighter and deeper shades of it. Before, they were turned up to 180° round the colour wheel, so a cyan Custom colour could give blue, purple or red zones.
+- **Hollow + None** no longer makes a zone disappear. Hollow always keeps a border.
+- **Glass + Dashed:** Glass's highlight line no longer fills the gaps between the dashes.
+- **Auto quality / Power saver** no longer shrink glows until they're almost invisible. Glows are drawn at 30% size instead of 15%.
+
 ## 0.1.86 (2026-11-04)
 Cleanup: every option now has one place. Nothing you set is lost; your settings, saved looks, saved candle styles and each chart's own style are updated to match.
 - **Materials** are in the main look grid (Chart › Candles), under a Materials label. The separate Material grid in Candle FX is gone.

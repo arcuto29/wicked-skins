@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 33;
+  const HOOK_VERSION = 34;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -362,6 +362,8 @@
     // tool) only with "Your drawings: Style them too"; greys stay grey like grey lines do
     const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && (fx.drawOn || !drawCols.has(r.k)) && glowable(`rgb(${r.k})`);
     const dim = fx.zoneDim && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k));   // Dim all zones (your drawings only with "Style them too")
+    // the Glow slider (Indicators) also glows zones left in their own colours, on their edge (drawings with "Style them too")
+    const glowOwn = fx.lineGlow > 0 && r.a < 0.9 && H < c.height * 0.9 && W >= 16 && H >= 4 && (fx.drawOn || !drawCols.has(r.k)) && glowable(`rgb(${r.k})`);
     const shaped = zoneStyled(ctx) && (w !== 1e4 || !!rectPath(ctx)) && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k))   // shape / border only
       && H >= 8 * dpr && W >= 24 * dpr && !stackedCols.has(r.k + "|" + r.a);                                      // (not slivers, not the position tool)
     // price is in this zone right now (Price in a zone: Glow), and it's a box, not full-height shading
@@ -372,8 +374,8 @@
       hot = isFinite(X) && isFinite(Y) ? L.zoneHot(c, X, Y, W, H) : 0; at = { ctx, X, Y, W, H };
     }
     const heat = (z) => (hot && z ? L.zoneHeat(z, fx.zoneReact, at) : z);
-    if (!own && !all && !dim && !shaped && !hot) return null;
-    if (!own && !all && !dim) { const zo = L.zoneOwn(orig); if (zo && !(H < c.height * 0.9)) zo.e = null; return heat(zo); }
+    if (!own && !all && !dim && !shaped && !hot && !glowOwn) return null;
+    if (!own && !all && !dim) { const zo = L.zoneOwn(orig); if (zo && !(H < c.height * 0.9)) zo.e = null; if (zo && glowOwn) zo.glow = fx.lineGlow; return heat(zo); }
     const z = L.zone(orig, { mode: all ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom, glow: fx.lineGlow, zoneFill: fx.zoneFill, dim, grad: fx.indGrad }, ctx);
     // the neon edge only on boxes / bands, not full-height shading (a session background, bgcolor) or slivers
     if (z && z.e && !(H < c.height * 0.9 && W >= 6 && H >= 3)) z.e = null;
