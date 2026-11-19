@@ -55,5 +55,26 @@ chrome.permissions.onAdded.addListener(async (perm) => {
   await WickedSites.enable(p.origin, p.frames || []);
   if (p.tabId) chrome.tabs.reload(p.tabId).catch(() => {});
 });
+// "Turn on" on the card offer.js shows on a trading platform Priism knows. The site is the page that asked (Chrome
+// says which), never one named in the message, and it must be one Priism already has access to (manifest
+// host_permissions). Frames from other sites Priism isn't allowed on are left out; if the chart itself is only in one
+// of those, it isn't turned on and the card says what to do.
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg || msg.priism !== "site-on") return;
+  (async () => {
+    if (!sender.tab || sender.frameId !== 0 || !/^https:\/\//.test(sender.origin || "")) return reply({ ok: false });
+    const origin = sender.origin;
+    if (!(await chrome.permissions.contains({ origins: [origin + "/*"] }))) return reply({ ok: false });
+    const frames = [...new Set((Array.isArray(msg.frames) ? msg.frames : []).filter((o) => typeof o === "string" && /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o) && o !== origin))].slice(0, 8);
+    const missing = [];
+    for (const o of frames) if (!(await chrome.permissions.contains({ origins: [o + "/*"] }))) missing.push(o);
+    // only a problem when the chart itself is in one of those frames (not e.g. a ticker widget next to it)
+    if (missing.length && !msg.direct) return reply({ ok: false, missing });
+    await WickedSites.enable(origin, frames.filter((o) => !missing.includes(o)));
+    reply({ ok: true });
+    chrome.tabs.reload(sender.tab.id).catch(() => {});
+  })().catch(() => reply({ ok: false }));
+  return true;   // answers after the awaits
+});
 // If you remove a site's access from chrome://extensions, stop running there too.
 chrome.permissions.onRemoved.addListener(() => WickedSites.sync());

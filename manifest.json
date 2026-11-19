@@ -10,7 +10,10 @@
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "https://*.tradingview.com/*"
+    "https://*.tradingview.com/*",
+    "https://*.topstepx.com/*",
+    "https://*.topstep.com/*",
+    "https://*.nq.vision/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
@@ -50,6 +53,17 @@
       "run_at": "document_idle",
       "all_frames": true,
       "match_origin_as_fallback": true
+    },
+    {
+      "matches": [
+        "https://*.topstepx.com/*",
+        "https://*.topstep.com/*",
+        "https://*.nq.vision/*"
+      ],
+      "js": [
+        "src/offer.js"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [

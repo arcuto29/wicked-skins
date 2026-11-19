@@ -44,7 +44,8 @@
     const sites = (await list()).filter((s) => s.origin !== origin);
     const site = { origin, extra: [...new Set(extra.filter((o) => o && o !== origin))] };
     await registerOne(site);
-    await chrome.storage.local.set({ [KEY]: [...sites, site] });
+    const { siteOfferNo: no = {} } = await chrome.storage.local.get("siteOfferNo"); delete no[origin];
+    await chrome.storage.local.set({ [KEY]: [...sites, site], siteOfferNo: no });
     return site;
   }
 
@@ -52,7 +53,9 @@
     const sites = await list(), site = sites.find((s) => s.origin === origin);
     const id = idFor(origin);
     await chrome.scripting.unregisterContentScripts({ ids: [id + "_hook", id + "_main"] }).catch(() => {});
-    await chrome.storage.local.set({ [KEY]: sites.filter((s) => s.origin !== origin) });
+    // (the "Turn on here?" card on platforms Priism knows, offer.js, doesn't ask again after you turned a site off)
+    const { siteOfferNo: no = {} } = await chrome.storage.local.get("siteOfferNo"); no[origin] = "off";
+    await chrome.storage.local.set({ [KEY]: sites.filter((s) => s.origin !== origin), siteOfferNo: no });
     if (site) await chrome.permissions.remove({ origins: patternsFor(site) }).catch(() => {});
   }
 
