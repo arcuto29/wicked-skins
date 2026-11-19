@@ -21,7 +21,9 @@ Purely cosmetic. It does not read orders, positions or account data and makes no
 
 ## Works on other platforms (TopstepX and other prop-firm platforms)
 Many platforms embed TradingView's charting library (e.g. [TopstepX](https://help.topstepx.com/components/tradingview-tm-charts)).
-Open the platform's chart, click the Priism Skins icon. If a chart is found you'll see **"Chart found on …" → Turn on here**.
+On platforms Priism knows (TopstepX, topstep.com, nq.vision) a card on the page asks **"turn on for …?"** as soon as a
+chart opens: one click, no trip to the toolbar, so it also works in a platform installed as an app from Chrome.
+Elsewhere: open the platform's chart, click the Priism Skins icon. If a chart is found you'll see **"Chart found on …" → Turn on here**.
 Chrome asks once for that site; the page reloads skinned. **Turn off** in the same place removes it (and the permission).
 It only switches on inside the frame that contains the chart; the rest of the platform is untouched.
 On platforms without TradingView's internal API, candle colours are learned from what's drawn.
