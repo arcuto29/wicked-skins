@@ -397,3 +397,6 @@ html.bd-lite.bd-sides-glass [class*="header-toolbar"] { -webkit-backdrop-filter:
 /* Lite also holds the endless decorative loops still (Shift look's hue cycle on the chart, rainbow P&L). They keep
    their colours; they just stop repainting every frame. */
 html.bd-lite.bd-shift .chart-markup-table.pane canvas:first-of-type, html.bd-lite #bd-pnl.bd-pnl-rainbow { animation-play-state: paused !important; }
+/* Trade focus (content.js syncHold): while you're at the order ticket or in a position, the endless loops hold still */
+html[data-bd-hold] #bd-layer .bd-frame::before, html[data-bd-hold] .bd-emb .bd-frame::before, html[data-bd-hold] #bd-barpat.bd-aurora > div,
+html[data-bd-hold].bd-shift .chart-markup-table.pane canvas:first-of-type, html[data-bd-hold] #bd-pnl.bd-pnl-rainbow { animation-play-state: paused !important; }
