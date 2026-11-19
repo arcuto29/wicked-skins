@@ -387,3 +387,13 @@ html.bd-on:not(.bd-over-mode) [data-bd-lwroot] > table, html.bd-on:not(.bd-over-
 /* Panel style › Aurora edge: the ring's colours turn (a registered angle, so it animates smoothly) */
 @property --bd-pn-a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @keyframes bd-pn-spin { to { --bd-pn-a: 360deg; } }
+
+/* Lite (Power saver, Auto quality easing off, or the safety floor while trading is slowed down): no blur behind
+   Priism's glass. A blurred backdrop over a moving wallpaper is redrawn on every wallpaper frame; a plain tint is not. */
+html.bd-lite .bd-flash, html.bd-lite #bd-goal, html.bd-lite #bd-guard, html.bd-lite #bd-layer .bd-pill, html.bd-lite #bd-pnl.bd-pnl-glass,
+html.bd-lite #bd-timer, html.bd-lite #bd-timer.bd-t-glass, html.bd-lite .bd-ui-card, html.bd-lite .bd-ui-rec,
+html.bd-lite.bd-left-glass [class*="layout__area--left"] [class*="drawingToolbar"], html.bd-lite.bd-on.bd-scale-glass .chart-markup-table.time-axis, html.bd-lite.bd-on.bd-scale-glass .chart-markup-table.price-axis-container,
+html.bd-lite.bd-sides-glass [class*="header-toolbar"] { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+/* Lite also holds the endless decorative loops still (Shift look's hue cycle on the chart, rainbow P&L). They keep
+   their colours; they just stop repainting every frame. */
+html.bd-lite.bd-shift .chart-markup-table.pane canvas:first-of-type, html.bd-lite #bd-pnl.bd-pnl-rainbow { animation-play-state: paused !important; }

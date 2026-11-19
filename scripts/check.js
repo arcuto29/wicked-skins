@@ -40,5 +40,24 @@ if (process.env.EXPECT_VERSION && process.env.EXPECT_VERSION !== manifest.versio
   bad++; console.error(`✗ tag v${process.env.EXPECT_VERSION} doesn't match manifest version ${manifest.version}`);
 }
 
+// Order safety: Priism is visual only. Nothing in src/ may talk to the network beyond the reviewed calls (fonts, invite
+// check, Workshop), patch the platform's network objects, cancel the platform's events, or send it synthetic input.
+// A new use fails CI until someone has looked at it and updated the reviewed count here.
+const REVIEWED = {
+  network: { re: /\bfetch\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource/g, ok: { "content.js": 1, "invite.js": 1, "workshop.js": 1 } },
+  patchNetwork: { re: /\b(?:window\.)?(?:fetch|XMLHttpRequest|WebSocket)(?:\.prototype(?:\.\w+)?)?\s*=(?!=)/g, ok: {} },
+  // Priism's own shortcut keys, crop overlay, clip player and magnifier only
+  cancelEvents: { re: /\.(?:preventDefault|stopPropagation|stopImmediatePropagation)\(/g, ok: { "content.js": 6 } },
+  // lw.js: a ±0.0001 wheel nudge on the chart canvas so Lightweight Charts repaints; no clicks, keys or pointer events
+  syntheticInput: { re: /new (?:Mouse|Pointer|Keyboard|Wheel|Touch|Input)Event\(|\.click\(\)/g, ok: { "lw.js": 2, "content.js": 1 } },
+};
+for (const f of fs.readdirSync(path.join(ROOT, "src"))) if (f.endsWith(".js")) {
+  const s = fs.readFileSync(path.join(ROOT, "src", f), "utf8");
+  for (const [k, { re, ok }] of Object.entries(REVIEWED)) {
+    const n = (s.match(re) || []).length;
+    if (n > (ok[f] || 0)) { bad++; console.error(`✗ order safety: ${f} has ${n} ${k} use(s), ${ok[f] || 0} reviewed. Check it can't touch orders, account data or the network, then update REVIEWED in scripts/check.js`); }
+  }
+}
+
 if (bad) { console.error(`\n${bad} problem(s).`); process.exit(1); }
 console.log(`✓ ${js.length} JS files parse · manifest OK · version ${manifest.version} everywhere`);

@@ -13,13 +13,14 @@
    } */
 (function () {
   if (window.__bdCandleLooks && window.__bdCandleLooks.fxv >= 3) return;   // an older copy (before an update) is replaced
-  // Lite glow (slow computers / Power saver, set by hook.js / lw.js from content.js): every glow's blur is drawn
-  // smaller. Canvas blur is the costliest thing on a chart without a fast graphics card.
+  // Lite (Power saver, Auto quality easing off, or the safety floor while trading is slowed down; set by hook.js /
+  // lw.js from content.js): glows on the chart are drawn without their blur. Canvas blur is the costliest thing on a
+  // chart, most of all without a fast graphics card, and every glow is redrawn on each move of the crosshair.
   if (!window.__bdLiteBlur && window.CanvasRenderingContext2D) {
     window.__bdLiteBlur = true;
     const P = CanvasRenderingContext2D.prototype, d = Object.getOwnPropertyDescriptor(P, "shadowBlur");
     if (d && d.set) Object.defineProperty(P, "shadowBlur", { configurable: true, enumerable: d.enumerable, get: d.get,
-      set(v) { d.set.call(this, window.__bdLite && v > 2 ? 2 + (v - 2) * 0.3 : v); } });   // (at 0.15 a glow all but vanished)
+      set(v) { d.set.call(this, window.__bdLite ? 0 : v); } });   // Lite: no blur at all (a blur's cost is mostly there at any size; it was the biggest delay on the chart while trading)
   }
 
   const LOOKS = [
