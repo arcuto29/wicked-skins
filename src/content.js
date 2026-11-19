@@ -880,7 +880,7 @@
         if (m.type === "add") V.set(m.id, { c: m.canvas, skin: m.skin, s: self.PriismMakeSkin(m.skin, m.canvas.getContext("2d"), m.opts) });
         else if (!v) return;
         else if (m.type === "opts") { v.s = self.PriismMakeSkin(v.skin, v.c.getContext("2d"), m.opts); v.s.resize(v.c.width, v.c.height); v.s.frame(m.t || 0, 0); }
-        else if (m.type === "resize") { v.c.width = m.w; v.c.height = m.h; v.s.resize(m.w, m.h); v.s.frame(m.t || 0, 0); }
+        else if (m.type === "resize") { v.c.width = m.w; v.c.height = m.h; v.s.resize(m.w, m.h); v.s.frame(m.t || 0, 0); postMessage({ type: "sized", id: m.id, n: m.n }); }
         else if (m.type === "frame") v.s.frame(m.t, m.dt);
         else if (m.type === "remove") V.delete(m.id);
       } catch (err) {}
@@ -894,7 +894,8 @@
       const url = URL.createObjectURL(new Blob([WORKER_MAIN.replace("__SKINS__", window.__priismSkinsSrc)], { type: "text/javascript" }));
       const w = new Worker(url); URL.revokeObjectURL(url);
       w.ready = false; w.views = new Map();
-      w.onmessage = (e) => { const m = e.data; if (m.type === "ready") w.ready = true; else if (m.type === "done") { const p = w.views.get(m.id); if (p) p.busy = false; } };
+      w.onmessage = (e) => { const m = e.data; if (m.type === "ready") w.ready = true; else if (m.type === "done") { const p = w.views.get(m.id); if (p) p.busy = false; }
+        else if (m.type === "sized") { const p = w.views.get(m.id); if (p && m.n === p.n && p.onSized) { const f = p.onSized; p.onSized = null; f(); } } };
       // blocked (page rules) or crashed before it started: draw on the main thread instead, from now on
       w.onerror = () => { if (wallWorker === w) { workerBroken = true; wallWorker = null; try { w.terminate(); } catch {} if (layer) build(); } };
       wallWorker = w;
@@ -910,7 +911,9 @@
     w.postMessage({ type: "add", id, skin: skinId, opts, canvas: off }, [off]);
     return {
       offThread: true,
-      resize(W, H) { p.w = W; p.h = H; w.postMessage({ type: "resize", id, w: W, h: H, t: p.lastT }); },
+      resize(W, H) { p.w = W; p.h = H; p.n = (p.n || 0) + 1; p.pending = true; w.postMessage({ type: "resize", id, w: W, h: H, t: p.lastT, n: p.n }); },
+      // resolves once the worker has drawn the wallpaper at its latest size (a painted wallpaper takes a moment)
+      whenSized() { if (!p.pending) return Promise.resolve(); return new Promise((r) => { p.onSized = () => { p.pending = false; r(); }; }); },
       // if the worker is still drawing the last frame, don't queue another: the time carries over to the next one
       frame(t, dt) { p.lastT = t; if (p.busy) { p.dt += dt; p.skipped++; return; } p.busy = true; p.sent++; w.postMessage({ type: "frame", id, t, dt: dt + p.dt }); p.dt = 0; },
       // how many frames we had to skip since last asked, because the worker was still drawing (0 = keeping up, 1 = never)
@@ -1714,7 +1717,10 @@
   let captureHi = 0;
   async function withSharpWallpaper(fn) {
     captureHi++; views.forEach(sizeCanvas);
-    await new Promise((r) => setTimeout(r, 160));          // a frame or two at the new size (wallpapers drawn in a worker too)
+    // a frame or two at the new size; a wallpaper drawn in the worker is waited for until it has redrawn at that size
+    // (painted wallpapers take a moment to set up), at most 1.5 s
+    const sized = views.map((v) => v.skin && v.skin.whenSized ? v.skin.whenSized() : null).filter(Boolean);
+    await Promise.race([Promise.all([...sized, new Promise((r) => setTimeout(r, 160))]), new Promise((r) => setTimeout(r, 1500))]);
     try { return await fn(); } finally { captureHi = Math.max(0, captureHi - 1); if (!captureHi) setTimeout(() => views.forEach(sizeCanvas), 50); }
   }
   function resBase(v) {

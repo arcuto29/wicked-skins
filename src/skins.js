@@ -6,41 +6,6 @@
 function priismSkins(window, document) {
   const rnd = (a, b) => a + Math.random() * (b - a);
 
-  const aurora = (ctx) => {
-    let w = 0, h = 0;
-    const bands = [
-      { hue: 150, y: 0.35, amp: 0.12, sp: 0.15 },
-      { hue: 190, y: 0.45, amp: 0.15, sp: 0.11 },
-      { hue: 280, y: 0.55, amp: 0.10, sp: 0.09 },
-    ];
-    return {
-      resize(W, H) { w = W; h = H; },
-      frame(t) {
-        ctx.fillStyle = "#050a14";
-        ctx.fillRect(0, 0, w, h);
-        ctx.globalCompositeOperation = "lighter";
-        bands.forEach((b, i) => {
-          const g = ctx.createLinearGradient(0, h * (b.y - 0.3), 0, h * (b.y + 0.3));
-          g.addColorStop(0, `hsla(${b.hue},90%,60%,0)`);
-          g.addColorStop(0.5, `hsla(${b.hue},90%,55%,0.28)`);
-          g.addColorStop(1, `hsla(${b.hue},90%,50%,0)`);
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.moveTo(0, h);
-          for (let x = 0; x <= w; x += 20) {
-            const y = h * b.y + Math.sin(x * 0.004 + t * b.sp * 4 + i) * h * b.amp
-                    + Math.sin(x * 0.011 - t * b.sp * 2) * h * 0.03;
-            ctx.lineTo(x, y);
-          }
-          ctx.lineTo(w, h);
-          ctx.closePath();
-          ctx.fill();
-        });
-        ctx.globalCompositeOperation = "source-over";
-      },
-    };
-  };
-
   const matrix = (ctx, o = {}) => {
     let w = 0, h = 0, cols = [], size = Math.round(16 * (o.size || 1));
     const chars = "01アイウエオカキクケコサシスセソ";
@@ -272,37 +237,6 @@ function priismSkins(window, document) {
     };
   };
 
-  const storm = (ctx) => {
-    let w = 0, h = 0, d = [], flash = 0, next = 2, bolt = null;
-    const mk = () => ({ x: rnd(-50, w), y: rnd(-h, 0), l: rnd(14, 30), v: rnd(700, 1100) });
-    return {
-      resize(W, H) { w = W; h = H; d = Array.from({ length: 180 }, mk); },
-      frame(t, dt) {
-        next -= dt;
-        if (next <= 0) {
-          flash = 1; next = rnd(3, 9);
-          let x = rnd(w * 0.2, w * 0.8), y = 0; bolt = [[x, y]];
-          while (y < h * 0.75) { x += rnd(-30, 30); y += rnd(15, 40); bolt.push([x, y]); }
-        }
-        const L = 6 + flash * 30;
-        ctx.fillStyle = `rgb(${L},${L + 4},${L + 14})`; ctx.fillRect(0, 0, w, h);
-        if (bolt && flash > 0.4) {
-          ctx.strokeStyle = `rgba(220,230,255,${flash})`; ctx.lineWidth = 2; ctx.shadowColor = "#9bb7ff"; ctx.shadowBlur = 18;
-          ctx.beginPath(); bolt.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
-          ctx.shadowBlur = 0;
-        }
-        flash = Math.max(0, flash - dt * 2.2);
-        ctx.strokeStyle = "rgba(170,190,230,0.3)"; ctx.lineWidth = 1; ctx.beginPath();
-        d.forEach((p, i) => {
-          p.y += p.v * dt; p.x += p.v * dt * 0.2;
-          ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.l * 0.2, p.y - p.l);
-          if (p.y > h) d[i] = { ...mk(), y: -20 };
-        });
-        ctx.stroke();
-      },
-    };
-  };
-
   const sakura = (ctx, o = {}) => {
     let w = 0, h = 0, p = [];
     const mk = (init) => ({ x: rnd(-50, w), y: init ? rnd(0, h) : -10, s: rnd(4, 9), r: rnd(0, TAU), vr: rnd(-2, 2), vx: rnd(10, 40), vy: rnd(20, 50), ph: rnd(0, TAU) });
@@ -427,31 +361,6 @@ function priismSkins(window, document) {
           ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
         }
         ctx.globalCompositeOperation = "source-over";
-      },
-    };
-  };
-
-  const neoncity = (ctx) => {
-    let w = 0, h = 0, bld = [];
-    return {
-      resize(W, H) {
-        w = W; h = H; bld = []; let x = 0;
-        while (x < w) { const bw = rnd(30, 80), bh = rnd(h * 0.15, h * 0.6); bld.push({ x, bw, bh, hue: [300, 190, 330][(Math.random() * 3) | 0], win: Array.from({ length: 40 }, () => Math.random() < 0.45) }); x += bw + rnd(2, 8); }
-      },
-      frame(t) {
-        const sky = ctx.createLinearGradient(0, 0, 0, h);
-        sky.addColorStop(0, "#07021a"); sky.addColorStop(1, "#2a0838");
-        ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
-        for (const b of bld) {
-          const y = h - b.bh;
-          ctx.fillStyle = "#08040f"; ctx.fillRect(b.x, y, b.bw, b.bh);
-          ctx.fillStyle = `hsla(${b.hue},100%,60%,0.9)`; ctx.fillRect(b.x, y, b.bw, 2);
-          let k = 0;
-          for (let wy = y + 10; wy < h - 6; wy += 14) for (let wx = b.x + 6; wx < b.x + b.bw - 6; wx += 12) {
-            const on = b.win[k++ % 40] !== (Math.sin(t * 0.5 + k * 1.7 + b.x) > 0.97);
-            if (on) { ctx.fillStyle = `hsla(${b.hue},90%,70%,0.55)`; ctx.fillRect(wx, wy, 5, 7); }
-          }
-        }
       },
     };
   };
@@ -600,27 +509,6 @@ function priismSkins(window, document) {
   const offscreen = (w, h) => { const c = document.createElement("canvas"); c.width = Math.max(2, w | 0); c.height = Math.max(2, h | 0); return c; };
   const starsOf = (w, h, n, k, maxY = 1) => Array.from({ length: n }, () => ({ x: rnd(0, w), y: rnd(0, h * maxY), r: rnd(0.5, 1.5) * k, p: rnd(0, T2) }));
   const drawStars = (ctx, st, t, a = 0.8) => { ctx.fillStyle = "#fff"; for (const s of st) { ctx.globalAlpha = a * (0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * 1.3 + s.p))); ctx.fillRect(s.x, s.y, s.r, s.r); } ctx.globalAlpha = 1; };
-
-  const eclipse = (ctx) => {
-    let w = 0, h = 0, k = 1, st = [];
-    return {
-      resize(W, H) { w = W; h = H; k = kOf(w, h); st = starsOf(w, h, 90, k); },
-      frame(t) {
-        sky(ctx, w, h, [[0, "#02030a"], [1, "#0a0a1c"]]); drawStars(ctx, st, t, 0.7);
-        const cx = w * 0.5, cy = h * 0.46, R = Math.min(w, h) * 0.17, pulse = 1 + 0.03 * Math.sin(t * 0.7);
-        ctx.globalCompositeOperation = "lighter";
-        glowDot(ctx, cx, cy, R * 4.2 * pulse, "255,160,80", 0.2); glowDot(ctx, cx, cy, R * 2.3 * pulse, "255,225,170", 0.32);
-        ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * 0.02); ctx.beginPath();
-        for (let i = 0; i < 40; i++) { const a = (i / 40) * T2, len = R * (1.7 + 1.5 * Math.abs(Math.sin(i * 12.9898 + t * 0.12 * (1 + (i % 3) * 0.3)))), da = 0.028;
-          ctx.moveTo(Math.cos(a - da) * R, Math.sin(a - da) * R); ctx.lineTo(Math.cos(a) * len, Math.sin(a) * len); ctx.lineTo(Math.cos(a + da) * R, Math.sin(a + da) * R); }
-        ctx.fillStyle = "rgba(255,220,160,0.07)"; ctx.fill(); ctx.restore();
-        const ring = ctx.createRadialGradient(cx, cy, R * 0.97, cx, cy, R * 1.32);
-        ring.addColorStop(0, "rgba(255,244,220,0.95)"); ring.addColorStop(0.22, "rgba(255,196,120,0.5)"); ring.addColorStop(1, "rgba(255,150,70,0)");
-        ctx.fillStyle = ring; ctx.fillRect(cx - R * 1.4, cy - R * 1.4, R * 2.8, R * 2.8);
-        ctx.globalCompositeOperation = "source-over"; ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(cx, cy, R, 0, T2); ctx.fill();
-      },
-    };
-  };
 
   const comets = (ctx) => {
     let w = 0, h = 0, k = 1, m = [], st = [];
@@ -912,22 +800,6 @@ function priismSkins(window, document) {
     };
   };
 
-  const silk = (ctx) => {
-    let w = 0, h = 0;
-    return {
-      resize(W, H) { w = W; h = H; },
-      frame(t) {
-        ctx.fillStyle = "#05060c"; ctx.fillRect(0, 0, w, h); ctx.globalCompositeOperation = "lighter";
-        for (let i = 0; i < 5; i++) {
-          const x = w * (0.5 + 0.35 * Math.sin(t * 0.11 * (i + 1) + i * 2)), y = h * (0.5 + 0.3 * Math.cos(t * 0.09 * (i + 2) + i)), r = Math.max(w, h) * (0.35 + 0.12 * Math.sin(t * 0.2 + i));
-          const g = ctx.createRadialGradient(x, y, 0, x, y, r), hue = (t * 6 + i * 52) % 360;
-          g.addColorStop(0, `hsla(${hue},85%,55%,0.42)`); g.addColorStop(1, `hsla(${hue},85%,45%,0)`); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-        }
-        ctx.globalCompositeOperation = "source-over";
-      },
-    };
-  };
-
   const leaves = (ctx) => {
     let w = 0, h = 0, k = 1, lv = [];
     const mk = (init) => ({ x: rnd(0, w), y: init ? rnd(0, h) : -20 * k, vy: rnd(24, 60) * k, s: rnd(10, 22) * k, rot: rnd(0, T2), vr: rnd(-1.4, 1.4), ph: rnd(0, T2), hue: rnd(8, 42), l: rnd(38, 54) });
@@ -943,30 +815,6 @@ function priismSkins(window, document) {
           ctx.beginPath(); ctx.ellipse(0, 0, l.s, l.s * 0.45, 0, 0, T2); ctx.fill();
           ctx.strokeStyle = "rgba(60,20,0,0.4)"; ctx.lineWidth = Math.max(0.5, 0.7 * k); ctx.beginPath(); ctx.moveTo(-l.s, 0); ctx.lineTo(l.s, 0); ctx.stroke(); ctx.restore();
         }
-      },
-    };
-  };
-
-  const mountains = (ctx) => {
-    let w = 0, h = 0, k = 1, bg = null, st = [];
-    return {
-      resize(W, H) {
-        w = W; h = H; k = kOf(w, h); st = starsOf(w, h, 110, k, 0.5); bg = offscreen(w, h); const g = bg.getContext("2d");
-        sky(g, w, h, [[0, "#050a1c"], [0.6, "#10224a"], [1, "#38406e"]]); glowDot(g, w * 0.7, h * 0.2, Math.min(w, h) * 0.4, "200,215,255", 0.2);
-        g.fillStyle = "rgba(240,244,255,0.92)"; g.beginPath(); g.arc(w * 0.7, h * 0.2, Math.min(w, h) * 0.035, 0, T2); g.fill();
-        const cols = ["#27386a", "#1a2750", "#0f1a38", "#05070f"], bases = [0.62, 0.7, 0.8, 0.92];
-        for (let L = 0; L < 4; L++) {
-          const p1 = rnd(0, T2), p2 = rnd(0, T2), p3 = rnd(0, T2), a1 = 0.09 - L * 0.012, f = (0.004 + L * 0.002) / k;
-          g.fillStyle = cols[L]; g.beginPath(); g.moveTo(0, h);
-          for (let x = 0; x <= w + 6; x += 6) g.lineTo(x, h * bases[L] - (Math.sin(x * f + p1) * a1 + Math.sin(x * f * 2.3 + p2) * a1 * 0.5 + Math.sin(x * f * 5.1 + p3) * a1 * 0.18 + a1) * h);
-          g.lineTo(w, h); g.closePath(); g.fill();
-        }
-      },
-      frame(t) {
-        ctx.drawImage(bg, 0, 0, w, h); drawStars(ctx, st, t, 0.8);
-        ctx.globalCompositeOperation = "lighter";
-        for (let i = 0; i < 3; i++) { const x = (((t * 7 * k * (i + 1) + i * w * 0.4) % (w * 1.6)) - w * 0.3); ctx.save(); ctx.translate(x, h * (0.7 + i * 0.07)); ctx.scale(3.2, 0.3); glowDot(ctx, 0, 0, w * 0.22, "150,170,220", 0.12); ctx.restore(); }
-        ctx.globalCompositeOperation = "source-over";
       },
     };
   };
@@ -2847,6 +2695,376 @@ function priismSkins(window, document) {
   const recolourSprite = (cols) => { const c = offscreen(64, 36), g = c.getContext("2d");
     if (cols.length === 1) { g.fillStyle = cols[0]; g.fillRect(0, 0, 64, 36); return c; }
     const gr = g.createLinearGradient(0, 36, 64, 0); cols.forEach((x, i) => gr.addColorStop(i / (cols.length - 1), x)); g.fillStyle = gr; g.fillRect(0, 0, 64, 36); return c; };
+
+  // =====================================================================================================================
+  // Signature wallpapers (Imperial, Eclipse, Orion, Glacier, Void, Aurora, Neon City, Obsidian, Storm, Blood Moon).
+  // Painted, not drawn from shapes: each one paints its scene once per size (per-pixel light, noise and shading, at
+  // half size for the soft parts, full size for the fine detail), then every frame only places that painting and a
+  // little light on top. The same seed is used at every size, so a thumbnail is the same picture as the wallpaper.
+  // The middle of each picture is kept calm and a little darker, where price action sits.
+  // =====================================================================================================================
+  const SIG = (() => {
+    // ---- seeded random + noise ----
+    const rng = (seed) => { let s = seed >>> 0 || 1; return () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+    const hash = (x, y, s) => { let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(s, 1442695041); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const sm = (t) => t * t * (3 - 2 * t);
+    function noise(x, y, s) {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = sm(xf), v = sm(yf);
+      const a = hash(xi, yi, s), b = hash(xi + 1, yi, s), c = hash(xi, yi + 1, s), d = hash(xi + 1, yi + 1, s);
+      return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+    }
+    const fbm = (x, y, s, o = 5, lac = 2, g = 0.5) => { let a = 0, f = 1, amp = 0.5, n = 0; for (let i = 0; i < o; i++) { a += amp * noise(x * f, y * f, s + i * 17); n += amp; f *= lac; amp *= g; } return a / n; };
+    const ridge = (x, y, s, o = 5) => { let a = 0, f = 1, amp = 0.5, n = 0, w = 1; for (let i = 0; i < o; i++) { let v = 1 - Math.abs(noise(x * f, y * f, s + i * 31) * 2 - 1); v *= v * w; w = Math.min(1, v * 2); a += v * amp; n += amp; f *= 2.03; amp *= 0.5; } return a / n; };
+    const clamp = (v, a = 0, b = 1) => (v < a ? a : v > b ? b : v);
+    const mix = (a, b, t) => a + (b - a) * t;
+    // palette: luminance-like t (0..1) -> colour between stops [[t, r, g, b], ...]
+    const ramp = (stops) => (t) => { t = clamp(t); let i = 1; while (i < stops.length - 1 && stops[i][0] < t) i++; const A = stops[i - 1], B = stops[i], f = clamp((t - A[0]) / (B[0] - A[0] || 1));
+      return [mix(A[1], B[1], f), mix(A[2], B[2], f), mix(A[3], B[3], f)]; };
+    // paint a canvas pixel by pixel: fn(u, v) -> [r, g, b, a?] with u, v in 0..1 (the same picture at any size)
+    function paint(w, h, fn) {
+      const c = offscreen(w, h), g = c.getContext("2d"), im = g.createImageData(c.width, c.height), d = im.data, W = c.width, H = c.height;
+      for (let y = 0; y < H; y++) { const v = (y + 0.5) / H; for (let x = 0; x < W; x++) { const p = fn((x + 0.5) / W, v, x, y), i = (y * W + x) * 4;
+        d[i] = p[0]; d[i + 1] = p[1]; d[i + 2] = p[2]; d[i + 3] = p.length > 3 ? p[3] : 255; } }
+      g.putImageData(im, 0, 0); return c;
+    }
+    // soft parts are painted at a fraction of the size and smoothed up (q = how many px per painted px)
+    // (never painted wider than 1280 px: past that it is smoothed up, so a 4K wallpaper sets up as fast as a 1080p one)
+    const soft = (w, h, q, fn) => { q = Math.max(q, Math.max(w, h) / 1280); return paint(Math.max(8, Math.round(w / q)), Math.max(8, Math.round(h / q)), fn); };
+    const up = (g, c, w, h) => { g.imageSmoothingEnabled = true; if ("imageSmoothingQuality" in g) g.imageSmoothingQuality = "high"; g.drawImage(c, 0, 0, w, h); };
+    // fine grain, so gradients never band and the picture reads like a photograph (one tile, repeated)
+    let grainTile = null;
+    const grain = (g, w, h, a) => { if (!grainTile) { grainTile = paint(128, 128, (u, v, x, y) => { const n = hash(x, y, 9) * 255; return [n, n, n, 255]; }); }
+      const p = g.createPattern(grainTile, "repeat"); g.save(); g.globalAlpha = a; g.globalCompositeOperation = "overlay"; g.fillStyle = p; g.fillRect(0, 0, w, h); g.restore(); };
+    // the calm middle: a soft darker ellipse where the candles are, and a gentle vignette at the corners
+    const calm = (g, w, h, a, vig) => {
+      g.save(); g.translate(w * 0.5, h * 0.52); g.scale(w * 0.42, h * 0.34);
+      let r = g.createRadialGradient(0, 0, 0, 0, 0, 1); r.addColorStop(0, `rgba(0,0,0,${a})`); r.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = r; g.fillRect(-1.5, -1.5, 3, 3); g.restore();
+      g.save(); g.translate(w / 2, h / 2); g.scale(w * 0.75, h * 0.75); r = g.createRadialGradient(0, 0, 0.55, 0, 0, 1.05); r.addColorStop(0, "rgba(0,0,0,0)"); r.addColorStop(1, `rgba(0,0,0,${vig})`); g.fillStyle = r; g.fillRect(-1, -1, 2, 2); g.restore();
+    };
+    const stars = (g, w, h, n, seed, maxV = 1, k = 1) => { const R = rng(seed); for (let i = 0; i < n; i++) { const x = R() * w, y = Math.pow(R(), 1.2) * h * maxV, b = R(), s = (0.4 + b * 1.1) * k;
+      g.fillStyle = `rgba(${200 + b * 55 | 0},${210 + b * 45 | 0},255,${0.25 + b * 0.65})`; g.fillRect(x, y, s, s); if (b > 0.93) { g.globalAlpha = 0.25; g.fillRect(x - 2 * s, y + s / 2 - 0.5, 5 * s, 1); g.fillRect(x + s / 2 - 0.5, y - 2 * s, 1, 5 * s); g.globalAlpha = 1; } } };
+    // a mountain range's top edge (ridged), for a band of the sky: returns ys per column (0..1 of the height)
+    // (normalised, so every range has real peaks and saddles, whatever the noise gives)
+    const range = (n, seed, base, amp, sc) => { const out = new Float32Array(n + 1); let lo = 1e9, hi = -1e9;
+      for (let i = 0; i <= n; i++) { const u = i / n, v = 0.62 * Math.pow(ridge(u * sc, 0.3, seed, 6), 1.4) + 0.38 * ridge(u * sc * 2.7, 1.7, seed + 5, 5); out[i] = v; if (v < lo) lo = v; if (v > hi) hi = v; }
+      for (let i = 0; i <= n; i++) out[i] = base - amp * ((out[i] - lo) / (hi - lo || 1)); return out; };
+    // a lightning bolt: a jagged path with branches (midpoint displacement), in 0..1 units
+    function bolt(R, x0, y0, x1, y1, rough, depth, out) {
+      const pts = [[x0, y0], [x1, y1]];
+      for (let it = 0; it < 7; it++) { const nx = []; for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+        nx.push(a, [(a[0] + b[0]) / 2 + (R() - 0.5) * rough * L * (-dy / (L || 1)) * 2, (a[1] + b[1]) / 2 + (R() - 0.5) * rough * L * (dx / (L || 1)) * 2]); } nx.push(pts[pts.length - 1]); pts.splice(0, pts.length, ...nx); }
+      out.push({ pts, w: depth ? 0.45 : 1 });
+      if (depth < 2) for (let i = 8; i < pts.length - 8; i += 8 + Math.floor(R() * 14)) if (R() < 0.42) { const p = pts[i], ang = Math.atan2(y1 - y0, x1 - x0) + (R() < 0.5 ? -1 : 1) * (0.35 + R() * 0.6), L = Math.hypot(x1 - x0, y1 - y0) * (0.18 + R() * 0.3);
+        bolt(R, p[0], p[1], p[0] + Math.cos(ang) * L, p[1] + Math.sin(ang) * L, rough * 1.1, depth + 1, out); }
+      return out;
+    }
+    function drawBolts(g, list, w, h, k, col, a) {
+      g.save(); g.globalCompositeOperation = "lighter"; g.lineJoin = "round"; g.lineCap = "round";
+      for (const pass of [[14, 0.06], [6, 0.16], [2.2, 0.5], [1, 1]]) for (const b of list) { g.strokeStyle = pass[1] === 1 ? `rgba(255,255,255,${a * b.w})` : `rgba(${col},${a * pass[1] * b.w})`; g.lineWidth = pass[0] * k * (b.w > 0.5 ? 1 : 0.55);
+        g.beginPath(); b.pts.forEach((p, i) => (i ? g.lineTo(p[0] * w, p[1] * h) : g.moveTo(p[0] * w, p[1] * h))); g.stroke(); }
+      g.restore();
+    }
+    return { rng, noise, fbm, ridge, clamp, mix, ramp, paint, soft, up, grain, calm, stars, range, bolt, drawBolts, hash };
+  })();
+
+  // ---- Silk (Imperial): black silk folds with a metallic gold sheen ----
+  // A height field of long, soft folds; each pixel is lit like satin: a dark base, a broad sheen across each fold and
+  // a sharp highlight on its crest. A slow band of light slides across now and then.
+  const sigSilk = (ctx) => {
+    let w = 0, h = 0, base = null, k = 1;
+    const tone = SIG.ramp([[0, 2, 2, 2], [0.2, 16, 11, 5], [0.42, 70, 46, 16], [0.62, 150, 104, 40], [0.8, 220, 172, 92], [0.93, 250, 222, 160], [1, 255, 248, 228]]);
+    // long diagonal folds (a flowing sheet): the fold phase bends with a slow warp, so folds swell, twist and part
+    const H = (u, v) => { const wa = SIG.fbm(u * 1.4 + 2, v * 1.4, 41, 4) * 3.2, a = u * 3.1 + v * 1.9 + wa;
+      return Math.sin(a * 2.2) * 0.6 + Math.sin(a * 4.6 + v * 3 + 1.3) * 0.22 + Math.sin(a * 1.1 - v * 2.4) * 0.35; };
+    return {
+      resize(W, Hh) { w = W; h = Hh; k = kOf(w, h); const e = 0.0015;
+        const tex = SIG.soft(w, h, 1.4, (u, v) => {
+          const z = H(u, v), dx = (H(u + e, v) - z) / e, dy = (H(u, v + e) - z) / e, s0 = 0.085, L = Math.hypot(dx * s0, dy * s0, 1), nx = -dx * s0 / L, ny = -dy * s0 / L, nz = 1 / L;
+          const lx = -0.5, ly = -0.55, lz = 0.67, diff = SIG.clamp(nx * lx + ny * ly + nz * lz);
+          const hx = lx, hy = ly, hz = lz + 1, hl = Math.hypot(hx, hy, hz), spec = Math.pow(SIG.clamp((nx * hx + ny * hy + nz * hz) / hl), 70);
+          const shadow = SIG.clamp(0.15 + 0.85 * SIG.fbm(u * 1.8 + 5, v * 1.8, 77, 3) * 1.25);   // whole folds fall into deep shadow
+          const mid = SIG.clamp(Math.hypot((u - 0.5) * 1.3, (v - 0.52) * 1.7) * 1.6);             // calmer, darker in the middle
+          const t = (Math.pow(diff, 4) * 0.5 + spec * 0.95) * shadow * (0.45 + 0.55 * mid);
+          const c = tone(t); return [c[0], c[1], c[2]]; });
+        base = offscreen(w, h); const g = base.getContext("2d"); SIG.up(g, tex, w, h); SIG.calm(g, w, h, 0.25, 0.5); SIG.grain(g, w, h, 0.045); },
+      frame(t) { ctx.drawImage(base, 0, 0, w, h);
+        const p = ((t * 0.018) % 1.6) - 0.3, x = p * w * 1.4 - w * 0.2;   // a slow sweep of light, every ~90 s
+        if (x < -w * 0.25 || x > w * 1.25) return;   // (off screen most of the time)
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; const g = ctx.createLinearGradient(x - w * 0.2, 0, x + w * 0.2, 0);
+        g.addColorStop(0, "rgba(255,210,140,0)"); g.addColorStop(0.5, "rgba(255,210,140,0.05)"); g.addColorStop(1, "rgba(255,210,140,0)"); ctx.fillStyle = g; ctx.fillRect(Math.max(0, x - w * 0.2), 0, w * 0.4, h); ctx.restore(); },
+    };
+  };
+
+  // ---- Totality (Eclipse): a solar eclipse with a golden corona ----
+  const sigEclipse = (ctx) => {
+    let w = 0, h = 0, base = null, k = 1, cx = 0, cy = 0, R = 0, beads = [];
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); cx = w * 0.68; cy = h * 0.27; R = Math.min(w, h) * 0.12;
+        const tone = SIG.ramp([[0, 0, 0, 0], [0.12, 40, 16, 4], [0.32, 140, 70, 18], [0.55, 236, 160, 64], [0.78, 255, 222, 150], [1, 255, 250, 236]]);
+        const ar = w / h, cu = cx / w, cv = cy / h, Rn = R / h;
+        const cor = SIG.soft(w, h, 1.5, (u, v) => { const dx = (u - cu) * ar, dy = v - cv, r = Math.hypot(dx, dy) / Rn, a = Math.atan2(dy, dx);
+          if (r < 0.99) return [0, 0, 0];
+          const streak = SIG.fbm(Math.cos(a) * 2.2 + 9, Math.sin(a) * 2.2 + 9, 13, 4) * 0.6 + SIG.fbm(a * 9.5, r * 0.25, 29, 3) * 0.55;   // long streamers
+          const fall = Math.pow(1 / Math.max(1, r), 2.6), inner = Math.exp(-(r - 1) * 9);
+          const sky = 0.02 + 0.05 * SIG.fbm(u * 3, v * 3, 5, 3);
+          const t = SIG.clamp(inner * 0.95 + fall * (0.55 + streak * 1.15) + sky);
+          const c = tone(t); return [c[0], c[1], c[2]]; });
+        base = offscreen(w, h); const g = base.getContext("2d"); g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+        SIG.stars(g, w, h, Math.round(260 * (w * h) / (1600 * 900) + 40), 314, 1, k);
+        g.globalCompositeOperation = "lighter"; SIG.up(g, cor, w, h); g.globalCompositeOperation = "source-over";
+        // the chromosphere: a thin rose-red rim, then the moon
+        const rim = g.createRadialGradient(cx, cy, R * 0.985, cx, cy, R * 1.05); rim.addColorStop(0, "rgba(255,120,150,0.95)"); rim.addColorStop(0.4, "rgba(255,90,90,0.35)"); rim.addColorStop(1, "rgba(255,80,80,0)");
+        g.fillStyle = rim; g.beginPath(); g.arc(cx, cy, R * 1.06, 0, T2); g.fill();
+        const moon = g.createRadialGradient(cx - R * 0.25, cy - R * 0.25, R * 0.1, cx, cy, R); moon.addColorStop(0, "#0a0908"); moon.addColorStop(1, "#000");   // faint earthshine
+        g.fillStyle = moon; g.beginPath(); g.arc(cx, cy, R, 0, T2); g.fill();
+        SIG.calm(g, w, h, 0.18, 0.5); SIG.grain(g, w, h, 0.045);
+        const Rr = SIG.rng(77); beads = Array.from({ length: 4 }, () => ({ a: -0.6 + Rr() * 1.1 + Math.PI * (Rr() < 0.5 ? 0 : 1), p: Rr() * T2, s: 0.6 + Rr() * 0.8 })); },
+      frame(t) { ctx.drawImage(base, 0, 0, w, h);
+        // Baily's beads: a few points of sunlight glinting at the moon's edge
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        for (const b of beads) { const x = cx + Math.cos(b.a) * R, y = cy + Math.sin(b.a) * R, a = 0.35 + 0.35 * Math.sin(t * 0.7 * b.s + b.p);
+          glowDot(ctx, x, y, R * 0.22, "255,236,200", a * 0.5); glowDot(ctx, x, y, R * 0.05, "255,255,245", a); }
+        ctx.restore(); },
+    };
+  };
+
+  // ---- Obsidian: black faceted metal with gold edges ----
+  // A low-poly surface; each facet is lit by a slow-moving light like polished black metal, and the creases that
+  // catch the light get a thin gold line. Dense and bright at the edges, smooth and dark in the middle.
+  const sigObsidian = (ctx) => {
+    let w = 0, h = 0, k = 1, tris = [], base = null;
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); const R = SIG.rng(2024), cols = Math.round(14 * Math.max(1, w / h) * 1.2), rows = 13, P = [];
+        for (let j = 0; j <= rows; j++) { const row = []; for (let i = 0; i <= cols; i++) { const u = i / cols, v = j / rows, edge = i === 0 || j === 0 || i === cols || j === rows;
+          const jit = edge ? 0 : 0.42, x = (u + (R() - 0.5) * jit / cols) * w, y = (v + (R() - 0.5) * jit / rows) * h;
+          const d = Math.hypot((u - 0.5) * 1.6, (v - 0.52) * 1.9), z = (SIG.fbm(u * 3.1, v * 3.1, 61, 4) - 0.5) * (40 + 180 * SIG.clamp(d)) * k;   // flatter in the middle
+          row.push([x, y, z]); } P.push(row); }
+        tris = [];
+        for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const a = P[j][i], b = P[j][i + 1], c = P[j + 1][i], d = P[j + 1][i + 1];
+          const f = (p, q, r) => { const ux = q[0] - p[0], uy = q[1] - p[1], uz = q[2] - p[2], vx = r[0] - p[0], vy = r[1] - p[1], vz = r[2] - p[2];
+            let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const L = Math.hypot(nx, ny, nz) || 1; if (nz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+            const cxp = (p[0] + q[0] + r[0]) / 3, cyp = (p[1] + q[1] + r[1]) / 3; tris.push({ p, q, r, n: [nx / L, ny / L, nz / L], d: Math.hypot((cxp / w - 0.5) * 1.6, (cyp / h - 0.52) * 1.9) }); };
+          if ((i + j) % 2) { f(a, b, d); f(a, d, c); } else { f(a, b, c); f(b, d, c); } }
+        // the fixed part: a dark sheen under the facets (smooth fall-off), painted once
+        base = offscreen(w, h); const g = base.getContext("2d"); const bg = g.createLinearGradient(0, 0, w, h); bg.addColorStop(0, "#0c0b0a"); bg.addColorStop(1, "#030303"); g.fillStyle = bg; g.fillRect(0, 0, w, h); },
+      frame(t) {
+        const la = Math.round(t * 0.05 / 0.025) * 0.025;   // the light moves slowly: re-lit only when it has moved a little (every 0.5 s)
+        if (!this._lit || this._la !== la || this._lit.width !== Math.round(w)) {
+          if (!this._lit || this._lit.width !== Math.round(w)) this._lit = offscreen(w, h);
+          this._la = la; const g = this._lit.getContext("2d"); g.drawImage(base, 0, 0, w, h);
+          const lx = Math.cos(la) * 0.55, ly = -0.5 + Math.sin(la) * 0.25, lz = 0.66, L = Math.hypot(lx, ly, lz), Lx = lx / L, Ly = ly / L, Lz = lz / L, hz = Lz + 1, hl = Math.hypot(Lx, Ly, hz);
+          for (const T of tris) { const [nx, ny, nz] = T.n, dif = Math.max(0, nx * Lx + ny * Ly + nz * Lz), spec = Math.pow(Math.max(0, (nx * Lx + ny * Ly + nz * hz) / hl), 90);
+            const v = 6 + dif * 16 * (0.4 + 0.6 * T.d) + spec * 46 * T.d;   // black metal: only a dull sheen, a little brighter at the edges
+            g.fillStyle = `rgb(${v + spec * 8 | 0},${v + spec * 4 | 0},${v * 0.95 | 0})`; g.beginPath(); g.moveTo(T.p[0], T.p[1]); g.lineTo(T.q[0], T.q[1]); g.lineTo(T.r[0], T.r[1]); g.closePath(); g.fill();
+            g.strokeStyle = g.fillStyle; g.lineWidth = 0.8; g.stroke();
+            if (T.d > 0.3) { const e = Math.pow(Math.max(0, (nx * Lx + ny * Ly + nz * hz) / hl), 24) * T.d; if (e > 0.04) {   // gold on the creases that catch the light
+              g.strokeStyle = `rgba(226,176,88,${Math.min(0.9, e * 1.8)})`; g.lineWidth = Math.max(0.8, 1.1 * k); g.beginPath(); g.moveTo(T.p[0], T.p[1]); g.lineTo(T.q[0], T.q[1]); g.stroke();
+              if (e > 0.5) { g.save(); g.globalCompositeOperation = "lighter"; g.strokeStyle = `rgba(255,200,110,${(e - 0.5) * 0.4})`; g.lineWidth = 4 * k; g.stroke(); g.restore(); } } } }
+          SIG.calm(g, w, h, 0.4, 0.6); SIG.grain(g, w, h, 0.04);
+        }
+        ctx.drawImage(this._lit, 0, 0, w, h);
+      },
+    };
+  };
+
+  const sigStorm = (ctx, o) => {
+    let w = 0, h = 0, k = 1, base = null, lit = null, ridge = null, next = 1.5, flash = null, R = SIG.rng(99);
+    const ground = !!(o && o.ground), strikes = !(o && o.lightning === false);
+    const cloud = (u, v, s) => { const wx = SIG.fbm(u * 2.2 + 3, v * 2.2, s + 3, 4), wy = SIG.fbm(u * 2.2, v * 2.2 + 7, s + 4, 4);
+      return SIG.fbm(u * 3.4 + wx * 1.6, v * 2.4 + wy * 1.2, s, 6); };
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h);
+        const dark = SIG.ramp([[0, 5, 6, 11], [0.25, 18, 21, 32], [0.5, 50, 56, 76], [0.72, 104, 112, 140], [0.9, 160, 168, 194], [1, 210, 216, 232]]);
+        const glow = SIG.ramp([[0, 0, 0, 0], [0.4, 30, 40, 90], [0.7, 120, 140, 230], [1, 235, 240, 255]]);
+        const fieldC = (u, v) => { const c = cloud(u, v, 11), top = SIG.clamp(1 - v * 1.15), shade = SIG.clamp(c - SIG.fbm(u * 3.4 + 0.02, v * 2.4 - 0.03, 11, 5) + 0.5);   // lit from above
+          return { d: SIG.clamp((c - 0.28) * 2.6) * (0.5 + 0.5 * top), s: shade }; };
+        base = offscreen(w, h); lit = offscreen(w, h);
+        const B = SIG.soft(w, h, 2, (u, v) => { const f = fieldC(u, v), t = f.d * (0.6 + 0.7 * f.s) * (0.62 + 0.38 * SIG.clamp(Math.abs(u - 0.5) * 2 + (0.6 - v))); const c = dark(t); return [c[0], c[1], c[2]]; });
+        const Lg = SIG.soft(w, h, 2, (u, v) => { const f = fieldC(u, v), c = glow(f.d * (0.7 + 0.5 * f.s)); return [c[0], c[1], c[2]]; });
+        let g = base.getContext("2d"); SIG.up(g, B, w, h);
+        g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = 0.16; SIG.up(g, Lg, w, h); g.restore();   // a faint glow inside, as if lightning is far off
+        g = lit.getContext("2d"); SIG.up(g, Lg, w, h);
+        if (ground) { ridge = [SIG.range(220, 7, 0.83, 0.2, 2.2), SIG.range(220, 9, 0.92, 0.17, 3.4)];
+          const bg = base.getContext("2d");
+          ridge.forEach((rr, li) => { bg.fillStyle = li ? "#030305" : "#0a0b12"; bg.beginPath(); bg.moveTo(0, h); rr.forEach((y, i) => bg.lineTo((i / (rr.length - 1)) * w, y * h)); bg.lineTo(w, h); bg.closePath(); bg.fill(); }); }
+        g = base.getContext("2d"); SIG.calm(g, w, h, 0.25, 0.55); SIG.grain(g, w, h, 0.05); },
+      frame(t, dt) {
+        ctx.drawImage(base, 0, 0, w, h);
+        if (!strikes) return;
+        next -= dt || 0.016;
+        if (next <= 0 && !flash) { const x0 = 0.12 + R() * 0.76, y1 = ground ? 0.78 + R() * 0.1 : 0.55 + R() * 0.35;   // a strike, away from the very middle
+          const x = Math.abs(x0 - 0.5) < 0.14 ? (x0 < 0.5 ? x0 - 0.16 : x0 + 0.16) : x0;
+          flash = { t: 0, bolts: SIG.bolt(R, x, -0.02, x + (R() - 0.5) * 0.18, y1, 0.22, 0, []), x }; next = 4 + R() * 7; }
+        if (flash) { flash.t += dt || 0.016; const ft = flash.t, a = ft < 0.06 ? 1 : ft < 0.12 ? 0.35 : ft < 0.2 ? 0.85 : Math.max(0, 1 - (ft - 0.2) / 0.55);
+          ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a * 0.5; ctx.drawImage(lit, 0, 0, w, h); ctx.restore();   // the clouds light up from inside
+          SIG.drawBolts(ctx, flash.bolts, w, h, k, "150,170,255", a);
+          if (ft > 0.8) flash = null; }
+      },
+    };
+  };
+
+  // ---- Moonlit Ridge (with Moon off and Fog up: Glacier): lit icy peaks in layers of mist ----
+  const sigRidge = (ctx, o) => {
+    let w = 0, h = 0, k = 1, base = null, fog = null;
+    const moon = !(o && o.moon === false), fogAmt = o && o.fog !== undefined ? +o.fog : 0.6;
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h);
+        base = offscreen(w, h); const g = base.getContext("2d");
+        const sg = g.createLinearGradient(0, 0, 0, h); sg.addColorStop(0, "#050a16"); sg.addColorStop(0.5, "#122440"); sg.addColorStop(1, "#33506e"); g.fillStyle = sg; g.fillRect(0, 0, w, h);
+        if (moon) { SIG.stars(g, w, h * 0.5, Math.round(160 * w * h / 1.44e6) + 30, 21, 1, k); const mx = w * 0.78, my = h * 0.16, mr = Math.min(w, h) * 0.042; glowDot(g, mx, my, mr * 10, "170,200,255", 0.2);
+          const md = g.createRadialGradient(mx - mr * 0.3, my - mr * 0.3, 0, mx, my, mr); md.addColorStop(0, "#fbfdff"); md.addColorStop(1, "#c3d1e6"); g.fillStyle = md; g.beginPath(); g.arc(mx, my, mr, 0, T2); g.fill(); }
+        // four ranges, far to near. Each: a ridged silhouette; inside, light faces (facing the upper left) vs shadow
+        // faces from a 2-D ridged field, snow near the peaks; farther ranges are paler and lost in the haze.
+        const L = [[0.6, 0.28, 1.6, 101], [0.7, 0.28, 2.3, 103], [0.8, 0.26, 3.1, 107], [0.92, 0.22, 4.4, 109]];
+        L.forEach(([b, a, sc, sd], li) => {
+          const N = 500, tops = SIG.range(N, sd, b, a, sc), far = 1 - li / (L.length - 1);
+          const rock = [[14, 22, 36], [10, 16, 28], [7, 11, 20], [4, 7, 13]][li], air = [58 + 34 * far, 80 + 36 * far, 112 + 34 * far];
+          // each face is lit by the slope of its own ridge (light from the upper left), with vertical gullies below
+          const slope = new Float32Array(N + 1); for (let i = 0; i <= N; i++) { let sm = 0; for (let d = 3; d <= 23; d += 5) sm += (tops[Math.min(N, i + d)] - tops[Math.max(0, i - d)]) * N / (2 * d); slope[i] = sm / 5; }
+          const ph = Math.max(8, Math.round(h / Math.max(1.4, Math.max(w, h) / 1280)));
+          const m = SIG.soft(w, h, 1.4, (u, v) => {
+            const fi = u * N, i0 = Math.min(N - 1, Math.floor(fi)), i = Math.round(fi), top = SIG.mix(tops[i0], tops[i0 + 1], fi - i0);
+            const edgeA = SIG.clamp((v - top) * ph + 0.5); if (edgeA <= 0) return [0, 0, 0, 0];
+            const depth = SIG.clamp((v - top) / a), gul = SIG.ridge(u * sc * 5 + v * 2.2, v * sc * 3.2, sd + 50, 4), face = SIG.clamp(0.5 - slope[i] * 1.2);
+            const lit = SIG.clamp(SIG.mix(face, 0.35, SIG.clamp(depth * 1.6)) + (gul - 0.5) * 0.24);
+            const snow = SIG.clamp((lit - 0.55) * 3.5) * SIG.clamp(1 - depth * 4.5) * SIG.clamp(gul * 1.3);
+            let r = rock[0] + lit * 26, gg = rock[1] + lit * 34, bb = rock[2] + lit * 46;
+            r = mix3(r, 226, snow); gg = mix3(gg, 236, snow); bb = mix3(bb, 250, snow);
+            const haze = 0.08 + far * 0.5 - depth * 0.1; return [mix3(r, air[0], haze), mix3(gg, air[1], haze), mix3(bb, air[2], haze), 255 * edgeA]; });
+          SIG.up(g, m, w, h);
+          if (fogAmt > 0) { const fy = (b + 0.04) * h, fg = g.createLinearGradient(0, fy - h * 0.14, 0, fy + h * 0.06); fg.addColorStop(0, "rgba(160,190,222,0)"); fg.addColorStop(0.72, `rgba(160,190,222,${0.3 * fogAmt})`); fg.addColorStop(1, "rgba(160,190,222,0)"); g.fillStyle = fg; g.fillRect(0, fy - h * 0.14, w, h * 0.2); }
+        });
+        SIG.calm(g, w, h, 0.5, 0.5); SIG.grain(g, w, h, 0.045);
+        fog = fogAmt > 0 ? SIG.soft(w * 2, h, 4, (u, v) => { const f = SIG.fbm(u * 6, v * 5, 71, 5), band = Math.exp(-Math.pow((v - 0.72) * 4.5, 2)); return [200, 220, 240, SIG.clamp((f - 0.42) * 2.2) * band * 150 * fogAmt]; }) : null; },
+      frame(t) { ctx.drawImage(base, 0, 0, w, h);
+        if (fog) { const x = -((t * 6 * k) % (w * 2)); ctx.drawImage(fog, x, 0, w * 2, h); ctx.drawImage(fog, x + w * 2, 0, w * 2, h); } },
+    };
+  };
+  const mix3 = (a, b, t) => a + (b - a) * t;
+
+  // ---- Polar Lights (Aurora): aurora curtains over dark mountains, reflected in a still lake ----
+  const sigAurora = (ctx) => {
+    let w = 0, h = 0, k = 1, sky = null, cur = null, land = null;
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h);
+        sky = offscreen(w, h); let g = sky.getContext("2d"); const sg = g.createLinearGradient(0, 0, 0, h); sg.addColorStop(0, "#02040a"); sg.addColorStop(0.7, "#071425"); sg.addColorStop(1, "#0a1a2a"); g.fillStyle = sg; g.fillRect(0, 0, w, h);
+        SIG.stars(g, w, h * 0.7, Math.round(300 * w * h / 1.44e6) + 40, 55, 1, k);
+        // the curtains, painted 1.5x as wide so they can drift
+        const green = [60, 255, 160], teal = [40, 210, 220], violet = [160, 90, 255];
+        cur = SIG.soft(w * 1.5, h, 1.8, (u, v) => { const x = u * 1.5;
+          const yb = 0.42 + 0.12 * Math.sin(x * 4.1 + 1) + 0.06 * Math.sin(x * 9.3) + 0.05 * (SIG.fbm(x * 2, 0.3, 5, 3) - 0.5);   // the curtain's lower edge
+          const d = yb - v; if (d < -0.03 || v > 0.62) return [0, 0, 0, 0];
+          const rays = Math.pow(SIG.fbm(x * 38, v * 1.6, 9, 3), 2.2) * 1.8, body = Math.exp(-Math.max(0, d) * 5) * (d < 0 ? Math.exp(d * 60) : 1);
+          const fold = 0.55 + 0.45 * SIG.fbm(x * 3.5, 0.5, 15, 3), I = SIG.clamp(body * rays * fold);
+          const tt = SIG.clamp(d * 3.2), c = tt < 0.5 ? teal.map((q, i) => mix3(green[i], q, tt * 2)) : teal.map((q, i) => mix3(q, violet[i], (tt - 0.5) * 2));
+          return [c[0], c[1], c[2], I * 235]; });
+        { const big = offscreen(w * 1.5, h); SIG.up(big.getContext("2d"), cur, w * 1.5, h); cur = big; }   // upscaled once, not every frame
+        land = offscreen(w, h); g = land.getContext("2d");
+        const tops = SIG.range(300, 33, 0.72, 0.16, 2.6), lake = 0.78;
+        g.fillStyle = "rgba(2,6,12,0.45)"; g.fillRect(0, lake * h, w, h - lake * h);   // the lake's darker water (over its reflection)
+        g.fillStyle = "#030608"; g.beginPath(); g.moveTo(0, lake * h); tops.forEach((y, i) => g.lineTo((i / 300) * w, Math.min(y, lake) * h)); g.lineTo(w, lake * h); g.closePath(); g.fill();
+        // rim light on the ridgeline from the aurora
+        g.strokeStyle = "rgba(90,255,190,0.25)"; g.lineWidth = 1.2 * k; g.beginPath(); tops.forEach((y, i) => (i ? g.lineTo((i / 300) * w, Math.min(y, lake) * h) : g.moveTo(0, Math.min(y, lake) * h))); g.stroke();
+        SIG.calm(g, w, h, 0.22, 0.5);
+        this._lake = lake; },
+      frame(t) {
+        // the curtains drift less than a pixel a frame: the picture is composed again only when they've moved a pixel
+        const off = Math.round((t * 4 * k) % (w * 0.5)), a = Math.round((0.85 + 0.15 * Math.sin(t * 0.25)) * 40) / 40, key = off + "|" + a;
+        if (!this._c || this._c.width !== Math.round(w)) { this._c = offscreen(w, h); this._key = ""; }
+        if (this._key !== key) { this._key = key; const g = this._c.getContext("2d");
+          g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; g.drawImage(sky, 0, 0, w, h);
+          g.globalCompositeOperation = "lighter"; g.globalAlpha = a; g.drawImage(cur, -off, 0, w * 1.5, h);
+          const L = this._lake * h;   // the lake: the sky above it, upside down, a little darker
+          g.save(); g.globalAlpha = 0.35; g.translate(0, 2 * L); g.scale(1, -1); g.beginPath(); g.rect(0, L - h * 0.4, w, h * 0.4); g.clip(); g.drawImage(cur, -off, 0, w * 1.5, h); g.restore();
+          g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; g.drawImage(land, 0, 0, w, h); }
+        ctx.drawImage(this._c, 0, 0, w, h); },
+    };
+  };
+
+  // ---- Skyline (Neon City): a city at night in three depths, neon on the edges, a wet street reflecting it ----
+  const sigCity = (ctx) => {
+    let w = 0, h = 0, k = 1, base = null, signs = [];
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); const R = SIG.rng(808), street = 0.8;
+        base = offscreen(w, h); const g = base.getContext("2d");
+        const sg = g.createLinearGradient(0, 0, 0, street * h); sg.addColorStop(0, "#04030c"); sg.addColorStop(0.6, "#120a2a"); sg.addColorStop(1, "#2a1240"); g.fillStyle = sg; g.fillRect(0, 0, w, h);
+        const haze = SIG.soft(w, h, 4, (u, v) => { const c = SIG.fbm(u * 3, v * 5, 4, 4); return [80, 40, 140, SIG.clamp((c - 0.45) * 2) * 60 * SIG.clamp(1 - Math.abs(v - 0.55) * 2.5)]; }); SIG.up(g, haze, w, h);
+        const layers = [[0.35, 0.22, "#0d0a1c", 0.12, 26], [0.5, 0.32, "#090717", 0.35, 18], [0.62, 0.42, "#050410", 0.75, 12]];
+        signs = [];
+        layers.forEach(([minH, maxH, col, wins, n], li) => {
+          let x = -R() * w * 0.05;
+          while (x < w) { const bw = (w / n) * (0.6 + R() * 0.9), bh = (minH + R() * (maxH - minH)) * h * (Math.abs(x / w - 0.5) < 0.18 ? 0.75 : 1), y = street * h - bh;   // lower in the middle
+            g.fillStyle = col; g.fillRect(x, y, bw, bh + 1);
+            if (wins > 0) { const cw = Math.max(2, 3 * k), ch = Math.max(2, 4 * k), gx = cw * 2.2, gy = ch * 2.1;
+              for (let yy = y + ch * 2; yy < street * h - ch; yy += gy) for (let xx = x + cw; xx < x + bw - cw; xx += gx) if (R() < wins * 0.35) {
+                const warm = R() < 0.55; g.fillStyle = warm ? `rgba(255,${180 + R() * 50 | 0},120,${0.25 + R() * 0.5})` : `rgba(${120 + R() * 60 | 0},200,255,${0.2 + R() * 0.45})`; g.fillRect(xx, yy, cw, ch); } }
+            if (li === 2 && R() < 0.5) { const nc = R() < 0.5 ? "0,230,255" : "255,60,200"; g.strokeStyle = `rgba(${nc},0.85)`; g.lineWidth = 1.5 * k; g.strokeRect(x + 0.5, y + 0.5, bw - 1, bh);
+              g.save(); g.globalCompositeOperation = "lighter"; g.strokeStyle = `rgba(${nc},0.18)`; g.lineWidth = 7 * k; g.strokeRect(x, y, bw, bh); g.restore();
+              if (R() < 0.6) signs.push({ x: x + bw * 0.5, y: y + bh * (0.2 + R() * 0.3), c: nc, p: R() * T2, s: (8 + R() * 10) * k }); }
+            x += bw + R() * w * 0.008; } });
+        // the wet street: everything above, upside down, darker and smeared
+        const L = street * h; g.save(); g.globalAlpha = 0.42; g.translate(0, 2 * L); g.scale(1, -1); g.drawImage(base, 0, 0, w, h); g.restore();
+        const wet = g.createLinearGradient(0, L, 0, h); wet.addColorStop(0, "rgba(10,6,20,0.35)"); wet.addColorStop(1, "rgba(4,3,8,0.92)"); g.fillStyle = wet; g.fillRect(0, L, w, h - L);
+        g.fillStyle = "rgba(255,60,200,0.35)"; g.fillRect(0, L, w, Math.max(1, k));
+        SIG.calm(g, w, h, 0.28, 0.55); SIG.grain(g, w, h, 0.05); },
+      frame(t) { ctx.drawImage(base, 0, 0, w, h);
+        ctx.save(); ctx.globalCompositeOperation = "lighter";
+        for (const s of signs) { const a = 0.55 + 0.25 * Math.sin(t * 1.3 + s.p) + (Math.sin(t * 9 + s.p * 7) > 0.995 ? -0.4 : 0); glowDot(ctx, s.x, s.y, s.s * 3, s.c, a * 0.35); ctx.fillStyle = `rgba(${s.c},${a})`; ctx.fillRect(s.x - s.s, s.y - s.s * 0.18, s.s * 2, s.s * 0.36); }
+        ctx.restore(); },
+    };
+  };
+
+  // ---- Void: deep purple energy waves on black ----
+  // Many thin luminous ribbons that flow across the picture, a soft glow under them; they breathe slowly.
+  const sigVoid = (ctx) => {
+    let w = 0, h = 0, k = 1, glow = null, lines = null;
+    const draw = (g, W, H, kk, ph, wide) => { g.save(); g.globalCompositeOperation = "lighter"; g.lineCap = "round";
+      for (let i = 0; i < 46; i++) { const f = i / 45, band = Math.sin(f * Math.PI), y0 = 0.5 + (f - 0.5) * 0.9;
+        const hue = 268 + 40 * Math.sin(f * 5.1), a = wide ? 0.05 + band * 0.06 : 0.1 + band * 0.42;
+        g.strokeStyle = `hsla(${hue},95%,${wide ? 55 : 70}%,${a})`; g.lineWidth = (wide ? 18 : 0.9 + band * 0.9) * kk; g.beginPath();
+        for (let s = 0; s <= 140; s++) { const u = s / 140, x = u * W, curve = 0.18 * Math.sin(u * 3.2 + f * 2.4 + ph) + 0.07 * Math.sin(u * 7.1 - f * 4 + ph * 1.3) + 0.04 * Math.sin(u * 13 + f * 9);
+          const pinch = 0.55 + 0.45 * Math.abs(Math.sin(u * 2.6 + 0.6)), y = (0.5 + (y0 - 0.5) * pinch + curve) * H; s ? g.lineTo(x, y) : g.moveTo(x, y); }
+        g.stroke(); }
+      g.restore(); };
+    return {
+      resize(W, H) { w = W; h = H; k = Math.min(w, h) / 600;   // (true scale, so a thumbnail has the same thin ribbons)
+        const gl = offscreen(w / 4, h / 4), gg = gl.getContext("2d"); gg.fillStyle = "#000"; gg.fillRect(0, 0, w, h); draw(gg, w / 4, h / 4, k / 4, 0, true);
+        glow = offscreen(w, h); const g = glow.getContext("2d"); g.fillStyle = "#020104"; g.fillRect(0, 0, w, h); g.globalCompositeOperation = "lighter"; SIG.up(g, gl, w, h); g.globalCompositeOperation = "source-over"; SIG.calm(g, w, h, 0.34, 0.55);
+        // the ribbons, once per size (1.1x wide, so they can sway), already softened in the middle
+        lines = offscreen(w * 1.1, h); const lg = lines.getContext("2d"); draw(lg, w * 1.1, h, k, 0.4, false);
+        lg.globalCompositeOperation = "destination-out"; lg.translate(w * 0.55, h * 0.52); lg.scale(w * 0.42, h * 0.34);
+        const r = lg.createRadialGradient(0, 0, 0, 0, 0, 1); r.addColorStop(0, "rgba(0,0,0,0.4)"); r.addColorStop(1, "rgba(0,0,0,0)"); lg.fillStyle = r; lg.fillRect(-1.5, -1.5, 3, 3); },
+      frame(t) {
+        ctx.drawImage(glow, 0, 0, w, h);
+        const sway = Math.sin(t * 0.05) * w * 0.045, breathe = 0.82 + 0.18 * Math.sin(t * 0.21);
+        ctx.save(); ctx.globalAlpha = breathe; ctx.drawImage(lines, -w * 0.05 + sway, 0, w * 1.1, h); ctx.restore(); },
+    };
+  };
+
+  // ---- Blood Moon: a huge red moon behind dark drifting clouds ----
+  const sigBlood = (ctx) => {
+    let w = 0, h = 0, k = 1, base = null, cl = null, mx = 0, my = 0, mr = 0;
+    return {
+      resize(W, H) { w = W; h = H; k = kOf(w, h); mx = w * 0.7; my = h * 0.3; mr = Math.min(w, h) * 0.2;
+        base = offscreen(w, h); const g = base.getContext("2d"); const sg = g.createLinearGradient(0, 0, 0, h); sg.addColorStop(0, "#020001"); sg.addColorStop(0.7, "#0a0103"); sg.addColorStop(1, "#160306"); g.fillStyle = sg; g.fillRect(0, 0, w, h);
+        SIG.stars(g, w, h * 0.8, Math.round(120 * w * h / 1.44e6) + 20, 66, 1, k * 0.8);
+        glowDot(g, mx, my, mr * 5, "150,14,8", 0.28); glowDot(g, mx, my, mr * 1.7, "255,70,30", 0.3);
+        const tone = SIG.ramp([[0, 52, 6, 3], [0.35, 140, 26, 10], [0.65, 214, 66, 28], [0.88, 250, 120, 62], [1, 255, 170, 110]]), d = Math.ceil(mr * 2);
+        const moon = SIG.paint(d, d, (u, v) => { const x = u * 2 - 1, y = v * 2 - 1, r = Math.hypot(x, y); if (r > 1) return [0, 0, 0, 0];
+          const z = Math.sqrt(1 - r * r), shade = SIG.clamp(0.25 + 0.75 * (z * 0.7 - x * 0.25 - y * 0.2));
+          const maria = SIG.fbm(x * 2.2 + 4, y * 2.2, 12, 5), crat = Math.pow(SIG.ridge(x * 5, y * 5, 19, 3), 3) * 0.25;
+          const t = SIG.clamp((0.62 - (maria - 0.5) * 0.9 + crat) * shade), c = tone(t), edge = SIG.clamp((1 - r) * mr * 0.9); return [c[0], c[1], c[2], 255 * edge]; });
+        g.drawImage(moon, mx - mr, my - mr, d, d);
+        const hz = SIG.soft(w, h, 3, (u, v) => { const f = SIG.fbm(u * 2, v * 6, 8, 4); return [12, 2, 3, SIG.clamp((v - 0.72) * 3.5) * (180 + f * 75)]; }); SIG.up(g, hz, w, h);   // low dark hills of cloud
+        SIG.calm(g, w, h, 0.22, 0.55); SIG.grain(g, w, h, 0.05);
+        cl = SIG.soft(w * 2, h, 2.5, (u, v) => { const x = u * 2; const c = SIG.fbm(x * 2.6 + SIG.fbm(x, v, 3, 3), v * 4.2, 31, 6), band = SIG.clamp(1 - Math.abs(v - 0.33) * 2.6);
+          const a = SIG.clamp((c - 0.47) * 3) * band, rim = SIG.clamp((c - 0.47) * 6) - SIG.clamp((c - 0.55) * 6);
+          const lit = SIG.clamp(1 - Math.hypot((x / 2 - 0.35) * 1.8, (v - 0.3) * 2.4) * 1.6);   // edges facing the moon glow red
+          return [mix3(10, 235, rim * (0.25 + 0.75 * lit)), mix3(2, 58, rim * (0.25 + 0.75 * lit)), mix3(3, 34, rim * (0.25 + 0.75 * lit)), a * 245]; }); },
+      frame(t) { ctx.drawImage(base, 0, 0, w, h); const x = -((t * 5 * k) % (w * 2)); ctx.drawImage(cl, x, 0, w * 2, h); ctx.drawImage(cl, x + w * 2, 0, w * 2, h); },
+    };
+  };
+
   function makeSkin(id, ctx, saved) {
     // "fx:<effect>": an effect layer (see-through, cleared every frame). saved = { amount, lightning... }
     if (typeof id === "string" && id.startsWith("fx:")) {
@@ -2866,7 +3084,7 @@ function priismSkins(window, document) {
   window.PriismSkinOpts = { optsOf, recolourOf };
 
   window.WickedSkins = {
-    aurora:    { name: "Polar Lights",    cat: "Wild", create: aurora },
+    aurora:    { name: "Aurora",          cat: "Wild", create: sigAurora },
     nebula:    { name: "Stardust",    cat: "Cosmos",  create: nebula },
     starfield: { name: "Deep Field", cat: "Cosmos",  create: starfield, oled: true , opts: [AMT] },
     embers:    { name: "Cinders",    cat: "Fire",   create: embers },
@@ -2880,7 +3098,7 @@ function priismSkins(window, document) {
     fireflies: { name: "Glowbugs", cat: "Wild", create: fireflies , opts: [AMT] },
     sakura:    { name: "Petal Drift",    cat: "Wild", create: sakura , opts: [AMT] },
     snow:      { name: "Snowfall",  cat: "Elements", create: snow , opts: [AMT] },
-    storm:     { name: "Thunderstorm", cat: "Elements", create: storm },
+    storm:     { name: "Storm",        cat: "Elements", create: sigStorm, opts: [{ k: "lightning", label: "Lightning", type: "toggle", def: true }, { k: "ground", label: "Mountains", type: "toggle", def: false }] },
     sunset:    { name: "Dusk Clouds", cat: "Elements", create: sunsetclouds },
     galaxy:    { name: "Spiral Galaxy",    cat: "Cosmos",  create: galaxy, oled: true },
     hyperspace:{ name: "Lightspeed", cat: "Cosmos", create: hyperspace, oled: true },
@@ -2888,7 +3106,7 @@ function priismSkins(window, document) {
     plasma:    { name: "Plasma",    cat: "Electric",   create: plasma },
     cybergrid: { name: "Cyber Grid", cat: "Electric",  create: cybergrid },
     circuit:   { name: "Circuit",   cat: "Electric",   create: circuit, oled: true },
-    neoncity:  { name: "Skyline", cat: "Urban",   create: neoncity },
+    neoncity:  { name: "Neon City", cat: "Urban", create: sigCity },
     tickertape:   { name: "Ticker Tape",   cat: "Markets", create: tickertape, oled: true },
     tradingfloor: { name: "Trading Floor", cat: "Markets", create: tradingFloor, wow: true,
       opts: [{ k: "board", label: "Quote board", type: "toggle", def: true }, { k: "refresh", label: "Screens refresh", type: "toggle", def: true }] },
@@ -2899,7 +3117,7 @@ function priismSkins(window, document) {
     twinkle:      { name: "Twinkle",       cat: "Cosmos",  create: twinkle, oled: true,
       opts: [{ ...AMT, label: "Stars" }, { k: "sparkle", label: "Sparkle", type: "toggle", def: true }] },
     // pack 2
-    eclipse:     { name: "Totality",       cat: "Cosmos",   create: eclipse },
+    eclipse:     { name: "Eclipse",        cat: "Cosmos",   create: sigEclipse },
     comets:      { name: "Meteor Shower",  cat: "Cosmos",   create: comets },
     wormhole:    { name: "Wormhole",       cat: "Cosmos",   create: wormhole, oled: true },
     pulsar:      { name: "Pulsar",         cat: "Cosmos",   create: pulsar },
@@ -2913,9 +3131,12 @@ function priismSkins(window, document) {
     zenwaves:    { name: "Zen Waves",      cat: "Chill",    create: zenwaves },
     mist:        { name: "Fog Bank",       cat: "Chill",    create: mist },
     bubbles:     { name: "Reef Light",     cat: "Chill",    create: bubbles },
-    silk:        { name: "Silk",           cat: "Chill",    create: silk },
+    silk:        { name: "Imperial",       cat: "Chill",    create: sigSilk },
+    obsidian:    { name: "Obsidian",       cat: "Abstract", create: sigObsidian },
+    void:        { name: "Void",           cat: "Abstract", create: sigVoid, oled: true },
     leaves:      { name: "Autumn Drift",   cat: "Wild",     create: leaves },
-    mountains:   { name: "Moonlit Ridge",  cat: "Wild",     create: mountains },
+    mountains:   { name: "Glacier",        cat: "Wild",     create: sigRidge, opts: [{ k: "moon", label: "Moon", type: "toggle", def: true }, { k: "fog", label: "Mist", type: "range", min: 0, max: 1, step: 0.05, def: 0.6 }] },
+    bloodmoon:   { name: "Blood Moon",     cat: "Cosmos",   create: sigBlood },
     jellyfish:   { name: "Jellyfish",      cat: "Wild",     create: jellyfish },
     // pack 3: the "wow" set
     blackhole:   { name: "Event Horizon",  cat: "Cosmos",   create: blackhole, wow: true },
