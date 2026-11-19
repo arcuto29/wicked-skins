@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 35;
+  const HOOK_VERSION = 37;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -291,8 +291,28 @@
       const n = api && api.chartsCount ? api.chartsCount() : 0;
       for (let i = 0; i < n; i++) { const w = api.chart(i); if (w && !out.includes(w)) out.push(w); }
     } catch {}
+    // platforms built on TradingView's charting library (the trading terminal, prop-firm platforms): the widget object
+    // (often in the page that holds the chart's frame)
+    if (!out.length) try { let tw = null; try { tw = window.tvWidget || (window.parent !== window && window.parent.tvWidget) || null; } catch {}
+      const n = tw && tw.chartsCount ? tw.chartsCount() : tw ? 1 : 0;
+      for (let i = 0; i < n; i++) { const w = n > 1 && tw.chart ? tw.chart(i) : tw.activeChart(); if (w && !out.includes(w)) out.push(w); } } catch {}
     return out;
   }
+  // Closed candles: where is the newest bar of the data, on this canvas? From the chart's own model (follows scrolling,
+  // zoom, timeframe and replay; each chart of a layout on its own). Device px, null = off screen, undefined = unknown.
+  // (read fresh at every pass end, a few times per paint: TradingView can paint twice in one frame while it scrolls,
+  // so a position remembered for the frame would be stale for the second paint)
+  function newestBarX(c) {
+    let v;
+    try { // (.chart-markup-table is nested: match the chart whose main table holds this canvas)
+      if (c.closest && c.closest(".chart-markup-table")) for (const w of chartWidgets()) { const cw = w._chartWidget || w; if (!cw || !cw._elMainTable || !cw._elMainTable.contains(c) || !cw.model) continue;
+        const mm = cw.model(), m = mm.model ? mm.model() : mm, ts = m.timeScale(), li = m.mainSeries().bars().lastIndex();
+        if (li === null || li === undefined) break;
+        const r = c.getBoundingClientRect(), k = r.width ? c.width / r.width : 1, x = ts.indexToCoordinate(li) * k, sp = ts.barSpacing() * k;
+        v = x + sp / 2 < 0 || x - sp / 2 > c.width ? null : x; break; } } catch { v = undefined; }   // off screen only once the whole bar is
+    return v;
+  }
+  try { if (window.__bdCandleLooks && window.__bdCandleLooks.live && window.__bdCandleLooks.live.setHint) window.__bdCandleLooks.live.setHint(newestBarX); } catch {}
   let scaleTextKey = null; // "r,g,b" of TradingView's axis label colour
   function learnSides() {
     const found = [];

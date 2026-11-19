@@ -732,11 +732,18 @@
   const live = (() => {
     const S = new WeakMap(), open = new Set(), painted = new Set();
     let queued = false, busy = false, seq = 0, wrapped = false;
+    let hint = null;   // the platform's own answer, where it has one: (canvas) => newest bar's x (device px) | null (off screen) | undefined (don't know)
     const st = (g) => { let s = S.get(g); if (!s) S.set(g, s = { grp: null, sp: 0, run: 0, liveCx: null, maxCx: -1e9, maxOk: false, cols: new Set(), priceY: null }); return s; };
     const onPrice = (s, grp) => s.priceY !== null && grp.ys.some((y) => Math.abs(y - s.priceY) <= 2);
     function end(g, s, runEnd) {
       const grp = s.grp; if (!grp) return; s.grp = null; open.delete(g);
-      const W = g.canvas ? g.canvas.width : 0, ok = s.sp >= 4 && (W - grp.cx > s.sp * 1.15 + 1 || (W - grp.cx > -s.sp && onPrice(s, grp)));
+      // Is this the newest bar of the data? The platform says so where it can (TradingView: its chart model knows the
+      // newest bar's place, for each chart, also when scrolled, zoomed, on any timeframe and in replay). Otherwise:
+      // room to its right, or its body on the last-price line.
+      const W = g.canvas ? g.canvas.width : 0, h = hint && g.canvas ? hint(g.canvas) : undefined;
+      const ok = typeof h === "number" ? Math.abs(grp.cx - h) <= Math.max(2.5, s.sp * 0.6)
+        : h === null ? false
+        : s.sp >= 4 && (W - grp.cx > s.sp * 1.15 + 1 || (W - grp.cx > -s.sp && onPrice(s, grp)));
       s.run++;
       if (grp.cx > s.maxCx) { s.maxCx = grp.cx; s.maxOk = ok; }
       // a pass of 3+ bars ending here, or (charts that start a new path for every candle) where the live bar was last paint
@@ -789,6 +796,7 @@
         s.grp = { cx, l: X, r: X + W, parts: [part], ys: body ? [Y0, Y1] : [] }; open.add(g);
       },
       flush,
+      setHint(fn) { hint = typeof fn === "function" ? fn : null; },
     };
   })();
 
