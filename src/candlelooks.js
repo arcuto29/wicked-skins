@@ -19,7 +19,7 @@
     window.__bdLiteBlur = true;
     const P = CanvasRenderingContext2D.prototype, d = Object.getOwnPropertyDescriptor(P, "shadowBlur");
     if (d && d.set) Object.defineProperty(P, "shadowBlur", { configurable: true, enumerable: d.enumerable, get: d.get,
-      set(v) { d.set.call(this, window.__bdLite && v > 2 ? 2 + (v - 2) * 0.15 : v); } });
+      set(v) { d.set.call(this, window.__bdLite && v > 2 ? 2 + (v - 2) * 0.3 : v); } });   // (at 0.15 a glow all but vanished)
   }
 
   const LOOKS = [
@@ -505,7 +505,11 @@
       return out;
     }
     if (o.mode === "candles") return isHex(o.up) && isHex(o.down) ? [o.up, o.down, shade(o.up, 38), shade(o.down, -38), shade(o.up, -38), shade(o.down, 38)] : null;
-    const base = o.mode === "custom" ? o.color : o.mode === "wallpaper" ? o.accent : null;
+    // Custom: every indicator stays in YOUR colour, told apart by lighter / deeper shades of it (and a small hue
+    // nudge), never a different colour. Wallpaper (no palette): shades round the wallpaper's accent.
+    if (o.mode === "custom") { if (!isHex(o.color)) return null; const c = rgbOf(o.color), tint = (t, f, d) => toHex(hueRotate(mixc(c, t, f), d || 0));
+      return [o.color, tint(WHITE, 0.32, 6), tint(BLACK, 0.3, -6), tint(WHITE, 0.55, -10), tint(BLACK, 0.5, 10), tint(WHITE, 0.18, 14)]; }
+    const base = o.mode === "wallpaper" ? o.accent : null;
     return isHex(base) ? [base, shade(base, 42), shade(base, -42), shade(base, 90), shade(base, -90), shade(base, 180)] : null;
   }
   const hsl = (h, a) => `hsl(${Math.round(((h % 360) + 360) % 360)} 95% 62%${a !== undefined && a < 1 ? " / " + +a.toFixed(3) : ""})`;
@@ -607,15 +611,18 @@
       if (style === "shine" || style === "glass") {           // a soft light from the top edge
         const gr = g.createLinearGradient(0, y, 0, y + h * (style === "glass" ? 0.5 : 0.65)); gr.addColorStop(0, `rgba(255,255,255,${style === "glass" ? 0.16 : 0.22})`); gr.addColorStop(1, "rgba(255,255,255,0)");
         path(0); k.style(gr); k.fill();
-        if (style === "glass" && h > 6 * px) { k.strokeStyle("rgba(255,255,255,0.35)"); g.lineWidth = px; k.begin(); const rr = Math.max(0, r - px); g.moveTo(x + rr + px, y + 1.5 * px); g.lineTo(x + w - rr - px, y + 1.5 * px); k.stroke(); }
+        // the fine highlight line (not with a dashed border: it would fill the gaps between the dashes)
+        if (style === "glass" && h > 6 * px && st.border !== "dashed") { k.strokeStyle("rgba(255,255,255,0.35)"); g.lineWidth = px; k.begin(); const rr = Math.max(0, r - px); g.moveTo(x + rr + px, y + 1.5 * px); g.lineTo(x + w - rr - px, y + 1.5 * px); k.stroke(); }
       }
     }
-    if (edge && st.border !== "none") {
-      const lw = Math.max(1, px) * (st.border === "glow" ? 1.6 : 1);
-      k.strokeStyle(edge); g.lineWidth = lw; if (g.setLineDash) g.setLineDash(st.border === "dashed" ? [6 * px, 4 * px] : []);
-      if (glow > 0 || st.border === "glow") { g.shadowColor = z.g; g.shadowBlur = st.border === "glow" ? 8 + glow * 20 : 3 + glow * 18; }
+    // Hollow has no fill, so it always keeps a border (Hollow + None would leave nothing to see)
+    const border = style === "hollow" && st.border === "none" ? "line" : st.border;
+    if (edge && border !== "none") {
+      const lw = Math.max(1, px) * (border === "glow" ? 1.6 : 1);
+      k.strokeStyle(edge); g.lineWidth = lw; if (g.setLineDash) g.setLineDash(border === "dashed" ? [6 * px, 4 * px] : []);
+      if (glow > 0 || border === "glow") { g.shadowColor = z.g; g.shadowBlur = border === "glow" ? 8 + glow * 20 : 3 + glow * 18; }
       path(lw / 2); k.stroke();
-      if (st.border === "double" && h > 8 * px && w > 8 * px) {   // a second, fainter line inside
+      if (border === "double" && h > 8 * px && w > 8 * px) {   // a second, fainter line inside
         g.shadowBlur = 0; g.globalAlpha *= 0.55; path(lw / 2 + 3 * px); k.stroke(); g.globalAlpha /= 0.55; }
     }
     g.shadowBlur = pSB; g.shadowColor = pSC; g.lineWidth = pW; if (g.setLineDash) g.setLineDash(pD);
