@@ -611,9 +611,6 @@ details.grp.fxmix { position: relative; border-color: transparent; background:
 details.grp.fxmix > summary { color: #e9f6ff; }
 details.grp.fxmix > summary { text-shadow: 0 0 10px rgba(25,211,255,.45); }
 .partsprev.fxprev { height: 110px; border: 1px solid rgba(140,110,255,.25); }
-#fxMaterial, .fxpresets { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-#fxMaterial .lookcard span, .fxpresets .lookcard span { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.15; min-height: 2.3em; text-align: center; font-size: 10px; letter-spacing: -.01em; }
-.fxpresets { display: grid; gap: 6px; margin-bottom: 6px; }
-#fxMaterial .lookcard canvas, .fxpresets .lookcard canvas { height: 46px; }
+.lookgrid .lookgrp { grid-column: 1 / -1; margin: 6px 0 0; color: #9fdcff; }
 .fxmix .lookcard.on { box-shadow: 0 0 0 2px #19d3ff, 0 0 18px -6px rgba(140,110,255,.8); }
 .fxmix input[type="range"] { accent-color: #19d3ff; }

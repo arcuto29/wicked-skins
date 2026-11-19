@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased: Signature wallpaper collection
+## 0.1.86 (2026-11-04)
+
+### Signature wallpaper collection
 - **New: Signature looks** (Wallpaper › Looks › Signature): Imperial, Eclipse, Orion, Glacier, Void, Aurora, Neon City, Obsidian, Storm and Blood Moon. Each comes with candles, glow and scale colours made for it.
 - **Painted wallpapers.** Each scene is painted pixel by pixel (light, shading, noise and grain) once per size. After that every frame only places the painting and moves a little light. Thumbnails are the same picture as the full-size wallpaper. The middle of each one, where price sits, is kept calm and dark.
 - **Reworked** (same wallpapers, new art; your saved looks and settings still point at them):
@@ -13,6 +15,27 @@
 - **New wallpapers:** Obsidian (black faceted metal, gold creases), Void (violet energy ribbons) and Blood Moon (a red moon behind drifting clouds).
 - **Orion** is the Storm wallpaper with Mountains and a violet Recolour, saved with the look, so there's no second copy of the wallpaper.
 - **Captures:** a snapshot or clip now waits until the wallpaper has redrawn at full sharpness (up to 1.5 s) before it's taken.
+
+### Zone fixes (Chart › Lines, zones & labels)
+Every zone option was checked against what's actually drawn, on TradingView and Lightweight Charts apps (nq.vision-style). Fixed:
+- **Lightweight Charts / nq.vision: zones drawn as shapes got no zone options at all.** Many apps and plugins draw a zone as a rectangle path (rect + fill, or roundRect) rather than with fillRect. Those zones now get every option: colour, gradient, fill, shape, border, style, glow, Dim, Each indicator and Price in a zone.
+- **Glow** now glows zones that keep their own colours too, not only recoloured ones.
+- **Custom colour** keeps every zone in your colour. Zones are told apart by lighter and deeper shades of it. Before, they were turned up to 180° round the colour wheel, so a cyan Custom colour could give blue, purple or red zones.
+- **Hollow + None** no longer makes a zone disappear. Hollow always keeps a border.
+- **Glass + Dashed:** Glass's highlight line no longer fills the gaps between the dashes.
+- **Auto quality / Power saver** no longer shrink glows until they're almost invisible. Glows are drawn at 30% size instead of 15%.
+
+### Tidier settings
+Cleanup: every option now has one place. Nothing you set is lost; your settings, saved looks, saved candle styles and each chart's own style are updated to match.
+- **Materials** are in the main look grid (Chart › Candles), under a Materials label. The separate Material grid in Candle FX is gone.
+- **Quick mixes** (Aurora Flow, Void Chrome, Ice Vapor, Synth Pulse) are in the candle preset cards, under Candle FX, with a Candle FX filter.
+- **Laser edge light** is now **Candle parts › Borders › Light**. Edge light keeps Rim and Glint.
+- **Live candle aura** moved next to the candle Glow slider.
+- **Price and zones:** Inside a zone (Glow, Strong, Edge, Spotlight, Shimmer) and Near, touch, enter (Proximity glow, Contact ripple, Liquid border, Directional light, Zone fusion) sit together under one heading, with one explanation.
+- **Cinematic focus** is now **Vignette centre › Live price** (Wallpaper › Adjust › Picture). It's the same vignette, centred on the live candle.
+- **Smart contrast** is now **Smart dim** in Picture, next to Dim. It's **off by default** now, so it doesn't change how your wallpaper looked before. If you had picked Soft or Strong, that's kept.
+- Removed **Depth fog** (the Fog wallpaper effect covers it) and **Parallax**.
+- The Clarity group is gone. Its options are in Picture.
 
 ## 0.1.85 (2026-11-04)
 - **New: Live candle atmosphere** (Chart › Candle FX): **Phantom Smoke**, **Liquid Vapor** or **Spectral Mist**, plus a **Motion trail** (Afterimage) and a **Live candle aura**. Each can be combined with any material or look.
