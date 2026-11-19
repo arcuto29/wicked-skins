@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 37;
+  const HOOK_VERSION = 38;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -302,13 +302,16 @@
   // zoom, timeframe and replay; each chart of a layout on its own). Device px, null = off screen, undefined = unknown.
   // (read fresh at every pass end, a few times per paint: TradingView can paint twice in one frame while it scrolls,
   // so a position remembered for the frame would be stale for the second paint)
+  // canvas px per CSS px (read once a frame: reading layout mid-paint can force the browser to lay the page out again)
+  const scaleMemo = new WeakMap();
+  const scaleOf = (c) => { const m = scaleMemo.get(c); if (m && m.f === frameNo) return m.k; const r = c.getBoundingClientRect(), k = r.width ? c.width / r.width : 1; scaleMemo.set(c, { f: frameNo, k }); return k; };
   function newestBarX(c) {
     let v;
     try { // (.chart-markup-table is nested: match the chart whose main table holds this canvas)
       if (c.closest && c.closest(".chart-markup-table")) for (const w of chartWidgets()) { const cw = w._chartWidget || w; if (!cw || !cw._elMainTable || !cw._elMainTable.contains(c) || !cw.model) continue;
         const mm = cw.model(), m = mm.model ? mm.model() : mm, ts = m.timeScale(), li = m.mainSeries().bars().lastIndex();
         if (li === null || li === undefined) break;
-        const r = c.getBoundingClientRect(), k = r.width ? c.width / r.width : 1, x = ts.indexToCoordinate(li) * k, sp = ts.barSpacing() * k;
+        const k = scaleOf(c), x = ts.indexToCoordinate(li) * k, sp = ts.barSpacing() * k;
         v = x + sp / 2 < 0 || x - sp / 2 > c.width ? null : x; break; } } catch { v = undefined; }   // off screen only once the whole bar is
     return v;
   }
@@ -791,9 +794,15 @@
   // light redraw ~8 times a second (4 on Lite); it stops by itself when price leaves the zone. Never with reduced motion.
   let zoneAnimAt = -1e9;
   const reduceZ = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)"); } catch { return { matches: false }; } })();
-  (function zoneAnim() { const lite = !!window.__bdLite;
-    setTimeout(zoneAnim, lite ? 250 : 125);
-    if (on && fx.zoneReact && fx.zoneReact !== "off" && !reduceZ.matches && !document.hidden && performance.now() - zoneAnimAt < 1000) apiRepaint(); })();
+  // Kept light for trading: TradingView's light redraw (not a full one), at most 4 times a second, never in Lite / Power
+  // saver (the zone stays lit, just still), and never right after you touched the chart (it redraws then anyway).
+  let inputAt = 0; for (const t of ["pointerdown", "pointermove", "wheel", "keydown"]) addEventListener(t, () => { inputAt = performance.now(); }, { capture: true, passive: true });
+  (function zoneAnim() { setTimeout(zoneAnim, 250);
+    const now = performance.now();
+    if (!on || !fx.zoneReact || fx.zoneReact === "off" || window.__bdLite || reduceZ.matches || document.hidden || now - zoneAnimAt > 1000 || now - inputAt < 300) return;
+    let done = false;
+    for (const w of chartWidgets()) { try { const cw = w._chartWidget || w, m0 = cw.model(), m = m0.model ? m0.model() : m0; if (m.lightUpdate) { m.lightUpdate(); done = true; } } catch {} }
+    if (!done) apiRepaint(); })();
   function forceRepaint(softOnly, toneOnly) {
     if (!softRaf) softRaf = requestAnimationFrame(() => {
       softRaf = 0; stats.soft++;

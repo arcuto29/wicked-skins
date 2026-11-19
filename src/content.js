@@ -466,7 +466,8 @@
     const look = M && M.LOOKS.includes(cfg.moodLook) ? cfg.moodLook : "glow", css = M ? M.css(look, /^#[0-9a-f]{6}$/i.test(col) ? col : "#00e08a", ks, moodSide) : null;
     const op = !active ? 0 : isMusic ? (musicParts().includes("g") ? 0.04 + 0.96 * k : 0) : css ? css.op * Math.min(1, 0.25 + k * 1.2) : 0.15 + 0.85 * k;
     const pulseOn = cfg.moodPulse !== "off", strong = cfg.moodPulse === "strong";
-    const fire = active && tick && pulseOn && performance.now() - lastPulse > (isMusic ? 150 : 1200);   // fast tickers: max ~1 pulse/1.2s; beats: ~2.5/s at most
+    // Lite (Power saver / Auto easing off / the safety floor): no pulses; restarting one forces a page layout
+    const fire = active && tick && pulseOn && !liteNow() && performance.now() - lastPulse > (isMusic ? 150 : 1200);   // fast tickers: max ~1 pulse/1.2s; beats: ~2.5/s at most
     if (fire) lastPulse = performance.now();
     const tcol = isMusic ? col : tick > 0 ? upColor() : downColor();
     for (const el of moodEls()) {
@@ -1165,7 +1166,7 @@
     if (!on) { if (st) st.remove(); return; }
     const buy = cfg.tpColors === "custom" ? cfg.tpBuy : upColor(), sell = cfg.tpColors === "custom" ? cfg.tpSell : downColor();
     const L = window.PriismTradeLook({ buy, sell, shape: cfg.tpShape, style: cfg.tpStyle });
-    const decl = (o) => Object.entries(o).map(([k, v]) => `${k}: ${v} !important;` + (k === "backdrop-filter" ? ` -webkit-backdrop-filter: ${v} !important;` : "")).join(" ");
+    const decl = (o) => Object.entries(o).filter(([k]) => !(k === "backdrop-filter" && liteNow())).map(([k, v]) => `${k}: ${v} !important;` + (k === "backdrop-filter" ? ` -webkit-backdrop-filter: ${v} !important;` : "")).join(" ");   // (Lite: no blur behind panels)
     const B = '[data-name="buy-order-button"], [data-name="place-and-modify-button"][class*="blue-"], [data-name="place-and-modify-button"][class*="green-"]';
     const S = '[data-name="sell-order-button"], [data-name="place-and-modify-button"][class*="red-"]';
     const scope = (sel) => sel.split(",").map((x) => "html.bd-tp " + x.trim()).join(", ");
@@ -1189,7 +1190,7 @@
       html.bd-tp [data-name="place-and-modify-button"][class*="red-"] { color: ${deep(sell)} !important; text-shadow: none !important; background: ${tint(sell, 0.3)} !important; }`; }
     if (cfg.tpPanel === "glass") css += `
       html.bd-tp [class*="layout__area--tradingpanel"], html.bd-tp [data-name="order-panel"] { background: ${dark ? "rgba(10,13,20,.58)" : "rgba(255,255,255,.62)"} !important;
-        -webkit-backdrop-filter: blur(18px) saturate(1.2) !important; backdrop-filter: blur(18px) saturate(1.2) !important; }`;
+        ${liteNow() ? "" : "-webkit-backdrop-filter: blur(18px) saturate(1.2) !important; backdrop-filter: blur(18px) saturate(1.2) !important;"} }`;
     if (!st) { st = document.createElement("style"); st.id = "bd-tp-css"; st.dataset.bdOwner = ME.token; (document.head || document.documentElement).appendChild(st); }
     if (st.textContent !== css) st.textContent = css;
   }
@@ -1206,7 +1207,7 @@
     const acc = /^#[0-9a-f]{6}$/i.test(cfg.uiAccent || "") ? cfg.uiAccent : skinAccent() || upColor(), n = parseInt(acc.slice(1), 16), a = (x) => `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${x})`;
     const areas = [...PANEL_AREAS, ...(cfg.pnWindows !== false ? WINDOWS : [])], sel = areas.map((x) => "html.bd-on " + x).join(", ");
     const d = [];
-    if (s === "glass") d.push("-webkit-backdrop-filter: blur(16px) saturate(1.2) !important", "backdrop-filter: blur(16px) saturate(1.2) !important");
+    if (s === "glass" && !liteNow()) d.push("-webkit-backdrop-filter: blur(16px) saturate(1.2) !important", "backdrop-filter: blur(16px) saturate(1.2) !important");
     if (s === "neon") d.push(`box-shadow: inset 0 0 0 1px ${a(0.85)}, inset 0 0 16px -2px ${a(0.55)}, 0 0 14px -4px ${a(0.6)} !important`);
     if (s === "outline") d.push(`box-shadow: inset 0 0 0 1px ${a(0.55)} !important`);
     if (round) d.push("border-radius: 12px !important", "overflow: hidden !important");
@@ -1248,7 +1249,7 @@
     for (const [n, L] of panelTextCandidates()) { if (dark ? L > 0.55 : L < 0.45) continue; const soft = dark ? L > 0.2 : L < 0.8;
       vars.push(`${n}:${dark ? (soft ? "#a9b0bf" : "#e8ebf2") : (soft ? "#4a4f5c" : "#14161c")}!important`); }
     const S = '#overlap-manager-root [class^="dialog-"], #overlap-manager-root [class^="menuWrap-"], [data-dialog-name][class^="dialog-"]';
-    const frost = mode === "glass" ? "-webkit-backdrop-filter:blur(22px) saturate(1.35)!important;backdrop-filter:blur(22px) saturate(1.35)!important;" : "";
+    const frost = mode === "glass" && !liteNow() ? "-webkit-backdrop-filter:blur(22px) saturate(1.35)!important;backdrop-filter:blur(22px) saturate(1.35)!important;" : "";
     st.textContent = `${S}{${vars.join(";")};background:${tint(0, mode === "glass" ? al : Math.max(al, 0.9))}!important;${frost}` +
       `border:1px solid ${dark ? "rgba(255,255,255,.12)" : "rgba(0,0,0,.1)"}!important;box-shadow:0 24px 60px -18px rgba(0,0,0,.75)!important;color:${text}}`;
   }
@@ -1351,7 +1352,7 @@
     const LW = 'html.bd-on.bd-lwpage:not(.bd-x) [data-bd-halo]';
     css += `${all ? `${LW}[data-bd-lg]` : `${LW}[data-bd-lg="n"]`}{color:var(--bd-lg-text)!important}`;
     if (back !== "none") {
-      const a = back === "glass" ? 0.45 : 0.72, blur = back === "glass" ? "-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);" : "";
+      const a = back === "glass" ? (liteNow() ? 0.6 : 0.45) : 0.72, blur = back === "glass" && !liteNow() ? "-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3);" : "";
       // a small box that hugs each legend line (its rows are as wide as the chart, which made one big band before)
       css += `${L}[class*="series-"], ${L}[class*="study-"]{width:max-content!important;max-width:calc(100% - 8px)!important;box-sizing:border-box!important;padding:0 6px!important;margin:1px 0!important;background:rgba(var(--bd-lg-back),${a})!important;${blur}border-radius:6px!important}`;
       css += `${LW}{text-shadow:0 0 2px rgba(var(--bd-lg-back),1),0 0 5px rgba(var(--bd-lg-back),.95),0 0 9px rgba(var(--bd-lg-back),.8)!important}`;
@@ -1479,7 +1480,7 @@
   const zoneFxList = () => (Array.isArray(cfg.zoneFx) ? cfg.zoneFx.filter((k) => ZFX.includes(k)) : []);
   const atmoBehind = () => cfg.enabled && cfg.layer !== "over" && !!window.PriismAtmo;
   // power saver turns the moving effects off (Smart dim is still: it stays)
-  const atmoLiveOn = () => atmoBehind() && !cfg.powerSaver && (cfg.atmoFx !== "off" || !!cfg.atmoTrail || !!cfg.atmoAura || zoneFxList().length > 0);
+  const atmoLiveOn = () => atmoBehind() && !cfg.powerSaver && !heavyNow() && (cfg.atmoFx !== "off" || !!cfg.atmoTrail || !!cfg.atmoAura || zoneFxList().length > 0);
   const clarOn = () => atmoBehind() && ["soft", "strong"].includes(cfg.smartDim);
   // Vignette centred on the live price (Picture › Vignette › Centre): needs to know where the live candle is
   const vgLive = () => cfg.enabled && cfg.vignetteAt === "live" && +cfg.vignette > 0;
@@ -1728,6 +1729,7 @@
   function resBase(v) {
     if (captureHi) return Math.max(1, Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1));
     if (cfg.powerSaver) return 0.5;
+    if (guard >= 1) return Math.min(cfg.res === "standard" ? 0.75 : 1, 0.75);   // trading slowed down: the wallpaper at Standard
     if (cfg.res === "sharp") return 1;
     if (cfg.res === "ultra") { const dpr = Math.max(1, Math.min(3, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1)), px = Math.max(1, (v.w || 1) * (v.h || 1));
       return Math.max(1, Math.min(dpr, Math.sqrt((3840 * 2160) / px))); }
@@ -1786,10 +1788,42 @@
   // Lite glow: on a slow computer (auto quality in its lower half) or with Power saver, every glow on the chart is drawn
   // with a smaller blur. Glow blur is what costs the most there: it was the difference between a smooth and a choppy
   // chart on a slow PC. Looks nearly the same, just a tighter glow.
-  const liteNow = () => !!(cfg.powerSaver || (cfg.autoQuality && qLevel >= 2));
+  // Trading comes first: Auto quality also watches how quickly the page answers your input (clicks, drags, the crosshair)
+  // and how long the main thread is blocked, not only the wallpaper's frame rate, so effects that slow the chart itself
+  // (glow, zones, candle FX) are eased too. With Max picked, a safety floor still switches to Lite while trading would
+  // feel slow (and back once it's quick again). Nothing about orders or the platform is touched; only Priism's drawing.
+  let guard = 0;                     // 0 = fine; 1 = Lite (safety floor while Max is picked); 2 = Lite and the atmosphere paused
+  let pressureBad = false, pressureGood = true, stepAt = 0, inputAt = 0;
+  const liteNow = () => !!(cfg.powerSaver || (cfg.autoQuality && qLevel >= 2) || guard >= 1);
+  // the heaviest level: also pause the moving layer drawn on the page itself (the live-candle atmosphere)
+  const heavyNow = () => !!(guard >= 2 || (cfg.autoQuality && qLevel >= qlevels().length - 1 && pressureBad));
   let liteWas = null;
   const publishQ = () => { document.documentElement.setAttribute("data-bd-q", `${qLevel + 1}/${qlevels().length}@${refreshHz}`);
-    if (liteNow() !== liteWas) { liteWas = liteNow(); pushCandles(); pushFx(); try { applyAtmo(); } catch {} } };
+    if (liteNow() !== liteWas) { liteWas = liteNow(); document.documentElement.classList.toggle("bd-lite", liteWas); pushCandles(); pushFx();
+      try { applyAtmo(); applyFrame(); applyBars(); applyPanels(); applySides(); applyUiStyle(); applyDialogs(); applyTicker(); applyLegend(); applyTradePanel(); } catch {} } };
+  // input delay (a capture listener runs before any page handler: now minus the event's time) and long tasks, per 2 s
+  { const lag = [], LT = { ms: 0 }; let winT = performance.now(), badRuns = 0, goodRuns = 0;
+    const note = (e) => { inputAt = performance.now(); if (cfg.enabled && lag.length < 400) lag.push(inputAt - e.timeStamp); };
+    for (const t of ["pointerdown", "pointermove", "keydown", "wheel"]) addEventListener(t, note, { capture: true, passive: true });
+    try { new PerformanceObserver((l) => { for (const e of l.getEntries()) LT.ms += e.duration - 50; }).observe({ type: "longtask" }); } catch {}
+    (function check() { setTimeout(check, 2000);
+      const now = performance.now(), span = now - winT; winT = now;
+      if (!cfg.enabled || document.hidden || !views.length) { lag.length = 0; LT.ms = 0; return; }
+      lag.sort((a, b) => a - b); const p95 = lag.length >= 5 ? lag[Math.floor(lag.length * 0.95)] : 0, blocked = LT.ms / Math.max(1, span); lag.length = 0; LT.ms = 0;
+      pressureBad = p95 > 50 || blocked > 0.2; pressureGood = p95 < 20 && blocked < 0.05;
+      document.documentElement.setAttribute("data-bd-press", `lag${Math.round(p95)}ms blocked${Math.round(blocked * 100)}%`);   // for Diagnose / tests
+      if (pressureBad) { badRuns++; goodRuns = 0; } else if (pressureGood) { goodRuns++; badRuns = 0; } else { badRuns = 0; goodRuns = 0; }
+      if (cfg.autoQuality && !cfg.powerSaver) {          // Auto: step down (also with a still wallpaper, where the frame watcher doesn't run)
+        guard = 0; const L = qlevels();
+        if (pressureBad && qLevel < L.length - 1 && now - stepAt > 2500) { qLevel++; stepAt = now; smoothFor = 0; views.forEach(sizeCanvas); publishQ(); }
+        else if (pressureBad && qLevel >= L.length - 1) publishQ();
+      } else if (!cfg.powerSaver) {                      // Max: the safety floor
+        const was = guard;
+        if (badRuns >= 2) guard = Math.min(2, guard + 1), badRuns = 0;
+        else if (goodRuns >= 8 && guard > 0) guard--, goodRuns = 0;   // ~16 s of quick answers before easing back
+        if (guard !== was) { views.forEach(sizeCanvas); publishQ(); }
+      } else guard = 0;
+    })(); }
 
   // While one of TradingView's big windows is open (Trade / broker login, Settings, Indicators, Alerts…) the wallpaper
   // holds still: TradingView blurs everything behind those windows, and re-blurring a moving wallpaper every frame
@@ -1826,6 +1860,10 @@
       // Target fps: user setting, power saver, or the current auto-quality cap (whichever is lowest).
       let target = cfg.powerSaver ? 15 : cfg.fps === "auto" ? 60 : cfg.fps === "max" ? refreshHz : +cfg.fps;
       if (watch) target = Math.min(target, qlv().fps);
+      if (guard >= 1) target = Math.min(target, guard >= 2 ? 20 : 30);   // the safety floor (see liteNow)
+      // Power saver, or trading slowed down at the lowest level: the wallpaper holds still while you use the chart
+      // (clicks, drags, the crosshair) and moves again ~0.4 s after
+      if ((cfg.powerSaver || heavyNow()) && now - inputAt < 400) { last = now; return; }
       const gap = now - last;
       if (gap < 1000 / target - 2) return;
       const dt = Math.min(0.1, gap / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
@@ -1845,10 +1883,10 @@
     hStart = now; hAcc = hCount = 0;
     // struggling = the page drops frames, OR the wallpaper's worker can't keep up (the page itself can look fine then,
     // but the wallpaper stutters and a CPU core sits at 100%)
-    const bad = health < refreshHz * 0.8 || busy > 0.25, good = health > refreshHz * 0.92 && busy < 0.08;
+    const bad = health < refreshHz * 0.8 || busy > 0.25 || pressureBad, good = health > refreshHz * 0.92 && busy < 0.08 && pressureGood;
     document.documentElement.setAttribute("data-bd-health", `${Math.round(health)}fps busy${Math.round(busy * 100)}%`);   // for Diagnose / tests
-    if (bad && qLevel < L.length - 1) {
-      qLevel++; smoothFor = 0; if (now - lastUp < 25000) needSmooth = Math.min(32, needSmooth * 2);   // failed soon after climbing: wait longer next time
+    if (bad && qLevel < L.length - 1 && now - stepAt > 2500) {
+      qLevel++; stepAt = now; smoothFor = 0; if (now - lastUp < 25000) needSmooth = Math.min(32, needSmooth * 2);   // failed soon after climbing: wait longer next time
       views.forEach(sizeCanvas); publishQ();
     } else if (good && qLevel > 0) {
       if (++smoothFor >= needSmooth) { qLevel--; smoothFor = 0; lastUp = now; views.forEach(sizeCanvas); publishQ(); }
