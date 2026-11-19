@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 38;
+  const HOOK_VERSION = 39;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -799,7 +799,7 @@
   let inputAt = 0; for (const t of ["pointerdown", "pointermove", "wheel", "keydown"]) addEventListener(t, () => { inputAt = performance.now(); }, { capture: true, passive: true });
   (function zoneAnim() { setTimeout(zoneAnim, 250);
     const now = performance.now();
-    if (!on || !fx.zoneReact || fx.zoneReact === "off" || window.__bdLite || reduceZ.matches || document.hidden || now - zoneAnimAt > 1000 || now - inputAt < 300) return;
+    if (!on || !fx.zoneReact || fx.zoneReact === "off" || window.__bdLite || htmlEl().hasAttribute("data-bd-hold") || reduceZ.matches || document.hidden || now - zoneAnimAt > 1000 || now - inputAt < 300) return;
     let done = false;
     for (const w of chartWidgets()) { try { const cw = w._chartWidget || w, m0 = cw.model(), m = m0.model ? m0.model() : m0; if (m.lightUpdate) { m.lightUpdate(); done = true; } } catch {} }
     if (!done) apiRepaint(); })();

@@ -280,6 +280,7 @@
   // Price comes from the tab title TradingView already shows, e.g. "BTCUSDT 77,228.95 ▼ −0.29%".
   const TITLE_RE = /^(\S+)\s+([\d,]+(?:\.\d+)?)\s*[▲▼]?\s*([+\-\u2212]?[\d.]+)%/;
   let quote = null, lastPrice = null, mood = 0, reactEl, pillEl, lastPulse = 0;
+  let overOrder = false, holdOn = false, holdOff = 0;   // trade focus (see syncHold)
 
   function parseTitle() {
     const m = (document.title || "").match(TITLE_RE);
@@ -467,7 +468,7 @@
     const op = !active ? 0 : isMusic ? (musicParts().includes("g") ? 0.04 + 0.96 * k : 0) : css ? css.op * Math.min(1, 0.25 + k * 1.2) : 0.15 + 0.85 * k;
     const pulseOn = cfg.moodPulse !== "off", strong = cfg.moodPulse === "strong";
     // Lite (Power saver / Auto easing off / the safety floor): no pulses; restarting one forces a page layout
-    const fire = active && tick && pulseOn && !liteNow() && performance.now() - lastPulse > (isMusic ? 150 : 1200);   // fast tickers: max ~1 pulse/1.2s; beats: ~2.5/s at most
+    const fire = active && tick && pulseOn && !liteNow() && !holdOn && performance.now() - lastPulse > (isMusic ? 150 : 1200);   // fast tickers: max ~1 pulse/1.2s; beats: ~2.5/s at most
     if (fire) lastPulse = performance.now();
     const tcol = isMusic ? col : tick > 0 ? upColor() : downColor();
     for (const el of moodEls()) {
@@ -1540,6 +1541,7 @@
     if (!on) { if (atmoEng) atmoEng.reset(); return; }
     const o = atmoOpts(), step = 1000 / (o.lite ? 15 : 30);
     if (atmoT && now - atmoT < step - 2) { atmoRaf = requestAnimationFrame(atmoTick); return; }
+    if (holdOn) { atmoT = 0; return; }   // trade focus: the last frame stays on screen; syncHold restarts it
     const dt = atmoT ? (now - atmoT) / 1000 : 0.016; atmoT = now;
     if (!atmoEng) atmoEng = window.PriismAtmo.engine();
     let busy = false;
@@ -1825,6 +1827,40 @@
       } else guard = 0;
     })(); }
 
+  // Trade focus (part of Auto quality, and Power saver): while the mouse is over the order ticket / Buy & Sell buttons /
+  // positions panel, or while you're in a position, everything that moves on its own holds still (the wallpaper, the
+  // live-candle atmosphere, zone animation, endless CSS loops, reaction pulses), so nothing competes with your click.
+  // The look stays exactly as it is: holding still costs nothing to switch, so it can't add work right before a click.
+  // In a position = the open P&L hook.js / lw.js read off the chart's position line (data-ws-pnl) was drawn recently.
+  // Moves again ~0.6 s after you leave the panel / the position closes. Never cancels or changes an event.
+  const ORDER_SEL = '[data-name="order-panel"], [class*="layout__area--tradingpanel"], [class*="layout__area--bottom"], [data-name="buy-order-button"], [data-name="sell-order-button"], [data-name="place-and-modify-button"], [data-name*="buy-sell"], [class*="buySellButtons"], [class*="order-panel"], [class*="orderPanel"], [class*="OrderEntry"], [class*="order-entry"], [class*="orderEntry"], [class*="dom-ladder"], [class*="DomLadder"]';
+  const ORDER_TEXT = /^(?:buy|sell|close|flatten|reverse|cancel(?: all)?|cxl|join (?:bid|ask)|(?:buy|sell) (?:mkt|market|bid|ask|limit|stop))(?:\s*[\d.,]+)?$/i;
+  const orderMemo = new WeakMap();
+  // (the answer per element is remembered: pointerover only fires when the element under the mouse changes)
+  const isOrderEl = (t) => {
+    if (!t || t.nodeType !== 1) return false;
+    const m = orderMemo.get(t); if (m !== undefined) return m;
+    let hit = false;
+    try { hit = !!t.closest(ORDER_SEL); } catch {}
+    for (let el = t, i = 0; !hit && el && el.nodeType === 1 && i < 6; el = el.parentElement, i++)
+      if (el.childElementCount <= 3) { const s = (el.textContent || "").trim(); hit = s.length <= 24 && ORDER_TEXT.test(s.replace(/\s+/g, " ")); }
+    orderMemo.set(t, hit);
+    return hit;
+  };
+  addEventListener("pointerover", (e) => { overOrder = !!cfg.enabled && isOrderEl(e.target); if (overOrder) syncHold(); }, { capture: true, passive: true });
+  addEventListener("pointerout", (e) => { if (!e.relatedTarget) overOrder = false; }, { capture: true, passive: true });
+  const holdWanted = () => !!(cfg.enabled && (cfg.autoQuality || cfg.powerSaver) &&
+    (overOrder || (() => { const p = readPnlRaw(); return !!p && Date.now() - p.ts < 8000; })()));
+  function syncHold() {
+    const want = holdWanted(), now = performance.now();
+    if (want) holdOff = now + 600;
+    const next = want || now < holdOff;
+    if (next === holdOn) return;
+    holdOn = next; document.documentElement.toggleAttribute("data-bd-hold", holdOn);
+    if (!holdOn) try { atmoKick(); } catch {}
+  }
+  setInterval(syncHold, 250);
+
   // While one of TradingView's big windows is open (Trade / broker login, Settings, Indicators, Alerts…) the wallpaper
   // holds still: TradingView blurs everything behind those windows, and re-blurring a moving wallpaper every frame
   // is what made them feel slow to open. Only fires when TradingView adds/removes a window, so it costs nothing.
@@ -1854,7 +1890,7 @@
     const step = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(step);
-      if (document.hidden || window.__bdBackground || cfg.paused || (cfg.focus && cfg.enabled) || dlgOpen) { last = now; hLast = 0; return; }   // __bdBackground: a desktop-app tab you're not looking at
+      if (document.hidden || window.__bdBackground || cfg.paused || (cfg.focus && cfg.enabled) || dlgOpen || holdOn) { last = now; hLast = 0; return; }   // holdOn: trade focus   // __bdBackground: a desktop-app tab you're not looking at
       const watch = cfg.autoQuality && !cfg.powerSaver && (cfg.fps === "auto" || cfg.fps === "max");
       if (watch) trackHealth(now);
       // Target fps: user setting, power saver, or the current auto-quality cap (whichever is lowest).
