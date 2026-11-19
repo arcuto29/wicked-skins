@@ -88,7 +88,7 @@
     clipQuality: "balanced",  // high | balanced | small (small keeps a clip under ~20 MB, e.g. for Discord)           // after a recording: open the crop / trim editor (false = download right away)
     // Chart styling — each part off = TradingView's own. Colour "" = skin colour, "candle" = your up-candle colour.
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
-    indMode: "own", indColor: "", indCustom: {},
+    indMode: "own", indColor: "", indCustom: {}, markMode: "own", markColor: "#ffd166",
     drawOn: false,            // your own drawings (rectangles, zones you draw) follow the indicator colours too
     zoneFill: 0.12,           // how see-through recoloured zones are (4%..45%): soft keeps the price readable
     zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",   // zoneStyle: flat | fade | shine | glass | hollow   // zone boxes: square | rounded | pill ; border: line | dashed | double | glow | none
@@ -1930,7 +1930,7 @@
   }
 
   // Line glow + price scale styling, also drawn by hook.js
-  const FX_KEYS = ["lineGlow", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
+  const FX_KEYS = ["lineGlow", "markMode", "markColor", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
     "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "zoneShape", "zoneBorder", "zoneStyle", "zoneReact", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];

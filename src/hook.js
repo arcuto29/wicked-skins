@@ -99,7 +99,7 @@
     bracketQty: "",           // colour of the lot size / quantity pill ("" = like the other numbers)
     // Indicator colours: own (TradingView's / the platform's) | rainbow | candles | wallpaper | custom (+ indColor)
     indMode: "own", indColor: "", indCustom: {}, drawOn: false, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0, wallColors: [],
-    zoneFill: 0.12, zoneDim: false, indGrad: [], zoneShape: "square", zoneBorder: "line", zoneStyle: "flat", zoneReact: "off",
+    zoneFill: 0.12, zoneDim: false, indGrad: [], zoneShape: "square", zoneBorder: "line", zoneStyle: "flat", zoneReact: "off", markMode: "own", markColor: "",
     // Chart styling (each part: off = TradingView's own). Colour "" = the skin's colour; "candle" = your up-candle colour.
     gridOn: false, gridColor: "", gridAlpha: 0.35, gridW: 0, gridStyle: "dotted",
     chOn: false, chColor: "", chW: 0, chStyle: "dashed", chGlow: false, chGlowColor: "", chLabels: false,
@@ -160,6 +160,7 @@
         plStyle: ["solid", "dotted", "dashed"].includes(f.plStyle) ? f.plStyle : "dotted",
         sbOn: !!f.sbOn, sbColor: colOpt(f.sbColor), sbW: Math.max(0, Math.min(2, +f.sbW || 0)), sbStyle: ["solid", "dotted", "dashed", "none"].includes(f.sbStyle) ? f.sbStyle : "dashed",
         axOn: !!f.axOn, axColor: colOpt(f.axColor), axW: Math.max(0, Math.min(2, +f.axW || 0)), axStyle: ["solid", "none"].includes(f.axStyle) ? f.axStyle : "solid",
+        markMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.markMode) ? f.markMode : "own", markColor: /^#[0-9a-f]{6}$/i.test(f.markColor || "") ? f.markColor : "",
         indMode: ["own", "rainbow", "gradient", "candles", "wallpaper", "custom"].includes(f.indMode) ? f.indMode : "own", indColor: /^#[0-9a-f]{6}$/i.test(f.indColor || "") ? f.indColor : "",
         indCustom: cleanCustom(f.indCustom), drawOn: !!f.drawOn,
         zoneFill: Math.max(0.04, Math.min(0.45, +f.zoneFill || 0.12)), zoneDim: !!f.zoneDim,
@@ -184,7 +185,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont, fx.scaleFamily, fx.fontTick, fx.lite,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.indMode, fx.indColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.zoneShape, fx.zoneBorder, fx.zoneStyle, fx.zoneReact, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.indMode, fx.indColor, fx.markMode, fx.markColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.zoneShape, fx.zoneBorder, fx.zoneStyle, fx.zoneReact, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
     if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(fx.wallColors);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
@@ -934,6 +935,9 @@
     if (R > G + 50 && R > B + 20) return -1;           // red-ish box: in loss
     return 0;
   }
+  // Each indicator has a marker of its own set up (colour / glow / hide)? Then markers are checked even with Markers: Own
+  let markEachSig = "", markEachV = false;
+  const markEach = () => { const sig = fx.indCustom; if (sig !== markEachSig) { markEachSig = sig; markEachV = !!(sig && Object.keys(sig).length); } return markEachV; };
   // bounding box (device px) of the path being built, so rounded pill boxes (roundRect / arcs) are recognised too
   const pathBox = new WeakMap();
   function growBox(ctx, x, y) {
@@ -1171,6 +1175,9 @@
   proto.fillText = function (...a) {
     const c = this.canvas;
     if (c && !c.isConnected) noteHiddenText(this, a);
+    // a marker's own text, in the marker's colour (a signal label's letters): the marker's new colour too
+    { const mk = on && this.__bdMark && this.__bdMark.get(String(this.__bdFill !== undefined ? this.__bdFill : this.fillStyle)); if (mk && typeof a[0] === "string" && a[0].length <= 24 && performance.now() - mk.t < 60) { if (mk.m.hide) return;
+      const pF = this.fillStyle; origFillDesc.set.call(this, mk.m.s); const r = origText.apply(this, a); origFillDesc.set.call(this, pF); return r; } }
     if (on && fx.chOn && fx.chLabels && c && isAxis(c) && isTop(c) && chLabel.get(this)) {
       const pF = this.fillStyle; origFillDesc.set.call(this, readableOn(chLabel.get(this)) || "#ffffff");
       const r = origText.apply(this, a); origFillDesc.set.call(this, pF); return r;
@@ -1349,6 +1356,14 @@
         }
       }
     }
+    // a marker (an indicator's signal arrow / triangle / circle / label, your trade arrows): Markers colour, glow, Each indicator
+    if (on && c && !a.length && isPane(c) && (fx.markMode !== "own" || markEach())) { const L = window.__bdCandleLooks;
+      if (L && L.marker) { L.shapeBox.install(); const orig = String(this.__bdFill !== undefined ? this.__bdFill : this.fillStyle);
+        const m = L.marker(this, orig, { mode: fx.markMode, color: fx.markColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom, grad: fx.indGrad, glow: fx.lineGlow });
+        if (m) { L.noteSeen(orig, "marker"); (this.__bdMark || (this.__bdMark = new Map())).set(orig, { m, t: performance.now() }); if (m.hide) return;
+          const pF = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor; origFillDesc.set.call(this, m.s);
+          if (m.glow > 0) { this.shadowColor = m.g; this.shadowBlur = 3 + m.glow * 14; }
+          const r = origFillPath.apply(this, a); origFillDesc.set.call(this, pF); this.shadowBlur = pB; this.shadowColor = pC; return r; } } }
     // crosshair price / time labels (the boxes that follow your pointer on the scales): your crosshair colour
     if (on && fx.chOn && fx.chLabels && c && isAxis(c) && isTop(c)) {
       const col = pick(fx.chColor, String(this.fillStyle)), pF = this.fillStyle;
