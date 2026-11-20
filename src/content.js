@@ -145,6 +145,8 @@
     // Multi-chart layouts: "span" = one wallpaper across the whole layout, "each" = every chart gets its own copy,
     // "mix" = pick a wallpaper per chart (chartSkins: { "2": "galaxy", "3": "media:<id>" }; chart 1 = your main skin)
     multi: "span", chartSkins: {},
+    // TopstepX's logo (top left): own | look (a badge in your look's colours) | text (your own name on that badge)
+    tsxLogo: "own", tsxLogoText: "",
   };
 
   let cfg = { ...DEFAULTS };
@@ -3495,7 +3497,7 @@
   //    surfaces. Only colours, borders and corner radius: nothing moves, resizes or changes how it works.
   // One stylesheet, no observers; if TopstepX changes these parts, the rules simply stop matching.
   if (window === window.top && (/(^|\.)(topstepx|projectx)\.com$/.test(location.hostname) || document.documentElement.hasAttribute("data-tds-brand"))) (function topstepx() {
-    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3" };
+    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3", tsxLogo: "own", tsxLogoText: "" };
     let c = { ...KEYS }, st = null, tries = 0, pro = false;
     const hex = (h) => /^#[0-9a-f]{6}$/i.test(h || "") ? h : null;
     const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), toHex = (a) => "#" + a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
@@ -3529,15 +3531,86 @@
         `${H} [class*="ordercard-module__cardWrapper"]{background-color:${BG}!important}` +
         `${H} [class*="ordercard-module__inputContent"],${H} [class*="ordercard-module__inputMarketContent"]{background-color:${S0}!important;border-color:${L2}!important}` +
         `${H} [class*="ordercard-module__inputContent"]:focus-within{border-color:${A}!important;box-shadow:0 0 0 1px ${rgba(A, 0.35)}!important}` +
-        `${H} [class*="dom-module__domHeader"]{background-color:${S1}!important}`;
+        `${H} [class*="dom-module__domHeader"]{background-color:${S1}!important}` +
+        // the left icon bar and the top account bar (found by where they are: see markBars), and their known classes
+        `${H} [data-bd-tsx="side"],${H} .sidebar .main-menu,${H} .MuiDrawer-paper{background-color:${S0}!important;box-shadow:inset -1px 0 0 ${L1}!important}` +
+        `${H} [data-bd-tsx="top"],${H} .navbar,${H} .MuiAppBar-root{background-color:${S0}!important;box-shadow:inset 0 -1px 0 ${L1}!important}` +
+        `${H} [data-bd-tsx="fill"]{background-color:transparent!important}` +
+        `${H} [data-bd-tsx="field"]{background-color:${S1}!important;border-color:${L2}!important}` +
+        `${H} .sidebar .main-menu ul li.active a i{background:${A}!important;color:${on}!important}` +
+        `html.bd-tsx-logo [data-bd-tsx-logo]{opacity:0!important}`;
     }
+    // The left icon bar and the top account bar are built at run time with generated class names, so they're found by
+    // where they are: the element stack at a few points (left edge, top edge), no page-wide search and no observer.
+    //  side / top = the bar itself; fill = an inner box in the bar's own colour (made see-through, so the bar's new
+    //  colour shows); field = a box in another solid colour inside the top bar (the account picker)
+    const solid = (el) => { const c = getComputedStyle(el).backgroundColor, m = c.match(/[\d.]+/g); return m && (m.length < 4 || +m[3] > 0.6) ? c : null; };
+    function markBars() {
+      if (!document.body) return false;
+      const W = innerWidth, Hh = innerHeight, found = { side: null, top: null };
+      const pick = (pts, test) => { for (const [x, y] of pts) for (const el of document.elementsFromPoint(x, y)) {
+        if (el === document.documentElement || el === document.body || el.tagName === "IFRAME") continue;
+        const r = el.getBoundingClientRect(); if (test(r) && solid(el)) { let best = el;
+          for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) { const q = p.getBoundingClientRect(); if (test(q) && solid(p)) best = p; }
+          return best; } } return null; };
+      found.side = pick([[12, Hh * 0.5], [12, Hh * 0.75]], (r) => r.left <= 2 && r.width >= 28 && r.width <= 130 && r.height >= Hh * 0.6);
+      found.top = pick([[W * 0.5, 12], [W * 0.35, 12], [W * 0.65, 12]], (r) => r.top <= 2 && r.height >= 22 && r.height <= 90 && r.width >= W * 0.5);
+      if (found.side && !logoEl) {   // the logo: the first box at the top of the left bar
+        const rb = found.side.getBoundingClientRect(); let best = null;
+        for (const c of document.elementsFromPoint(rb.left + rb.width / 2, rb.top + 22)) {
+          if (c === found.side || !found.side.contains(c)) continue;
+          const r = c.getBoundingClientRect(); if (r.width >= 20 && r.height >= 16 && r.height <= 90 && r.top - rb.top < 60) best = c;
+        }
+        if (best) { logoEl = best; best.setAttribute("data-bd-tsx-logo", ""); }
+      }
+      for (const [k, el] of Object.entries(found)) {
+        if (!el || el.getAttribute("data-bd-tsx") === k) continue;
+        el.setAttribute("data-bd-tsx", k);
+        const own = solid(el), rb = el.getBoundingClientRect();
+        // inner boxes at the same points: the bar's colour -> see-through; another dark solid box in the top bar -> field
+        const pts = k === "side" ? [[12, Hh * 0.3], [12, Hh * 0.5], [12, Hh * 0.75]] : [[W * 0.1, 12], [W * 0.35, 12], [W * 0.5, 12], [W * 0.65, 12], [W * 0.9, 12]];
+        for (const [x, y] of pts) for (const c of document.elementsFromPoint(x, y)) {
+          if (c === el || !el.contains(c) || c.hasAttribute("data-bd-tsx") || c.matches("button, [role=button], input, img, svg, svg *")) continue;
+          const bg = solid(c); if (!bg) continue;
+          const r = c.getBoundingClientRect();
+          if (bg === own) c.setAttribute("data-bd-tsx", "fill");
+          else if (k === "top" && r.height < rb.height && r.width > 60) { const m = bg.match(/[\d.]+/g).slice(0, 3).map(Number); if (m[0] + m[1] + m[2] < 200) c.setAttribute("data-bd-tsx", "field"); }
+        }
+      }
+      return !!(found.side && found.top);
+    }
+    // Your logo: a badge drawn exactly over TopstepX's logo (same box, nothing moves; clicks go through to the logo's
+    // link). "look": TOPSTEP X in your accent; "text": your own name, sized to fit.
+    let logoEl = null, logoDiv = null;
+    function renderLogo() {
+      const H = document.documentElement, mode = c.tsxLogo === "look" || c.tsxLogo === "text" ? c.tsxLogo : "own";
+      const show = mode !== "own" && H.classList.contains("bd-tsx") && logoEl && logoEl.isConnected;
+      H.classList.toggle("bd-tsx-logo", !!show);
+      if (!show) { if (logoDiv) { logoDiv.remove(); logoDiv = null; } return; }
+      const r = logoEl.getBoundingClientRect(), A = accent(), A2 = mix(A, "#ffffff", 0.45), P = panel() || "#0b0d12";
+      const words = (mode === "text" ? String(c.tsxLogoText || "").trim().slice(0, 24) : "") || "TOPSTEP X";
+      const lines = words.split(/\s+/).filter(Boolean).slice(0, 3), longest = Math.max(...lines.map((l) => l.length));
+      const fs = Math.max(7, Math.min(r.height / (lines.length * 1.05), (r.width - 6) / (longest * 0.66)));
+      if (!logoDiv) { logoDiv = document.createElement("div"); logoDiv.id = "bd-tsx-logo"; logoDiv.setAttribute("aria-hidden", "true"); document.documentElement.appendChild(logoDiv); }
+      logoDiv.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:2147483000;pointer-events:none;box-sizing:border-box;` +
+        `display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;border:1px solid ${rgba(A, 0.55)};` +
+        `background:linear-gradient(160deg,${mix(P, A, 0.22)},${mix(P, "#000000", 0.4)});box-shadow:0 0 12px -4px ${rgba(A, 0.7)},inset 0 1px 0 ${rgba("#ffffff", 0.08)};` +
+        `font:900 ${fs.toFixed(1)}px/1.02 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;text-transform:${mode === "text" ? "none" : "uppercase"};text-align:center;overflow:hidden`;
+      logoDiv.innerHTML = "";
+      for (const l of lines) { const s = document.createElement("span"); s.textContent = l;
+        s.style.cssText = `display:block;max-width:100%;white-space:nowrap;background:linear-gradient(180deg,${A2},${A});-webkit-background-clip:text;background-clip:text;color:transparent`; logoDiv.appendChild(s); }
+    }
+    let barsDone = false, rsT = 0;
+    addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(() => { if (document.documentElement.classList.contains("bd-tsx")) { markBars(); renderLogo(); } }, 500); }, { passive: true });
     const apply = () => {
       const want = css(), here = !!document.querySelector(".dock-panel, .dock-layout, [data-tds-brand]");
       document.documentElement.classList.toggle("bd-tsx", !!want && here);
-      if (!want || !here) { if (st) st.textContent = ""; return !here; }
+      if (!want || !here) { if (st) st.textContent = ""; renderLogo(); return !here; }
       if (!st) { st = document.createElement("style"); st.id = "bd-tsx-css"; (document.head || document.documentElement).appendChild(st); }
       if (st.textContent !== want) st.textContent = want;
-      return false;
+      if (!barsDone) barsDone = markBars();
+      renderLogo();
+      return !barsDone;   // keep looking (a few times) until both bars are found
     };
     const plan = async () => { const P = window.PriismPass; let info = null; try { info = P ? await P.verify(c.pass, c.deviceId) : null; } catch {}
       pro = P ? P.planOf(info, c.invite) === "pro" : !!(c.invite && c.invite.ok); };
