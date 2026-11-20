@@ -1314,8 +1314,9 @@
       if (L && L.chartText && L.chartText(this, txtK(this), a, { mode: fx.txtMode, color: fx.txtColor, outline: fx.txtOutline, size: fx.txtSize, bg: fx.bg || "dark", up: candles && candles.upHex })) return;
     }
     const bgDark = fx.bg ? fx.bg === "dark" : htmlEl().classList.contains("theme-light"); // before 1st measurement: old behaviour
+    // (not text inside a label's own solid box on the chart: a position's black P&L on its bright green box must stay black)
     if (on && !htmlEl().classList.contains("bd-over-mode") && this.canvas && inChart(this.canvas) && isScaleLabel(this.fillStyle) &&
-        (bgDark ? isDark(this.fillStyle) : !isDark(this.fillStyle))) {
+        (bgDark ? isDark(this.fillStyle) : !isDark(this.fillStyle)) && !(isPane(this.canvas) && inSolidBox(this, a[1], a[2]))) {
       const prev = this.fillStyle;
       this.fillStyle = bgDark ? AUTO_TEXT.dark : AUTO_TEXT.light;
       origText.apply(this, a);
