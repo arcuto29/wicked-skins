@@ -1778,6 +1778,7 @@ if ($("snapBtn")) $("snapBtn").onclick = async () => {
   const sym = (await tabMsg({ ws: "symbol" }).catch(() => null)) || {};
   prev.download = `priism-${(sym.symbol || "chart").replace(/[^\w-]+/g, "")}.png`;
   prev.style.display = "";
+  if ($("snapOut")) { $("snapOut").hidden = false; $("snapOut").textContent = `PNG · lossless · ${r.w}×${r.h} · ${((r.url.length - r.url.indexOf(",") - 1) * 0.75 / 1048576).toFixed(1)} MB`; }
   show(r.mediaMissed
     ? "Done — click the image to save. (Your uploaded wallpaper couldn't be included because it renders in a protected frame; the chart and watermark are captured.)"
     : "Done — click the image to save or drag it out to share.", true);
@@ -1788,7 +1789,7 @@ let clipSecs = 10;
 // Chart only = we redraw the chart + effects ourselves (fast, no prompts). Whole screen = Chrome's screen share,
 // which records exactly what you see (every effect, uploaded wallpapers, the lot) after you pick what to share.
 const CLIP_HINTS = {
-  chart: "Records an animated clip (WebM) of your chart with the live wallpaper and effects moving, from 2 seconds up to 2 minutes. Click Record, then close this panel if you like: it downloads by itself when it ends. A badge on the chart shows the countdown; click it to stop and save early. Keep the chart tab visible. An uploaded wallpaper can't be read this way; use Whole screen for that.",
+  chart: "Records an animated clip (MP4 where your browser can, else WebM) of your chart with the live wallpaper and effects moving, from 2 seconds up to 2 minutes. Click Record, then close this panel if you like: it downloads by itself when it ends. A badge on the chart shows the countdown; click it to stop and save early. Keep the chart tab visible. An uploaded wallpaper can't be read this way; use Whole screen for that.",
   screen: "Records exactly what you see, so every effect and any uploaded wallpaper is in it. After you click Record, a card appears on your chart: click \u201cChoose what to record\u201d and pick Entire Screen (or a window / this tab) in Chrome's box. It records for the length below, then downloads by itself. Stop early with Chrome's \u201cStop sharing\u201d button.",
 };
 const AUDIO_HINT = {
@@ -1799,14 +1800,61 @@ const AUDIO_HINT = {
 const syncClipMode = () => {
   if ($("clipAudio")) { seg("clipAudio", [["none", "Off"], ["mic", "Voice"], ["computer", "Computer"], ["both", "Both"]], () => cfg.clipAudio || "none", (v) => { set({ clipAudio: v }); syncClipMode(); });
     $("clipAudioHint").hidden = !AUDIO_HINT[cfg.clipAudio]; $("clipAudioHint").textContent = AUDIO_HINT[cfg.clipAudio] || ""; }
-  if ($("clipQuality")) seg("clipQuality", [["high", "High"], ["balanced", "Balanced"], ["small", "Small file"]], () => cfg.clipQuality || "balanced", (v) => set({ clipQuality: v }));
+  renderPresets();
   if ($("clipEdit")) seg("clipEdit", [[true, "Crop & trim first"], [false, "Download right away"]], () => cfg.clipEdit !== false, (v) => set({ clipEdit: v }));
   seg("clipFps", [[30, "30 fps"], [60, "60 fps"]], () => (+cfg.clipFps === 60 ? 60 : 30), (v) => { set({ clipFps: v }); syncClipMode(); });
   seg("clipMode", [["chart", "Chart only"], ["screen", "Whole screen"]], () => cfg.clipMode || "chart", (v) => { set({ clipMode: v }); syncClipMode(); });
   if ($("clipHint")) $("clipHint").textContent = CLIP_HINTS[cfg.clipMode === "screen" ? "screen" : "chart"];
-  if ($("clipBtn")) $("clipBtn").textContent = cfg.clipMode === "screen" ? "Record screen" : "Record";
+  if ($("clipBtnTxt")) $("clipBtnTxt").textContent = cfg.clipMode === "screen" ? "Start screen recording" : "Start recording";
+  syncReady();
 };
+// ---------- Capture Studio (the Capture tab): Screenshot | Record, Quality as cards, what you'll really get ----------
+// Quality (clipQuality) is the one quality setting; each card picks it with its usual frame rate (Frame rate, under
+// Advanced, can still change that). The sizes come from the chart itself (capinfo): never upscaled, so on a 1080p
+// screen High and Ultra record 1080p, and the cards say so.
+const PRESETS = [["balanced", "Balanced", "1080p", 30], ["high", "High quality", "1440p", 60], ["ultra", "Ultra", "4K", 60], ["small", "Small file", "720p · Discord", 30]];
+let capInfo = null;
+const csMode = () => localStorage.getItem("csMode") === "rec" ? "rec" : "shot";
+function syncCsMode() { if (!$("csMode")) return; const m = csMode(); $("csMode").querySelectorAll("button").forEach((b) => { b.classList.toggle("on", b.dataset.m === m); b.setAttribute("aria-selected", b.dataset.m === m); });
+  $("csShot").hidden = m !== "shot"; $("csRec").hidden = m !== "rec"; }
+if ($("csMode")) { $("csMode").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; localStorage.setItem("csMode", b.dataset.m); syncCsMode(); }; syncCsMode(); }
+function renderPresets() {
+  const box = $("clipPresets"); if (!box) return; box.innerHTML = "";
+  const cur = cfg.clipQuality || "balanced";
+  for (const [q, name, target, fps] of PRESETS) {
+    const c = capInfo && capInfo.clips && capInfo.clips[q], fpsNow = q === cur ? (+cfg.clipFps === 60 ? 60 : 30) : fps;
+    const long = c ? Math.max(c.w, c.h) : 0, full = { balanced: 1920, high: 2560, ultra: 3840, small: 1280 }[q];
+    const capped = c && long < full * 0.85;   // the screen has far fewer pixels than the preset: it records what the screen has
+    const b = document.createElement("button"); b.type = "button"; b.className = "cs-card" + (q === cur ? " on" : "") + (capped && q !== "small" ? " capped" : "");
+    b.setAttribute("role", "radio"); b.setAttribute("aria-checked", q === cur);
+    b.innerHTML = `<b>${name}</b><span>${target} · ${fpsNow} fps</span><small>${c ? (capped && q !== "small" ? `${c.w}×${c.h} ${capInfo.chartDensity < capInfo.screenDpr - 0.01 ? "(the chart’s own detail)" : "on this screen"}` : `${c.w}×${c.h}`) : "&nbsp;"}</small>`;
+    if (c && !c.mime) { b.disabled = true; b.title = "This browser can't record this size"; }
+    else if (capped && q !== "small") b.title = capInfo && capInfo.chartDensity < capInfo.screenDpr - 0.01
+      ? `This chart draws at ${capInfo.chartDensity}\u00D7, so it's recorded at its real detail (${c.w}\u00D7${c.h}): never upscaled.`
+      : "This screen has fewer pixels than this preset: it records your screen's own pixels, never upscaled. True 4K needs a 4K screen (or a Retina screen at 2x).";
+    b.onclick = () => { set({ clipQuality: q, clipFps: fps }); syncClipMode(); };
+    box.appendChild(b);
+  }
+}
+function syncReady() {
+  const el = $("clipReady"); if (!el) return;
+  if (cfg.clipMode === "screen") { el.textContent = "Ready · whole screen · Chrome asks what to share"; return; }
+  const c = capInfo && capInfo.clips && capInfo.clips[cfg.clipQuality || "balanced"];
+  el.textContent = c && c.label ? `Ready · ${c.label.replace(/ · \d+ fps/, ` · ${+cfg.clipFps === 60 ? 60 : 30} fps`)}` : capInfo && !capInfo.canRecord ? "This browser can't record clips" : "Open your chart to record";
+  if ($("snapSpec")) $("snapSpec").textContent = capInfo && capInfo.snap ? `PNG · lossless · ${capInfo.snap[0]}×${capInfo.snap[1]}${capInfo.dpr > 1 ? ` (${+capInfo.dpr.toFixed(2)}×, your screen's native pixels)` : " (native pixels)"}` : "PNG · lossless · your screen's native pixels";
+}
+async function loadCapInfo() {
+  if (!EXT_MODE || IS_TAB || !$("clipPresets")) return;
+  try { const r = await tabMsgAnyFrame({ ws: "capinfo", fps: +cfg.clipFps === 60 ? 60 : 30 }); if (r && r.ok) capInfo = r; } catch {}
+  renderPresets(); syncReady();
+}
+function syncKeyHints() { if ($("recKeyHint")) $("recKeyHint").textContent = cfg.recordKey ? keyLabel(cfg.recordKey) : ""; if ($("snapKeyHint")) $("snapKeyHint").textContent = cfg.snapKey ? keyLabel(cfg.snapKey) : ""; }
+// "MP4 · H.264 · 2560×1440 · 60 fps · 10.0 s · 12.4 MB" (what the file really is: as recorded, counted on the chart)
+const clipOut = (r) => { const fmt = /mp4/.test(r.mime || "") ? "MP4" : "WebM", codec = /vp9/.test(r.mime || "") ? "VP9" : /av01/.test(r.mime || "") ? "AV1" : /vp8/.test(r.mime || "") ? "VP8" : /mp4/.test(r.mime || "") ? "H.264" : "";
+  return [fmt, codec, r.w && `${r.w}×${r.h}`, r.fps && `${r.fps} fps`, r.secs && `${(+r.secs).toFixed(1)} s`, r.bytes && `${(r.bytes / 1048576).toFixed(1)} MB`].filter(Boolean).join(" · "); };
 if ($("clipMode")) syncClipMode();
+setTimeout(() => { syncKeyHints(); loadCapInfo(); }, 0);   // (after the whole panel has loaded; again whenever the Capture tab is opened: the chart may have been resized)
+document.querySelector('#nav [data-tab="capture"]') && document.querySelector('#nav [data-tab="capture"]').addEventListener("click", () => { syncKeyHints(); loadCapInfo(); });
 if ($("clipLen")) seg("clipLen", [[5, "5s"], [10, "10s"], [30, "30s"], [60, "1 min"], [120, "2 min"]], () => clipSecs, (v) => { clipSecs = v; set({ clipLen: v }); if ($("clipCustom")) $("clipCustom").value = ""; });
 if ($("clipCustom")) $("clipCustom").addEventListener("input", () => { const c = Math.round(+$("clipCustom").value); if (c >= 2) set({ clipLen: Math.min(120, c) }); });
 // a custom length (2-120 s) overrides the preset
@@ -1842,12 +1890,11 @@ if ($("clipBtn")) $("clipBtn").onclick = async () => {
   if (!r) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
   if (!r.ok) return show(r.reason || "Couldn't record the clip.", false);
   if (r.saved) {
-    const mb = ((r.bytes || 0) / 1048576).toFixed(1);
-    return show(`Saved ${r.name} (${mb} MB) to your downloads.` + (r.mediaMissed ? " (Your uploaded wallpaper renders in a protected frame, so it isn't in the clip; the chart + watermark are.)" : ""), true);
+    return show(`Saved ${r.name} to your downloads · ${clipOut(r)}${r.lowered ? " (lowered to 30 fps to keep trading smooth)" : ""}.` + (r.mediaMissed ? " (Your uploaded wallpaper renders in a protected frame, so it isn't in the clip; the chart + watermark are.)" : ""), true);
   }
   vid.src = r.url; prev.href = r.url;
   const sym = (await tabMsg({ ws: "symbol" }).catch(() => null)) || {};
-  prev.download = `priism-${(sym.symbol || "chart").replace(/[^\w-]+/g, "")}.webm`;
+  prev.download = `priism-${(sym.symbol || "chart").replace(/[^\w-]+/g, "")}.${/mp4/.test(r.mime || "") ? "mp4" : "webm"}`;
   prev.style.display = "";
   const kb = Math.round((r.bytes || 0) / 1024);
   show(r.mediaMissed

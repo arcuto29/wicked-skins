@@ -400,3 +400,21 @@ html.bd-lite.bd-shift .chart-markup-table.pane canvas:first-of-type, html.bd-lit
 /* Trade focus (content.js syncHold): while you're at the order ticket or in a position, the endless loops hold still */
 html[data-bd-hold] #bd-layer .bd-frame::before, html[data-bd-hold] .bd-emb .bd-frame::before, html[data-bd-hold] #bd-barpat.bd-aurora > div,
 html[data-bd-hold].bd-shift .chart-markup-table.pane canvas:first-of-type, html[data-bd-hold] #bd-pnl.bd-pnl-rainbow { animation-play-state: paused !important; }
+
+/* The recording control (content.js recControl): one compact pill while a clip records. Never part of the recording.
+   Capture Studio palette: surface #11121D, border #343047, text #F5F3FF / #9CA3B5, record #FF4757, accent #A855F7. */
+.bd-rec { position: fixed; z-index: 2147483647; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 6px 0 12px; border-radius: 12px; background: rgba(17,18,29,.92); border: 1px solid #343047; color: #F5F3FF;
+  font: 600 12.5px/1 system-ui, -apple-system, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; box-shadow: 0 8px 24px -10px rgba(0,0,0,.7);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); cursor: grab; user-select: none; touch-action: none; }
+.bd-rec:active { cursor: grabbing; }
+.bd-rec-dot { width: 9px; height: 9px; border-radius: 50%; background: #FF4757; box-shadow: 0 0 0 3px rgba(255,71,87,.18); flex: none; }
+.bd-rec.paused .bd-rec-dot { background: #9CA3B5; box-shadow: none; }
+.bd-rec-time { min-width: 72px; }
+.bd-rec-info { color: #9CA3B5; font-weight: 500; font-size: 11.5px; max-width: 260px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bd-rec-b { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid transparent; border-radius: 8px; background: rgba(255,255,255,.06);
+  color: #F5F3FF; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+.bd-rec-b:hover { background: rgba(255,255,255,.12); }
+.bd-rec-b.bd-rec-stop { color: #FF4757; }
+.bd-rec-b.bd-rec-priv.on { color: #C084FC; border-color: rgba(168,85,247,.55); background: rgba(168,85,247,.16); }
+html.bd-lite .bd-rec { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(17,18,29,.97); }

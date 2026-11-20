@@ -876,14 +876,27 @@
     const document = { createElement: () => new OffscreenCanvas(2, 2) };
     (__SKINS__)(self, document);
     const V = new Map();
+    // While a snapshot / clip is being made, every frame that was really drawn is also handed to the page as an
+    // ImageBitmap, with the wallpaper's picture filter (blur, saturation, hue, black & white) already applied here.
+    // Reading the transferred canvas back on the page cost ~14 ms a frame at 1440p; a bitmap is under 1 ms.
+    const capSend = (id, v) => {
+      if (!v.cap) return;
+      let src = v.c;
+      if (v.cap.f && v.cap.f !== "none") {
+        if (!v.fc || v.fc.width !== v.c.width || v.fc.height !== v.c.height) v.fc = new OffscreenCanvas(v.c.width, v.c.height);
+        const g = v.fc.getContext("2d"); g.clearRect(0, 0, v.fc.width, v.fc.height); g.filter = v.cap.f; g.drawImage(v.c, 0, 0); g.filter = "none"; src = v.fc;
+      }
+      createImageBitmap(src).then((b) => postMessage({ type: "bmp", id, b, n: v.n || 0 }, [b])).catch(() => {});
+    };
     onmessage = (e) => {
       const m = e.data, v = V.get(m.id);
       try {
         if (m.type === "add") V.set(m.id, { c: m.canvas, skin: m.skin, s: self.PriismMakeSkin(m.skin, m.canvas.getContext("2d"), m.opts) });
         else if (!v) return;
-        else if (m.type === "opts") { v.s = self.PriismMakeSkin(v.skin, v.c.getContext("2d"), m.opts); v.s.resize(v.c.width, v.c.height); v.s.frame(m.t || 0, 0); }
-        else if (m.type === "resize") { v.c.width = m.w; v.c.height = m.h; v.s.resize(m.w, m.h); v.s.frame(m.t || 0, 0); postMessage({ type: "sized", id: m.id, n: m.n }); }
-        else if (m.type === "frame") v.s.frame(m.t, m.dt);
+        else if (m.type === "opts") { v.s = self.PriismMakeSkin(v.skin, v.c.getContext("2d"), m.opts); v.s.resize(v.c.width, v.c.height); v.s.frame(m.t || 0, 0); capSend(m.id, v); }
+        else if (m.type === "resize") { v.n = m.n; v.c.width = m.w; v.c.height = m.h; v.s.resize(m.w, m.h); v.s.frame(m.t || 0, 0); postMessage({ type: "sized", id: m.id, n: m.n }); capSend(m.id, v); }
+        else if (m.type === "frame") { if (v.s.frame(m.t, m.dt) !== false) capSend(m.id, v); }   // (false: nothing moved, the last bitmap still holds)
+        else if (m.type === "cap") { v.cap = m.on ? { f: m.f || "none" } : null; if (!m.on) v.fc = null; else capSend(m.id, v); }
         else if (m.type === "remove") V.delete(m.id);
       } catch (err) {}
       if (m.type === "frame") postMessage({ type: "done", id: m.id });
@@ -897,6 +910,8 @@
       const w = new Worker(url); URL.revokeObjectURL(url);
       w.ready = false; w.views = new Map();
       w.onmessage = (e) => { const m = e.data; if (m.type === "ready") w.ready = true; else if (m.type === "done") { const p = w.views.get(m.id); if (p) p.busy = false; }
+        else if (m.type === "bmp") { const p = w.views.get(m.id); if (!p || !p.capOn) { try { m.b.close(); } catch {} return; }
+          if (p.bmp) try { p.bmp.close(); } catch {} p.bmp = m.b; p.bmpN = m.n; if (p.onBmp && m.n === (p.n || 0)) { const f = p.onBmp; p.onBmp = null; f(); } }
         else if (m.type === "sized") { const p = w.views.get(m.id); if (p && m.n === p.n && p.onSized) { const f = p.onSized; p.onSized = null; f(); } } };
       // blocked (page rules) or crashed before it started: draw on the main thread instead, from now on
       w.onerror = () => { if (wallWorker === w) { workerBroken = true; wallWorker = null; try { w.terminate(); } catch {} if (layer) build(); } };
@@ -923,6 +938,10 @@
       remove() { w.views.delete(id); w.postMessage({ type: "remove", id }); },
       // your settings for this wallpaper changed: the worker rebuilds it in place (same canvas, no flash)
       setOpts(o) { w.postMessage({ type: "opts", id, opts: o, t: p.lastT }); },
+      // capture: the worker hands over each drawn frame as a bitmap, with this picture filter applied (see capSend)
+      capture(on, f) { p.capOn = !!on; if (!on && p.bmp) { try { p.bmp.close(); } catch {} p.bmp = null; } w.postMessage({ type: "cap", id, on: !!on, f: f || "none" }); },
+      capFrame() { return p.capOn && p.bmp && p.bmpN === (p.n || 0) ? p.bmp : null; },   // the latest frame at the current size
+      whenCapFrame() { if (this.capFrame()) return Promise.resolve(); return new Promise((r) => { p.onBmp = r; }); },
     };
   }
 
@@ -1720,16 +1739,34 @@
   // while a snapshot or clip is being made, wallpapers and effects are drawn with every real pixel (up to 2x), so the
   // picture is as sharp as the chart in it
   let captureHi = 0;
-  async function withSharpWallpaper(fn) {
-    captureHi++; views.forEach(sizeCanvas);
+  // While capturing, the wallpaper is drawn at the capture's own pixel density (your screen's real pixels for a
+  // snapshot; a clip's size), whatever Sharpness and Auto quality do on screen, and a wallpaper drawn in the worker
+  // hands each frame over as a bitmap (see capSend). capDprs = the density each capture in progress needs.
+  const capDprs = [];
+  const screenDpr = () => Math.max(1, Math.min(4, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1));
+  // how many pixels the chart itself draws per CSS pixel (TradingView and most apps: the screen's own density; some draw
+  // at 1x even on a Retina / 4K screen). A capture never goes above it: past that it would only be the chart upscaled.
+  function chartDensity() {
+    let d = 0;
+    for (const c of charts) for (const cv of (c.el.querySelectorAll ? c.el.querySelectorAll("canvas") : [])) { const r = cv.getBoundingClientRect(); if (r.width > 200 && r.height > 100) d = Math.max(d, cv.width / r.width); }
+    return d > 0 ? Math.max(1, Math.round(d * 4) / 4) : screenDpr();
+  }
+  const nativeDpr = () => Math.min(screenDpr(), chartDensity());
+  function captureFilter(v) { const k = v.cw && v.w ? v.cw / v.w : 1; return wallFilter(k); }   // in the wallpaper canvas's own pixels
+  function setCapture(on) { for (const v of views) if (v.skin && v.skin.capture) try { v.skin.capture(on, on ? captureFilter(v) : "none"); } catch {} }
+  async function withSharpWallpaper(fn, dpr) {
+    capDprs.push(dpr || nativeDpr()); captureHi++; views.forEach(sizeCanvas); setCapture(true);
     // a frame or two at the new size; a wallpaper drawn in the worker is waited for until it has redrawn at that size
-    // (painted wallpapers take a moment to set up), at most 1.5 s
-    const sized = views.map((v) => v.skin && v.skin.whenSized ? v.skin.whenSized() : null).filter(Boolean);
+    // and handed the frame over (painted wallpapers take a moment to set up), at most 1.5 s
+    const sized = views.map((v) => v.skin && v.skin.whenSized ? v.skin.whenSized().then(() => v.skin.whenCapFrame && v.skin.whenCapFrame()) : null).filter(Boolean);
     await Promise.race([Promise.all([...sized, new Promise((r) => setTimeout(r, 160))]), new Promise((r) => setTimeout(r, 1500))]);
-    try { return await fn(); } finally { captureHi = Math.max(0, captureHi - 1); if (!captureHi) setTimeout(() => views.forEach(sizeCanvas), 50); }
+    try { return await fn(); } finally {
+      capDprs.splice(capDprs.indexOf(dpr || nativeDpr()), 1); captureHi = Math.max(0, captureHi - 1);
+      if (!captureHi) { setCapture(false); setTimeout(() => views.forEach(sizeCanvas), 50); } else views.forEach(sizeCanvas);
+    }
   }
   function resBase(v) {
-    if (captureHi) return Math.max(1, Math.min(2, (typeof devicePixelRatio === "number" && devicePixelRatio) || 1));
+    if (captureHi) return Math.max(...capDprs, 0.5);
     if (cfg.powerSaver) return 0.5;
     if (guard >= 1) return Math.min(cfg.res === "standard" ? 0.75 : 1, 0.75);   // trading slowed down: the wallpaper at Standard
     if (cfg.res === "sharp") return 1;
@@ -1742,7 +1779,7 @@
     if (!v.skin) return;
     // Auto quality steps the resolution down when the computer struggles (res 1 = full, 0 = lowest).
     const base = resBase(v);
-    const scale = Math.max(0.35, base * qlv().res);
+    const scale = captureHi ? base : Math.max(0.35, base * qlv().res);   // (a capture is never lowered by Auto quality)
     const w = Math.max(2, (v.w * scale) | 0), h = Math.max(2, (v.h * scale) | 0);
     if (v.skin.offThread) { if (v.cw !== w || v.ch !== h) { v.cw = w; v.ch = h; v.skin.resize(w, h); } return; }   // sized in the worker
     if (v.content.width !== w || v.content.height !== h) {
@@ -1964,6 +2001,18 @@
       if (msg.ws === "layout") reply({ count: chartCount() });
       if (msg.ws === "numbers") { showNumbers(+msg.n || 0); reply({ count: chartCount() }); }
       if (msg.ws === "symbol") { const q = parseTitle(); reply({ symbol: q ? q.sym : "" }); }
+      // what a capture here would really be (the Capture tab shows it): the screen's native pixels, each Quality's
+      // clip size and format, and whether that format can be recorded in this browser
+      if (msg.ws === "capinfo") {
+        if (!owner || standDown) return;
+        const fps = (q) => (+msg.fps === 30 || +msg.fps === 60 ? +msg.fps : q === "small" || q === "balanced" ? 30 : 60);
+        const out = {};
+        for (const q of Object.keys(CLIP_CAP)) { const d = clipDims(q), f = fps(q), mime = typeof MediaRecorder !== "undefined" ? clipMime(false, d.W, d.H, f) : "";
+          out[q] = { w: d.W, h: d.H, fps: f, mime, label: mime ? clipLabel({ mime, w: d.W, h: d.H, fps: f }) : "" }; }
+        const b = chartsBox(), k = snapDpr();
+        reply({ ok: true, native: [Math.round(b.width * nativeDpr()), Math.round(b.height * nativeDpr())], dpr: nativeDpr(), screenDpr: screenDpr(), chartDensity: chartDensity(), snap: [Math.round(b.width * k), Math.round(b.height * k)], clips: out, hz: refreshHz || 60, canRecord: typeof MediaRecorder !== "undefined" });
+        return;
+      }
       if (msg.ws === "snapshot") {
         if (!owner || standDown) return;   // only the owning frame/instance answers
         captureSnapshot().then(async (r) => {
@@ -2429,8 +2478,9 @@
       const dx = (v.x - box.left) * dpr, dy = (v.y - box.top) * dpr, dw = v.w * dpr, dh = v.h * dpr;
       g.save(); g.beginPath(); g.rect(dx, dy, dw, dh); g.clip();
       try {
-        const t = v.content && v.content.tagName;
-        if (t === "CANVAS" || t === "VIDEO" || t === "IMG") { g.filter = filt; drawFit(g, v.content, dx, dy, dw, dh); g.filter = "none"; }
+        const t = v.content && v.content.tagName, bmp = v.skin && v.skin.capFrame ? v.skin.capFrame() : null;
+        if (bmp) g.drawImage(bmp, dx, dy, dw, dh);                   // the worker's frame, its filter already applied
+        else if (t === "CANVAS" || t === "VIDEO" || t === "IMG") { g.filter = filt; drawFit(g, v.content, dx, dy, dw, dh); g.filter = "none"; }
         else if (v.recFrame) { g.filter = filt; drawFit(g, v.recFrame, dx, dy, dw, dh); g.filter = "none"; }   // an uploaded wallpaper's frame (wallFeed)
         else mediaMissed = true;
         if (v.fxEl) g.drawImage(v.fxEl, dx, dy, dw, dh);           // the effect over it (rain, snow...)
@@ -2554,11 +2604,14 @@
     if (!cfg.wmOn) return null;
     try { return await loadImage(cfg.wmStyle === "tiled" ? tilePattern() : BRAND_LOGO); } catch { return null; }
   }
-  const captureSnapshot = () => withSharpWallpaper(captureSnapshot0);
-  async function captureSnapshot0() {
+  // A snapshot is your screen's real pixels (devicePixelRatio as it is: a 4K screen gives a 4K picture, a Retina
+  // laptop 2x), lossless PNG. Never larger than the screen shows it: no upscaling. (8192 px is the browser's limit.)
+  const snapDpr = () => { const b = chartsBox(); return Math.min(nativeDpr(), 8192 / Math.max(1, b.width, b.height)); };
+  const captureSnapshot = () => { const d = snapDpr(); return withSharpWallpaper(() => captureSnapshot0(d), d); };
+  async function captureSnapshot0(dprIn) {
     if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
     const box = chartsBox();
-    const dpr = Math.min(2, devicePixelRatio || 1);
+    const dpr = dprIn || snapDpr();
     const W = Math.max(1, Math.round(box.width * dpr)), H = Math.max(1, Math.round(box.height * dpr));
     const out = document.createElement("canvas"); out.width = W; out.height = H;
     const g = out.getContext("2d");
@@ -2580,6 +2633,7 @@
     const px = Math.max(1, W * H * (fps || 30));
     // charts are thin lines and small text: they need more bits than video of people (1080p30: ~8.7 Mbps Balanced, ~15.5 High)
     const high = Math.min(45e6, Math.max(8e6, px * 0.25)), bal = Math.min(20e6, Math.max(5e6, px * 0.14));
+    if (q === "ultra") return Math.round(Math.min(80e6, Math.max(12e6, px * 0.25)));   // 4K60: room for the encoder (it only uses what the picture needs)
     if (q === "high") return Math.round(high);
     if (q === "small") return Math.round(Math.max(600e3, Math.min(bal * 0.5, (20 * 8e6 * 0.92) / Math.max(2, dur))));
     return Math.round(bal);
@@ -2589,7 +2643,7 @@
     a.href = url; a.download = name; document.documentElement.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
-  function openClipEditor(blob, name, fps, hasAudio) {
+  function openClipEditor(blob, name, fps, hasAudio, meta) {
     const host = document.createElement("div"); host.id = "bd-clip-editor";
     host.style.cssText = "position:fixed;inset:0;z-index:2147483646";
     const root = host.attachShadow({ mode: "open" });
@@ -2634,12 +2688,12 @@
       .est{color:#c8c8d0}
     </style>
     <div class="bg"><div class="card">
-      <div class="top"><div><b>Edit your clip</b><small>Drag the box to crop · drag the green handles to trim</small></div><div style="display:flex;gap:8px">${hasAudio ? '<button data-a="snd">\u{1F508} Play sound</button>' : ""}<button data-a="discard">Discard</button></div></div>
+      <div class="top"><div><b>Edit your clip</b><small>${meta ? clipLabel(meta).replace(/[<>&"]/g, "") : "Drag the box to crop · drag the green handles to trim"}</small></div><div style="display:flex;gap:8px">${hasAudio ? '<button data-a="snd">\u{1F508} Play sound</button>' : ""}<button data-a="discard">Discard</button></div></div>
       <div class="stage"><video muted playsinline></video><div class="shade s1"></div><div class="shade s2"></div><div class="shade s3"></div><div class="shade s4"></div>
         <div class="crop"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i></div></div>
       <div class="row"><span>Crop</span><button data-r="free" class="on">Free</button><button data-r="full">Whole video</button><button data-r="16:9">16:9 (YouTube)</button><button data-r="9:16">9:16 (TikTok / Reels)</button><button data-r="1:1">1:1 (square)</button><button data-r="4:5">4:5</button></div>
       <div class="row"><span>Trim</span><div class="trim"><div class="bar"></div><div class="sel"></div><input type="range" class="t0" min="0" max="1000" value="0"><input type="range" class="t1" min="0" max="1000" value="1000"></div><b class="tl">0.0s – 0.0s</b></div>
-      <div class="row"><span>Size</span><button data-s="0" class="on">Original</button><button data-s="1080">1080p</button><button data-s="720">720p</button><button data-s="480">480p</button></div>
+      <div class="row"><span>Size</span><button data-s="0" class="on">Original</button><button data-s="1440">1440p</button><button data-s="1080">1080p</button><button data-s="720">720p</button><button data-s="480">480p</button></div>
       <div class="row"><span>Quality</span><button data-q="high">High</button><button data-q="balanced" class="on">Balanced</button><button data-q="small">Small file (Discord)</button><b class="est"></b></div>
       <div class="prog"><div></div></div>
       <div class="acts"><span class="msg">Cropping or trimming re-saves the clip as it plays, so it takes about as long as the clip.</span><button data-a="orig">Save as is (instant)</button><button data-a="save" class="go">Save edited clip</button></div>
@@ -2648,15 +2702,15 @@
     const $q = (s) => root.querySelector(s), v = $q("video"), stage = $q(".stage"), box = $q(".crop"), msg = $q(".msg");
     const url = URL.createObjectURL(blob); v.src = url; v.loop = false;
     let dur = 0, t0 = 0, t1 = 0, ratio = "free", crop = { x: 0, y: 0, w: 1, h: 1 }, busy = false;   // crop in 0..1 of the video
-    let outSize = 0, quality = (cfg.clipQuality === "high" || cfg.clipQuality === "small") ? cfg.clipQuality : "balanced";
+    let outSize = 0, quality = (cfg.clipQuality === "high" || cfg.clipQuality === "ultra") ? "high" : cfg.clipQuality === "small" ? "small" : "balanced";
     const pick = (attr, val) => root.querySelectorAll(`[data-${attr}]`).forEach((b) => b.classList.toggle("on", b.dataset[attr] === String(val)));
     const outDims = () => { let W = Math.max(2, Math.round(crop.w * (v.videoWidth || 2))), H = Math.max(2, Math.round(crop.h * (v.videoHeight || 2)));
-      // Size = the short side (1080p, 720p...), never upscaled; the long side is capped at 1920 (3840 = 4K with Ultra sharpness)
-      const k = Math.min(1, outSize ? outSize / Math.min(W, H) : 1, (cfg.res === "ultra" ? 3840 : 1920) / Math.max(W, H));
+      // Size = the short side (1440p, 1080p...), never upscaled; Original keeps the recording's own size (up to 4K)
+      const k = Math.min(1, outSize ? outSize / Math.min(W, H) : 1, 3840 / Math.max(W, H));
       return [Math.max(2, Math.round(W * k) & ~1), Math.max(2, Math.round(H * k) & ~1)]; };
     const estimate = () => { const [W, H] = outDims(), d = Math.max(0.5, t1 - t0), bps = clipBps(W, H, fps || 30, d, quality);
       root.querySelector(".est").textContent = `≈ ${Math.max(0.1, (bps * d) / 8e6).toFixed(1)} MB · ${W}×${H}`; };
-    const untouched = () => crop.x === 0 && crop.y === 0 && crop.w === 1 && crop.h === 1 && t0 <= 0.05 && t1 >= dur - 0.05 && !outSize && quality === ((cfg.clipQuality === "high" || cfg.clipQuality === "small") ? cfg.clipQuality : "balanced");
+    const untouched = () => crop.x === 0 && crop.y === 0 && crop.w === 1 && crop.h === 1 && t0 <= 0.05 && t1 >= dur - 0.05 && !outSize && quality === ((cfg.clipQuality === "high" || cfg.clipQuality === "ultra") ? "high" : cfg.clipQuality === "small" ? "small" : "balanced");
     // Sound: the preview plays muted until you click in the editor (browsers only allow sound after a click); then it
     // runs through an audio graph so the same sound can be both heard and re-recorded when you save an edit.
     let ac = null, asrc = null, pv = null, soundOn = true;
@@ -2757,7 +2811,7 @@
         const stream = cv.captureStream(fps || 30);
         let withSound = false;
         if (hasAudio) { audioUp(); if (ac) { try { await ac.resume(); const d = ac.createMediaStreamDestination(); asrc.connect(d); stream.addTrack(d.stream.getAudioTracks()[0]); withSound = true; } catch {} } }
-        const mime = clipMime(withSound);
+        const mime = clipMime(withSound, OW, OH, fps || 30);
         const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: clipBps(OW, OH, fps || 30, Math.max(0.5, t1 - t0), quality) } : undefined);
         const chunks = []; rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
         const done = new Promise((res) => (rec.onstop = res));
@@ -2821,10 +2875,18 @@
   const wantSys = () => cfg.clipAudio === "computer" || cfg.clipAudio === "both";
   // MP4 first: it plays everywhere (phones, Windows, Mac, every editing app and social site). H.264 + AAC is the most
   // compatible; then H.264 + Opus; WebM only on a browser that can't record MP4.
-  function clipMime(withAudio) {
+  // H.264 High profile at the level the clip needs (a level caps the picture size and frames a second: 4.0 is 1080p30;
+  // 1440p60 needs 5.1, 4K60 5.2). Plain "avc1" let the browser pick Constrained Baseline, its simplest profile.
+  function h264Level(W, H, fps) {
+    const mbs = Math.ceil(W / 16) * Math.ceil(H / 16), rate = mbs * (fps || 30);
+    const L = [[0x28, 8192, 245760], [0x2a, 8704, 522240], [0x32, 22080, 589824], [0x33, 36864, 983040], [0x34, 36864, 2073600]];
+    const l = L.find(([, f, r]) => mbs <= f && rate <= r); return l ? "avc1.6400" + l[0].toString(16).toUpperCase().padStart(2, "0") : null;
+  }
+  function clipMime(withAudio, W, H, fps) {
+    const lv = W && H ? h264Level(W, H, fps) : null;
     const list = withAudio
-      ? ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1,opus", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
-      : ["video/mp4;codecs=avc1", "video/mp4;codecs=avc1.640028", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+      ? [...(lv ? [`video/mp4;codecs=${lv},mp4a.40.2`] : []), "video/mp4;codecs=avc1,mp4a.40.2", "video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1,opus", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]
+      : [...(lv ? [`video/mp4;codecs=${lv}`] : []), "video/mp4;codecs=avc1", "video/mp4;codecs=avc1.640028", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
     return list.find((m) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || "";
   }
   const clipExt = (mime) => (/mp4/.test(mime || "") ? "mp4" : "webm");
@@ -2896,29 +2958,35 @@
     for (let i = 0; i < 20 && players.some((v) => !v.recFrame); i++) await new Promise((r) => setTimeout(r, 50));
     return () => { for (const [v, port] of ports) { try { port.postMessage({ stop: true }); port.close(); } catch {} if (v.recFrame && v.recFrame.close) try { v.recFrame.close(); } catch {} v.recFrame = null; } };
   }
-  const captureClip = (...a) => withSharpWallpaper(() => captureClip0(...a));
+  // Clip size: your screen's real pixels, the long side capped by Quality: Small 1280 (720p), Balanced 1920 (1080p),
+  // High 2560 (1440p), Ultra 3840 (4K). Never above what the screen shows: a 1080p screen records 1080p in Ultra too.
+  const CLIP_CAP = { small: 1280, balanced: 1920, high: 2560, ultra: 3840 };
+  function clipDims(q) {
+    const box = chartsBox(), long = Math.max(1, box.width, box.height), cap = CLIP_CAP[q] || CLIP_CAP.balanced;
+    const dpr = Math.min(nativeDpr(), cap / long);
+    return { box, dpr, W: Math.max(2, Math.round(box.width * dpr)) & ~1, H: Math.max(2, Math.round(box.height * dpr)) & ~1, nativeLong: Math.round(long * nativeDpr()) };
+  }
+  const captureClip = (...a) => { const d = clipDims(cfg.clipQuality); return withSharpWallpaper(() => captureClip0(...a), d.dpr); };
   async function captureClip0(seconds, fpsWanted, display, soundAsked) {
     if (!cfg.enabled) return { ok: false, reason: "Turn Priism Skins on first." };
     if (clipRec) return { ok: false, reason: "Already recording a clip." };
     if (typeof MediaRecorder === "undefined") return { ok: false, reason: "Your browser can't record clips." };
-    const box = chartsBox();
-    // full resolution: your screen's real pixels (up to 2x), the long side capped by Quality: Small 1280, Balanced 1920,
-    // High 2560 (3840 with Sharpness › Ultra 4K)
-    const cap0 = cfg.clipQuality === "small" ? 1280 : cfg.clipQuality === "high" ? (cfg.res === "ultra" ? 3840 : 2560) : (cfg.res === "ultra" ? 3840 : 1920);
-    const dpr0 = Math.min(2, devicePixelRatio || 1), dpr = Math.min(dpr0, cap0 / Math.max(1, Math.max(box.width, box.height)));
-    const W = Math.max(2, Math.round(box.width * dpr)) & ~1, H = Math.max(2, Math.round(box.height * dpr)) & ~1;  // even dims for encoders
+    const { box, dpr, W, H } = clipDims(cfg.clipQuality);   // (even sizes, for encoders)
     const cap = document.createElement("canvas"); cap.width = W; cap.height = H;
     const g = cap.getContext("2d");
     const wmImg = await watermarkImage();
-    const capFps = Math.max(10, Math.min(60, +fpsWanted || 30));
+    let capFps = Math.max(10, Math.min(60, +fpsWanted || 30));
     const stopWallFeed = await startWallFeed(capFps, Math.max(W, 640));
     // first frame to check we can actually read the pixels (a tainted/cross-origin chart will throw on record)
     const { mediaMissed } = compositeFrame(g, box, dpr, wmImg);
-    let stream;
-    try { stream = cap.captureStream(capFps); } catch { stopWallFeed(); return { ok: false, reason: "Your browser can't record this chart." }; }
+    // Frames are pushed one by one (captureStream(0) + requestFrame), right after each is drawn, at exactly the
+    // frame rate you picked: even spacing, no frame drawn for nothing. Older browsers: the stream samples by itself.
+    let stream, track, manual = false;
+    try { stream = cap.captureStream(0); track = stream.getVideoTracks()[0]; manual = !!(track && track.requestFrame); if (!manual) { stream = cap.captureStream(capFps); track = stream.getVideoTracks()[0]; } }
+    catch { stopWallFeed(); return { ok: false, reason: "Your browser can't record this chart." }; }
     let au = null; try { au = await clipAudioTrack(display || null); } catch {}
     if (au && au.track) stream.addTrack(au.track);
-    const mime = clipMime(!!au);
+    const mime = clipMime(!!au, W, H, capFps);
     const stopAudio = () => { try { au && au.stop(); } catch {} try { display && display.getTracks().forEach((t) => t.stop()); } catch {} };
     let rec;
     // Any length from 2s to 2 minutes, at the quality you picked (based on the clip's real size + frame rate).
@@ -2932,39 +3000,101 @@
     // Every clip is saved by the page itself the moment it ends. The popup closes when you click away,
     // so it must never be the thing that holds the file.
     const autoSave = true;
-    // A small countdown badge on the chart. Click it to stop early. It is not part of the recording.
-    const badge = document.createElement("div");
-    badge.className = "bd-ui-rec";
-    badge.title = "Click to stop and save now";
-    document.documentElement.appendChild(badge);
-    const t0 = performance.now();
-    const paint = () => { const left = Math.max(0, Math.ceil(dur - (performance.now() - t0) / 1000)); badge.textContent = `Recording ${left}s \u00B7 click to stop`; };
-    paint(); const badgeTimer = setInterval(paint, 250);
+    // The recording control on the chart (not part of the recording): see recControl
+    let recTime = 0, runFrom = performance.now(), paused = false, frames = 0, note = "";
+    const elapsed = () => recTime + (paused ? 0 : (performance.now() - runFrom) / 1000);
+    const ctl = recControl({ total: dur, elapsed, info: () => `${W}\u00D7${H} \u00B7 ${capFps} fps${note ? " \u00B7 " + note : ""}`,
+      pause: () => { if (paused || rec.state !== "recording") return false; try { rec.pause(); } catch { return false; } recTime = elapsed(); paused = true; return true; },
+      resume: () => { if (!paused) return false; try { rec.resume(); } catch { return false; } paused = false; runFrom = performance.now(); return true; },
+      canPause: typeof rec.pause === "function" });
     return await new Promise((resolve) => {
-      let rafId = 0, done = false, stopTimer = 0;
-      const stop = () => { clearTimeout(stopTimer); try { rec.state !== "inactive" && rec.stop(); } catch {} };
-      badge.onclick = stop; stopClip = stop;
-      const cleanup = () => { done = true; cancelAnimationFrame(rafId); clearTimeout(stopTimer); clearInterval(badgeTimer); badge.remove(); clipRec = null; stopWallFeed(); };
-      const draw = () => { if (done) return; try { compositeFrame(g, box, dpr, wmImg); } catch {} rafId = requestAnimationFrame(draw); };
+      let rafId = 0, done = false, last = 0, slow = 0, endT = 0;
+      const stop = () => { clearInterval(endT); try { rec.state !== "inactive" && rec.stop(); } catch {} };
+      ctl.onStop = stop; stopClip = stop;
+      const cleanup = () => { done = true; cancelAnimationFrame(rafId); clearInterval(endT); ctl.remove(); clipRec = null; stopWallFeed(); };
+      const draw = (now) => {
+        if (done) return; rafId = requestAnimationFrame(draw);
+        if (paused) return;
+        if (last && now - last < 1000 / capFps - 2) return;   // exactly your frame rate, whatever the screen's refresh rate
+        last = now;
+        try { compositeFrame(g, box, dpr, wmImg); if (manual) track.requestFrame(); frames++; } catch {}
+      };
+      // Trading first: if the page starts answering your input slowly while recording (see the pressure monitor),
+      // a 60 fps clip carries on at 30 fps, and the control says so.
+      const watch = setInterval(() => { if (done) return clearInterval(watch);
+        slow = pressureBad ? slow + 1 : 0;
+        if (slow >= 2 && capFps > 30) { capFps = 30; note = "30 fps to keep trading smooth"; try { localStorage.setItem("bdCapSlow", String(Date.now())); } catch {} } }, 2000);
       rec.onstop = async () => {
-        cleanup();
+        const secs = elapsed();
+        cleanup(); clearInterval(watch);
         try { stream.getTracks().forEach((t) => t.stop()); } catch {}
         stopAudio();
         if (!chunks.length) return resolve({ ok: false, reason: "The browser blocked recording (a cross-origin chart)." });
         const blob = new Blob(chunks, { type: mime || "video/webm" });
+        // what was really recorded: size, length, frames a second (counted), format
+        const meta = { w: W, h: H, secs: +secs.toFixed(1), fps: secs > 0.5 ? Math.round(frames / secs) : capFps, mime: mime || "video/webm", bytes: blob.size, lowered: !!note };
         if (autoSave) {
-          const q = parseTitle(), name = `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${Math.round((performance.now() - t0) / 1000)}s.${clipExt(mime)}`;
-          if (cfg.clipEdit !== false) { openClipEditor(blob, name, cfg.clipFps, !!au); return resolve({ ok: true, saved: true, editing: true, name, mediaMissed, bytes: blob.size, w: W, h: H }); }
+          const q = parseTitle(), name = `priism-${((q && q.sym) || "chart").replace(/[^\w-]+/g, "")}-${Math.round(secs)}s.${clipExt(mime)}`;
+          if (cfg.clipEdit !== false) { openClipEditor(blob, name, meta.fps, !!au, meta); return resolve({ ok: true, saved: true, editing: true, name, mediaMissed, ...meta }); }
           saveBlob(blob, name);
-          flash("Clip saved to your downloads");
-          return resolve({ ok: true, saved: true, name, mediaMissed, bytes: blob.size, w: W, h: H });
+          flash(`Clip saved \u00B7 ${clipLabel(meta)}`);
+          return resolve({ ok: true, saved: true, name, mediaMissed, ...meta });
         }
-        resolve({ ok: true, url: await blobToDataURL(blob), mediaMissed, bytes: blob.size, w: W, h: H });
+        resolve({ ok: true, url: await blobToDataURL(blob), mediaMissed, ...meta });
       };
-      rec.onerror = () => { cleanup(); stopAudio(); resolve({ ok: false, reason: "Recording failed." }); };
-      try { rec.start(); draw(); stopTimer = setTimeout(stop, dur * 1000); }
-      catch { cleanup(); resolve({ ok: false, reason: "Recording failed." }); }
+      rec.onerror = () => { cleanup(); clearInterval(watch); stopAudio(); resolve({ ok: false, reason: "Recording failed." }); };
+      try {
+        rec.start(1000); runFrom = performance.now(); rafId = requestAnimationFrame(draw);
+        endT = setInterval(() => { if (elapsed() >= dur) stop(); }, 100);   // the length counts recorded time (not paused time)
+      } catch { cleanup(); clearInterval(watch); resolve({ ok: false, reason: "Recording failed." }); }
     });
+  }
+  // "MP4 · H.264 · 2560×1440 · 60 fps · 10.0 s · 12.4 MB" (what the file really is)
+  function clipLabel(m) {
+    const fmt = /mp4/.test(m.mime) ? "MP4" : "WebM", codec = /avc1|h264/i.test(m.mime) || (/mp4/.test(m.mime) && !/vp9|av01/.test(m.mime)) ? "H.264" : /vp9/.test(m.mime) ? "VP9" : /av01/.test(m.mime) ? "AV1" : /vp8/.test(m.mime) ? "VP8" : "";
+    return [fmt, codec, `${m.w}\u00D7${m.h}`, m.fps ? `${m.fps} fps` : "", m.secs ? `${m.secs.toFixed(1)} s` : "", m.bytes ? `${(m.bytes / 1048576).toFixed(1)} MB` : ""].filter(Boolean).join(" \u00B7 ");
+  }
+  // The recording control: one small pill on the chart while a clip records. A red dot, the time, Pause / Resume,
+  // Stop, and Streamer mode (hides your money on the chart and in this recording, the same switch as in the panel).
+  // Drag it anywhere (it remembers where); it's never part of the recording, and it never blocks the chart's own
+  // clicks outside it. o = { total, elapsed(), info(), pause(), resume(), canPause }
+  const ICO = {
+    pause: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 5v14M15 5v14"/></svg>',
+    play: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+    stop: '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>',
+    eyeOff: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.7 5.1A10.9 10.9 0 0 1 12 5c7 0 10 7 10 7a13.2 13.2 0 0 1-1.7 2.7M6.6 6.6A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.4-1.6M2 2l20 20M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+  };
+  function recControl(o) {
+    const el = document.createElement("div"); el.className = "bd-rec"; el.setAttribute("role", "toolbar"); el.setAttribute("aria-label", "Priism recording");
+    el.innerHTML = `<span class="bd-rec-dot"></span><span class="bd-rec-time">0:00</span><span class="bd-rec-info"></span>
+      ${o.canPause ? `<button class="bd-rec-b" data-a="pause" title="Pause">${ICO.pause}</button>` : ""}
+      <button class="bd-rec-b bd-rec-priv" data-a="priv" title="Streamer mode: hide your money on the chart and in this recording">${ICO.eyeOff}</button>
+      <button class="bd-rec-b bd-rec-stop" data-a="stop" title="Stop and save">${ICO.stop}</button>`;
+    document.documentElement.appendChild(el);
+    try { const p = JSON.parse(localStorage.getItem("bdRecPos") || "null"); if (p && p.x >= 0 && p.y >= 0) { el.style.left = Math.min(innerWidth - 60, p.x) + "px"; el.style.top = Math.min(innerHeight - 30, p.y) + "px"; el.style.transform = "none"; } } catch {}
+    const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+    const priv = el.querySelector('[data-a="priv"]');
+    const paint = () => { const t = o.elapsed(); el.querySelector(".bd-rec-time").textContent = `${fmt(t)} / ${fmt(o.total)}`; el.querySelector(".bd-rec-info").textContent = o.info();
+      priv.classList.toggle("on", !!cfg.privacy); };
+    paint(); const timer = setInterval(paint, 250);
+    const api = { onStop: null, remove() { clearInterval(timer); el.remove(); } };
+    el.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      e.stopPropagation();
+      if (b.dataset.a === "stop") api.onStop && api.onStop();
+      else if (b.dataset.a === "pause") { const now = el.classList.contains("paused") ? o.resume() : o.pause(); if (now) { const p = el.classList.toggle("paused"); b.innerHTML = p ? ICO.play : ICO.pause; b.title = p ? "Resume" : "Pause"; } }
+      else if (b.dataset.a === "priv") { save({ privacy: !cfg.privacy }); setTimeout(paint, 50); }
+    });
+    // drag by the pill itself (not its buttons); the chart under it never sees these presses
+    el.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button") || e.button !== 0) return;
+      e.preventDefault(); e.stopPropagation(); el.setPointerCapture(e.pointerId);
+      const r = el.getBoundingClientRect(), dx = e.clientX - r.left, dy = e.clientY - r.top;
+      const mv = (ev) => { el.style.transform = "none"; el.style.left = Math.max(4, Math.min(innerWidth - r.width - 4, ev.clientX - dx)) + "px"; el.style.top = Math.max(4, Math.min(innerHeight - r.height - 4, ev.clientY - dy)) + "px"; };
+      const up = () => { el.removeEventListener("pointermove", mv); el.removeEventListener("pointerup", up); try { localStorage.setItem("bdRecPos", JSON.stringify({ x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0 })); } catch {} };
+      el.addEventListener("pointermove", mv); el.addEventListener("pointerup", up);
+    });
+    return api;
   }
 
   // ---------- Whole-screen recording ----------

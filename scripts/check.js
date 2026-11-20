@@ -46,8 +46,8 @@ if (process.env.EXPECT_VERSION && process.env.EXPECT_VERSION !== manifest.versio
 const REVIEWED = {
   network: { re: /\bfetch\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource/g, ok: { "content.js": 1, "invite.js": 1, "workshop.js": 1 } },
   patchNetwork: { re: /\b(?:window\.)?(?:fetch|XMLHttpRequest|WebSocket)(?:\.prototype(?:\.\w+)?)?\s*=(?!=)/g, ok: {} },
-  // Priism's own shortcut keys, crop overlay, clip player and magnifier only
-  cancelEvents: { re: /\.(?:preventDefault|stopPropagation|stopImmediatePropagation)\(/g, ok: { "content.js": 6 } },
+  // Priism's own shortcut keys, crop overlay, clip player, magnifier and recording control (its own clicks / drags) only
+  cancelEvents: { re: /\.(?:preventDefault|stopPropagation|stopImmediatePropagation)\(/g, ok: { "content.js": 9 } },
   // lw.js: a ±0.0001 wheel nudge on the chart canvas so Lightweight Charts repaints; no clicks, keys or pointer events
   syntheticInput: { re: /new (?:Mouse|Pointer|Keyboard|Wheel|Touch|Input)Event\(|\.click\(\)/g, ok: { "lw.js": 2, "content.js": 1 } },
 };

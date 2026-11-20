@@ -631,3 +631,49 @@ details.grp.fxmix > summary { text-shadow: 0 0 10px rgba(25,211,255,.45); }
 #planName { font-weight: 700; }
 .ig-close { position: absolute; top: 10px; right: 12px; background: none; border: 0; color: inherit; font-size: 20px; cursor: pointer; opacity: .7; }
 .ig-card { position: relative; }
+
+/* ---------- Capture Studio (the Capture tab) ----------
+   Palette (design targets): background #080910, surface #11121D, raised #191A2A, accent #A855F7 / #C084FC, text #F5F3FF /
+   #9CA3B5, borders #343047, record #FF4757, success #32D583. 8px spacing; 12-16px panels, 8-12px buttons; 150ms. */
+#tab-capture { --cs-bg: #080910; --cs-s1: #11121D; --cs-s2: #191A2A; --cs-acc: #A855F7; --cs-acc2: #C084FC; --cs-tx: #F5F3FF; --cs-tx2: #9CA3B5; --cs-ln: #343047; --cs-rec: #FF4757; --cs-ok: #32D583; }
+.cs { background: var(--cs-s1); border: 1px solid var(--cs-ln); border-radius: 14px; padding: 12px; margin-top: 10px; color: var(--cs-tx); }
+.cs-head { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+.cs-head b { display: block; font-size: 15px; letter-spacing: .01em; }
+.cs-head small { display: block; color: var(--cs-tx2); font-size: 11.5px; line-height: 1.35; margin-top: 2px; }
+.cs-ico { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--cs-s2); border: 1px solid var(--cs-ln); color: var(--cs-acc2); }
+.cs-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 12px; background: var(--cs-bg); border: 1px solid var(--cs-ln); margin-bottom: 12px; }
+.cs-mode button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; border: 1px solid transparent; border-radius: 9px; background: none; color: var(--cs-tx2); font-weight: 600; transition: background .15s, color .15s, border-color .15s; }
+.cs-mode button:hover { color: var(--cs-tx); }
+.cs-mode button.on { background: var(--cs-s2); color: var(--cs-tx); border-color: rgba(168,85,247,.45); box-shadow: 0 0 0 1px rgba(168,85,247,.12), 0 0 14px -6px rgba(168,85,247,.6); }
+.cs-q { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.cs-card { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; padding: 10px; border-radius: 12px; background: var(--cs-s2); border: 1px solid var(--cs-ln); color: var(--cs-tx); transition: border-color .15s, box-shadow .15s, background .15s; }
+.cs-card b { font-size: 12.5px; }
+.cs-card span { color: var(--cs-tx2); font-size: 11.5px; }
+.cs-card small { color: #6f7385; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.cs-card:hover { border-color: #4a4466; }
+.cs-card.on { border-color: var(--cs-acc); box-shadow: 0 0 0 1px rgba(168,85,247,.35), 0 0 18px -8px rgba(168,85,247,.7); background: linear-gradient(180deg, rgba(168,85,247,.12), rgba(168,85,247,.03)); }
+.cs-card.on span { color: var(--cs-acc2); }
+.cs-card.capped small { color: #b9a4d6; }
+.cs-card:disabled { opacity: .45; cursor: not-allowed; }
+.cs-go { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px; border: 0; border-radius: 12px; font-weight: 700; font-size: 14px;
+  background: linear-gradient(135deg, #A855F7, #8b5cf6); color: #fff; box-shadow: 0 6px 22px -10px rgba(168,85,247,.9); transition: filter .15s, box-shadow .15s; }
+.cs-go:hover { filter: brightness(1.08); box-shadow: 0 8px 26px -10px rgba(168,85,247,1); }
+.cs-go:disabled { filter: saturate(.4) brightness(.8); cursor: default; }
+.cs-go kbd { font: 600 10.5px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 6px; border-radius: 6px; background: rgba(0,0,0,.25); color: rgba(255,255,255,.85); }
+.cs-go kbd:empty { display: none; }
+.cs-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cs-rec); box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
+.cs-ready { margin: 8px 0 0; font-size: 11.5px; color: var(--cs-tx2); display: flex; align-items: center; gap: 6px; }
+.cs-ready::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--cs-ok); flex: none; }
+.cs-out { margin: 6px 0 0; font: 600 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--cs-ok); }
+.cs-preview { display: block; margin-top: 10px; }
+.cs-preview img, .cs-preview video { width: 100%; border-radius: 10px; border: 1px solid var(--cs-ln); display: block; }
+.cs-adv { margin-top: 12px; border-top: 1px solid var(--cs-ln); padding-top: 8px; }
+.cs-adv > summary { cursor: pointer; color: var(--cs-tx2); font-weight: 600; font-size: 12px; list-style: none; padding: 4px 0; }
+.cs-adv > summary::-webkit-details-marker { display: none; }
+.cs-adv > summary::after { content: "\203A"; display: inline-block; margin-left: 6px; transition: transform .15s; }
+.cs-adv[open] > summary::after { transform: rotate(90deg); }
+.cs .seg { border-color: var(--cs-ln); } .cs .seg button { background: var(--cs-bg); } .cs .seg button.on { background: var(--cs-s2); color: var(--cs-tx); box-shadow: inset 0 -2px 0 var(--cs-acc); }
+#tab-capture details.grp { border-color: var(--cs-ln); background: var(--cs-s1); border-radius: 14px; }
+body.desk .cs { padding: 18px; column-span: all; break-inside: avoid; margin: 0 0 18px; }
+body.desk .cs-q { grid-template-columns: repeat(4, 1fr); }
+body.desk .cs-go { max-width: 420px; }

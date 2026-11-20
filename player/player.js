@@ -30,7 +30,7 @@
     let ok = false;
     try { const s = await chrome.storage.local.get("recToken"); ok = !!s.recToken && s.recToken === msg.token; } catch {}
     if (!ok) { try { port.close(); } catch {} return; }
-    const fps = Math.max(5, Math.min(60, +msg.fps || 30)), maxW = Math.max(160, Math.min(1920, +msg.maxW || 1280));
+    const fps = Math.max(5, Math.min(60, +msg.fps || 30)), maxW = Math.max(160, Math.min(3840, +msg.maxW || 1280));   // up to 4K captures (never above the upload's own size)
     let stopped = false; const until = Date.now() + 135000;   // never longer than the longest clip
     port.onmessage = (ev) => { if (ev.data && ev.data.stop) { stopped = true; try { port.close(); } catch {} } };
     const tick = async () => {
@@ -39,7 +39,7 @@
         recBusy = true;
         try {
           const nw = el.videoWidth || el.naturalWidth, nh = el.videoHeight || el.naturalHeight;
-          if (nw && nh) { const k = Math.min(1, maxW / nw), bmp = await createImageBitmap(el, { resizeWidth: Math.max(2, Math.round(nw * k)), resizeHeight: Math.max(2, Math.round(nh * k)), resizeQuality: "medium" });
+          if (nw && nh) { const k = Math.min(1, maxW / nw), bmp = await createImageBitmap(el, { resizeWidth: Math.max(2, Math.round(nw * k)), resizeHeight: Math.max(2, Math.round(nh * k)), resizeQuality: k < 1 ? "high" : "pixelated" });
             port.postMessage({ bmp, nw, nh }, [bmp]); }
         } catch {} finally { recBusy = false; }
       }
