@@ -3484,4 +3484,68 @@
       if (keys.includes("pass") || keys.includes("deviceId")) refreshPass().then(go); else go();
     };
   }
+
+  // ---------- TopstepX: the platform's own panels in your look ----------
+  // TopstepX (the ProjectX platform) keeps its chart in a frame; its panels, order ticket, tables and menus are in the
+  // top page, where nothing else of Priism runs. This styles them with the same settings as TradingView's panels
+  // (TradingView tab › Bars & panels: Panel colours, Panel style, Rounded, and the accent Match everything sets):
+  //  - TopstepX's own design tokens (--tds-*): surfaces, borders, accent, focus ring, selection. Its trading colours
+  //    (buy / sell, profit / loss, flashes) and status colours (warnings, errors) are never touched.
+  //  - its older parts that don't use the tokens yet: dock panels and tabs, tables, menus, dialogs, the order ticket's
+  //    surfaces. Only colours, borders and corner radius: nothing moves, resizes or changes how it works.
+  // One stylesheet, no observers; if TopstepX changes these parts, the rules simply stop matching.
+  if (window === window.top && (/(^|\.)(topstepx|projectx)\.com$/.test(location.hostname) || document.documentElement.hasAttribute("data-tds-brand"))) (function topstepx() {
+    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3" };
+    let c = { ...KEYS }, st = null, tries = 0, pro = false;
+    const hex = (h) => /^#[0-9a-f]{6}$/i.test(h || "") ? h : null;
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), toHex = (a) => "#" + a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+    const rgba = (h, a) => `rgba(${rgb(h).join(",")},${a})`, mix = (a, b, f) => toHex(rgb(a).map((v, i) => v + (rgb(b)[i] - v) * f));
+    const accent = () => hex(c.uiAccent) || (c.wallMatch && Array.isArray(c.wallMatch.colors) && hex(c.wallMatch.colors[0])) || hex(c.candleUp) || "#7c6cff";
+    // the panel colour, exactly as on TradingView (panelColour): your colour, or a deep tint of the wallpaper's accent
+    const panel = () => c.panelMode === "color" ? hex(c.panelColor) : c.panelMode === "skin" ? toHex(rgb(accent()).map((v, i) => [11, 13, 19][i] + (v - [11, 13, 19][i]) * 0.14)) : null;
+    function css() {
+      const P = panel(); if (!P || !c.enabled || !pro) return "";
+      const A = accent(), lum = (x) => { const [r, g, b] = rgb(x).map((v) => v / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const S0 = mix(P, "#000000", 0.35), S1 = mix(P, "#ffffff", 0.04), S2 = mix(P, "#ffffff", 0.07), S3 = mix(P, "#ffffff", 0.1), glass = c.pnStyle === "glass";
+      const BG = glass ? rgba(P, 0.74) : P, L1 = rgba(mix("#ffffff", A, 0.25), 0.08), L2 = rgba(mix("#ffffff", A, 0.25), 0.13);
+      const edge = c.pnStyle === "neon" || c.pnStyle === "aurora" ? rgba(A, 0.5) : c.pnStyle === "outline" ? rgba(A, 0.3) : L2, R = c.pnRound ? "10px" : null;
+      const H = "html.bd-tsx", on = lum(A) > 0.55 ? "#0b0c10" : "#ffffff";
+      return `${H},${H} [data-tds-brand]{--tds-color-surface-sunken:${S0}!important;--tds-color-surface-base:${BG}!important;--tds-color-surface-raised:${S1}!important;--tds-color-surface-elevated:${S2}!important;--tds-color-surface-overlay:${S3}!important;` +
+        `--tds-color-brand-panel:${glass ? rgba(P, 0.7) : P}!important;--tds-color-topstepx-panel-glass:${rgba(P, 0.7)}!important;--tds-color-brand-page:${S0}!important;--tds-brand-page-gradient:radial-gradient(ellipse at top,${rgba(A, 0.12)} 0%,${S0} 58%,#000 100%)!important;` +
+        `--tds-color-border-subtle:${L1}!important;--tds-color-border-default:${L2}!important;--tds-color-accent-solid:${A}!important;--tds-color-accent-solid-hover:${mix(A, "#ffffff", 0.15)}!important;--tds-color-accent-on-solid:${on}!important;` +
+        `--tds-color-accent-fg:${A}!important;--tds-color-accent-indicator:${A}!important;--tds-color-accent-subtle:${rgba(A, 0.16)}!important;--tds-color-accent-border:${rgba(A, 0.6)}!important;--tds-color-focus-ring:${A}!important;` +
+        `--tds-color-state-selected:${rgba(A, 0.12)}!important;--tds-color-state-selected-hover:${rgba(A, 0.16)}!important;${R ? `--tds-radius-md:${R}!important;--tds-shape-container:${R}!important;` : ""}}` +
+        // the dock: panels, tab bars, the active tab's line, its menus
+        `${H} .dock-panel{background-color:${BG}!important;border-color:${edge}!important;${R ? `border-radius:${R}!important;` : ""}}` +
+        `${H} .dock-bar,${H} .dock-nav{background-color:${S1}!important}${H} .dock-tab{border-bottom-color:${L1}!important}${H} .dock-ink-bar{background-color:${A}!important}` +
+        `${H} .dock-dropdown-menu,${H} .dropdown-menu,${H} .react-contextmenu,${H} .MuiMenu-paper,${H} .MuiPopover-paper{background-color:${S3}!important;border:1px solid ${L2}!important}` +
+        `${H} .dock-dropdown-menu-item:hover,${H} .dropdown-item:hover,${H} .react-contextmenu-item:hover,${H} .MuiMenuItem-root:hover{background-color:${rgba(A, 0.12)}!important}` +
+        `${H} .modal-content,${H} .MuiDialog-paper{background-color:${S2}!important;border-color:${L2}!important}` +
+        // tables (positions, orders, trades): headers, separators, row hover. Values and their colours stay as they are.
+        `${H} .MuiTableHead-root .MuiTableCell-head,${H} .rt-thead.-header{background-color:${S1}!important}` +
+        `${H} .MuiTableCell-root,${H} .rt-tr-group,${H} .rt-thead.-header{border-bottom-color:${L1}!important}` +
+        `${H} .MuiTableBody-root .MuiTableRow-root:hover,${H} .rt-tbody .rt-tr:hover{background-color:${rgba(A, 0.07)}!important}` +
+        // the order ticket: its surface and fields (Buy / Sell, their colours and every button stay TopstepX's own)
+        `${H} [class*="ordercard-module__cardWrapper"]{background-color:${BG}!important}` +
+        `${H} [class*="ordercard-module__inputContent"],${H} [class*="ordercard-module__inputMarketContent"]{background-color:${S0}!important;border-color:${L2}!important}` +
+        `${H} [class*="ordercard-module__inputContent"]:focus-within{border-color:${A}!important;box-shadow:0 0 0 1px ${rgba(A, 0.35)}!important}` +
+        `${H} [class*="dom-module__domHeader"]{background-color:${S1}!important}`;
+    }
+    const apply = () => {
+      const want = css(), here = !!document.querySelector(".dock-panel, .dock-layout, [data-tds-brand]");
+      document.documentElement.classList.toggle("bd-tsx", !!want && here);
+      if (!want || !here) { if (st) st.textContent = ""; return !here; }
+      if (!st) { st = document.createElement("style"); st.id = "bd-tsx-css"; (document.head || document.documentElement).appendChild(st); }
+      if (st.textContent !== want) st.textContent = want;
+      return false;
+    };
+    const plan = async () => { const P = window.PriismPass; let info = null; try { info = P ? await P.verify(c.pass, c.deviceId) : null; } catch {}
+      pro = P ? P.planOf(info, c.invite) === "pro" : !!(c.invite && c.invite.ok); };
+    // TopstepX builds its screen after loading: look for its panels a few times (cheap), then stop
+    const look = () => { if (apply() && ++tries < 30) setTimeout(look, 2000); };
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(KEYS, async (s) => { c = { ...KEYS, ...s }; await plan(); look(); });
+      chrome.storage.onChanged.addListener(async (ch, area) => { if (area !== "local") return; let hit = false; for (const k of Object.keys(ch)) if (k in KEYS) { c[k] = ch[k].newValue; hit = true; } if (!hit) return; if (ch.pass || ch.invite || ch.deviceId) await plan(); apply(); });
+    }
+  })();
 })();
