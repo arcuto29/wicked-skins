@@ -3510,6 +3510,9 @@
       const BG = glass ? rgba(P, 0.74) : P, L1 = rgba(mix("#ffffff", A, 0.25), 0.08), L2 = rgba(mix("#ffffff", A, 0.25), 0.13);
       const edge = c.pnStyle === "neon" || c.pnStyle === "aurora" ? rgba(A, 0.5) : c.pnStyle === "outline" ? rgba(A, 0.3) : L2, R = c.pnRound ? "10px" : null;
       const H = "html.bd-tsx", on = lum(A) > 0.55 ? "#0b0c10" : "#ffffff";
+      const barBG = glass ? rgba(S0, 0.55) : S0, blur = glass ? "backdrop-filter:blur(14px) saturate(1.2);" : "";
+      const barEdge = (o) => c.pnStyle === "neon" || c.pnStyle === "aurora" ? `inset ${o} 0 ${rgba(A, 0.6)},0 0 14px ${rgba(A, 0.16)}`
+        : c.pnStyle === "outline" ? `inset ${o} 0 ${rgba(A, 0.35)}` : `inset ${o} 0 ${L1}`;
       return `${H},${H} [data-tds-brand]{--tds-color-surface-sunken:${S0}!important;--tds-color-surface-base:${BG}!important;--tds-color-surface-raised:${S1}!important;--tds-color-surface-elevated:${S2}!important;--tds-color-surface-overlay:${S3}!important;` +
         `--tds-color-brand-panel:${glass ? rgba(P, 0.7) : P}!important;--tds-color-topstepx-panel-glass:${rgba(P, 0.7)}!important;--tds-color-brand-page:${S0}!important;--tds-brand-page-gradient:radial-gradient(ellipse at top,${rgba(A, 0.12)} 0%,${S0} 58%,#000 100%)!important;` +
         `--tds-color-border-subtle:${L1}!important;--tds-color-border-default:${L2}!important;--tds-color-accent-solid:${A}!important;--tds-color-accent-solid-hover:${mix(A, "#ffffff", 0.15)}!important;--tds-color-accent-on-solid:${on}!important;` +
@@ -3531,8 +3534,12 @@
         `${H} [class*="ordercard-module__inputContent"]:focus-within{border-color:${A}!important;box-shadow:0 0 0 1px ${rgba(A, 0.35)}!important}` +
         `${H} [class*="dom-module__domHeader"]{background-color:${S1}!important}` +
         // the left icon bar and the top account bar (found by where they are: see markBars), and their known classes
-        `${H} [data-bd-tsx="side"],${H} .sidebar .main-menu,${H} .MuiDrawer-paper{background-color:${S0}!important;box-shadow:inset -1px 0 0 ${L1}!important}` +
-        `${H} [data-bd-tsx="top"],${H} .navbar,${H} .MuiAppBar-root{background-color:${S0}!important;box-shadow:inset 0 -1px 0 ${L1}!important}` +
+        // They follow your panel settings like the panels do: Panel style (glass = see-through and frosted, over the
+        // backdrop; neon / aurora = a glowing accent edge; outline = an accent line), Rounded, colour, accent.
+        // Edges are shadows, never borders, so nothing resizes.
+        `${H} [data-testid="user-layout-container"]{background:radial-gradient(ellipse at top,${rgba(A, 0.14)} 0%,${S0} 55%,${mix(S0, "#000000", 0.5)} 100%)!important;background-color:${S0}!important}` +
+        `${H} [data-bd-tsx="side"],${H} [data-testid="sidebar-container"],${H} .sidebar .main-menu,${H} .MuiDrawer-paper{background-color:${barBG}!important;box-shadow:${barEdge("-1px 0")}!important;${blur}}` +
+        `${H} [data-bd-tsx="top"],${H} [data-testid="navbar-container"],${H} .navbar,${H} .MuiAppBar-root{background-color:${barBG}!important;box-shadow:${barEdge("0 -1px")}!important;${blur}${R ? `border-radius:0 0 ${R} ${R}!important;` : ""}}` +
         `${H} [data-bd-tsx="fill"]{background-color:transparent!important}` +
         `${H} [data-bd-tsx="field"]{background-color:${S1}!important;border-color:${L2}!important}` +
         `${H} .sidebar .main-menu ul li.active a i{background:${A}!important;color:${on}!important}`;
@@ -3554,8 +3561,10 @@
           if (el === document.documentElement || el === document.body || el.tagName === "IFRAME") continue;
           const r = el.getBoundingClientRect(); if (test(r) && r.width * r.height >= bestA) { best = el; bestA = r.width * r.height; } }   // (>=: the outer of same-size boxes)
         return best; };
-      found.side = pick([[10, Hh * 0.5], [10, Hh * 0.7], [10, Hh * 0.35]], isSide);
-      found.top = pick([[W * 0.5, 10], [W * 0.35, 10], [W * 0.65, 10], [W * 0.8, 10]], isTop);
+      // TopstepX names both bars for its own tests (data-testid, from its app code): use those first. The top bar
+      // sits in the column right of the left bar, under any banner, so it isn't always at the window's top edge.
+      found.side = document.querySelector('[data-testid="sidebar-container"]') || pick([[10, Hh * 0.5], [10, Hh * 0.7], [10, Hh * 0.35]], isSide);
+      found.top = document.querySelector('[data-testid="navbar-container"]') || pick([[W * 0.5, 10], [W * 0.35, 10], [W * 0.65, 10], [W * 0.8, 10]], isTop);
       for (const [k, el] of Object.entries(found)) {
         if (!el) continue;
         if (el.getAttribute("data-bd-tsx") !== k) el.setAttribute("data-bd-tsx", k);
@@ -3582,7 +3591,7 @@
     let barsDone = false, rsT = 0;
     addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(() => { if (document.documentElement.classList.contains("bd-tsx")) { markBars(); } }, 500); }, { passive: true });
     const apply = () => {
-      const want = css(), here = !!document.querySelector(".dock-panel, .dock-layout, [data-tds-brand]");
+      const want = css(), here = !!document.querySelector(".dock-panel, .dock-layout, [data-tds-brand], [data-testid='user-layout-container']");
       document.documentElement.classList.toggle("bd-tsx", !!want && here);
       if (!want || !here) { if (st) st.textContent = ""; return !here; }
       if (!st) { st = document.createElement("style"); st.id = "bd-tsx-css"; (document.head || document.documentElement).appendChild(st); }
