@@ -4,6 +4,8 @@
      PASS_REQUIRED  false = a saved invite counts as Pro on its own (until the licence function is deployed);
                     true  = Pro needs a signed pass from the licence function (supabase/functions/licence)
      STORE_URL      your Whop store page (Get Pro buttons)
+     LICENCE_LIVE   false = the licence function isn't deployed yet: codes are checked the old way (redeem_invite) and
+                    Whop keys can't be checked; true = once `supabase functions deploy licence` is done (LICENCES.md)
    A pass is a signed note from the licence function: { plan, src, dev, iat, exp, until }. It's checked here with the
    public key below (ECDSA P-256), for this device only, and lasts 14 days; Priism renews it once a day. Editing saved
    settings can't make one. Nothing about your charts or trading is sent anywhere. (Setup: LICENCES.md) */
@@ -12,6 +14,7 @@
   const FREE_TIER = false;
   const PASS_REQUIRED = false;
   const STORE_URL = "";
+  const LICENCE_LIVE = false;
   const PUBLIC_JWK = { kty: "EC", crv: "P-256", x: "po_7MEF1ILlVXG3EpMWwSU6P3koiNkFClC9Sry6DDYQ", y: "DPdTlvkvBkfk0rdSPOscJAxu0mH9abOX6Yag1Z_uvQY" };
 
   // ---- what Free includes ----
@@ -64,5 +67,5 @@
     if (!PASS_REQUIRED && invite && invite.ok && invite.code) return "pro";
     return FREE_TIER ? "free" : "none";
   }
-  root.PriismPass = { FREE_TIER, PASS_REQUIRED, STORE_URL, FREE_SKINS, isFreeSkin, isPro, freeValue, verify, planOf };
+  root.PriismPass = { FREE_TIER, PASS_REQUIRED, STORE_URL, LICENCE_LIVE, FREE_SKINS, isFreeSkin, isPro, freeValue, verify, planOf };
 })(typeof self !== "undefined" ? self : window);
