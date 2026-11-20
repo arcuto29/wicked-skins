@@ -1622,3 +1622,51 @@
   readCharts();
   new MutationObserver(() => { readCharts(); try { forceRepaint(true); } catch {} }).observe(document.documentElement || document, { attributes: true, attributeFilter: ["data-ws-charts"] });
 })();
+
+// ---------- Tradovate: its charts are drawn with WebGL, into one canvas the size of the window ----------
+// Each chart's dark background is a scissored clear in opaque black (its own colour). With Priism on, that one clear is
+// made see-through (same clear, alpha 0), so the wallpaper Priism places behind each chart shows; candles, grid and
+// prices are drawn by Tradovate on top as always. Nothing else in its drawing is touched. The cleared boxes are also
+// where its charts are: published on <html data-bd-tdv-panes> (CSS px) so content.js can put a wallpaper under each.
+(function tradovateGl() {
+  if (window.__bdTdvGl || !/(^|\.)tradovate\.com$/.test(location.hostname) || window !== window.top) return;
+  window.__bdTdvGl = true;
+  const H = document.documentElement;
+  let on = false;
+  const readOn = () => { const c = H.classList; on = c.contains("bd-on") && c.contains("bd-tdv") && !c.contains("bd-over-mode") && !c.contains("bd-focus"); };
+  new MutationObserver(readOn).observe(H, { attributes: true, attributeFilter: ["class"] }); readOn();
+  const seen = new Map();          // "x,y,w,h" (GL px) -> last time a chart background was cleared there
+  let pubT = 0, lastPub = "", glCanvas = null;
+  function publish() {
+    pubT = 0;
+    const now = performance.now(), cv = glCanvas; if (!cv || !cv.isConnected) return;
+    const boxes = [...seen].filter(([, t]) => now - t < 1500).map(([k]) => k.split(",").map(Number));
+    for (const [k, t] of seen) if (now - t >= 1500) seen.delete(k);
+    // the charts themselves: the outermost boxes (a chart's own panes and price scale sit inside its box)
+    const outer = boxes.filter((b) => !boxes.some((o) => o !== b && o[0] <= b[0] && o[1] <= b[1] && o[0] + o[2] >= b[0] + b[2] && o[1] + o[3] >= b[1] + b[3] && (o[2] > b[2] || o[3] > b[3])));
+    const r = cv.getBoundingClientRect(), kx = cv.width / Math.max(1, r.width), ky = cv.height / Math.max(1, r.height);
+    const css = outer.map(([x, y, w, h]) => [r.left + x / kx, r.top + (cv.height - y - h) / ky, w / kx, h / ky].map((v) => Math.round(v * 10) / 10))
+      .filter(([, , w, h]) => w >= 120 && h >= 80).sort((a, b) => (Math.abs(a[1] - b[1]) > 20 ? a[1] - b[1] : a[0] - b[0])).slice(0, 12);
+    const s = JSON.stringify(css);
+    if (s !== lastPub) { lastPub = s; H.setAttribute("data-bd-tdv-panes", s); }
+  }
+  for (const K of [window.WebGL2RenderingContext, window.WebGLRenderingContext]) {
+    if (!K) continue;
+    const P = K.prototype, oCC = P.clearColor, oClear = P.clear, cc = new WeakMap();
+    P.clearColor = function (r, g, b, a) { cc.set(this, [r, g, b, a]); return oCC.call(this, r, g, b, a); };
+    P.clear = function (mask) {
+      const c = cc.get(this), cv = this.canvas;
+      // an opaque dark clear inside a scissor box, on the page's big canvas = one chart's background
+      if (c && c[3] >= 0.99 && (mask & 0x4000) && 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] < 0.3 && cv && cv.width >= 400 && this.isEnabled(this.SCISSOR_TEST)) {
+        const b = this.getParameter(this.SCISSOR_BOX);
+        if (b && b[2] < cv.width * 0.98 && b[2] >= 60 && b[3] >= 40) {
+          glCanvas = cv; seen.set(b[0] + "," + b[1] + "," + b[2] + "," + b[3], performance.now());
+          if (!pubT) pubT = setTimeout(publish, 400);
+          if (on) { oCC.call(this, 0, 0, 0, 0); const res = oClear.call(this, mask); oCC.call(this, c[0], c[1], c[2], c[3]); return res; }
+        }
+      }
+      return oClear.call(this, mask);
+    };
+  }
+  addEventListener("resize", () => { seen.clear(); lastPub = ""; }, { passive: true });
+})();

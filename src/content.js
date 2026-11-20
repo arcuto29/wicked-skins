@@ -190,6 +190,7 @@
     // ".chart-container" is a common class name, so only count it as TradingView's own chart when it holds one.
     let all = [...document.querySelectorAll(".chart-container")].filter((el) => el.querySelector(".chart-markup-table"));
     if (!all.length) all = [...document.querySelectorAll(LW_SEL)];
+    if (!all.length && TDV) all = [...document.querySelectorAll("[data-bd-tdvpane]")];   // Tradovate: where its WebGL charts are (see tdvPanes)
     return all
       .filter((el) => !all.some((o) => o !== el && o.contains(el)))
       .map((el) => ({ el, r: el.getBoundingClientRect() }))
@@ -198,7 +199,8 @@
   }
   const LW_SEL = "[data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight']";
   let charts = [];
-  const tiled = () => charts.length > 1 && (cfg.multi !== "span" || lwMulti());
+  // Tradovate: always one wallpaper per chart, under that chart only (its panels and lists stay as they are)
+  const tiled = () => (TDV && charts.length >= 1) || (charts.length > 1 && (cfg.multi !== "span" || lwMulti()));
   // the area covered by all charts together (watermark, P&L pill, over-chart clipping)
   function chartsBox() {
     if (!charts.length) {
@@ -215,6 +217,22 @@
   // the top page numbers every chart by position, so "Chart 2" means the same thing everywhere.
   // firstNum = the number of this frame's first chart (1 on a normal page).
   const IN_FRAME = window !== window.top;
+  // Tradovate draws its charts with WebGL into one canvas as big as the window (no chart elements to find). hook.js
+  // publishes where each chart's background is cleared (<html data-bd-tdv-panes>, CSS px) and makes those clears
+  // see-through while Priism is on; here an invisible box marks each of them, so the usual per-chart wallpaper tiles
+  // go exactly under the charts.
+  const TDV = !IN_FRAME && /(^|\.)tradovate\.com$/.test(location.hostname);
+  function tdvPanes() {
+    let list = []; try { list = JSON.parse(document.documentElement.getAttribute("data-bd-tdv-panes") || "[]"); } catch {}
+    const have = [...document.querySelectorAll("[data-bd-tdvpane]")];
+    list.forEach(([x, y, w, h], i) => { let el = have[i];
+      if (!el) { el = document.createElement("div"); el.setAttribute("data-bd-tdvpane", ""); el.setAttribute("aria-hidden", "true"); document.documentElement.appendChild(el); }
+      el.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:${w}px;height:${h}px;pointer-events:none;visibility:hidden`; });
+    have.slice(list.length).forEach((el) => el.remove());
+    try { if (layer) trackLayout(); } catch {}        // (before the layer exists: nothing to move yet)
+  }
+  if (TDV) { document.documentElement.classList.add("bd-tdv"); tdvPanes();
+    new MutationObserver(tdvPanes).observe(document.documentElement, { attributes: true, attributeFilter: ["data-bd-tdv-panes"] }); }
   let firstNum = 1;
   const chartFrames = new Map();   // (top page only) frame window -> { seen, count }
   function frameRects() {
@@ -1385,6 +1403,7 @@
   // chart's own container, directly under the chart (whose background lw.js clears). Single chart + "behind" mode only.
   let embeddedHost = null, lastRebuild = 0;
   function lwHost(list = charts) {
+    if (TDV) return null;
     if (document.querySelector(".chart-markup-table")) return null;          // TradingView's own charts: not a LW page
     if (list.length !== 1) return null;
     const el = list[0].el;
@@ -1395,6 +1414,7 @@
   // gets its wallpaper, under the chart. The page's own (solid) backgrounds would hide a layer behind the page.
   let embHosts = [];
   function lwHosts(list = charts) {
+    if (TDV) return null;
     if (document.querySelector(".chart-markup-table") || list.length < 2) return null;
     const hosts = list.map((c) => { const el = c.el;
       const h = el.classList.contains("tv-lightweight-charts") || (el.hasAttribute("data-bd-lwroot") && el.tagName === "TABLE") ? el.parentElement : el;
@@ -1963,6 +1983,8 @@
   if (!IN_FRAME && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
       if (!msg || typeof msg.ws !== "string") return;
+      // Tradovate: a chart-only capture can't include its WebGL chart, so the panel takes the whole page / screen there
+      if (TDV && (msg.ws === "snapshot" || msg.ws === "capinfo" || (msg.ws === "clip" && msg.mode !== "screen"))) return;
       if (msg.ws === "layout") reply({ count: chartCount() });
       if (msg.ws === "numbers") { showNumbers(+msg.n || 0); reply({ count: chartCount() }); }
       if (msg.ws === "symbol") { const q = parseTitle(); reply({ symbol: q ? q.sym : "" }); }
@@ -3389,7 +3411,7 @@
   // platform's embedded chart iframe). Other frames / pages of an enabled site are left untouched.
   // Advanced Charts (.chart-container) OR Lightweight Charts (.tv-lightweight-charts) — the wallpaper layer and
   // activation work for both; the candle recolour engine for each lives in hook.js / lw.js respectively.
-  const CHART_SEL = ".chart-markup-table, .chart-container, [data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight']";
+  const CHART_SEL = ".chart-markup-table, .chart-container, [data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight'], [data-bd-tdvpane]";
   // a real chart: one at least 400 x 250, or several smaller ones that together fill that much (a 2- or 3-chart layout
   // on a small window). Mini charts (sparklines, a watchlist's tiny previews) are below 200 x 140 and don't count.
   const bigChart = () => { let area = 0;
