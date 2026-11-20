@@ -33,6 +33,7 @@
     if (s.sites.some((x) => x.origin === origin) || s.siteOfferNo[origin]) return;
     let tries = 0;
     const look = () => {
+      if (window.__bdContentAlive) return;   // Priism already runs on this page (content.js, same extension world): nothing to offer
       const found = chartFrames();
       if (found) return show(found);
       if (++tries < 120) setTimeout(look, tries < 40 ? 1500 : 5000);   // a platform can take a while to open its chart

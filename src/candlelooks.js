@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks && window.__bdCandleLooks.fxv >= 3) return;   // an older copy (before an update) is replaced
+  if (window.__bdCandleLooks && window.__bdCandleLooks.fxv >= 5) return;   // an older copy (before an update) is replaced: keep this number the same as fxv below
   // Lite (Power saver, Auto quality easing off, or the safety floor while trading is slowed down; set by hook.js /
   // lw.js from content.js): glows on the chart are drawn without their blur. Canvas blur is the costliest thing on a
   // chart, most of all without a fast graphics card, and every glow is redrawn on each move of the crosshair.
@@ -495,6 +495,8 @@
     slots.set(orig, i); return i; };
   const isHex = (h) => /^#[0-9a-f]{6}$/i.test(h || "");
   const shade = (hex, deg) => toHex(hueRotate(rgbOf(hex), deg));
+  // the same hue and saturation, lifted so its brightest channel is full (a deep shade's glow that still shows)
+  const bright = (hex) => { if (!isHex(hex)) return hex; const c = rgbOf(hex), m = Math.max(...c); return m >= 200 || !m ? hex : toHex(c.map((v) => Math.round((v * 255) / m))); };
   // the wallpaper's own colours (set by hook.js / lw.js from what the page measured), for "Wallpaper"
   let wallCols = [];
   function setWallColors(a) { wallCols = Array.isArray(a) ? a.filter(isHex).slice(0, 5) : []; }
@@ -675,7 +677,9 @@
       return { s: gr, g: rb ? hsl(off + 180) : G[1] };
     }
     const P = memo("ind|" + o.mode + o.color + o.up + o.down + o.accent + (o.mode === "wallpaper" ? wallCols.join("") : ""), () => indPalette(o));
-    return P ? { s: withAlpha(P[i % P.length], al), g: P[i % P.length] } : null;
+    // the glow: the line's own hue at full brightness. Custom's deeper shades (half your colour, half black) would
+    // otherwise glow dark on a dark chart and all but vanish; the line itself keeps its shade.
+    return P ? { s: withAlpha(P[i % P.length], al), g: o.mode === "custom" ? bright(P[i % P.length]) : P[i % P.length] } : null;
   }
 
   // ---------- chart text (Style > Chart text): text indicators draw ON the chart (labels, levels, values, prints) ----------
@@ -998,5 +1002,5 @@
     return a ? { s: a.s, g: a.g, glow: gl } : null;
   }
 
-  window.__bdCandleLooks = { fxv: 4, spot, shapeBox, marker, MARK_MODES, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
+  window.__bdCandleLooks = { fxv: 5, spot, shapeBox, marker, MARK_MODES, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
 })();
