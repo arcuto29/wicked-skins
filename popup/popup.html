@@ -462,7 +462,9 @@
         <p class="hint">Hides your money on screen and in clips while you stream or record. You choose what viewers see.</p>
         <div class="row"><span>P&amp;L on your trades</span><div class="seg" id="privacyPnl"></div></div>
         <p class="hint" id="privacyPnlHint"></p>
-        <div class="row"><span style="flex:1;white-space:nowrap">Blur account panel</span><label class="switch" title="Balance, positions and history at the bottom"><input type="checkbox" id="privacyAcct" /><span></span></label></div>
+        <div class="row"><span style="flex:1;white-space:nowrap">Blur account panel</span><label class="switch" title="Balance, positions and history at the bottom. On TopstepX: the account box and balances at the top"><input type="checkbox" id="privacyAcct" /><span></span></label></div>
+        <div class="row" id="tsxAcctRow"><span>Account box label</span><input type="text" id="tsxAcctLabel" class="field" maxlength="24" placeholder="Your name or handle" /></div>
+        <p class="hint" id="tsxAcctHint">On TopstepX, the account box shows this instead of your account, and the balances are blurred. A name only: no amounts or account types.</p>
         <div class="row"><span style="flex:1;white-space:nowrap">Blur order panel</span><label class="switch" title="The Buy / Sell panel on the right. Off = you can still see and use it"><input type="checkbox" id="privacyOrder" /><span></span></label></div>
         <div class="row"><span>Blurred panels under your mouse</span><div class="seg" id="privacyPeek"></div></div>
       </details>
