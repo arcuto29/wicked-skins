@@ -1,8 +1,9 @@
-/* Invite only: Priism needs an invite code before it draws anything (extension, desktop app, Android).
-   The code is checked with the Workshop backend (Supabase): redeem_invite(code, device) -> ok | invalid | revoked | full.
-   Only the code you typed and a random id for this copy of Priism are sent; nothing about your charts or account.
+/* Unlocking Priism: an invite code or a Priism Pro licence key (Whop), entered in the panel (extension, desktop, Android).
+   Checked by the licence function on the Workshop backend (supabase/functions/licence), which answers with a signed
+   pass (see src/pass.js); before that function is deployed, invites are checked with redeem_invite as before.
+   Only the code / key you typed and a random id for this copy of Priism are sent; nothing about your charts or account.
    Shared by the panel (popup.js) and the extension's background worker (bg.js). Stored as
-   invite = { code, ok, status, checked (last answer from the server), since }   and   deviceId = random id. */
+   invite = { code, ok, status, checked, since, plan, until, manage },  pass = the signed pass,  deviceId = random id. */
 (function (root) {
   const CFG = () => root.WORKSHOP_CONFIG || {};
   const RECHECK_MS = 24 * 3600e3;            // ask again at most once a day (revoked codes lock within a day)
@@ -17,34 +18,56 @@
     await put({ deviceId: id }); return id;
   }
   const app = () => (root.wickedStore ? "desktop" : root.PriismNative ? "android" : "extension");
-  // ask the server about a code: "ok" | "invalid" | "revoked" | "full" | "offline"
-  async function ask(code) {
-    const c = CFG(); if (!c.url || !c.anonKey) return "offline";
+  // POST to the backend (8 s timeout) -> { http, body } or null when unreachable
+  async function post(path, body) {
+    const c = CFG(); if (!c.url || !c.anonKey) return null;
     const ctl = typeof AbortController === "function" ? new AbortController() : null, t = setTimeout(() => ctl && ctl.abort(), 8000);
     try {
-      const r = await fetch(c.url.replace(/\/$/, "") + "/rest/v1/rpc/redeem_invite", { method: "POST", signal: ctl && ctl.signal,
-        headers: { apikey: c.anonKey, Authorization: "Bearer " + c.anonKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ p_code: tidy(code), p_device: await deviceId(), p_app: app() }) });
-      if (!r.ok) return "offline";
-      const v = await r.json(); return ["ok", "invalid", "revoked", "full"].includes(v) ? v : "offline";
-    } catch { return "offline"; } finally { clearTimeout(t); }
+      const r = await fetch(c.url.replace(/\/$/, "") + path, { method: "POST", signal: ctl && ctl.signal,
+        headers: { apikey: c.anonKey, Authorization: "Bearer " + c.anonKey, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      let b = null; try { b = await r.json(); } catch {}
+      return { http: r.status, body: b };
+    } catch { return null; } finally { clearTimeout(t); }
   }
-  // you typed a code in the panel
+  // ask the server about a code or licence key -> { status: "ok" | "invalid" | "revoked" | "full" | "expired" | "offline",
+  // pass?, plan?, until?, manage? }. The licence function (supabase/functions/licence) knows invites AND Whop keys and
+  // answers with a signed pass; until it's deployed, invites are checked the old way (no pass).
+  async function ask(code, action) {
+    const key = String(code || "").trim().slice(0, 64), dev = await deviceId();
+    const r = await post("/functions/v1/licence", { key, device: dev, app: app(), action: action || "check" });
+    if (r && r.http === 200 && r.body && typeof r.body.status === "string") return r.body;
+    if (r && r.http !== 404) return { status: "offline" };
+    if (action === "release") return { status: "ok" };
+    const old = await post("/rest/v1/rpc/redeem_invite", { p_code: tidy(code), p_device: dev, p_app: app() });   // no licence function yet
+    if (!old || old.http !== 200) return { status: "offline" };
+    return { status: ["ok", "invalid", "revoked", "full"].includes(old.body) ? old.body : "offline" };
+  }
+  const record = (code, r, since) => ({ code, ok: r.status === "ok", status: r.status, checked: Date.now(), since: since || Date.now(),
+    plan: r.plan || (r.status === "ok" ? "pro" : ""), until: r.until || null, manage: r.manage || null });
+  // you typed a code or key in the panel
   async function redeem(code) {
-    const status = await ask(code);
-    if (status === "ok") { const inv = { code: tidy(code), ok: true, status, checked: Date.now(), since: Date.now() }; await put({ invite: inv }); return inv; }
-    return { ok: false, status };
+    const k = String(code || "").trim(), r = await ask(k);
+    // (invite codes are saved in capitals; a Whop key exactly as typed)
+    if (r.status === "ok") { const inv = record(r.src === "whop" ? k : tidy(k), r); await put({ invite: inv, pass: r.pass || "" }); return inv; }
+    return { ok: false, status: r.status };
   }
-  // now and then: is the saved code still good? A revoked / deleted code locks Priism again; no internet keeps it as is.
+  // now and then: is the saved code / key still good? A revoked or ended one locks Pro again; no internet keeps it
+  // as is (a pass lasts 14 days, so going offline for a while is fine).
   async function recheck(force) {
     const { invite } = await get({ invite: null });
     if (!invite || !invite.code) return invite;
     if (!force && Date.now() - (invite.checked || 0) < RECHECK_MS) return invite;
-    const status = await ask(invite.code);
-    if (status === "offline") return invite;
-    const next = { ...invite, ok: status === "ok", status, checked: Date.now() };
-    await put({ invite: next }); return next;
+    const r = await ask(invite.code);
+    if (r.status === "offline") return invite;
+    const next = record(invite.code, r, invite.since);
+    await put({ invite: next, pass: r.status === "ok" ? r.pass || "" : "" }); return next;
+  }
+  // "Sign out on this device": frees this device on the key (so it can be used on another one), then forgets it here
+  async function release() {
+    const { invite } = await get({ invite: null });
+    if (invite && invite.code) await ask(invite.code, "release");
+    await put({ invite: null, pass: "" });
   }
   const isOk = (inv) => !!(inv && inv.ok && inv.code);
-  root.PriismInvite = { redeem, recheck, isOk, deviceId, tidy };
+  root.PriismInvite = { redeem, recheck, release, isOk, deviceId, tidy };
 })(typeof self !== "undefined" ? self : window);
