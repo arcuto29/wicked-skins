@@ -3497,7 +3497,7 @@
   //    surfaces. Only colours, borders and corner radius: nothing moves, resizes or changes how it works.
   // One stylesheet, no observers; if TopstepX changes these parts, the rules simply stop matching.
   if (window === window.top && (/(^|\.)(topstepx|projectx)\.com$/.test(location.hostname) || document.documentElement.hasAttribute("data-tds-brand"))) (function topstepx() {
-    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look" };
+    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look", privacy: false, privacyAcct: true, tsxAcctLabel: "" };
     let c = { ...KEYS }, st = null, tries = 0, pro = false;
     const hex = (h) => /^#[0-9a-f]{6}$/i.test(h || "") ? h : null;
     const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), toHex = (a) => "#" + a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
@@ -3696,11 +3696,47 @@
     };
     const plan = async () => { const P = window.PriismPass; let info = null; try { info = P ? await P.verify(c.pass, c.deviceId) : null; } catch {}
       pro = P ? P.planOf(info, c.invite) === "pro" : !!(c.invite && c.invite.ok); };
+    // Streamer mode on TopstepX (Streamer mode › Blur account panel): the account box at the top shows your label instead
+    // of the account, and the balances next to it (BAL, DMLL, RP&L, UP&L) are blurred, on screen and in captures. Only
+    // how it looks changes: the box still opens its account list, and nothing is read or sent.
+    // The label is a name, never account details: it can't hold amounts, numbers or account words (live, funded,
+    // practice…), so a picture can't pass for an account it isn't. Shown with an eye, so viewers know it's hidden.
+    const ACCT_RE = /\b(practice|combine|express|funded|live|xfa|eval)\b|\(\s*(…|\.\.\.)\s*\d{2,}\s*\)/i;
+    const MONEY_RE = /[-+]?\$\s*[-+]?[\d,]+(\.\d+)?|^[-+]?[\d,]+\.\d{2}$/;
+    const BAD_LABEL = /\d|[$€£¥%]|\b(live|funded|fund|practice|combine|express|xfa|eval|evaluation|account|acct|payout|pa|demo|sim|real|prop|balance|k)\b/i;
+    const cleanLabel = (t) => { const v = String(t || "").replace(/\s+/g, " ").trim().slice(0, 24); return v && !BAD_LABEL.test(v) ? v : ""; };
+    let privT = 0, privCss = null;
+    function markPriv() {
+      const top = document.querySelector('[data-testid="navbar-container"], [data-bd-tsx="top"]'); if (!top) return;
+      for (const el of top.querySelectorAll("*")) {
+        if (el.closest("#bd-tsx-logo") || el.children.length > 3) continue;
+        const t = (el.textContent || "").trim(); if (!t || t.length > 60) continue;
+        if (ACCT_RE.test(t) && ![...el.children].some((k) => ACCT_RE.test(k.textContent || ""))) {      // the smallest box with the account in it…
+          const box = el.closest('[data-bd-tsx="field"], [role="button"], [role="combobox"], button') || el;   // …or the picker it sits in
+          if (top.contains(box)) box.setAttribute("data-bd-tsx-acct", "");
+        } else if (MONEY_RE.test(t) && ![...el.children].some((k) => MONEY_RE.test(k.textContent || ""))) el.setAttribute("data-bd-tsx-money", "");
+      }
+    }
+    function applyPriv() {
+      const on = !!(c.enabled && c.privacy && c.privacyAcct !== false && pro), H = document.documentElement;
+      H.classList.toggle("bd-tsx-priv", on); clearInterval(privT); privT = 0;
+      if (!privCss) { privCss = document.createElement("style"); privCss.id = "bd-tsx-priv-css"; (document.head || H).appendChild(privCss); }
+      if (!on) { privCss.textContent = ""; return; }
+      const label = (cleanLabel(c.tsxAcctLabel) || "Streamer mode").replace(/["\\]/g, "");
+      privCss.textContent = `html.bd-tsx-priv [data-bd-tsx-acct]{position:relative!important;color:transparent!important;text-shadow:none!important}` +
+        `html.bd-tsx-priv [data-bd-tsx-acct] *{color:transparent!important;fill:transparent!important;text-shadow:none!important}` +
+        // (a crossed-out eye before the label: viewers can tell the account is hidden)
+        `html.bd-tsx-priv [data-bd-tsx-acct]::after{content:"${label}";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:0 8px 0 26px;` +
+        `background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23c9cdd8' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M3 3l18 18'/%3E%3C/svg%3E") no-repeat 9px center/13px;` +
+        `color:#e6e8ef;font-weight:700;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}` +
+        `html.bd-tsx-priv [data-bd-tsx-money]{filter:blur(6px)!important}`;
+      markPriv(); privT = setInterval(() => { if (!document.hidden) markPriv(); }, 1000);   // TopstepX redraws its bar as numbers change
+    }
     // TopstepX builds its screen after loading: look for its panels a few times (cheap), then stop
     const look = () => { if (apply() && ++tries < 30) setTimeout(look, 2000); };
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(KEYS, async (s) => { c = { ...KEYS, ...s }; await plan(); look(); });
-      chrome.storage.onChanged.addListener(async (ch, area) => { if (area !== "local") return; let hit = false; for (const k of Object.keys(ch)) if (k in KEYS) { c[k] = ch[k].newValue; hit = true; } if (!hit) return; if (ch.pass || ch.invite || ch.deviceId) await plan(); apply(); });
+      chrome.storage.local.get(KEYS, async (s) => { c = { ...KEYS, ...s }; await plan(); look(); applyPriv(); });
+      chrome.storage.onChanged.addListener(async (ch, area) => { if (area !== "local") return; let hit = false; for (const k of Object.keys(ch)) if (k in KEYS) { c[k] = ch[k].newValue; hit = true; } if (!hit) return; if (ch.pass || ch.invite || ch.deviceId) await plan(); apply(); applyPriv(); });
     }
   })();
 })();
