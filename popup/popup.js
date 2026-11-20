@@ -2811,6 +2811,7 @@ async function siteBar() {
         }
       }
       if (window.TradingView || window.tvWidget) chart = true;
+      if (/(^|\.)tradovate\.com$/.test(location.hostname) && document.querySelector("canvas#c")) chart = true;   // Tradovate's WebGL charts
       return { chart, frames: [...frames] };
     } });
     found = res.result || found;
