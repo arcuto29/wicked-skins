@@ -26,6 +26,16 @@ GitHub Actions (`.github/workflows/release.yml`) then:
 Pull requests run `ci.yml`: syntax and manifest checks, the extension build, and a **desktop smoke test**
 that launches the real app against TradingView and uploads screenshots.
 
+## Two repos: private code, public releases
+- **`arcuto29/priism-app` (private):** all the code, tests and history. Tags, CI and builds run here.
+- **`arcuto29/wicked-skins` (public):** only the GitHub Releases (downloads + the desktop app's auto-update files) and
+  the website (`gh-pages` branch → https://arcuto29.github.io/wicked-skins/). Never push code here.
+
+The workflows publish to the public repo with the **`PUBLIC_REPO_TOKEN`** secret (in `priism-app` → Settings →
+Secrets and variables → Actions). It's a fine-grained personal access token limited to **only** `arcuto29/wicked-skins`,
+with **Contents: Read and write**. When it expires, make a new one and replace the secret; releases and the website
+fail with "Add the PUBLIC_REPO_TOKEN secret" until then.
+
 ## One-time setup
 ### Chrome Web Store (auto-updates for extension users)
 1. Register as a Chrome Web Store developer (one-time $5 fee) at https://chrome.google.com/webstore/devconsole.
