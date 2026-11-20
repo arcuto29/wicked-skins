@@ -7,17 +7,18 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <!-- Invite only: until this copy has a working invite code, this covers the panel -->
+  <!-- Unlock: until this copy has a licence key or invite code (or chooses Free, when it's open), this covers the panel -->
   <div id="inviteGate" class="invite-gate" hidden>
     <div class="ig-card">
+      <button id="igClose" class="ig-close" type="button" title="Close" hidden>&times;</button>
       <div class="ig-mark"><img src="../icons/icon-128.png" alt="" class="ig-logo" /></div>
       <div class="ig-word">PRIISM SKINS</div>
-      <h2>Priism is invite only</h2>
-      <p id="igLead">Enter the invite code you were given to start skinning your charts.</p>
-      <input id="igCode" class="field" placeholder="PRIISM-XXXX-XXXX" maxlength="40" autocomplete="off" spellcheck="false" />
-      <button id="igGo" class="primary">Unlock Priism</button>
+      <h2>Unlock Priism</h2>
+      <p id="igLead">Enter your Priism Pro licence key or an invite code.</p>
+      <input id="igCode" class="field" placeholder="Licence key or invite code" maxlength="64" autocomplete="off" spellcheck="false" />
+      <button id="igGo" class="primary">Unlock</button>
       <p class="hint" id="igMsg"></p>
-      <p class="hint ig-foot">No code? Ask whoever invited you.</p>
+      <p class="hint ig-foot">No key yet? <button id="igGet" class="link" type="button">Get Priism Pro</button></p>
     </div>
   </div>
   <nav id="nav">
@@ -33,6 +34,8 @@
   </nav>
 
   <main>
+    <div id="proBar" class="pro-bar" hidden><span><b>Priism Free</b> · 6 wallpapers and candle colours</span>
+      <button id="proBarGet" class="primary" type="button">Get Pro</button><button id="proBarKey" type="button">Enter key</button></div>
     <div id="deskCard" class="sitebar" hidden>
       <div><b id="deskTitle"></b><p class="hint" id="deskHint"></p></div>
       <button id="deskBtn" class="primary"></button>
@@ -557,6 +560,13 @@
     </section>
 
     <section id="tab-tune" hidden>
+      <details class="grp" data-grp="plan" open id="planBox">
+        <summary>Plan</summary>
+        <div class="row"><span id="planName">No plan</span></div>
+        <p class="hint" id="planHint"></p>
+        <div class="row plan-btns"><button id="planGet" class="primary" type="button">Get Priism Pro</button><button id="planKey" type="button">Enter a key</button>
+          <button id="planManage" type="button" hidden>Manage billing</button><button id="planOut" class="link" type="button" hidden>Sign out on this device</button></div>
+      </details>
 
 
 
@@ -601,6 +611,7 @@
   <script src="../vendor/supabase/supabase.js"></script>
   <script src="../src/workshop-config.js"></script>
   <script src="../src/invite.js"></script>
+  <script src="../src/pass.js"></script>
   <script src="../src/workshop.js"></script>
   <script src="../src/sites.js"></script>
   <script src="../src/migrate.js"></script>

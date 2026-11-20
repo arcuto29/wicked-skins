@@ -1,6 +1,6 @@
 /* "Turn on Priism Skins here?" on trading platforms Priism knows (manifest: the offer.js content script and its
    host_permissions). It only runs in the top page, and only until you answer.
-   - Already on for this site (sites.js), Priism turned off, or not invited: nothing.
+   - Already on for this site (sites.js), Priism turned off, or no plan (no code / key, and Free isn't open): nothing.
    - A chart shows up: a small card offers to turn it on. One click and the background worker registers the site
      (sites.js enable), then the page reloads skinned. No trip to the toolbar icon, so it works in an installed
      platform app window too (TopstepX installed from Chrome), where there is no toolbar.
@@ -29,7 +29,7 @@
   };
   chrome.storage.local.get({ sites: [], siteOfferNo: {}, enabled: true, invite: null }, (s) => {
     if (chrome.runtime.lastError) return;
-    if (s.enabled === false || !(s.invite && s.invite.ok)) return;
+    if (s.enabled === false || !((s.invite && s.invite.ok) || (window.PriismPass && window.PriismPass.FREE_TIER))) return;   // (an invite / key, or Free is open)
     if (s.sites.some((x) => x.origin === origin) || s.siteOfferNo[origin]) return;
     let tries = 0;
     const look = () => {

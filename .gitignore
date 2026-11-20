@@ -6,3 +6,6 @@ desktop/dist/
 notes.md
 desktop/test-output/
 site/lib/
+
+# signing keys for Priism passes: never commit (LICENCES.md)
+PRIVATE-*.json

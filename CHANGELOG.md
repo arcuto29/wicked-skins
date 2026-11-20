@@ -9,6 +9,18 @@
   - Match everything covers markers too.
   - Only the colour changes: where a marker sits, its shape and its text stay as the platform draws them. Candles and zones are untouched.
 
+## Unreleased
+
+### Priism Pro (Whop licence keys)
+- **Plans.** Priism Pro is unlocked with a licence key from Whop, entered in the same box as invite codes. Invite codes
+  keep working and count as Pro. Settings › **Plan** shows your plan, its renewal date, **Manage billing**, and
+  **Sign out on this device**, which frees the device so the key can go on another one. A key works on up to 3 devices.
+- **Free** (ready, switched off until launch): 6 wallpapers and candle colours, with the Priism watermark. Pro
+  features show a PRO tag and explain instead of doing nothing. Your Pro settings stay saved and come back with Pro.
+- **Safer unlock.** The licence check answers with a signed pass for this device, which lasts 14 days and is renewed
+  daily. Editing saved settings can't unlock Pro. Nothing about your charts or trading is sent.
+- Setup and launch steps: LICENCES.md.
+
 ## 0.1.86 (2026-11-04)
 
 ### Trading comes first

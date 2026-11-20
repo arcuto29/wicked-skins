@@ -4,6 +4,9 @@ if (window.wickedStore && !(window.chrome && window.chrome.storage)) {
   catch { window.chrome = { storage: window.wickedStore.storage }; }
 }
 const $ = (id) => document.getElementById(id);
+// your plan: "pro" | "free" | "none" (see the plans section further down, and src/pass.js)
+let PLAN = "none", planInfo = null;
+const PP = window.PriismPass;
 // Small inline icons (some system fonts lack ↖ ✕ etc.)
 const ICON_X = '<svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
 const cornerIcon = (x, y) => `<svg viewBox="0 0 16 12" width="18" height="14" aria-hidden="true"><rect x="0.75" y="0.75" width="14.5" height="10.5" rx="2" fill="none" stroke="currentColor" stroke-opacity=".55"/><rect x="${x}" y="${y}" width="5" height="3" rx="1" fill="currentColor"/></svg>`;
@@ -112,15 +115,15 @@ function renderSkins() {
     if (!grouped && (activeCat === "Wow" ? !s.wow : activeCat === "OLED" ? !s.oled : activeCat !== "All" && s.cat !== activeCat)) continue;
     if (!matchQ(s.name, s.cat, (s.wow ? "wow " : "") + (s.oled ? "oled" : ""))) continue;
     shown++;
-    const card = document.createElement("button");
-    card.className = "card" + (currentSrc() === id ? " on" : "");
+    const card = document.createElement("button"), pro = PLAN === "free" && !PP.isFreeSkin(id);
+    card.className = "card" + (currentSrc() === id ? " on" : "") + (pro ? " pro" : ""); card.dataset.skin = id;
     const cv = document.createElement("canvas");
     const CW = big ? 260 : 160, CH = big ? 128 : 76;
     cv.width = CW; cv.height = CH;
     const skin = makeSkin(id, cv.getContext("2d")); skin.resize(CW, CH);
     previews.push(watchPreview({ skin, t: 0, id, cv }, cv));
     card.append(cv);
-    card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span>${s.oled ? '<span class="wtag oled" title="Mostly true black and no bright part that stays still: easy on OLED screens">OLED</span>' : ""}<div class="label">${esc(s.name)}</div>`);
+    card.insertAdjacentHTML("beforeend", `<span class="live">● LIVE</span>${pro ? '<span class="wtag pro">PRO</span>' : ""}${s.oled ? '<span class="wtag oled" title="Mostly true black and no bright part that stays still: easy on OLED screens">OLED</span>' : ""}<div class="label">${esc(s.name)}</div>`);
     card.onclick = () => pickSource(id);
     $("skinCards").appendChild(card);
   }
@@ -2246,13 +2249,14 @@ function syncTune() {
     if ((key === "posX" || key === "posY") && cfg.skin !== "media") return;
     if (key === "overOpacity" && cfg.layer !== "over") return;
     if (key === "opacity" && cfg.layer === "over") return;
-    const row = document.createElement("div"); row.className = "row";
+    const row = document.createElement("div"); row.className = "row"; row.dataset.key = key;
     row.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
     const inp = row.querySelector("input"), out = row.querySelector("output");
     inp.value = cfg[key]; out.textContent = fmt(+cfg[key]);
     inp.oninput = () => { set({ [key]: +inp.value }); out.textContent = fmt(+inp.value); };
     inp.ondblclick = () => { inp.value = DEFAULTS[key]; inp.oninput(); }; // double-click resets
     $("sliders").appendChild(row);
+    if (PLAN === "free" && PP.isPro(key)) proLock(row, label);
   });
   document.querySelectorAll("[data-only=media]").forEach((el) => (el.hidden = cfg.skin !== "media"));
   // the wallpaper in black & white (candles, indicators and the rest of the chart keep their colours)
@@ -2903,35 +2907,100 @@ async function updates() {
   }
 }
 
-// ---------- invite only ----------
-// Until this copy has a working invite code, the gate covers the panel (and content.js draws nothing on charts).
-// The saved code is re-checked now and then (bg.js daily; here when the panel opens, if it's been a day).
+// ---------- plans: an invite code or a Pro licence key, or Free (src/pass.js, src/invite.js) ----------
+// No plan yet: the gate covers the panel (and content.js draws nothing). Free (when it's open): the panel works, and
+// what's Pro shows a PRO tag and asks you to upgrade instead. The code / key is re-checked now and then (bg.js daily,
+// here when the panel opens if it's been a day). The chart holds Pro settings back on Free by itself (content.js);
+// the locks here just say so instead of letting a control seem to do nothing.
+const storeUrl = () => (PP && PP.STORE_URL) || (window.WORKSHOP_CONFIG && WORKSHOP_CONFIG.storeUrl) || "";
+function openStore() { const u = storeUrl(); if (!u) { toast("The Priism Pro store opens soon."); return; } try { if (EXT_MODE && chrome.tabs) chrome.tabs.create({ url: u }); else window.open(u, "_blank"); } catch { window.open(u, "_blank"); } }
+function proOnly(what) { toast(`${what} ${/s$/.test(what) ? "are" : "is"} part of Priism Pro.`, openStore, "Get Pro"); }
+// Pro parts of the panel on Free: whole tabs, sections and rows (made inert, with a PRO chip that explains)
+const PRO_TABS = ["tab-interface", "tab-trading", "tab-capture", "tab-workshop", "tab-loadouts", "tab-media"];
+const PRO_GRPS = ["wallopts", "motion", "charts", "sessions", "symbols", "candlefx", "chart", "scale", "patterns", "lens"];
+const PRO_ROWS = ["candleLook", "closedRow", "shiftRow", "candleWick", "candleBorder", "candleBorderW", "candleHollow", "candleWickW", "candleBodyW", "partsPreview", "atmoAura", "vignetteAt", "smartDim", "matchAll", "styleChartBar", "autoMatch", "keepBg"];
+function proLock(el, what) {
+  if (!el || el.classList.contains("pro-locked")) return;
+  el.classList.add("pro-locked"); el.inert = true;
+  const chip = document.createElement("button"); chip.className = "pro-chip"; chip.type = "button"; chip.textContent = "PRO";
+  chip.title = "Part of Priism Pro"; chip.onclick = () => proOnly(what || "This");
+  el.before(chip);
+}
+function applyLocks() {
+  document.querySelectorAll(".pro-chip").forEach((c) => c.remove());
+  document.querySelectorAll(".pro-locked").forEach((el) => { el.classList.remove("pro-locked"); el.inert = false; });
+  document.body.classList.toggle("plan-free", PLAN === "free");
+  if (PLAN !== "free") return;
+  for (const id of PRO_TABS) { const t = $(id); if (t) for (const el of [...t.children]) proLock(el, "This tab"); }
+  for (const g of PRO_GRPS) document.querySelectorAll(`details.grp[data-grp="${g}"]`).forEach((el) => proLock(el, (el.querySelector("summary") || {}).textContent || "This"));
+  for (const id of PRO_ROWS) { const el = $(id); if (el) proLock(el.closest(".row") || el, "This"); }
+  document.querySelectorAll("#sliders .row[data-key]").forEach((r) => { if (PP.isPro(r.dataset.key)) proLock(r, "This"); });
+}
+// cards that are drawn again and again (wallpapers, looks, Candle FX mixes, your saved candles): one listener
+document.addEventListener("click", (e) => {
+  if (PLAN !== "free") return;
+  const c = e.target.closest && e.target.closest("#skinCards .card.pro, #quickLooks .card, #candleCards .fxmixcard, #candleCards .card.preset.mine, #candleCards .card.preset.save");
+  if (!c) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  proOnly(c.closest("#skinCards") ? "Every wallpaper" : c.closest("#quickLooks") ? "Looks" : "Candle FX and saved styles");
+}, true);
+async function readPlan() {
+  const s = await new Promise((r) => chrome.storage.local.get({ invite: null, pass: "", deviceId: "" }, r));
+  const info = PP ? await PP.verify(s.pass, s.deviceId) : null;
+  PLAN = PP ? PP.planOf(info, s.invite) : PriismInvite.isOk(s.invite) ? "pro" : "none";
+  planInfo = { info, invite: s.invite };
+  return s.invite;
+}
+function renderPlan() {
+  const box = $("planBox"); if (!box) return;
+  const inv = planInfo && planInfo.invite, info = planInfo && planInfo.info, life = (info && info.plan === "lifetime") || (inv && inv.plan === "lifetime");
+  const until = (info && info.until) || (inv && inv.until), invite = info ? info.src === "invite" : inv && !inv.manage;
+  const when = until ? new Date(until).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+  $("planName").textContent = PLAN === "pro" ? (life ? "Priism Pro \u00B7 Lifetime" : invite ? "Priism Pro \u00B7 invite" : "Priism Pro") : PLAN === "free" ? "Priism Free" : "No plan";
+  $("planHint").textContent = PLAN === "pro" ? (life ? "Yours for good, with every update." : when ? `Renews ${when}.` : "Everything is unlocked.")
+    : `6 wallpapers and candle colours, with the Priism watermark. Pro unlocks all ${Object.keys(WickedSkins).length} wallpapers, Signature looks, candle styles and FX, zones, the TradingView tab, trading tools and clips.`;
+  $("planGet").hidden = PLAN === "pro"; $("planKey").hidden = PLAN === "pro";
+  $("planManage").hidden = !(inv && inv.manage); $("planManage").onclick = () => { try { chrome.tabs.create({ url: inv.manage }); } catch { window.open(inv.manage, "_blank"); } };
+  $("planOut").hidden = !(inv && inv.code);
+  $("proBar").hidden = PLAN !== "free";
+}
 async function inviteGate() {
   if (!window.PriismInvite) return;
-  const show = (inv) => {
-    const gate = $("inviteGate"), ok = PriismInvite.isOk(inv);
-    gate.hidden = ok; if (ok) return;
-    const why = inv && inv.status === "revoked" ? "This invite code has been turned off. Ask for a new one to keep using Priism."
-      : inv && inv.status === "invalid" ? "Your invite code isn't valid any more. Enter a new one." : "Enter the invite code you were given to start skinning your charts.";
-    $("igLead").textContent = why;
-    setTimeout(() => $("igCode").focus(), 50);
+  const gate = $("inviteGate");
+  const show = async (force) => {
+    const was = PLAN, inv = await readPlan();
+    gate.hidden = PLAN !== "none" && !force; $("igClose").hidden = PLAN === "none";
+    applyLocks(); renderPlan();
+    if (PLAN !== was) setTimeout(() => { try { renderSkins(); renderQuick(); } catch {} }, 0);   // PRO tags on / off
+    if (!gate.hidden) {
+      const why = inv && inv.status === "revoked" ? "This code has been turned off. Enter a new one, or get Priism Pro."
+        : inv && inv.status === "expired" ? "Your Priism Pro membership has ended. Renew it on Whop, or enter another key."
+        : inv && inv.status === "invalid" ? "Your code or key isn't valid any more. Enter a new one." : "Enter your Priism Pro licence key or an invite code.";
+      $("igLead").textContent = why; setTimeout(() => $("igCode").focus(), 50);
+    }
   };
-  let { invite } = await new Promise((r) => chrome.storage.local.get({ invite: null }, r));
-  show(invite);
-  if (invite && invite.code) PriismInvite.recheck(false).then(show).catch(() => {});
+  await show();
+  const { invite } = await new Promise((r) => chrome.storage.local.get({ invite: null }, r));
+  if (invite && invite.code) PriismInvite.recheck(false).then(() => show()).catch(() => {});
   const go = async () => {
-    const code = PriismInvite.tidy($("igCode").value); const msg = $("igMsg");
-    if (code.length < 8) { msg.className = "hint bad"; msg.textContent = "That doesn't look like an invite code."; return; }
+    const code = $("igCode").value.trim(), msg = $("igMsg");
+    if (code.replace(/[^A-Za-z0-9]/g, "").length < 6) { msg.className = "hint bad"; msg.textContent = "That doesn't look like a licence key or invite code."; return; }
     $("igGo").disabled = true; msg.className = "hint"; msg.textContent = "Checking\u2026";
     const r = await PriismInvite.redeem(code);
     $("igGo").disabled = false;
-    if (r.ok) { msg.textContent = ""; show(r); toast("Welcome to Priism! Your charts are being skinned."); return; }
+    if (r.ok) { msg.textContent = ""; $("igCode").value = ""; await show(); toast(r.plan === "lifetime" ? "Priism Pro Lifetime is unlocked. Enjoy!" : "Priism Pro is unlocked. Enjoy!"); return; }
     msg.className = "hint bad";
-    msg.textContent = r.status === "invalid" ? "That code isn't right. Check it and try again." : r.status === "revoked" ? "That code has been turned off."
-      : r.status === "full" ? "That code is already used on its maximum number of devices." : "Couldn't reach the server. Check your internet and try again.";
+    msg.textContent = r.status === "invalid" ? "That code or key isn't right. Check it and try again." : r.status === "revoked" ? "That code has been turned off."
+      : r.status === "expired" ? "That membership has ended. Renew it on Whop to unlock Pro again."
+      : r.status === "full" ? "That code or key is already used on its maximum number of devices. With a Pro key, sign out on one of them first (Settings \u203a Plan)." : "Couldn't reach the server. Check your internet and try again.";
   };
   $("igGo").onclick = go; $("igCode").onkeydown = (e) => { if (e.key === "Enter") go(); };
-  try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.invite) show(ch.invite.newValue); }); } catch {}
+  $("igGet").onclick = openStore; $("igClose").onclick = () => (gate.hidden = true);
+  $("planGet").onclick = openStore; $("proBarGet").onclick = openStore;
+  $("planKey").onclick = $("proBarKey").onclick = () => show(true);
+  $("planOut").onclick = async () => { if (!confirm("Sign out of Priism Pro on this device? This frees it for another device; you can enter your key again any time.")) return;
+    await PriismInvite.release(); await show(); toast("Signed out on this device."); };
+  try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && (ch.invite || ch.pass)) show(); }); } catch {}
 }
 inviteGate();
 

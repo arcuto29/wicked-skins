@@ -40,3 +40,4 @@ jobs:
         with: { node-version: 20 }
       - run: npm install --no-save @electric-sql/pglite@0.5.15
       - run: node supabase/test.mjs
+      - run: node supabase/licence.test.mjs
