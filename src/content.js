@@ -1039,12 +1039,14 @@
   const surfSeen = new WeakSet();   // elements already looked at: getComputedStyle once per element, not every rescan
   function markSurfaces() {
     surfT = 0;
-    const root = document.querySelector("[data-bd-lwroot], .tv-lightweight-charts");
+    const roots = [...document.querySelectorAll("[data-bd-lwroot], .tv-lightweight-charts")];   // every chart, not just the first
     let n = 0;
     for (const el of document.body ? document.body.querySelectorAll("div, aside, header, nav, section, main, footer, ul, li, table, td, th, button, input, select") : []) {
       if (++n > 6000) break;
       if (surfSeen.has(el)) continue; surfSeen.add(el);
-      if (el.hasAttribute("data-bd-surf") || el.closest("#bd-layer, #bd-timer, #bd-goal, #bd-pnl, #bd-wm, #bd-tip") || (root && root.contains(el))) continue;
+      // never Priism's own layers (in a layout each chart's wallpaper, with its dim, is a .bd-emb box inside that chart: it
+      // was taken for the app's panel and painted the panel colour, a tint over the wallpaper) nor any chart's insides
+      if (el.hasAttribute("data-bd-surf") || el.closest("#bd-layer, .bd-emb, .bd-num, #bd-lens, #bd-timer, #bd-goal, #bd-pnl, #bd-wm, #bd-tip") || roots.some((r) => r.contains(el))) continue;
       const bg = getComputedStyle(el).backgroundColor, m = bg.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/);
       if (!m || (m[4] !== undefined && +m[4] < 0.5)) continue;
       const r = el.getBoundingClientRect(); if (r.width * r.height < 600) continue;
@@ -1102,7 +1104,7 @@
     if (!appWanted()) { if (surfObs) { surfObs.disconnect(); surfObs = null; } return; }
     if (surfObs || !document.body) return;
     surfObs = new MutationObserver(() => {
-      if (panelApplied && !surfT) surfT = setTimeout(markSurfaces, 2000);
+      if (panelCol && !surfT) surfT = setTimeout(markSurfaces, 2000);
       if (!tkT) tkT = setTimeout(() => { tkT = 0; markTickers(); }, 2000);
     });
     surfObs.observe(document.body, { childList: true, subtree: true, characterData: true });
@@ -1120,14 +1122,14 @@
     st.textContent = `html.bd-app-panels [data-bd-surf="d"]{background-color:${col}!important;border-color:${up(0.12)}!important}` +
       `html.bd-app-panels [data-bd-surf="l"]{background-color:${up(0.86)}!important}`;
   }
-  let panelApplied = null;
+  let panelApplied = null, panelCol = "";   // what was applied (colour + glass, to skip repeats) / the panel colour itself
   function applyPanels() {
     const h = document.documentElement, glass = cfg.enabled && cfg.pnStyle === "glass";
     // Glass needs a colour to make see-through: TradingView's own dark / light panel colour if Panels is TradingView's
     const col = cfg.enabled ? (panelColour() || (glass ? (h.classList.contains("theme-light") ? "#ffffff" : "#10131c") : "") ) : "";
     applyPanelDeco();
     if (col + glass === panelApplied) return;    // nothing changed: never restyle the page for nothing (keeps it smooth)
-    panelApplied = col + glass;
+    panelApplied = col + glass; panelCol = col;
     applyAppPanels(col);
     h.classList.toggle("bd-panels", !!col && !focusAll());
     // ONE stylesheet holds every override, written in a single update (setting hundreds of properties one by one made
@@ -1375,7 +1377,7 @@
     if (isLwPage() && (accent || cfg.tkOn)) { markTickers(); watchApp(); }
   }
   // lw.js marks the page once it finds a Lightweight Charts chart (can be after we start): apply the app styling then
-  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelApplied) applyAppPanels(panelApplied); tkApplied = ""; applyTicker(); lgApplied = ""; applyLegend(); markTickers(); watchApp(); } })
+  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelCol) applyAppPanels(panelCol); tkApplied = ""; applyTicker(); lgApplied = ""; applyLegend(); markTickers(); watchApp(); } })
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-bd-lw"] });
 
   // Pages built on Lightweight Charts (not TradingView's own charts), like nq.vision: the app around the chart has solid
@@ -3179,7 +3181,7 @@
     const h = document.documentElement, f = !!(cfg.enabled && cfg.focus);
     h.classList.toggle("bd-focus", f);
     const wantOn = cfg.enabled && !focusAll();
-    if (h.classList.contains("bd-on") !== wantOn && cfg.enabled) { h.classList.toggle("bd-on", wantOn); h.classList.toggle("bd-panels", wantOn && !!panelApplied); repaint(); }
+    if (h.classList.contains("bd-on") !== wantOn && cfg.enabled) { h.classList.toggle("bd-on", wantOn); h.classList.toggle("bd-panels", wantOn && !!panelCol); repaint(); }
   }
 
   // ---------- session timer ----------
