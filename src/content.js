@@ -3495,7 +3495,7 @@
   //    surfaces. Only colours, borders and corner radius: nothing moves, resizes or changes how it works.
   // One stylesheet, no observers; if TopstepX changes these parts, the rules simply stop matching.
   if (window === window.top && (/(^|\.)(topstepx|projectx)\.com$/.test(location.hostname) || document.documentElement.hasAttribute("data-tds-brand"))) (function topstepx() {
-    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3", tsxLogo: "own", tsxLogoText: "" };
+    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look" };
     let c = { ...KEYS }, st = null, tries = 0, pro = false;
     const hex = (h) => /^#[0-9a-f]{6}$/i.test(h || "") ? h : null;
     const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), toHex = (a) => "#" + a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
@@ -3543,7 +3543,8 @@
         `${H} [data-bd-tsx="fill"]{background-color:transparent!important}` +
         `${H} [data-bd-tsx="field"]{background-color:${S1}!important;border-color:${L2}!important}` +
         `html.bd-tsx-logo [data-bd-tsx-logo]{opacity:0!important}@keyframes bd-tsx-sheen{0%,62%{transform:translateX(-120%)}100%{transform:translateX(120%)}}` +
-        `@media (prefers-reduced-motion:reduce){#bd-tsx-logo i{animation:none!important;opacity:0}}` +
+        `@keyframes bd-tsx-spin{to{transform:rotate(1turn)}}@keyframes bd-tsx-pulse{50%{opacity:.55}}` +
+        `@media (prefers-reduced-motion:reduce){#bd-tsx-logo i{animation:none!important;opacity:0}#bd-tsx-logo b,#bd-tsx-logo u{animation:none!important}}` +
         `${H} .sidebar .main-menu ul li.active a i{background:${A}!important;color:${on}!important}`;
     }
     // The left icon bar and the top account bar are built at run time with generated class names, so they're found by
@@ -3610,16 +3611,25 @@
       H.classList.toggle("bd-tsx-logo", !!show);
       if (!show) { if (logoDiv) { logoDiv.remove(); logoDiv = null; logoSig = ""; } return; }
       const r = logoEl.getBoundingClientRect(), W = Math.max(20, Math.round(r.width)), Hh = Math.max(16, Math.round(r.height));
-      const A = accent(), P = panel() || "#0b0d12", wall = (c.wallMatch && Array.isArray(c.wallMatch.colors) ? c.wallMatch.colors.map(hex).filter(Boolean) : []);
-      const stops = [mix(A, "#ffffff", 0.55), A, wall.find((x) => x.toLowerCase() !== A.toLowerCase()) || mix(A, "#000000", 0.25)];
+      // Logo colours: your look's (accent + wallpaper colours), a rainbow, or one colour you pick (in light-to-deep shades)
+      const P = panel() || "#0b0d12", wall = (c.wallMatch && Array.isArray(c.wallMatch.colors) ? c.wallMatch.colors.map(hex).filter(Boolean) : []);
+      const RAINBOW = ["#ff3b6b", "#ff9a3c", "#ffe14a", "#3dff9a", "#38d6ff", "#6f6bff", "#ff4ff0"];
+      const pick = hex(c.tsxLogoColor), rainbow = c.tsxLogoColor === "rainbow";
+      const A = rainbow ? "#9b6bff" : pick || accent();
+      const stops = rainbow ? RAINBOW : pick ? [mix(pick, "#ffffff", 0.6), pick, mix(pick, "#000000", 0.35)]
+        : [mix(A, "#ffffff", 0.55), A, wall.find((x) => x.toLowerCase() !== A.toLowerCase()) || mix(A, "#000000", 0.25)];
       const name = mode === "text" ? String(c.tsxLogoText || "").trim().slice(0, 24) : "";
-      const sig = [mode, name, W, Hh, A, P, stops.join("")].join("|");
+      const sig = [mode, name, W, Hh, A, P, stops.join(""), c.tsxLogoColor].join("|");
       if (!logoDiv) { logoDiv = document.createElement("div"); logoDiv.id = "bd-tsx-logo"; logoDiv.setAttribute("aria-hidden", "true"); document.documentElement.appendChild(logoDiv); }
-      logoDiv.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${W}px;height:${Hh}px;z-index:2147483000;pointer-events:none;border-radius:${Math.min(10, Hh * 0.24)}px;overflow:hidden;` +
-        `box-shadow:0 0 14px -3px ${rgba(A, 0.65)},0 0 2px ${rgba(A, 0.5)}`;
+      logoDiv.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${W}px;height:${Hh}px;z-index:2147483000;pointer-events:none;border-radius:${Math.min(10, Hh * 0.24)}px;overflow:hidden;isolation:isolate;` +
+        `box-shadow:0 0 18px -2px ${rgba(A, 0.7)},0 0 4px ${rgba(A, 0.55)},0 0 30px -6px ${rgba(stops[2], 0.6)}`;
       if (sig === logoSig) return; logoSig = sig;
       const esc = (t) => t.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m]);
-      const rad = Math.min(10, Hh * 0.24), grad = `<linearGradient id="bdtsx-f" x1="0" y1="1" x2="1" y2="0">${stops.map((x, i) => `<stop offset="${i / (stops.length - 1)}" stop-color="${x}"/>`).join("")}</linearGradient>`;
+      const still = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
+      const rad = Math.min(10, Hh * 0.24), ring = rainbow ? [...stops, stops[0]] : [...stops, mix(A, "#ffffff", 0.2), stops[0]];
+      // the fill sweeps slowly through your look's colours (a holographic shimmer), unless you've asked for less motion
+      const grad = `<linearGradient id="bdtsx-f" x1="0" y1="1" x2="1" y2="0" spreadMethod="reflect">${stops.map((x, i) => `<stop offset="${i / (stops.length - 1)}" stop-color="${x}"/>`).join("")}` +
+        (still ? "" : `<animateTransform attributeName="gradientTransform" type="rotate" values="0 .5 .5;360 .5 .5" dur="9s" repeatCount="indefinite"/>`) + `</linearGradient>`;
       let art;
       if (mode === "look") {   // the Priism mark (the same three candles as the Priism icon), centred, with a soft glow
         const k = Math.min(W, Hh) * 0.78 / 32, ox = (W - 32 * k) / 2, oy = (Hh - 32 * k) / 2;
@@ -3630,13 +3640,19 @@
         art = `<g fill="url(#bdtsx-f)" filter="url(#bdtsx-g)" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-weight="800" font-size="${fs.toFixed(1)}" text-anchor="middle" dominant-baseline="central" letter-spacing="${(fs * 0.04).toFixed(2)}">` +
           lines.map((l, i) => `<text x="${W / 2}" y="${(y0 + i * lh).toFixed(1)}"${l.length * fs * 0.6 > W - 6 ? ` textLength="${W - 6}" lengthAdjust="spacingAndGlyphs"` : ""}>${esc(l)}</text>`).join("") + "</g>";
       }
-      logoDiv.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}" style="display:block"><defs>${grad}` +
+      // an edge of light that circles the badge: a slowly turning ring of your look's colours, seen as a 1.5px rim
+      // around the glass tile drawn just inside it
+      logoDiv.innerHTML = `<b style="position:absolute;left:50%;top:50%;width:${Math.ceil(Math.hypot(W, Hh)) + 4}px;height:${Math.ceil(Math.hypot(W, Hh)) + 4}px;margin:-${Math.ceil(Math.hypot(W, Hh) / 2) + 2}px;` +
+        `background:conic-gradient(from 0deg,${ring.join(",")});animation:bd-tsx-spin 6s linear infinite"></b>` +
+        `<div style="position:absolute;inset:1.5px;border-radius:${Math.max(0, rad - 1.5)}px;overflow:hidden">` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${W - 3}" height="${Hh - 3}" viewBox="1.5 1.5 ${W - 3} ${Hh - 3}" style="display:block"><defs>${grad}` +
         `<linearGradient id="bdtsx-t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(P, A, 0.2)}"/><stop offset="1" stop-color="${mix(P, "#000000", 0.45)}"/></linearGradient>` +
         `<linearGradient id="bdtsx-e" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${rgba(stops[0], 0.9)}"/><stop offset=".5" stop-color="${rgba(A, 0.35)}"/><stop offset="1" stop-color="${rgba(stops[2], 0.8)}"/></linearGradient>` +
         `<filter id="bdtsx-g" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="${(Math.min(W, Hh) / 28).toFixed(2)}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>` +
-        `<rect x=".5" y=".5" width="${W - 1}" height="${Hh - 1}" rx="${rad}" fill="url(#bdtsx-t)" stroke="url(#bdtsx-e)"/>` +
-        `<rect x="1.5" y="1.5" width="${W - 3}" height="${(Hh - 3) / 2}" rx="${Math.max(0, rad - 1)}" fill="#ffffff" opacity=".05"/>${art}</svg>` +
-        `<i style="position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.22) 50%,transparent 65%);animation:bd-tsx-sheen 7s ease-in-out infinite"></i>`;
+        `<rect x="1.5" y="1.5" width="${W - 3}" height="${Hh - 3}" fill="url(#bdtsx-t)"/>` +
+        `<rect x="1.5" y="1.5" width="${W - 3}" height="${(Hh - 3) / 2}" rx="${Math.max(0, rad - 1)}" fill="#ffffff" opacity=".06"/>${art}</svg>` +
+        `<u style="position:absolute;inset:0;background:radial-gradient(70% 60% at 50% 55%,${rgba(A, 0.28)},transparent 70%);mix-blend-mode:screen;animation:bd-tsx-pulse 3.2s ease-in-out infinite"></u>` +
+        `<i style="position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.26) 50%,transparent 65%);animation:bd-tsx-sheen 7s ease-in-out infinite"></i></div>`;
     }
     let barsDone = false, rsT = 0;
     addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(() => { if (document.documentElement.classList.contains("bd-tsx")) { markBars(); renderLogo(); } }, 500); }, { passive: true });
