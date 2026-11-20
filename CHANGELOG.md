@@ -11,6 +11,41 @@
 
 ## 0.1.86 (2026-11-04)
 
+### Trading comes first
+Priism never touches orders, account data or the network, so it can't change how fast an order reaches your broker.
+Heavy effects could delay how fast the page reacted to your click, though. With every effect on, a Buy press could
+wait up to 74 ms; now it's about 32 ms at worst. Defaults measure the same as Priism off.
+- **Auto quality watches trading.** Besides the frame rate, it now measures how long your clicks, drags and crosshair
+  moves wait, and how much of the page is blocked. If trading slows, effects are eased first.
+- **Safety floor with Max.** With Auto quality off, Priism still switches to Lite if trading stays slow for a few
+  seconds, and goes back once it's quick again.
+- **Lite** (Power saver, Auto quality easing off, or the safety floor) drops the costliest parts: glow blur, the blur
+  behind Priism's glass panels, reaction pulses, the Shift colour cycle, the rainbow P&L animation and zone animation.
+  Under Power saver the wallpaper also holds still while you use the chart.
+- **Trade focus.** With Auto quality (the default) or Power saver, everything that moves holds still while your mouse
+  is over Buy / Sell, the order ticket or the positions panel, and while you're in a position. Your look doesn't
+  change, only the motion stops. It moves again a moment after.
+- **Order safety is checked on every change.** A build fails if code is added that could use the network beyond the
+  known calls (fonts, invite, Workshop), cancel the platform's clicks or keys, or send it synthetic input.
+
+### Turn on from the page
+- On **TopstepX, topstep.com and nq.vision** a card offers **Turn on** as soon as a chart opens: one click, no trip to
+  the toolbar icon. It also works in a platform installed as an app window, which has no toolbar. **Not now** hides
+  it for that tab; **Never here** stops it asking on that site.
+- Chrome asks once to allow these three sites when this update installs.
+- Other platforms: the Priism icon › **Turn on here**, as before.
+
+### Fixes
+- **TradingView: the live candle** (Closed candles) is the newest bar from the chart's own data, so the wrong bar is no
+  longer drawn live after scrolling, zooming or switching timeframe. Works on charting-library platforms too.
+- **Indicators › Custom colour + Glow:** the deeper shades of your colour glowed dark and all but vanished on a dark
+  chart. Their glow is now your colour at full brightness; the lines keep their shades.
+- **Signature wallpapers at 4K:** Orion, Glacier, Void, Aurora, Storm and Blood Moon now cost 2-8x less per frame on a
+  4K screen (Orion 60 ms to 7.5 ms without a graphics card) and set up faster (Orion 5 s to under 1 s). They look
+  the same: slow drifts move in steps of one 1080p pixel and only redraw when they've moved.
+- After an update, the new candle drawing code now replaces the old copy on an open chart straight away.
+- The trade-bracket troubleshooting recorder is off unless you use Diagnose.
+
 ### Signature wallpaper collection
 - **New: Signature looks** (Wallpaper › Looks › Signature): Imperial, Eclipse, Orion, Glacier, Void, Aurora, Neon City, Obsidian, Storm and Blood Moon. Each comes with candles, glow and scale colours made for it.
 - **Painted wallpapers.** Each scene is painted pixel by pixel (light, shading, noise and grain) once per size. After that every frame only places the painting and moves a little light. Thumbnails are the same picture as the full-size wallpaper. The middle of each one, where price sits, is kept calm and dark.
@@ -32,7 +67,7 @@ Every zone option was checked against what's actually drawn, on TradingView and 
 - **Custom colour** keeps every zone in your colour. Zones are told apart by lighter and deeper shades of it. Before, they were turned up to 180° round the colour wheel, so a cyan Custom colour could give blue, purple or red zones.
 - **Hollow + None** no longer makes a zone disappear. Hollow always keeps a border.
 - **Glass + Dashed:** Glass's highlight line no longer fills the gaps between the dashes.
-- **Auto quality / Power saver** no longer shrink glows until they're almost invisible. Glows are drawn at 30% size instead of 15%.
+- **Auto quality / Power saver:** see *Trading comes first* above. Lite now drops glow blur entirely while trading would otherwise slow down, and the full glow comes back once it's quick again.
 
 ### Tidier settings
 Cleanup: every option now has one place. Nothing you set is lost; your settings, saved looks, saved candle styles and each chart's own style are updated to match.

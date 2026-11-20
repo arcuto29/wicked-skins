@@ -2764,7 +2764,13 @@ function priismSkins(window, document) {
         g.beginPath(); b.pts.forEach((p, i) => (i ? g.lineTo(p[0] * w, p[1] * h) : g.moveTo(p[0] * w, p[1] * h))); g.stroke(); }
       g.restore();
     }
-    return { rng, noise, fbm, ridge, clamp, mix, ramp, paint, soft, up, grain, calm, stars, range, bolt, drawBolts, hash };
+    // Slow drifting layers move in steps the size of one 1080p pixel (2 px at 4K): just as smooth to the eye, and a
+    // frame where nothing reached its next step isn't drawn at all (frame() returns false). Without a graphics card a
+    // full-screen blended layer costs ~25 ms at 4K, so this is what keeps 4K as light as 1080p. dt = 0 always draws
+    // (first paint, a new size, new settings).
+    const stepOf = (h) => Math.max(1, Math.round(h / 1080));
+    const snap = (x, h) => { const st = stepOf(h); return Math.round(x / st) * st; };
+    return { rng, noise, fbm, ridge, clamp, mix, ramp, paint, soft, up, grain, calm, stars, range, bolt, drawBolts, hash, snap, stepOf };
   })();
 
   // ---- Silk (Imperial): black silk folds with a metallic gold sheen ----
@@ -2868,12 +2874,12 @@ function priismSkins(window, document) {
   };
 
   const sigStorm = (ctx, o) => {
-    let w = 0, h = 0, k = 1, base = null, lit = null, ridge = null, next = 1.5, flash = null, R = SIG.rng(99);
+    let w = 0, h = 0, k = 1, base = null, lit = null, ridge = null, next = 1.5, flash = null, R = SIG.rng(99), dirty = true;
     const ground = !!(o && o.ground), strikes = !(o && o.lightning === false);
     const cloud = (u, v, s) => { const wx = SIG.fbm(u * 2.2 + 3, v * 2.2, s + 3, 4), wy = SIG.fbm(u * 2.2, v * 2.2 + 7, s + 4, 4);
       return SIG.fbm(u * 3.4 + wx * 1.6, v * 2.4 + wy * 1.2, s, 6); };
     return {
-      resize(W, H) { w = W; h = H; k = kOf(w, h);
+      resize(W, H) { w = W; h = H; k = kOf(w, h); dirty = true;
         const dark = SIG.ramp([[0, 5, 6, 11], [0.25, 18, 21, 32], [0.5, 50, 56, 76], [0.72, 104, 112, 140], [0.9, 160, 168, 194], [1, 210, 216, 232]]);
         const glow = SIG.ramp([[0, 0, 0, 0], [0.4, 30, 40, 90], [0.7, 120, 140, 230], [1, 235, 240, 255]]);
         const fieldC = (u, v) => { const c = cloud(u, v, 11), top = SIG.clamp(1 - v * 1.15), shade = SIG.clamp(c - SIG.fbm(u * 3.4 + 0.02, v * 2.4 - 0.03, 11, 5) + 0.5);   // lit from above
@@ -2888,24 +2894,27 @@ function priismSkins(window, document) {
           const bg = base.getContext("2d");
           ridge.forEach((rr, li) => { bg.fillStyle = li ? "#030305" : "#0a0b12"; bg.beginPath(); bg.moveTo(0, h); rr.forEach((y, i) => bg.lineTo((i / (rr.length - 1)) * w, y * h)); bg.lineTo(w, h); bg.closePath(); bg.fill(); }); }
         g = base.getContext("2d"); SIG.calm(g, w, h, 0.25, 0.55); SIG.grain(g, w, h, 0.05); },
+      // a still picture between strikes: drawn only while a strike is on screen (and once after, to clear it)
       frame(t, dt) {
-        ctx.drawImage(base, 0, 0, w, h);
+        if (strikes) next -= dt || 0.016;
+        const striking = strikes && (flash || next <= 0);
+        if (dt && !striking && !dirty) return false;
+        ctx.drawImage(base, 0, 0, w, h); dirty = false;
         if (!strikes) return;
-        next -= dt || 0.016;
         if (next <= 0 && !flash) { const x0 = 0.12 + R() * 0.76, y1 = ground ? 0.78 + R() * 0.1 : 0.55 + R() * 0.35;   // a strike, away from the very middle
           const x = Math.abs(x0 - 0.5) < 0.14 ? (x0 < 0.5 ? x0 - 0.16 : x0 + 0.16) : x0;
           flash = { t: 0, bolts: SIG.bolt(R, x, -0.02, x + (R() - 0.5) * 0.18, y1, 0.22, 0, []), x }; next = 4 + R() * 7; }
         if (flash) { flash.t += dt || 0.016; const ft = flash.t, a = ft < 0.06 ? 1 : ft < 0.12 ? 0.35 : ft < 0.2 ? 0.85 : Math.max(0, 1 - (ft - 0.2) / 0.55);
           ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a * 0.5; ctx.drawImage(lit, 0, 0, w, h); ctx.restore();   // the clouds light up from inside
           SIG.drawBolts(ctx, flash.bolts, w, h, k, "150,170,255", a);
-          if (ft > 0.8) flash = null; }
+          dirty = true; if (ft > 0.8) flash = null; }
       },
     };
   };
 
   // ---- Moonlit Ridge (with Moon off and Fog up: Glacier): lit icy peaks in layers of mist ----
   const sigRidge = (ctx, o) => {
-    let w = 0, h = 0, k = 1, base = null, fog = null;
+    let w = 0, h = 0, k = 1, base = null, fog = null, lastX = null;
     const moon = !(o && o.moon === false), fogAmt = o && o.fog !== undefined ? +o.fog : 0.6;
     return {
       resize(W, H) { w = W; h = H; k = kOf(w, h);
@@ -2936,17 +2945,18 @@ function priismSkins(window, document) {
         });
         SIG.calm(g, w, h, 0.5, 0.5); SIG.grain(g, w, h, 0.045);
         fog = fogAmt > 0 ? SIG.soft(w * 2, h, 4, (u, v) => { const f = SIG.fbm(u * 6, v * 5, 71, 5), band = Math.exp(-Math.pow((v - 0.72) * 4.5, 2)); return [200, 220, 240, SIG.clamp((f - 0.42) * 2.2) * band * 150 * fogAmt]; }) : null; },
-      frame(t) { ctx.drawImage(base, 0, 0, w, h);
-        if (fog) { const x = -((t * 6 * k) % (w * 2)); ctx.drawImage(fog, x, 0, w * 2, h); ctx.drawImage(fog, x + w * 2, 0, w * 2, h); } },
+      frame(t, dt) { const x = fog ? SIG.snap(-((t * 6 * k) % (w * 2)), h) : 0; if (dt && x === lastX) return false; lastX = x;   // (no mist: a still picture)
+        ctx.drawImage(base, 0, 0, w, h);
+        if (fog) { ctx.drawImage(fog, x, 0, w * 2, h); ctx.drawImage(fog, x + w * 2, 0, w * 2, h); } },
     };
   };
   const mix3 = (a, b, t) => a + (b - a) * t;
 
   // ---- Polar Lights (Aurora): aurora curtains over dark mountains, reflected in a still lake ----
   const sigAurora = (ctx) => {
-    let w = 0, h = 0, k = 1, sky = null, cur = null, land = null;
+    let w = 0, h = 0, k = 1, sky = null, cur = null, land = null, lastKey = "";
     return {
-      resize(W, H) { w = W; h = H; k = kOf(w, h);
+      resize(W, H) { w = W; h = H; k = kOf(w, h); lastKey = "";
         sky = offscreen(w, h); let g = sky.getContext("2d"); const sg = g.createLinearGradient(0, 0, 0, h); sg.addColorStop(0, "#02040a"); sg.addColorStop(0.7, "#071425"); sg.addColorStop(1, "#0a1a2a"); g.fillStyle = sg; g.fillRect(0, 0, w, h);
         SIG.stars(g, w, h * 0.7, Math.round(300 * w * h / 1.44e6) + 40, 55, 1, k);
         // the curtains, painted 1.5x as wide so they can drift
@@ -2967,17 +2977,17 @@ function priismSkins(window, document) {
         g.strokeStyle = "rgba(90,255,190,0.25)"; g.lineWidth = 1.2 * k; g.beginPath(); tops.forEach((y, i) => (i ? g.lineTo((i / 300) * w, Math.min(y, lake) * h) : g.moveTo(0, Math.min(y, lake) * h))); g.stroke();
         SIG.calm(g, w, h, 0.22, 0.5);
         this._lake = lake; },
-      frame(t) {
-        // the curtains drift less than a pixel a frame: the picture is composed again only when they've moved a pixel
-        const off = Math.round((t * 4 * k) % (w * 0.5)), a = Math.round((0.85 + 0.15 * Math.sin(t * 0.25)) * 40) / 40, key = off + "|" + a;
-        if (!this._c || this._c.width !== Math.round(w)) { this._c = offscreen(w, h); this._key = ""; }
-        if (this._key !== key) { this._key = key; const g = this._c.getContext("2d");
-          g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; g.drawImage(sky, 0, 0, w, h);
-          g.globalCompositeOperation = "lighter"; g.globalAlpha = a; g.drawImage(cur, -off, 0, w * 1.5, h);
-          const L = this._lake * h;   // the lake: the sky above it, upside down, a little darker
-          g.save(); g.globalAlpha = 0.35; g.translate(0, 2 * L); g.scale(1, -1); g.beginPath(); g.rect(0, L - h * 0.4, w, h * 0.4); g.clip(); g.drawImage(cur, -off, 0, w * 1.5, h); g.restore();
-          g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; g.drawImage(land, 0, 0, w, h); }
-        ctx.drawImage(this._c, 0, 0, w, h); },
+      frame(t, dt) {
+        // the curtains drift less than a pixel a frame: the picture is composed again only when they've moved a step
+        // (one 1080p pixel), otherwise the last frame stays
+        const off = SIG.snap((t * 4 * k) % (w * 0.5), h), a = Math.round((0.85 + 0.15 * Math.sin(t * 0.25)) * 40) / 40, key = off + "|" + a;
+        if (dt && key === lastKey) return false; lastKey = key;
+        const g = ctx;
+        g.save(); g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; g.drawImage(sky, 0, 0, w, h);
+        g.globalCompositeOperation = "lighter"; g.globalAlpha = a; g.drawImage(cur, -off, 0, w * 1.5, h);
+        const L = this._lake * h;   // the lake: the sky above it, upside down, a little darker
+        g.save(); g.globalAlpha = 0.35; g.translate(0, 2 * L); g.scale(1, -1); g.beginPath(); g.rect(0, L - h * 0.4, w, h * 0.4); g.clip(); g.drawImage(cur, -off, 0, w * 1.5, h); g.restore();
+        g.globalCompositeOperation = "source-over"; g.globalAlpha = 1; g.drawImage(land, 0, 0, w, h); g.restore(); },
     };
   };
 
@@ -3017,7 +3027,7 @@ function priismSkins(window, document) {
   // ---- Void: deep purple energy waves on black ----
   // Many thin luminous ribbons that flow across the picture, a soft glow under them; they breathe slowly.
   const sigVoid = (ctx) => {
-    let w = 0, h = 0, k = 1, glow = null, lines = null;
+    let w = 0, h = 0, k = 1, glow = null, lines = null, lastKey = "";
     const draw = (g, W, H, kk, ph, wide) => { g.save(); g.globalCompositeOperation = "lighter"; g.lineCap = "round";
       for (let i = 0; i < 46; i++) { const f = i / 45, band = Math.sin(f * Math.PI), y0 = 0.5 + (f - 0.5) * 0.9;
         const hue = 268 + 40 * Math.sin(f * 5.1), a = wide ? 0.05 + band * 0.06 : 0.1 + band * 0.42;
@@ -3027,25 +3037,26 @@ function priismSkins(window, document) {
         g.stroke(); }
       g.restore(); };
     return {
-      resize(W, H) { w = W; h = H; k = Math.min(w, h) / 600;   // (true scale, so a thumbnail has the same thin ribbons)
+      resize(W, H) { w = W; h = H; k = Math.min(w, h) / 600; lastKey = "";   // (true scale, so a thumbnail has the same thin ribbons)
         const gl = offscreen(w / 4, h / 4), gg = gl.getContext("2d"); gg.fillStyle = "#000"; gg.fillRect(0, 0, w, h); draw(gg, w / 4, h / 4, k / 4, 0, true);
         glow = offscreen(w, h); const g = glow.getContext("2d"); g.fillStyle = "#020104"; g.fillRect(0, 0, w, h); g.globalCompositeOperation = "lighter"; SIG.up(g, gl, w, h); g.globalCompositeOperation = "source-over"; SIG.calm(g, w, h, 0.34, 0.55);
         // the ribbons, once per size (1.1x wide, so they can sway), already softened in the middle
         lines = offscreen(w * 1.1, h); const lg = lines.getContext("2d"); draw(lg, w * 1.1, h, k, 0.4, false);
         lg.globalCompositeOperation = "destination-out"; lg.translate(w * 0.55, h * 0.52); lg.scale(w * 0.42, h * 0.34);
         const r = lg.createRadialGradient(0, 0, 0, 0, 0, 1); r.addColorStop(0, "rgba(0,0,0,0.4)"); r.addColorStop(1, "rgba(0,0,0,0)"); lg.fillStyle = r; lg.fillRect(-1.5, -1.5, 3, 3); },
-      frame(t) {
+      frame(t, dt) {
+        const sway = SIG.snap(Math.sin(t * 0.05) * w * 0.045, h), breathe = Math.round((0.82 + 0.18 * Math.sin(t * 0.21)) * 60) / 60, key = sway + "|" + breathe;
+        if (dt && key === lastKey) return false; lastKey = key;   // nothing moved a step: keep the frame
         ctx.drawImage(glow, 0, 0, w, h);
-        const sway = Math.sin(t * 0.05) * w * 0.045, breathe = 0.82 + 0.18 * Math.sin(t * 0.21);
         ctx.save(); ctx.globalAlpha = breathe; ctx.drawImage(lines, -w * 0.05 + sway, 0, w * 1.1, h); ctx.restore(); },
     };
   };
 
   // ---- Blood Moon: a huge red moon behind dark drifting clouds ----
   const sigBlood = (ctx) => {
-    let w = 0, h = 0, k = 1, base = null, cl = null, mx = 0, my = 0, mr = 0;
+    let w = 0, h = 0, k = 1, base = null, cl = null, mx = 0, my = 0, mr = 0, lastX = null;
     return {
-      resize(W, H) { w = W; h = H; k = kOf(w, h); mx = w * 0.7; my = h * 0.3; mr = Math.min(w, h) * 0.2;
+      resize(W, H) { w = W; h = H; k = kOf(w, h); mx = w * 0.7; my = h * 0.3; mr = Math.min(w, h) * 0.2; lastX = null;
         base = offscreen(w, h); const g = base.getContext("2d"); const sg = g.createLinearGradient(0, 0, 0, h); sg.addColorStop(0, "#020001"); sg.addColorStop(0.7, "#0a0103"); sg.addColorStop(1, "#160306"); g.fillStyle = sg; g.fillRect(0, 0, w, h);
         SIG.stars(g, w, h * 0.8, Math.round(120 * w * h / 1.44e6) + 20, 66, 1, k * 0.8);
         glowDot(g, mx, my, mr * 5, "150,14,8", 0.28); glowDot(g, mx, my, mr * 1.7, "255,70,30", 0.3);
@@ -3061,7 +3072,8 @@ function priismSkins(window, document) {
           const a = SIG.clamp((c - 0.47) * 3) * band, rim = SIG.clamp((c - 0.47) * 6) - SIG.clamp((c - 0.55) * 6);
           const lit = SIG.clamp(1 - Math.hypot((x / 2 - 0.35) * 1.8, (v - 0.3) * 2.4) * 1.6);   // edges facing the moon glow red
           return [mix3(10, 235, rim * (0.25 + 0.75 * lit)), mix3(2, 58, rim * (0.25 + 0.75 * lit)), mix3(3, 34, rim * (0.25 + 0.75 * lit)), a * 245]; }); },
-      frame(t) { ctx.drawImage(base, 0, 0, w, h); const x = -((t * 5 * k) % (w * 2)); ctx.drawImage(cl, x, 0, w * 2, h); ctx.drawImage(cl, x + w * 2, 0, w * 2, h); },
+      frame(t, dt) { const x = SIG.snap(-((t * 5 * k) % (w * 2)), h); if (dt && x === lastX) return false; lastX = x;   // the clouds haven't reached their next step
+        ctx.drawImage(base, 0, 0, w, h); ctx.drawImage(cl, x, 0, w * 2, h); ctx.drawImage(cl, x + w * 2, 0, w * 2, h); },
     };
   };
 
@@ -3078,7 +3090,8 @@ function priismSkins(window, document) {
     let spr = null;
     const paint = () => { if (!spr) return; const cv = ctx.canvas; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = "color"; ctx.globalAlpha = rc.s;
       ctx.drawImage(spr, 0, 0, cv.width, cv.height); ctx.restore(); };
-    return { resize(W, H) { spr = spr || recolourSprite(rc.c); sk.resize(W, H); }, frame(t, dt) { sk.frame(t, dt); paint(); } };
+    // (a wallpaper that kept its last frame, frame() === false, is already recoloured: painting again would double it)
+    return { resize(W, H) { spr = spr || recolourSprite(rc.c); sk.resize(W, H); }, frame(t, dt) { if (sk.frame(t, dt) === false && dt) return false; paint(); } };
   }
   window.PriismMakeSkin = makeSkin;
   window.PriismSkinOpts = { optsOf, recolourOf };

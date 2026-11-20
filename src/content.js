@@ -141,7 +141,7 @@
     bracketOn: false, bracketSize: 1, bracketBack: "keep",
     bracketFill: "", bracketText: "", bracketProfit: "", bracketLoss: "",
     bracketBorderColor: "", bracketBorderW: 0, bracketLineColor: "", bracketLineW: 0,
-    bracketDebug: true,   // records caught pills to window.__bdBracketDebug for troubleshooting (no data leaves)
+    bracketDebug: false,  // records caught pills to window.__bdBracketDebug for troubleshooting (Diagnose turns it on; no data leaves)
     // Multi-chart layouts: "span" = one wallpaper across the whole layout, "each" = every chart gets its own copy,
     // "mix" = pick a wallpaper per chart (chartSkins: { "2": "galaxy", "3": "media:<id>" }; chart 1 = your main skin)
     multi: "span", chartSkins: {},
