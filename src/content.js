@@ -3543,6 +3543,9 @@
         `${H} [data-bd-tsx="side"],${H} [data-testid="sidebar-container"],${H} .sidebar .main-menu,${H} .MuiDrawer-paper{background-color:${barBG}!important;box-shadow:${barEdge("-1px 0")}!important;${blur}}` +
         `${H} [data-bd-tsx="top"],${H} [data-testid="navbar-container"],${H} .navbar,${H} .MuiAppBar-root{background-color:${barBG}!important;box-shadow:${barEdge("0 -1px")}!important;${blur}${R ? `border-radius:0 0 ${R} ${R}!important;` : ""}}` +
         `${H} [data-bd-tsx="fill"]{background-color:transparent!important}` +
+        // every other page (Platform Settings, Stats, Store…): its dark neutral surfaces, by how dark they were (see markSurfaces)
+        `${H} [data-bd-tsx-surf="0"]{background-color:${S0}!important}${H} [data-bd-tsx-surf="1"]{background-color:${BG}!important}` +
+        `${H} [data-bd-tsx-surf="2"]{background-color:${S1}!important}${H} [data-bd-tsx-surf="3"]{background-color:${S2}!important}` +
         `${H} [data-bd-tsx="field"]{background-color:${S1}!important;border-color:${L2}!important}` +
         `html.bd-tsx-logo [data-bd-tsx-logo]{opacity:0!important}@keyframes bd-tsx-sheen{0%,62%{transform:translateX(-120%)}100%{transform:translateX(120%)}}` +
         `@keyframes bd-tsx-spin{to{transform:rotate(1turn)}}@keyframes bd-tsx-pulse{50%{opacity:.55}}` +
@@ -3656,15 +3659,38 @@
         `<u style="position:absolute;inset:0;background:radial-gradient(70% 60% at 50% 55%,${rgba(A, 0.28)},transparent 70%);mix-blend-mode:screen;animation:bd-tsx-pulse 3.2s ease-in-out infinite"></u>` +
         `<i style="position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.26) 50%,transparent 65%);animation:bd-tsx-sheen 7s ease-in-out infinite"></i></div>`;
     }
+    // Every page, not just the trading screen: TopstepX's other pages (Platform Settings, Stats, Store…) are built from
+    // components with fixed dark colours of their own. Their dark, neutral surfaces take your panel colours, the darkest
+    // the deepest shade. Anything coloured (the red RP&L badge, Save, buy / sell, profit / loss, status) keeps its colour,
+    // and so do buttons, inputs, pictures, the chart frame and the bars (styled above). Only elements not seen before are
+    // looked at, every few seconds while the look is on (a page or tab opening adds new ones): no observer, no cost at rest.
+    const surfSeen = new WeakSet();
+    function markSurfaces() {
+      const root = document.body; if (!root) return;      // (the whole page: order toasts and dialogs live outside the layout)
+      let n = 0;
+      for (const el of root.querySelectorAll("div, section, aside, header, nav, main, ul, li, form, table, thead, tbody, tr, td, th, fieldset")) {
+        if (surfSeen.has(el)) continue; surfSeen.add(el);
+        if (++n > 2500) break;
+        if (el.hasAttribute("data-bd-tsx") || el.closest('[data-bd-tsx="side"], [data-bd-tsx="top"], [data-bd-tsx-logo], #bd-tsx-logo, iframe, button, [role="button"], .dock-panel, [id^="bd-"], [class*="bd-ui"]')) continue;
+        const m = getComputedStyle(el).backgroundColor.match(/[\d.]+/g); if (!m || (m.length > 3 && +m[3] < 0.5)) continue;
+        const [r, g, b] = m.slice(0, 3).map(Number), L = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+        if (Math.max(r, g, b) - Math.min(r, g, b) > 34 || L > 0.2) continue;                      // coloured, or not a dark surface
+        const q = el.getBoundingClientRect(); if (q.width * q.height < 2000) continue;           // a tiny box (a dot, a chip)
+        el.setAttribute("data-bd-tsx-surf", L < 0.035 ? "0" : L < 0.075 ? "1" : L < 0.12 ? "2" : "3");
+      }
+    }
+    let surfT = 0;
+    const surfLoop = () => { clearInterval(surfT); surfT = 0; if (document.documentElement.classList.contains("bd-tsx")) { markSurfaces(); surfT = setInterval(() => { if (!document.hidden) markSurfaces(); }, 3000); } };
     let barsDone = false, rsT = 0;
     addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(() => { if (document.documentElement.classList.contains("bd-tsx")) { markBars(); renderLogo(); } }, 500); }, { passive: true });
     const apply = () => {
       const want = css(), here = !!document.querySelector(".dock-panel, .dock-layout, [data-tds-brand], [data-testid='user-layout-container']");
       document.documentElement.classList.toggle("bd-tsx", !!want && here);
-      if (!want || !here) { if (st) st.textContent = ""; renderLogo(); return !here; }
+      if (!want || !here) { if (st) st.textContent = ""; renderLogo(); clearInterval(surfT); surfT = 0; return !here; }
       if (!st) { st = document.createElement("style"); st.id = "bd-tsx-css"; (document.head || document.documentElement).appendChild(st); }
       if (st.textContent !== want) st.textContent = want;
       if (!barsDone) barsDone = markBars();
+      if (!surfT) surfLoop();
       renderLogo();
       return !barsDone;   // keep looking (a few times) until both bars are found
     };
