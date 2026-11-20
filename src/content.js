@@ -1995,9 +1995,26 @@
       setTimeout(() => el.remove(), 1800);
     });
   }
-  if (!IN_FRAME && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
+  // Captures work on any platform. The panel asks every frame of the tab: the frame whose chart Priism draws answers
+  // chart captures (on TopstepX and other platforms the chart lives in a frame of its own). Whole-screen recording and
+  // the stamp on a whole-page picture are the top page's, also on a page where Priism draws nothing (the panel puts a
+  // capture-only copy there: see __bdCaptureOnly).
+  if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
       if (!msg || typeof msg.ws !== "string") return;
+      const chartCap = msg.ws === "capinfo" || msg.ws === "snapshot" || (msg.ws === "clip" && msg.mode !== "screen");
+      if (IN_FRAME && !chartCap) return;
+      if (chartCap && (!owner || standDown || !started)) return;     // not the frame with the chart: stay quiet, it answers
+      if (msg.ws === "clip" && msg.mode === "screen") {
+        if (standDown) return;
+        ensureCfg().then(() => reply(startScreenFlow(+msg.seconds || 5, +msg.fps || 30))).catch(() => reply({ ok: false, reason: "Couldn't start the screen recording." }));
+        return true;
+      }
+      if (msg.ws === "stamp") {
+        if (standDown) return;
+        ensureCfg().then(() => stampShot(String(msg.url || ""))).then(reply).catch(() => reply({ ok: false }));
+        return true;
+      }
       if (msg.ws === "layout") reply({ count: chartCount() });
       if (msg.ws === "numbers") { showNumbers(+msg.n || 0); reply({ count: chartCount() }); }
       if (msg.ws === "symbol") { const q = parseTitle(); reply({ symbol: q ? q.sym : "" }); }
@@ -2023,7 +2040,6 @@
       }
       if (msg.ws === "clip") {
         if (!owner || standDown) return;
-        if (msg.mode === "screen") { reply(startScreenFlow(+msg.seconds || 5, +msg.fps || 30)); return; }   // the user finishes this on the page
         if (wantSys()) { reply(startSoundFlow(+msg.seconds || 5, +msg.fps || 30)); return; }                  // picks the sound on the page first
         captureClip(+msg.seconds || 5, +msg.fps || 30).then((r) => reply(r)).catch((e) => reply({ ok: false, reason: String(e && e.message || e) }));
         return true;   // async reply (takes a few seconds while recording)
@@ -2625,6 +2641,19 @@
       catch { res({ ok: false, reason: "The browser blocked reading the chart pixels (a cross-origin chart)." }); }
     });
   }
+  // A picture of the whole page, on a platform whose chart Priism doesn't draw: the panel takes it (Chrome's own
+  // screenshot of the tab) and the watermark goes on here, the same mark and rules as every other capture.
+  async function stampShot(url) {
+    if (plan() === "none") return { ok: false, reason: "Priism needs an invite code or licence key: open the Priism panel to enter it." };
+    if (!/^data:image\/png;base64,/.test(url)) return { ok: false };
+    const wmImg = (wmEl && wmEl.isConnected) ? null : await watermarkImage();      // (already on screen: it's in the picture)
+    if (!wmImg) return { ok: true, url };
+    const im = await loadImage(url), W = im.naturalWidth, H = im.naturalHeight;
+    const out = document.createElement("canvas"); out.width = W; out.height = H;
+    const g = out.getContext("2d"); g.drawImage(im, 0, 0);
+    drawWatermark(g, { left: 0, top: 0, right: innerWidth, bottom: innerHeight, width: innerWidth, height: innerHeight }, W / Math.max(1, innerWidth), wmImg);
+    return { ok: true, url: out.toDataURL("image/png") };
+  }
   // ---------- clip editor: crop + trim a finished recording before saving ----------
   // Opens on the chart page when a recording ends (unless "After recording" is set to download right away).
   // Everything happens on this computer: the clip is re-recorded from a hidden canvas, nothing is uploaded.
@@ -3119,6 +3148,9 @@
   function startScreenFlow(seconds, fps) {
     if (screenBusy || clipRec) return { ok: false, reason: "Already recording." };
     if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return { ok: false, reason: "Your browser can't record the screen on this page." };
+    if (plan() === "none") return { ok: false, reason: "Priism needs an invite code or licence key: open the Priism panel to enter it." };
+    // Free recordings carry the Priism watermark, which is only on screen where Priism draws the chart
+    if (plan() === "free" && window.__bdCaptureOnly) return { ok: false, reason: "Recording platforms Priism doesn't skin is part of Pro. Free can record charts Priism draws (with its watermark)." };
     cancelScreenAsk();
     const dur = Math.max(2, Math.min(MAX_CLIP_SECONDS, +seconds || 5));
     const card = document.createElement("div"); card.id = "bd-screenask"; screenAsk = card;
@@ -3526,6 +3558,7 @@
     return area >= 400 * 250 * 1.5; };
   let startFn = null, started = false;
   function whenChart(start) {
+    if (window.__bdCaptureOnly) return;            // put here by the panel only to record this page: nothing else runs
     startFn = start;
     const go = () => { if (!claim()) return; sweep(); started = true; start(); setTimeout(announceFrame, 300); };
     if (bigChart()) return go();
@@ -3577,6 +3610,14 @@
     }
     lastPlan = p; try { document.documentElement.setAttribute("data-bd-plan", p); } catch {}   // (for Diagnose / tests)
     return keys;
+  }
+  // A page where Priism draws nothing (a platform it can't skin, or the top page of one that has its chart in a frame)
+  // still records with your settings and plan: read them once, without starting anything there.
+  let cfgLoad = null;
+  function ensureCfg() {
+    if (started || !(typeof chrome !== "undefined" && chrome.storage && chrome.storage.local)) return Promise.resolve();
+    return (cfgLoad = cfgLoad || new Promise((r) => chrome.storage.local.get(DEFAULTS, async (stored) => {
+      cfg = { ...DEFAULTS, ...stored }; try { await refreshPass(); } catch {} gate(); r(); })));
   }
   setInterval(() => { passFor = ""; const was = plan(); refreshPass().then(() => { if (plan() !== was) apply(gate(["enabled"])); }); }, 3600e3);   // a pass runs out
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {

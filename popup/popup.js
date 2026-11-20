@@ -1771,8 +1771,9 @@ if ($("snapBtn")) $("snapBtn").onclick = async () => {
   }
   if (!EXT_MODE || IS_TAB) return show("Open this on a TradingView chart tab to capture.", false);
   show("Capturing…"); prev.style.display = "none";
-  const r = await tabMsgAnyFrame({ ws: "snapshot" });
-  if (!r) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
+  let r = await tabMsgAnyFrame({ ws: "snapshot" });
+  if (!r) r = await pageShot();                 // no chart Priism draws here: a picture of the whole page instead
+  if (!r) return show("Couldn't capture this page. Click on the page once, then open this panel from the toolbar and try again.", false);
   if (!r.ok) return show(r.reason || "Couldn't capture the chart.", false);
   img.src = r.url; prev.href = r.url;
   const sym = (await tabMsg({ ws: "symbol" }).catch(() => null)) || {};
@@ -1840,7 +1841,7 @@ function syncReady() {
   const el = $("clipReady"); if (!el) return;
   if (cfg.clipMode === "screen") { el.textContent = "Ready · whole screen · Chrome asks what to share"; return; }
   const c = capInfo && capInfo.clips && capInfo.clips[cfg.clipQuality || "balanced"];
-  el.textContent = c && c.label ? `Ready · ${c.label.replace(/ · \d+ fps/, ` · ${+cfg.clipFps === 60 ? 60 : 30} fps`)}` : capInfo && !capInfo.canRecord ? "This browser can't record clips" : "Open your chart to record";
+  el.textContent = c && c.label ? `Ready · ${c.label.replace(/ · \d+ fps/, ` · ${+cfg.clipFps === 60 ? 60 : 30} fps`)}` : capInfo && !capInfo.canRecord ? "This browser can't record clips" : "Ready · whole screen · Priism doesn't draw this page's chart";
   if ($("snapSpec")) $("snapSpec").textContent = capInfo && capInfo.snap ? `PNG · lossless · ${capInfo.snap[0]}×${capInfo.snap[1]}${capInfo.dpr > 1 ? ` (${+capInfo.dpr.toFixed(2)}×, your screen's native pixels)` : " (native pixels)"}` : "PNG · lossless · your screen's native pixels";
 }
 async function loadCapInfo() {
@@ -1870,18 +1871,24 @@ if ($("clipBtn")) $("clipBtn").onclick = async () => {
     return show(r.stopped ? "Stopped. Your clip is saving." : `Recording on your chart window for ${secs}s. It saves by itself when it ends.`, true);
   }
   if (!EXT_MODE || IS_TAB) return show("Open this on a TradingView chart tab to record.", false);
+  // the whole screen (Chrome asks what to share): your choice, or the only way on a platform whose chart Priism
+  // doesn't draw (no frame of the tab answers for a chart), where a capture-only copy runs the same recorder
+  const screenRec = async (why) => {
+    let r0 = await tabMsg({ ws: "clip", seconds: secs, mode: "screen", fps: +cfg.clipFps === 60 ? 60 : 30 });
+    if (!r0 && (await capturePage())) r0 = await tabMsg({ ws: "clip", seconds: secs, mode: "screen", fps: +cfg.clipFps === 60 ? 60 : 30 });
+    if (!r0) return show("Couldn't start recording on this page. Click on the page once, then open this panel from the toolbar and try again.", false);
+    if (!r0.ok) return show(r0.reason || "Couldn't start the screen recording.", false);
+    return show(`${why || ""}Now click \u201cChoose what to record\u201d on the page and pick what to share. It records ${secs}s, then downloads by itself.`, true);
+  };
+  if (cfg.clipMode !== "screen" && !(await tabMsgAnyFrame({ ws: "capinfo" })))
+    return screenRec("Priism doesn't draw this platform's chart, so this records your screen. ");
   if (cfg.clipMode !== "screen" && (cfg.clipAudio === "computer" || cfg.clipAudio === "both")) {
     const r1 = await tabMsgAnyFrame({ ws: "clip", seconds: secs, fps: +cfg.clipFps === 60 ? 60 : 30 });
     if (!r1) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
     if (!r1.ok) return show(r1.reason || "Couldn't start the recording.", false);
     return show(`Now click \u201cChoose sound\u201d on your chart and pick what to share. It records ${secs}s, then downloads by itself.`, true);
   }
-  if (cfg.clipMode === "screen") {
-    const r0 = await tabMsgAnyFrame({ ws: "clip", seconds: secs, mode: "screen", fps: +cfg.clipFps === 60 ? 60 : 30 });
-    if (!r0) return show("Couldn't reach the chart. Open your TradingView chart, make sure Priism Skins is on here, then try again.", false);
-    if (!r0.ok) return show(r0.reason || "Couldn't start the screen recording.", false);
-    return show(`Now click \u201cChoose what to record\u201d on your chart and pick what to share. It records ${secs}s, then downloads by itself.`, true);
-  }
+  if (cfg.clipMode === "screen") return screenRec();
   prev.style.display = "none"; btn.disabled = true;
   let left = secs; show(`Recording ${secs}s. You can close this panel; the clip downloads by itself when it ends.`);
   const tick = setInterval(() => { left--; }, 1000);
@@ -2477,10 +2484,37 @@ async function tabMsg(msg) {
   const tab = await activeTab(); if (!tab) return null;
   return new Promise((res) => { try { chrome.tabs.sendMessage(tab.id, msg, { frameId: 0 }, (r) => { void chrome.runtime.lastError; res(r || null); }); } catch { res(null); } });
 }
-// Snapshot: the owning instance (top frame on tradingview.com) answers. We message the top frame; the content
-// script only replies from the owning, non-stood-down instance. (Broadcast-to-all-frames would need extra
-// permissions we deliberately don't ask for, to keep the listing lean.)
-async function tabMsgAnyFrame(msg) { return tabMsg(msg); }
+// Chart captures: asked of every frame of the tab, and only the frame whose chart Priism draws answers (the top page
+// on tradingview.com; on TopstepX and other platforms the chart is in a frame of its own). null = no such chart here.
+async function tabMsgAnyFrame(msg) {
+  const tab = await activeTab(); if (!tab) return null;
+  return new Promise((res) => { try { chrome.tabs.sendMessage(tab.id, msg, (r) => { void chrome.runtime.lastError; res(r || null); }); } catch { res(null); } });
+}
+// A platform Priism doesn't draw on (Tradovate, NinjaTrader…): captures still work there, of the whole page / screen.
+// Opening this panel from the toolbar lets Priism into this tab once (Chrome's activeTab): a capture-only copy goes
+// in, which records and stamps but draws nothing and changes nothing on the page.
+async function capturePage() {
+  const tab = await activeTab(); if (!tab || !/^https?:/.test(tab.url || "")) return null;
+  const target = { tabId: tab.id };
+  try {
+    const [p] = await chrome.scripting.executeScript({ target, func: () => !!window.__bdContentAlive });
+    if (!(p && p.result)) {
+      await chrome.scripting.executeScript({ target, func: () => { window.__bdCaptureOnly = true; } });
+      await chrome.scripting.insertCSS({ target, files: ["src/content.css"] });
+      await chrome.scripting.executeScript({ target, files: ["src/skins.js", "src/sounds.js", "src/pass.js", "src/content.js"] });
+    }
+    return tab;
+  } catch { return null; }
+}
+// Picture of the whole page (Chrome's own screenshot of the tab, at your screen's pixels), watermarked on the page
+async function pageShot() {
+  const tab = await capturePage(); if (!tab) return null;
+  let url; try { url = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" }); } catch { return null; }
+  const r = await tabMsg({ ws: "stamp", url });
+  if (!r || !r.ok) return r && r.reason ? r : null;
+  const im = new Image(); await new Promise((ok) => { im.onload = im.onerror = ok; im.src = r.url; });
+  return { ok: true, url: r.url, w: im.naturalWidth, h: im.naturalHeight, page: true };
+}
 async function detectCharts() {
   const r = await tabMsg({ ws: "layout" });
   if (r && r.count !== chartCount) { chartCount = r.count | 0; syncCharts(); }
