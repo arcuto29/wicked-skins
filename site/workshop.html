@@ -297,6 +297,7 @@
       box.hidden = false;
       const r = await sb.rpc("workshop_usage");
       if (r.error) { $("usageBars").innerHTML = /workshop_usage|schema cache|function/i.test(r.error.message) ? "<p class='hint'>Usage isn't set up on the server yet: re-run supabase/schema.sql in Supabase (SQL Editor).</p>" : "<p class='hint'>Couldn't load usage: " + esc(r.error.message) + "</p>"; return; }
+      if (!r.data) { $("usageBars").innerHTML = "<p class='hint'>Usage isn't set up on the server yet: re-run supabase/schema.sql in Supabase (SQL Editor).</p>"; return; }
       const u = r.data, L = u.limits || {};
       const bar = (name, used, of, note) => { const p = of > 0 ? Math.min(100, (used / of) * 100) : 0, lvl = p >= 90 ? "bad" : p >= 70 ? "warn" : "ok";
         return `<div class="ubar ${lvl}"><div class="ubar-t"><b>${esc(name)}</b><span>${MBf(used)} of ${MBf(of)} (${Math.round(p)}%)</span></div><i style="width:${p.toFixed(1)}%"></i>${note ? `<small>${esc(note)}</small>` : ""}</div>`; };
