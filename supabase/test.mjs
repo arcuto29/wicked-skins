@@ -169,6 +169,8 @@ ok("the owner marks one done and deletes one", (await as(ADMIN, "select count(*)
 // Supabase grants execute on new functions by default and schema.sql revokes it again; the blanket grant above undid
 // that here, so put the schema's revoke back for the internal helper.
 await db.exec("revoke execute on function public.account_access(uuid) from anon, authenticated");
+// (tests above may re-run schema.sql, which keeps only the owner as admin: make the test admin an admin again)
+await db.exec(`update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com')`);
 const raw = (sql, p) => db.query(sql, p);   // as the database owner: used only to move the clock for a test
 const B1 = "00000000-0000-0000-0000-0000000000b1", B2 = "00000000-0000-0000-0000-0000000000b2";
 for (const [id, e] of [[B1, "tester1@x.com"], [B2, "tester2@x.com"]]) await raw("insert into auth.users (id, email) values ($1, $2)", [id, e]);
