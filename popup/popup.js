@@ -2959,13 +2959,33 @@ async function readPlan() {
   planInfo = { info, invite: s.invite };
   return s.invite;
 }
+const niceDate = (d) => new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+// why a code / key / beta link didn't work (r = the answer, saved = it's the one this copy had)
+function planWhy(r, saved) {
+  const site = WS_SITE() + "workshop.html#account";
+  switch (r && r.status) {
+    case "revoked": return saved ? "This code has been turned off. Enter a new one, or get Priism Pro." : "That code has been turned off.";
+    case "expired": return r.kind === "account" || r.until ? `The beta ended${r.until ? " on " + niceDate(r.until) : ""}. Thanks for testing!` : saved ? "Your Priism Pro membership has ended. Renew it on Whop, or enter another key." : "That code or membership has ended.";
+    case "invalid": return saved ? (r.kind === "account" ? "This device isn't linked any more. Get a new link code on the website (Account) and enter it here." : "Your code or key isn't valid any more. Enter a new one.")
+      : "That code or key isn't right. Check it and try again. (Link codes work for 10 minutes, once.)";
+    case "account": return `That's a beta code. Add it to your account on the website first (${site}), then enter the link code it shows.`;
+    case "none": return "Your account has no beta access yet. Add your beta code on the website (Account).";
+    case "moved": return "Your beta moved to another device. To use it here, get a link code on the website (Account). You can move once every 7 days.";
+    case "full": return r.next ? `Your account is already used on another device. You can move it to this one from ${niceDate(r.next)}, or ask the Priism team to reset it.`
+      : "That code or key is already used on its maximum number of devices. With a Pro key, sign out on one of them first (Settings \u203a Plan).";
+    case "offline": return "Couldn't reach the server. Check your internet and try again.";
+  }
+  return "Enter your Priism Pro licence key, an invite code, or a beta link code from the website.";
+}
 function renderPlan() {
   const box = $("planBox"); if (!box) return;
   const inv = planInfo && planInfo.invite, info = planInfo && planInfo.info, life = (info && info.plan === "lifetime") || (inv && inv.plan === "lifetime");
   const until = (info && info.until) || (inv && inv.until), invite = info ? info.src === "invite" : inv && !inv.manage;
-  const when = until ? new Date(until).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
-  $("planName").textContent = PLAN === "pro" ? (life ? "Priism Pro \u00B7 Lifetime" : invite ? "Priism Pro \u00B7 invite" : "Priism Pro") : PLAN === "free" ? "Priism Free" : "No plan";
-  $("planHint").textContent = PLAN === "pro" ? (life ? "Yours for good, with every update." : when ? `Renews ${when}.` : "Everything is unlocked.")
+  const beta = info ? info.src === "account" : inv && inv.kind === "account";
+  const when = until ? niceDate(until) : "";
+  $("planName").textContent = PLAN === "pro" ? (life ? "Priism Pro \u00B7 Lifetime" : beta ? "Priism beta" : invite ? "Priism Pro \u00B7 invite" : "Priism Pro") : PLAN === "free" ? "Priism Free" : "No plan";
+  $("planHint").textContent = PLAN === "pro" ? (life ? "Yours for good, with every update." : beta ? (when ? `Beta until ${when}. Linked to your account on this device.` : "Linked to your account on this device.")
+    : when ? `Renews ${when}.` : "Everything is unlocked.")
     : `6 wallpapers and candle colours, with the Priism watermark. Pro unlocks all ${Object.keys(WickedSkins).length} wallpapers, Signature looks, candle styles and FX, zones, the TradingView tab, trading tools and clips.`;
   $("planGet").hidden = PLAN === "pro"; $("planKey").hidden = PLAN === "pro";
   $("planManage").hidden = !(inv && inv.manage); $("planManage").onclick = () => { try { chrome.tabs.create({ url: inv.manage }); } catch { window.open(inv.manage, "_blank"); } };
@@ -2981,10 +3001,7 @@ async function inviteGate() {
     applyLocks(); renderPlan();
     if (PLAN !== was) setTimeout(() => { try { renderSkins(); renderQuick(); } catch {} }, 0);   // PRO tags on / off
     if (!gate.hidden) {
-      const why = inv && inv.status === "revoked" ? "This code has been turned off. Enter a new one, or get Priism Pro."
-        : inv && inv.status === "expired" ? "Your Priism Pro membership has ended. Renew it on Whop, or enter another key."
-        : inv && inv.status === "invalid" ? "Your code or key isn't valid any more. Enter a new one." : "Enter your Priism Pro licence key or an invite code.";
-      $("igLead").textContent = why; setTimeout(() => $("igCode").focus(), 50);
+      $("igLead").textContent = inv && inv.status && inv.status !== "ok" ? planWhy(inv, true) : planWhy(null); setTimeout(() => $("igCode").focus(), 50);
     }
   };
   await show();
@@ -2992,21 +3009,22 @@ async function inviteGate() {
   if (invite && invite.code) PriismInvite.recheck(false).then(() => show()).catch(() => {});
   const go = async () => {
     const code = $("igCode").value.trim(), msg = $("igMsg");
-    if (code.replace(/[^A-Za-z0-9]/g, "").length < 6) { msg.className = "hint bad"; msg.textContent = "That doesn't look like a licence key or invite code."; return; }
+    if (code.replace(/[^A-Za-z0-9]/g, "").length < 6) { msg.className = "hint bad"; msg.textContent = "That doesn't look like a licence key, invite code or link code."; return; }
     $("igGo").disabled = true; msg.className = "hint"; msg.textContent = "Checking\u2026";
     const r = await PriismInvite.redeem(code);
     $("igGo").disabled = false;
-    if (r.ok) { msg.textContent = ""; $("igCode").value = ""; await show(); toast(r.plan === "lifetime" ? "Priism Pro Lifetime is unlocked. Enjoy!" : "Priism Pro is unlocked. Enjoy!"); return; }
+    if (r.ok) { msg.textContent = ""; $("igCode").value = ""; await show(); toast(r.kind === "account" ? "This device is linked. Welcome to the Priism beta!" : r.plan === "lifetime" ? "Priism Pro Lifetime is unlocked. Enjoy!" : "Priism Pro is unlocked. Enjoy!"); return; }
     msg.className = "hint bad";
-    msg.textContent = r.status === "invalid" ? "That code or key isn't right. Check it and try again." : r.status === "revoked" ? "That code has been turned off."
-      : r.status === "expired" ? "That membership has ended. Renew it on Whop to unlock Pro again."
-      : r.status === "full" ? "That code or key is already used on its maximum number of devices. With a Pro key, sign out on one of them first (Settings \u203a Plan)." : "Couldn't reach the server. Check your internet and try again.";
+    msg.textContent = planWhy(r, false);
   };
   $("igGo").onclick = go; $("igCode").onkeydown = (e) => { if (e.key === "Enter") go(); };
   $("igGet").onclick = openStore; $("igClose").onclick = () => (gate.hidden = true);
   $("planGet").onclick = openStore; $("proBarGet").onclick = openStore;
   $("planKey").onclick = $("proBarKey").onclick = () => show(true);
-  $("planOut").onclick = async () => { if (!confirm("Sign out of Priism Pro on this device? This frees it for another device; you can enter your key again any time.")) return;
+  $("planOut").onclick = async () => {
+    const acct = planInfo && planInfo.invite && planInfo.invite.kind === "account";
+    if (!confirm(acct ? "Unlink this device from your beta account? To use the beta on another device, link it with a code from the website. (You can move once every 7 days.)"
+      : "Sign out of Priism Pro on this device? This frees it for another device; you can enter your key again any time.")) return;
     await PriismInvite.release(); await show(); toast("Signed out on this device."); };
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && (ch.invite || ch.pass)) show(); }); } catch {}
 }

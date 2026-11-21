@@ -68,7 +68,60 @@ curl -s -X POST https://tsazewpipzgfwgcepcsb.supabase.co/functions/v1/licence \
 # -> {"status":"invalid"}
 ```
 
-Until the function is deployed, Priism checks invite codes the old way, so nothing breaks in between.
+Then set `LICENCE_LIVE = true` in `src/pass.js` and release. Until then Priism checks invite codes the old way (and doesn't ask the function at all, so Chrome logs no errors); Whop keys can only be checked once it's on.
+
+## 2b. The closed beta (codes tied to accounts)
+Beta codes belong to one person's account and work on one device at a time until their end date. Nothing is paid,
+so Whop isn't involved.
+
+**Set up (once):** run `supabase/schema.sql` in the SQL Editor. This adds the beta columns and functions, and existing
+codes keep working. Turn on Google sign-in (Authentication › Providers) so testers don't need email confirmation.
+
+**Give someone access:** on the website (Workshop, signed in as the owner), go to **Invites** › For one person. Leave
+"Beta: needs an account" on, set 1 device and 21 days, then press **Make a code** and send it to them.
+
+**What the tester does:**
+1. On the website: sign in, then **Beta access** › paste the code › **Add to my account**.
+2. Press **Get a link code**. It gives a code like `K7QM-3XPA` that works once, for 10 minutes.
+3. In the Priism panel: type the link code in the code box. The panel shows **Priism beta**, "Beta until <date>".
+
+**Rules (enforced by the database, not the app):**
+- One code goes on one account. If anyone else tries it, they get "taken".
+- One device per account. Linking a new device moves the beta to it, and the old one locks at its next daily check.
+  A move is allowed once every 7 days. "Unlink" in Settings › Plan still counts toward that, so access can't be
+  passed around.
+- The device keeps a random secret, and the server stores only its SHA-256. Copying the device id alone doesn't work.
+- After the end date, the device's check says *ended* and it locks. A pass never lasts past the end date.
+
+**Manage access (Invites list):** each row shows who claimed the code, how many devices are linked, when they were last
+seen and when the code ends.
+- **+7 days** extends it. Devices pick up the new date at their next check.
+- **Reset devices** unlinks everything on that account, so the tester can link a new device straight away (for
+  example, after a reinstall or a new PC).
+- **Turn off** revokes the code, and the device locks within a day.
+
+**What the device secret protects against, and what it doesn't (audit, Nov 2026):**
+
+| Situation | Result |
+|---|---|
+| A tester sends their beta code to a friend | Blocked: the code is already on the tester's account ("taken"). |
+| A tester sends a link code | It works once, for 10 minutes, and moves the beta off the tester's own device. They notice. |
+| Someone copies the device id from one install into another | Blocked: they also need the secret, and the server only has its hash. |
+| Someone edits `invite` in storage by hand (devtools) | **Gets Pro while `PASS_REQUIRED = false`.** Only the signed pass stops this, so deploy the function and turn `PASS_REQUIRED` on before relying on it. |
+| Someone copies the whole browser profile or the desktop `settings.json` to a second machine | **Both copies work.** They have the same id and secret, and the server can't tell them apart. Possible later fix: a new secret on every check, with the previous one accepted for a day, so the copy that checks in second is caught. Not built: it adds lock-out risk if a reply is lost. |
+| Someone edits the extension's own code | Can't be prevented by any extension. The pass makes it a deliberate act, not a casual one. |
+| A tester goes offline or blocks the server | Pro keeps working until the pass ends: 14 days at most, and never past the beta's end. Revoking or moving takes effect at the next check (once a day when online). |
+| A tester reinstalls or clears the extension's data | It's a new device. Within 7 days of their last move they get "full" until you press **Reset devices**. This is expected support work during the beta. |
+| Guessing codes | Link codes and invite codes each have 32^8 (about 10^12) possibilities. With 15 testers that's out of reach without rate limiting (PostgREST has none). |
+
+Where the secret is stored: `chrome.storage.local` (extension), `settings.json` in the app's data folder (desktop) and
+SharedPreferences (Android), all in plain text like the rest of the settings. Other websites and extensions can't
+read them. Anyone with access to the user's computer account can.
+
+Before the licence function is deployed, the panel calls the database functions directly (`link_device`,
+`device_check`). The checks run on the server, but without a signed pass, so `PASS_REQUIRED` must stay `false` until
+§2 is done. After that, set `LICENCE_LIVE = true` and then `PASS_REQUIRED = true`. Beta devices then need a pass
+from the function, and it expires at the beta's end date.
 
 ## 3. Test a real purchase
 1. Make a 100% off promo code on Whop and "buy" Pro with it.

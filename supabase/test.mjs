@@ -165,5 +165,78 @@ ok("the owner reads them, with contact and version", br && br.message === "Candl
 ok("nobody can write one directly (only through report_bug)", (await tryAs(U1, "insert into public.bug_reports (device, message) values ('x-00000001', 'hey')")) !== "ok" && (await tryAs(null, "insert into public.bug_reports (device, message) values ('x-00000001', 'hey')")) !== "ok");
 await as(ADMIN, "update public.bug_reports set done = true where message = 'report 0'");
 ok("the owner marks one done and deletes one", (await as(ADMIN, "select count(*)::int n from public.bug_reports where done")).rows[0].n === 1 && (await tryAs(ADMIN, "delete from public.bug_reports where message = 'report 1'")).startsWith("ok"));
+// ---------- beta access tied to accounts ----------
+// Supabase grants execute on new functions by default and schema.sql revokes it again; the blanket grant above undid
+// that here, so put the schema's revoke back for the internal helper.
+await db.exec("revoke execute on function public.account_access(uuid) from anon, authenticated");
+// (tests above may re-run schema.sql, which keeps only the owner as admin: make the test admin an admin again)
+await db.exec(`update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com')`);
+const raw = (sql, p) => db.query(sql, p);   // as the database owner: used only to move the clock for a test
+const B1 = "00000000-0000-0000-0000-0000000000b1", B2 = "00000000-0000-0000-0000-0000000000b2";
+for (const [id, e] of [[B1, "tester1@x.com"], [B2, "tester2@x.com"]]) await raw("insert into auth.users (id, email) values ($1, $2)", [id, e]);
+ok("new codes are for 1 device by default", (await as(ADMIN, "insert into public.invites (code) values ('BETA-0001-AAAA') returning max_devices")).rows[0].max_devices === 1);
+await as(ADMIN, "update public.invites set requires_account = true, expires_at = now() + interval '21 days' where code = 'BETA-0001-AAAA'");
+await as(ADMIN, "insert into public.invites (code, requires_account, expires_at) values ('BETA-0002-AAAA', true, now() - interval '1 day'), ('BETA-0003-AAAA', true, now() + interval '21 days')");
+const claim = async (uid, c) => (await as(uid, "select public.claim_invite($1) r", [c])).rows[0].r;
+ok("a beta code can't be used by a device on its own", (await red("BETA-0001-AAAA", "solo-0000001")) === "account");
+ok("an ended code says expired", (await red("BETA-0002-AAAA", "solo-0000001")) === "expired" && (await claim(B1, "BETA-0002-AAAA")) === "expired");
+ok("signed out can't claim", (await tryAs(null, "select public.claim_invite('BETA-0001-AAAA')")).startsWith("denied"));
+ok("claim a code to your account", (await claim(B1, " beta-0001-aaaa ")) === "ok" && (await claim(B1, "BETA-0001-AAAA")) === "ok");
+ok("someone else can't take it", (await claim(B2, "BETA-0001-AAAA")) === "taken");
+ok("unknown code", (await claim(B2, "NOPE-0000-0000")) === "invalid");
+const acc = async uid => (await as(uid, "select public.my_access() r")).rows[0].r;
+{ const a = await acc(B1); ok("my_access: ok, until the code's end, 1 device", a.status === "ok" && a.until && a.max_devices === 1 && a.codes.length === 1, JSON.stringify(a)); }
+ok("no code yet -> none", (await acc(B2)).status === "none");
+ok("the internal access check isn't callable from outside", (await tryAs(null, "select public.account_access($1)", [B1])).startsWith("denied") && (await tryAs(B2, "select public.account_access($1)", [B1])).startsWith("denied"));
+ok("no link code without access", (await tryAs(B2, "select public.create_link_code()")).startsWith("denied") && (await tryAs(null, "select public.create_link_code()")).startsWith("denied"));
+const mk = async uid => (await as(uid, "select public.create_link_code() c")).rows[0].c;
+const S1 = "s".repeat(40), S2 = "t".repeat(40), S3 = "u".repeat(40);
+const link = async (c, dev, sec, app = "extension") => (await as(null, "select public.link_device($1, $2, $3, $4) r", [c, dev, sec, app])).rows[0].r;
+const chk = async (dev, sec) => (await as(null, "select public.device_check($1, $2) r", [dev, sec])).rows[0].r;
+let L = await mk(B1);
+ok("link code looks like ABCD-EF23", /^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(L), L);
+ok("a new link code replaces the old one", (await mk(B1)) !== L && (await link(L, "pc-00000001", S1)).status === "invalid");
+L = await mk(B1);
+ok("bad device or secret refused", (await link(L, "x';drop", S1)).status === "invalid" && (await link(L, "pc-00000001", "short")).status === "invalid");
+{ const r = await link(L.toLowerCase().replace("-", "-"), "pc-00000001", S1); ok("first copy links (ok + until)", r.status === "ok" && r.until, JSON.stringify(r)); }
+ok("a link code works once", (await link(L, "pc-00000009", S3)).status === "invalid");
+ok("only the hash of the secret is stored", (await raw("select secret_hash from public.account_devices where device = 'pc-00000001'")).rows[0].secret_hash.length === 64
+  && (await raw("select count(*)::int n from public.account_devices where secret_hash like '%sss%'")).rows[0].n === 0);
+ok("nobody reads linked copies directly", (await as(B1, "select count(*)::int n from public.account_devices")).rows[0].n === 0 && (await as(null, "select count(*)::int n from public.account_devices")).rows[0].n === 0);
+ok("check: right secret ok", (await chk("pc-00000001", S1)).status === "ok");
+ok("check: wrong secret or copied id is invalid", (await chk("pc-00000001", S2)).status === "invalid");
+L = await mk(B1); await raw("update public.link_codes set expires_at = now() - interval '1 minute' where code = $1", [L]);
+ok("a link code ends after 10 minutes", (await link(L, "pc-00000002", S2)).status === "invalid");
+L = await mk(B1);
+ok("a second copy moves the account to it", (await link(L, "pc-00000002", S2)).status === "ok");
+ok("the old copy is told it moved", (await chk("pc-00000001", S1)).status === "moved" && (await chk("pc-00000002", S2)).status === "ok");
+L = await mk(B1);
+{ const r = await link(L, "pc-00000003", S3); ok("another move within 7 days -> full, with the date it opens", r.status === "full" && r.next, JSON.stringify(r)); }
+ok("re-linking the same copy is fine (reinstall)", (await link(await mk(B1), "pc-00000002", S2)).status === "ok");
+ok("my_access shows the next move date", !!(await acc(B1)).next_move);
+await as(null, "select public.unlink_device($1, $2)", ["pc-00000002", S2]);
+ok("sign out on a copy stops it", (await chk("pc-00000002", S2)).status === "moved");
+ok("...and still counts for 7 days (can't pass it around)", (await link(await mk(B1), "pc-00000003", S3)).status === "full");
+await raw("update public.account_moves set last_move = now() - interval '8 days' where user_id = $1", [B1]);
+ok("after 7 days a move is allowed again", (await link(await mk(B1), "pc-00000003", S3)).status === "ok" && (await chk("pc-00000003", S3)).status === "ok");
+ok("a linked copy can report a bug", (await bug("Glow too bright", "pc-00000003")) === "ok");
+ok("non-admins can't see accounts or reset", (await tryAs(B1, "select public.admin_accounts()")).startsWith("denied") && (await tryAs(B1, "select public.admin_reset_account($1)", [B1])).startsWith("denied"));
+{ const list = (await as(ADMIN, "select public.admin_accounts() r")).rows[0].r; const me = list.find(x => x.code === "BETA-0001-AAAA");
+  ok("the owner sees who claimed which code and their copies", me && me.email === "tester1@x.com" && me.devices === 1 && me.next_move, JSON.stringify(me)); }
+await as(ADMIN, "select public.admin_reset_account($1)", [B1]);
+ok("owner reset: copies removed, a new one links straight away", (await chk("pc-00000003", S3)).status === "invalid" && (await link(await mk(B1), "pc-00000004", S1)).status === "ok"
+  && (await link(await mk(B1), "pc-00000005", S2)).status === "ok");
+await as(ADMIN, "update public.invites set expires_at = now() + interval '28 days' where code = 'BETA-0001-AAAA'");
+ok("owner extends: the new end date shows on the next check", new Date((await chk("pc-00000005", S2)).until) > new Date(Date.now() + 27 * 864e5));
+await raw("update public.invites set expires_at = now() - interval '1 minute' where code = 'BETA-0001-AAAA'");
+ok("beta ends -> check says expired, no new link codes", (await chk("pc-00000005", S2)).status === "expired" && (await acc(B1)).status === "expired" && (await tryAs(B1, "select public.create_link_code()")).startsWith("denied"));
+ok("an expired account's copies can't report bugs", (await bug("after the end", "pc-00000005")) === "invalid");
+await raw("update public.invites set expires_at = now() + interval '7 days' where code = 'BETA-0001-AAAA'");
+await as(ADMIN, "update public.invites set revoked = true where code = 'BETA-0001-AAAA'");
+ok("owner revokes -> check says revoked", (await chk("pc-00000005", S2)).status === "revoked");
+await claim(B2, "BETA-0003-AAAA"); await link(await mk(B2), "pc-00000005", S2);
+ok("a copy linked to a new account leaves the old one", (await chk("pc-00000005", S2)).status === "ok"
+  && (await raw("select count(*)::int n from public.account_devices where device = 'pc-00000005' and active")).rows[0].n === 1);
+ok("admins: access with no code", (await as(ADMIN, "select public.my_access() r")).rows[0].r.status === "ok");
 const passed = Object.values(R).filter(Boolean).length, total = Object.keys(R).length;
 console.log("SUMMARY:", passed + "/" + total); if (passed !== total) process.exit(1);
