@@ -46,6 +46,7 @@
         "src/skins.js",
         "src/sounds.js",
         "src/pass.js",
+        "src/acct.js",
         "src/content.js"
       ],
       "css": [
