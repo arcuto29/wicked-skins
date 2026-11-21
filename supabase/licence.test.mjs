@@ -7,7 +7,11 @@ const PRIV = await crypto.subtle.exportKey("jwk", kp.privateKey), PUB = await cr
 const env = { SUPABASE_URL: "https://db.example", SUPABASE_ANON_KEY: "anon", WHOP_API_KEY: "whop_secret_123", WHOP_PRODUCT_IDS: "prod_priism", PASS_PRIVATE_JWK: JSON.stringify(PRIV) };
 const D1 = "dev-11111111", D2 = "dev-22222222", D3 = "dev-33333333", D4 = "dev-44444444";
 // fake backends
-const invites = { "PRIISM-GOOD-0001": "ok", "PRIISM-GONE-0001": "revoked", "PRIISM-FULL-0001": "full" };
+const invites = { "PRIISM-GOOD-0001": "ok", "PRIISM-GONE-0001": "revoked", "PRIISM-FULL-0001": "full", "BETA-ACCT-0001": "account", "BETA-ENDED-001": "expired" };
+// beta accounts: a stand-in for link_device / device_check / unlink_device (the real ones are tested in test.mjs)
+const SEC = "k".repeat(43), SEC2 = "q".repeat(43), SOON = new Date(Date.now() + 3 * 864e5).toISOString(), LATER = new Date(Date.now() + 60 * 864e5).toISOString();
+const links = { "ABCD-EF23": SOON, "WXYZ-2345": LATER, "FULL-FULL": "full" }, linked = {};
+let dbDown = false;
 const memberships = {
   "AAAAAA-MONTHLY-0001": { id: "mem_1", status: "active", product: { id: "prod_priism" }, renewal_price: { amount: "14.99" }, billing_period_days: 30, current_period_end: "2026-12-04T00:00:00.000Z", manage_url: "https://whop.com/billing/manage/mem_1", metadata: {} },
   "BBBBBB-LIFETIME-001": { id: "mem_2", status: "active", product: { id: "prod_priism" }, renewal_price: { amount: "0.00" }, billing_period_days: null, metadata: {} },
@@ -20,6 +24,13 @@ const calls = [];
 const fakeFetch = async (url, o = {}) => {
   calls.push({ url, method: o.method || "GET", headers: o.headers || {}, body: o.body });
   const res = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+  if (dbDown && url.startsWith("https://db.example")) return res(503, {});
+  if (url.startsWith("https://db.example/rest/v1/rpc/link_device")) { const b = JSON.parse(o.body); const u = links[b.p_link];
+    if (u === "full") return res(200, { status: "full", next: "2026-12-01T00:00:00Z" });
+    if (!u) return res(200, { status: "invalid" }); linked[b.p_device + b.p_secret] = u; delete links[b.p_link]; return res(200, { status: "ok", until: u }); }
+  if (url.startsWith("https://db.example/rest/v1/rpc/device_check")) { const b = JSON.parse(o.body); const u = linked[b.p_device + b.p_secret];
+    return res(200, u === "moved" ? { status: "moved" } : u ? { status: "ok", until: u } : { status: "invalid" }); }
+  if (url.startsWith("https://db.example/rest/v1/rpc/unlink_device")) { const b = JSON.parse(o.body); if (linked[b.p_device + b.p_secret]) linked[b.p_device + b.p_secret] = "moved"; return res(200, "ok"); }
   if (url.startsWith("https://db.example/rest/v1/rpc/redeem_invite")) { const b = JSON.parse(o.body); return res(200, invites[b.p_code] || "invalid"); }
   const m = url.match(/^https:\/\/api\.whop\.com\/api\/v1\/memberships\/([^/?]+)$/);
   if (m) {
@@ -70,5 +81,25 @@ ok("an edited pass is rejected", (await verifyPass(PUB, forged)) === null);
 const other = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
 ok("a pass checked with another key is rejected", (await verifyPass(await crypto.subtle.exportKey("jwk", other.publicKey), r.pass)) === null);
 ok("judge: a membership with no status is not unlocked", judge({ product: { id: "prod_priism" } }, D1, ["prod_priism"]).status === "expired");
+// beta: copies linked to an account
+const acct = (extra) => handle({ device: D1, app: "extension", ...extra }, env, fakeFetch);
+ok("a beta code typed in the panel: 'account' (add it on the website)", (await run("BETA-ACCT-0001", D1)).status === "account");
+ok("an ended code: expired", (await run("BETA-ENDED-001", D1)).status === "expired");
+r = await acct({ action: "link", link: "abcdef23", secret: SEC }); p = await verifyPass(PUB, r.pass);
+ok("a link code joins the account: a pass for this copy, from the account", r.status === "ok" && p && p.src === "account" && p.dev === D1 && p.plan === "pro" && r.until === SOON, r.status);
+ok("the pass ends when the beta ends (not 14 days later)", p && p.exp === Math.floor(Date.parse(SOON) / 1000));
+ok("a link code works once", (await acct({ action: "link", link: "ABCD-EF23", secret: SEC })).status === "invalid");
+r = await acct({ secret: SEC }); p = await verifyPass(PUB, r.pass);
+ok("the daily check renews the pass", r.status === "ok" && p && p.src === "account");
+ok("a long beta still gets a 14-day pass", await (async () => { const q = await handle({ device: D2, action: "link", link: "WXYZ-2345", secret: SEC2 }, env, fakeFetch); const pp = await verifyPass(PUB, q.pass); return pp.exp - pp.iat === PASS_DAYS * 86400; })());
+ok("account full: says when a move is allowed", await (async () => { const q = await acct({ action: "link", link: "FULL-FULL", secret: SEC }); return q.status === "full" && q.next === "2026-12-01T00:00:00Z" && !q.pass; })());
+ok("the wrong secret: invalid, no pass", await (async () => { const q = await acct({ secret: SEC2 }); return q.status === "invalid" && !q.pass; })());
+ok("a short or missing secret is refused before asking", (await acct({ secret: "abc" })).status === "invalid" && (await acct({ action: "link", link: "ABCD-EF23" })).status === "invalid");
+ok("a badly formed link code is refused", (await acct({ action: "link", link: "IIII-0000", secret: SEC })).status === "invalid");
+await acct({ action: "release", secret: SEC });
+ok("sign out: the copy is told it moved next time", (await acct({ secret: SEC })).status === "moved");
+dbDown = true;
+ok("database down: offline (Priism keeps the pass it has)", (await handle({ device: D2, secret: SEC2 }, env, fakeFetch)).status === "offline");
+dbDown = false;
 console.log("SUMMARY:", Object.values(R).filter(Boolean).length + "/" + Object.keys(R).length);
 process.exit(Object.values(R).every(Boolean) ? 0 : 1);
