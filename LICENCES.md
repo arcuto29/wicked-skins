@@ -70,6 +70,41 @@ curl -s -X POST https://tsazewpipzgfwgcepcsb.supabase.co/functions/v1/licence \
 
 Then set `LICENCE_LIVE = true` in `src/pass.js` and release. Until then Priism checks invite codes the old way (and doesn't ask the function at all, so Chrome logs no errors); Whop keys can only be checked once it's on.
 
+## 2b. The closed beta (codes tied to accounts)
+Beta codes belong to one person's account and work on one device at a time until their end date. Nothing is paid,
+so Whop isn't involved.
+
+**Set up (once):** run `supabase/schema.sql` in the SQL Editor. This adds the beta columns and functions, and existing
+codes keep working. Turn on Google sign-in (Authentication › Providers) so testers don't need email confirmation.
+
+**Give someone access:** on the website (Workshop, signed in as the owner), go to **Invites** › For one person. Leave
+"Beta: needs an account" on, set 1 device and 21 days, then press **Make a code** and send it to them.
+
+**What the tester does:**
+1. On the website: sign in, then **Beta access** › paste the code › **Add to my account**.
+2. Press **Get a link code**. It gives a code like `K7QM-3XPA` that works once, for 10 minutes.
+3. In the Priism panel: type the link code in the code box. The panel shows **Priism beta**, "Beta until <date>".
+
+**Rules (enforced by the database, not the app):**
+- One code goes on one account. If anyone else tries it, they get "taken".
+- One device per account. Linking a new device moves the beta to it, and the old one locks at its next daily check.
+  A move is allowed once every 7 days. "Unlink" in Settings › Plan still counts toward that, so access can't be
+  passed around.
+- The device keeps a random secret, and the server stores only its SHA-256. Copying the device id alone doesn't work.
+- After the end date, the device's check says *ended* and it locks. A pass never lasts past the end date.
+
+**Manage access (Invites list):** each row shows who claimed the code, how many devices are linked, when they were last
+seen and when the code ends.
+- **+7 days** extends it. Devices pick up the new date at their next check.
+- **Reset devices** unlinks everything on that account, so the tester can link a new device straight away (for
+  example, after a reinstall or a new PC).
+- **Turn off** revokes the code, and the device locks within a day.
+
+Before the licence function is deployed, the panel calls the database functions directly (`link_device`,
+`device_check`). The checks run on the server, but without a signed pass, so `PASS_REQUIRED` must stay `false` until
+§2 is done. After that, set `LICENCE_LIVE = true` and then `PASS_REQUIRED = true`. Beta devices then need a pass
+from the function, and it expires at the beta's end date.
+
 ## 3. Test a real purchase
 1. Make a 100% off promo code on Whop and "buy" Pro with it.
 2. Enter the key in the panel. It should say **Priism Pro**, and Settings › Plan should show the renewal date and
