@@ -100,6 +100,9 @@ await acct({ action: "release", secret: SEC });
 ok("sign out: the copy is told it moved next time", (await acct({ secret: SEC })).status === "moved");
 dbDown = true;
 ok("database down: offline (Priism keeps the pass it has)", (await handle({ device: D2, secret: SEC2 }, env, fakeFetch)).status === "offline");
+ok("database down: an invite code is offline, not invalid (no one is locked out by an outage)", (await run("PRIISM-GOOD-0001", D1)).status === "offline"
+  && (await handle({ key: "PRIISM-GOOD-0001", device: D1 }, { ...env, WHOP_API_KEY: "" }, fakeFetch)).status === "offline");
+ok("database down: a real Whop key still works", (await run("AAAAAA-MONTHLY-0001", D1)).status === "ok");
 dbDown = false;
 console.log("SUMMARY:", Object.values(R).filter(Boolean).length + "/" + Object.keys(R).length);
 process.exit(Object.values(R).every(Boolean) ? 0 : 1);

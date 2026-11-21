@@ -100,6 +100,24 @@ seen and when the code ends.
   example, after a reinstall or a new PC).
 - **Turn off** revokes the code, and the device locks within a day.
 
+**What the device secret protects against, and what it doesn't (audit, Nov 2026):**
+
+| Situation | Result |
+|---|---|
+| A tester sends their beta code to a friend | Blocked: the code is already on the tester's account ("taken"). |
+| A tester sends a link code | It works once, for 10 minutes, and moves the beta off the tester's own device. They notice. |
+| Someone copies the device id from one install into another | Blocked: they also need the secret, and the server only has its hash. |
+| Someone edits `invite` in storage by hand (devtools) | **Gets Pro while `PASS_REQUIRED = false`.** Only the signed pass stops this, so deploy the function and turn `PASS_REQUIRED` on before relying on it. |
+| Someone copies the whole browser profile or the desktop `settings.json` to a second machine | **Both copies work.** They have the same id and secret, and the server can't tell them apart. Possible later fix: a new secret on every check, with the previous one accepted for a day, so the copy that checks in second is caught. Not built: it adds lock-out risk if a reply is lost. |
+| Someone edits the extension's own code | Can't be prevented by any extension. The pass makes it a deliberate act, not a casual one. |
+| A tester goes offline or blocks the server | Pro keeps working until the pass ends: 14 days at most, and never past the beta's end. Revoking or moving takes effect at the next check (once a day when online). |
+| A tester reinstalls or clears the extension's data | It's a new device. Within 7 days of their last move they get "full" until you press **Reset devices**. This is expected support work during the beta. |
+| Guessing codes | Link codes and invite codes each have 32^8 (about 10^12) possibilities. With 15 testers that's out of reach without rate limiting (PostgREST has none). |
+
+Where the secret is stored: `chrome.storage.local` (extension), `settings.json` in the app's data folder (desktop) and
+SharedPreferences (Android), all in plain text like the rest of the settings. Other websites and extensions can't
+read them. Anyone with access to the user's computer account can.
+
 Before the licence function is deployed, the panel calls the database functions directly (`link_device`,
 `device_check`). The checks run on the server, but without a signed pass, so `PASS_REQUIRED` must stay `false` until
 §2 is done. After that, set `LICENCE_LIVE = true` and then `PASS_REQUIRED = true`. Beta devices then need a pass

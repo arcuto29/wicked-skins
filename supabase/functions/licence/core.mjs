@@ -88,18 +88,22 @@ export async function handle(input, env, fetch, now = Date.now()) {
   }
   if (!KEY_RE.test(key) || !DEV_RE.test(device)) return { status: "invalid" };
   // 1) an invite code (the same check as before, so invites keep working and count as Pro)
+  // dbDown: the invite check couldn't be asked. Then "not a Whop key" doesn't mean the code is bad (it may be an
+  // invite), so the answer is offline: Priism keeps what it has instead of locking everyone during an outage.
+  let dbDown = false;
   if (action === "check") {
     const inv = await rpc("redeem_invite", { p_code: key.toUpperCase(), p_device: device, p_app: app });
+    dbDown = inv === undefined;
     if (inv === "ok") return pass("invite", { plan: "pro" });
     if (["revoked", "full", "expired", "account"].includes(inv)) return { status: inv };   // account: a beta code, added on the website
   }
   // 2) a Whop licence key
-  if (!env.WHOP_API_KEY) return { status: "invalid" };
+  if (!env.WHOP_API_KEY) return { status: dbDown ? "offline" : "invalid" };
   const H = { Authorization: "Bearer " + env.WHOP_API_KEY, "Api-Version-Date": WHOP_VERSION, "Content-Type": "application/json" };
   let m;
   try {
     const r = await fetch(`${WHOP_API}/memberships/${encodeURIComponent(key)}`, { headers: H });
-    if (r.status === 404 || r.status === 400 || r.status === 422) return { status: "invalid" };
+    if (r.status === 404 || r.status === 400 || r.status === 422) return { status: dbDown ? "offline" : "invalid" };
     if (!r.ok) return { status: "offline" };
     m = await r.json();
   } catch { return { status: "offline" }; }
