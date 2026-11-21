@@ -396,6 +396,7 @@
       const box = $("account"); box.hidden = !user; if (!user) return;
       const r = await sb.rpc("my_access");
       if (r.error) { $("betaStatus").innerHTML = /my_access|function/i.test(r.error.message) ? "" : "<p class='hint'>Couldn't load your access: " + esc(r.error.message) + "</p>"; $("betaLinkRow").hidden = true; return; }
+      if (!r.data) { $("betaStatus").innerHTML = ""; $("betaLinkRow").hidden = true; return; }   // (not set up on the server yet)
       const a = r.data, day = (t) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       const line = a.status === "ok" ? (a.until ? `Active until ${day(a.until)}` : "Active") : a.status === "expired" ? `Ended${a.until ? " on " + day(a.until) : ""}. Thanks for testing!` : a.status === "revoked" ? "Turned off" : "No beta code on this account yet";
       const devs = (a.devices || []).map((d) => `<small>${esc(d.app || "Priism")} ··${esc(d.device)} · linked ${day(d.linked_at)} · seen ${day(d.last_seen)}${d.active ? "" : " · unlinked"}</small>`).join("");
