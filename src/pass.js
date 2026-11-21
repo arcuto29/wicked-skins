@@ -26,7 +26,7 @@
     "powerSaver", "paused", "bw", "layer", "autoQuality", "calm", "candleOn", "candleUp", "candleDown", "candleGlow", "candlePreset", "chartColors",
     "toggleKey", "focusKey", "focus", "focusHides", "wmPos"]);
   // not features: account, bookkeeping and data (left exactly as they are)
-  const INTERNAL = new Set(["invite", "pass", "deviceId", "welcomePending", "media", "mediaId", "loadouts", "wallMatch", "bracketDebug", "dayPnl", "journal", "lastPick", "sites", "siteOfferNo", "myCandles"]);
+  const INTERNAL = new Set(["invite", "pass", "deviceId", "deviceSecret", "welcomePending", "media", "mediaId", "loadouts", "wallMatch", "bracketDebug", "dayPnl", "journal", "lastPick", "sites", "siteOfferNo", "myCandles"]);
   const FREE_FORCE = { wmOn: true, wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false };
   const isFreeSkin = (id) => FREE_SKINS.includes(id);
   // the value a setting has on Free (undefined = yours)
