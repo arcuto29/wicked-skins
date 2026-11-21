@@ -53,7 +53,7 @@
         <label id="drop" class="drop">
           <input id="file" type="file" hidden accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm">
           <b id="dropTitle">Choose an image or video</b>
-          <small>PNG, JPG, WebP, GIF, AVIF, MP4 or WebM · up to 50 MB</small>
+          <small id="dropSmall">PNG, JPG, WebP, GIF, AVIF, MP4 or WebM · pictures up to 20 MB, videos up to 30 MB</small>
         </label>
         <div id="preview" class="preview" hidden></div>
         <input id="title" class="field" maxlength="60" placeholder="Title">
@@ -91,6 +91,26 @@
       <div id="invList" class="mine-list"></div>
     </section>
 
+    <section id="usage" hidden>
+      <h2 style="font-size:22px;margin:34px 0 6px">Usage <span class="adm">ADMIN</span></h2>
+      <p class="hint">How close the Workshop is to the Supabase Free plan's limits (storage and database are exact; bandwidth is an estimate from downloads: check Supabase › Usage for the real figure). Uploads stop by themselves at the storage cap below, so the plan's limit is never reached.</p>
+      <div id="usageBars" class="usage-bars"></div>
+      <p class="hint" id="usageMsg"></p>
+      <details class="usage-more"><summary>Limits</summary>
+        <div class="usage-lim">
+          <label>Wallpapers per person <input id="limUploads" class="field" type="number" min="0" max="1000"></label>
+          <label>MB per person <input id="limUserMb" class="field" type="number" min="0" max="51200"></label>
+          <label>Picture MB <input id="limImgMb" class="field" type="number" min="1" max="50"></label>
+          <label>Video MB <input id="limVidMb" class="field" type="number" min="1" max="50"></label>
+          <label>Picture size (px, longest side) <input id="limPx" class="field" type="number" min="640" max="16384"></label>
+          <label>Workshop storage cap (MB) <input id="limTotalMb" class="field" type="number" min="0" max="1048576"></label>
+        </div>
+        <button id="limSave" class="btn primary" type="button">Save limits</button> <span class="hint" id="limMsg"></span>
+      </details>
+      <div id="usageTop" class="mine-list"></div>
+      <p class="hint" id="usageOrph"></p>
+    </section>
+
     <section id="bugs" hidden>
       <h2 style="font-size:22px;margin:34px 0 6px">Bug reports <span class="adm">ADMIN</span></h2>
       <p class="hint">Sent from the Priism panel (Settings › Report a bug). Only you can see these.</p>
@@ -117,14 +137,22 @@
     <p style="color:var(--muted);font-size:13px;margin-top:30px">Each wallpaper belongs to its uploader or the original rights holder. We review uploads before they appear and remove anything that breaks the <a href="terms.html">rules</a>. If something here is yours and was posted without permission, email <span data-contact></span>.</p>
   </main>
 
-  <script src="site-config.js"></script><script src="common.js"></script><script src="supabase.js"></script><script src="lib/skins.js"></script>
+  <script src="site-config.js"></script><script src="common.js"></script><script src="supabase.js"></script><script src="lib/skins.js"></script><script src="media-prep.js"></script>
   <script>
   (function () {
     const S = window.SITE, $ = (id) => document.getElementById(id);
     const grid = $("grid"), empty = $("empty"), more = $("more");
     if (!S.supabaseUrl || !S.supabaseAnonKey) { empty.hidden = false; empty.textContent = "The Workshop opens soon."; $("submit").style.display = "none"; return; }
     const sb = supabase.createClient(S.supabaseUrl, S.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "implicit" } });
-    const BUCKET = "workshop", LIMIT = 50 * 1024 * 1024;
+    const BUCKET = "workshop", LIMIT = 50 * 1024 * 1024;   // (the storage bucket's own cap; the real limits are LIM below)
+    // the Workshop's limits (app_limits: the owner sets them); defaults until they're loaded, or on a server set up
+    // before they existed
+    let LIM = { max_uploads_per_user: 15, max_bytes_per_user: 60 * 1048576, max_image_bytes: 20 * 1048576, max_video_bytes: 30 * 1048576, max_image_px: 3840 };
+    const MBf = (b) => window.PriismMediaPrep ? PriismMediaPrep.mb(+b) : Math.round(+b / 1048576) + " MB";
+    sb.from("app_limits").select("*").eq("id", 1).maybeSingle().then((r) => { if (r && r.data) LIM = { ...LIM, ...r.data };
+      const d = document.getElementById("dropSmall"); if (d) d.textContent = `PNG, JPG, WebP, GIF, AVIF, MP4 or WebM · pictures up to ${MBf(LIM.max_image_bytes)}, videos up to ${MBf(LIM.max_video_bytes)} · up to ${LIM.max_uploads_per_user} wallpapers`; }, () => {});
+    // a refusal from the server's limits ("quota: ...") in plain words
+    const quotaMsg = (e) => { const m = String((e && e.message) || e || ""); const q = m.match(/quota:\s*(.+)$/i); return q ? q[1].charAt(0).toUpperCase() + q[1].slice(1) + "." : /row-level security|violates/i.test(m) ? "You've reached your upload limit (delete one of your wallpapers to share another)." : m; };
     const url = (p) => (p ? sb.storage.from(BUCKET).getPublicUrl(p).data.publicUrl : "");
     const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const say = (el, t) => ($(el).textContent = t);
@@ -199,9 +227,10 @@
     $("lookUpdChk").onchange = () => { $("lookGo").textContent = ownLook && $("lookUpdChk").checked ? "Update look" : "Publish look"; };
     $("lookTitle").addEventListener("input", () => { clearTimeout(checkOwnLook.t); checkOwnLook.t = setTimeout(checkOwnLook, 300); });
     $("lookWallFile").onchange = (e) => { const f = e.target.files[0]; if (!f) return;
-      if (f.size > LIMIT) { lookFile = null; return say("lookMsg", "That file is over the 50 MB limit."); }
       if (!/^(image\/(png|jpeg|webp|gif|avif)|video\/(mp4|webm))$/.test(f.type)) { lookFile = null; return say("lookMsg", "Allowed: PNG, JPG, WebP, GIF, AVIF, MP4, WebM."); }
-      lookFile = f; $("lookWallPick").textContent = f.name; say("lookMsg", ""); };
+      lookFile = null; say("lookMsg", "Getting it ready…");
+      PriismMediaPrep.prepare(f, f.type.startsWith("video") ? "video" : "image", LIM).then((r) => { lookFile = r.file; $("lookWallPick").textContent = f.name; say("lookMsg", r.note || ""); },
+        (err) => { lookFile = null; say("lookMsg", err.message); }); };
     function readLook() {
       // the look comes in the address (#look=...); it's also kept here, so signing in (which reloads the page
       // without it) doesn't lose it. Cleared once it's published, or after a day.
@@ -238,7 +267,7 @@
       $("lookGo").disabled = true; say("lookMsg", lookFile ? "Uploading the wallpaper…" : "Sharing…");
       let data = { ...pendingLook.data }, wallNote = "";
       if (lookFile) {
-        try { const kind = lookFile.type.startsWith("video") ? "video" : "image", thumb = await makeThumb(lookFile, kind).catch(() => null);
+        try { const kind = lookFile.type.startsWith("video") ? "video" : "image", thumb = await PriismMediaPrep.thumb(lookFile, kind).catch(() => null);
           const w = await uploadWallpaper(lookFile, kind, title, thumb); data.wallId = w.id; wallNote = w.status === "approved" ? "" : " Its wallpaper is in review too.";
           say("lookMsg", "Sharing…"); }
         catch (e) { $("lookGo").disabled = false; return say("lookMsg", "Couldn't upload the wallpaper: " + String((e && e.message) || e)); }
@@ -261,6 +290,39 @@
       pendingLook = null; try { localStorage.removeItem("priismPendingLook"); } catch {} history.replaceState(null, "", location.pathname); loadLooks(); renderMine();
     };
 
+
+    // ---------- usage (admins): storage, database and estimated bandwidth against the Free plan; limits; clean-up ----------
+    async function renderUsage() {
+      const box = $("usage"); if (!profile || !profile.is_admin) { box.hidden = true; return; }
+      box.hidden = false;
+      const r = await sb.rpc("workshop_usage");
+      if (r.error) { $("usageBars").innerHTML = /workshop_usage|schema cache|function/i.test(r.error.message) ? "<p class='hint'>Usage isn't set up on the server yet: re-run supabase/schema.sql in Supabase (SQL Editor).</p>" : "<p class='hint'>Couldn't load usage: " + esc(r.error.message) + "</p>"; return; }
+      const u = r.data, L = u.limits || {};
+      const bar = (name, used, of, note) => { const p = of > 0 ? Math.min(100, (used / of) * 100) : 0, lvl = p >= 90 ? "bad" : p >= 70 ? "warn" : "ok";
+        return `<div class="ubar ${lvl}"><div class="ubar-t"><b>${esc(name)}</b><span>${MBf(used)} of ${MBf(of)} (${Math.round(p)}%)</span></div><i style="width:${p.toFixed(1)}%"></i>${note ? `<small>${esc(note)}</small>` : ""}</div>`; };
+      $("usageBars").innerHTML =
+        bar("File storage (all buckets)", +u.storage_bytes, +L.free_storage_bytes, `Workshop: ${MBf(u.workshop_bytes)} in ${u.objects} files · uploads stop at the cap of ${MBf(L.max_total_bytes)}`) +
+        bar("Database", +u.db_bytes, +L.free_db_bytes, `${u.wallpapers} wallpapers (${u.pending} waiting for review) from ${u.uploaders} people`) +
+        bar("Bandwidth this month (estimate)", +u.month_bytes, +L.free_egress_bytes, `${u.month_downloads} wallpaper downloads; browsing thumbnails isn't counted here`);
+      const worst = Math.max(+u.storage_bytes / +L.free_storage_bytes, +u.db_bytes / +L.free_db_bytes, +u.month_bytes / +L.free_egress_bytes);
+      say("usageMsg", worst >= 0.9 ? "Close to a Free plan limit: lower the limits below, clean up, or plan for Supabase Pro ($25/month). Nothing is upgraded automatically."
+        : worst >= 0.7 ? "Over 70% of a Free plan limit: keep an eye on it." : "Well inside the Free plan.");
+      const MB = 1048576, val = (id, v) => { const el = $(id); if (document.activeElement !== el) el.value = v; };
+      val("limUploads", L.max_uploads_per_user); val("limUserMb", Math.round(L.max_bytes_per_user / MB)); val("limImgMb", Math.round(L.max_image_bytes / MB));
+      val("limVidMb", Math.round(L.max_video_bytes / MB)); val("limPx", L.max_image_px); val("limTotalMb", Math.round(L.max_total_bytes / MB));
+      $("usageTop").innerHTML = (u.top || []).length ? "<p class='hint' style='margin-top:12px'>Who uses the most storage:</p>" + u.top.map((t) => `<div class="mine-row"><div class="mine-t"><b>${esc(t.name || t.owner)}</b><small>${t.files} files · ${MBf(t.bytes)}</small></div></div>`).join("") : "";
+      const orph = u.orphans || [], ob = orph.reduce((a, o) => a + (+o.bytes || 0), 0);
+      $("usageOrph").innerHTML = orph.length ? `${orph.length} file${orph.length === 1 ? "" : "s"} (${MBf(ob)}) from uploads that never finished. <button class="btn" type="button" id="orphGo">Delete them</button>` : "";
+      if (orph.length) $("orphGo").onclick = async (e) => { if (!confirm(`Delete ${orph.length} unused file(s)? Wallpapers people shared aren't touched.`)) return;
+        e.target.disabled = true; const x = await sb.storage.from(BUCKET).remove(orph.map((o) => o.path)); if (x.error) { e.target.disabled = false; return alert(x.error.message); } renderUsage(); };
+    }
+    $("limSave").onclick = async () => {
+      const MB = 1048576, n = (id) => Math.max(0, Math.round(+$(id).value || 0));
+      const v = { max_uploads_per_user: n("limUploads"), max_bytes_per_user: n("limUserMb") * MB, max_image_bytes: Math.min(50, Math.max(1, n("limImgMb"))) * MB,
+        max_video_bytes: Math.min(50, Math.max(1, n("limVidMb"))) * MB, max_image_px: Math.min(16384, Math.max(640, n("limPx"))), max_total_bytes: n("limTotalMb") * MB, updated_at: new Date().toISOString() };
+      const r = await sb.from("app_limits").update(v).eq("id", 1).select("id");
+      say("limMsg", r.error ? "Couldn't save: " + r.error.message : (r.data || []).length ? "Saved. New uploads use these limits now." : "Not saved (admins only)."); if (!r.error) { LIM = { ...LIM, ...v }; renderUsage(); }
+    };
     // ---------- invites (admins): make, copy, turn off / on, free a device, delete ----------
     const CODE_ABC = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
     const newCode = () => { const r = crypto.getRandomValues(new Uint32Array(8)); let s = ""; for (let i = 0; i < 8; i++) s += CODE_ABC[r[i] % CODE_ABC.length]; return "PRIISM-" + s.slice(0, 4) + "-" + s.slice(4); };
@@ -383,7 +445,7 @@
       $("myShares").hidden = !user;
       if (user) { $("signout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); await refresh(); say("shareMsg", ""); }; renderMine(); }
       say("ownerNote", user && profile && profile.is_admin ? "You're the owner: what you share goes live straight away." : user ? "Shares are checked before everyone can see them (usually within a day). You'll see yours under Your shares." : "");
-      renderReview(); renderInvites(); renderBugs();
+      renderReview(); renderInvites(); renderBugs(); renderUsage();
     }
     sb.auth.onAuthStateChange(() => refresh());
     refresh().then(() => { if (location.hash === "#mine" && user) $("myShares").scrollIntoView(); });
@@ -407,40 +469,39 @@
     async function pick(f) {
       say("shareMsg", "");
       if (!f) return;
-      if (f.size > LIMIT) return say("shareMsg", "That file is over the 50 MB limit.");
       const kind = f.type.startsWith("video") ? "video" : "image";
       if (!/^(image\/(png|jpeg|webp|gif|avif)|video\/(mp4|webm))$/.test(f.type)) return say("shareMsg", "Allowed: PNG, JPG, WebP, GIF, AVIF, MP4, WebM.");
-      chosen = { file: f, kind };
+      // the original as you made it, unless it's over the limits (then a high-quality 4K WebP); see media-prep.js
+      chosen = null; say("shareMsg", "Getting it ready\u2026");
+      let prep; try { prep = await PriismMediaPrep.prepare(f, kind, LIM); } catch (err) { update(); return say("shareMsg", err.message); }
+      say("shareMsg", prep.note || "");
+      chosen = { file: prep.file, kind };
       $("dropTitle").textContent = f.name;
       if (!$("title").value) $("title").value = f.name.replace(/\.[^.]+$/, "").slice(0, 60);
-      const src = URL.createObjectURL(f);
+      const src = URL.createObjectURL(prep.file);
       $("preview").hidden = false;
       $("preview").innerHTML = kind === "video" ? `<video src="${src}" autoplay loop muted playsinline></video>` : `<img src="${src}" alt="">`;
-      thumbBlob = await makeThumb(f, kind).catch(() => null);
+      thumbBlob = await PriismMediaPrep.thumb(prep.file, kind).catch(() => null);
       update();
-    }
-    function makeThumb(file, kind) {
-      return new Promise((res, rej) => {
-        const draw = (img, w, h) => { const c = document.createElement("canvas"); const scale = Math.min(1, 640 / w); c.width = w * scale; c.height = h * scale;
-          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); c.toBlob((b) => (b ? res(b) : rej()), "image/jpeg", 0.82); };
-        if (kind === "image") { const i = new Image(); i.onload = () => draw(i, i.naturalWidth, i.naturalHeight); i.onerror = rej; i.src = URL.createObjectURL(file); }
-        else { const v = document.createElement("video"); v.muted = true; v.src = URL.createObjectURL(file); v.onloadeddata = () => { v.currentTime = Math.min(0.1, v.duration || 0.1); }; v.onseeked = () => draw(v, v.videoWidth, v.videoHeight); v.onerror = rej; }
-      });
     }
     // one wallpaper into the Workshop (file + thumbnail + quality/OLED labels): { id, status }
     async function uploadWallpaper(file, kind, title, thumb) {
       const ext = (file.type.split("/")[1] || "png").replace("jpeg", "jpg");
       const base = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
       const path = `${user.id}/${base}.${ext}`;
-      const r = await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type });
+      // files are never changed after upload (a new name each time), so browsers and the CDN may keep them for a year:
+      // browsing the Workshop again costs no bandwidth
+      const CACHE = "31536000";
+      const r = await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type, cacheControl: CACHE });
       if (r.error) throw r.error;
       let thumbPath = null;
-      if (thumb) { thumbPath = `${user.id}/${base}.thumb.jpg`; const tr = await sb.storage.from(BUCKET).upload(thumbPath, thumb, { contentType: "image/jpeg" }); if (tr.error) thumbPath = null; }
+      if (thumb && thumb.blob) { thumbPath = `${user.id}/${base}.thumb.${thumb.ext}`; const tr = await sb.storage.from(BUCKET).upload(thumbPath, thumb.blob, { contentType: thumb.type, cacheControl: CACHE }); if (tr.error) thumbPath = null; }
       let lab = null; try { lab = await window.PriismWallInfo.measure(file, kind); } catch {}
       const row = { title, kind, file_path: path, thumb_path: thumbPath, size_bytes: file.size };
       let ins = await sb.from("wallpapers").insert(lab && lab.w ? { ...row, width: lab.w, height: lab.h, oled: !!lab.oled } : row).select("id,status").single();
       if (ins.error && lab && /column|width|oled/i.test(ins.error.message || "")) ins = await sb.from("wallpapers").insert(row).select("id,status").single();
-      if (ins.error) throw ins.error;
+      // not saved (a limit, or the connection): remove the files again, so nothing is left behind using up storage
+      if (ins.error) { await sb.storage.from(BUCKET).remove([path, thumbPath].filter(Boolean)).catch(() => {}); throw ins.error; }
       return ins.data;
     }
     $("rights").onchange = update; $("title").oninput = update;
@@ -460,7 +521,7 @@
         // the most common setup gap: supabase/schema.sql hasn't been run (or not all of it), so there's no file storage yet
         say("shareMsg", /bucket not found|relation .* does not exist|schema cache/i.test(m)
           ? "Uploads aren't set up on the server yet (the site owner needs to run supabase/schema.sql in Supabase). Nothing was shared."
-          : "Couldn't share: " + m);
+          : "Couldn't share: " + quotaMsg(e));
         $("share").disabled = false;
       }
     };
@@ -473,6 +534,9 @@
       const items = [...(w.data || []).map((x) => ({ ...x, t: "wallpaper" })), ...(l.data || []).map((x) => ({ ...x, t: "look" }))]
         .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       box.innerHTML = items.length ? "" : "<p class='hint'>Nothing yet. Share a wallpaper above, or publish a look from Priism (Saved › Publish).</p>";
+      sb.rpc("my_workshop_usage").then((r) => { const u = r && r.data; if (!u) return;
+        say("mySharesHint", u.unlimited ? "Everything you've shared, and whether it's live yet. As the owner you have no upload limits."
+          : `Everything you've shared, and whether it's live yet. You've shared ${u.uploads} of ${u.max_uploads} wallpapers, using ${MBf(u.bytes)} of ${MBf(u.max_bytes)}. Delete anything any time to make room.`); }, () => {});
       const badge = (x) => x.status === "approved" ? `<span class="st live">Live</span>` : x.status === "pending" ? `<span class="st rev">In review</span>`
         : `<span class="st rej">Not approved</span>`;
       for (const x of items) {

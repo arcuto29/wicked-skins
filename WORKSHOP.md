@@ -39,11 +39,15 @@ its rules. Looks are settings only (no files), shared from the extension via **W
 ## How it works
 - **Extension:** browse approved wallpapers and tap **Use** — no account, ever. "Use" downloads the file into Uploads
   and puts it on the chart. A **Submit on the website** link opens the site for sharing.
-- **Website:** sign in to **share** (max 50 MB; MP4, WebM, PNG, JPG, WebP, GIF, AVIF). Anyone can browse there too.
+- **Website:** sign in to **share** (MP4, WebM, PNG, JPG, WebP, GIF, AVIF). By default you can share up to 15 wallpapers
+  using up to 60 MB, with pictures up to 20 MB and 4K and videos up to 30 MB. The owner changes these on the Workshop
+  page under Usage. Pictures over the limits are scaled to 4K WebP in the browser; everything else is kept as uploaded.
+  Anyone can browse there too.
 - Uploads wait for admin review; an admin's own uploads are approved automatically.
 - 3 reports hide a wallpaper until an admin reviews it again.
-- All of this is enforced in the database (`supabase/schema.sql`), verified by 27 tests.
+- All of this is enforced in the database (`supabase/schema.sql`), verified by `supabase/test.mjs` (CI).
 
 ## Costs
-Free tier is fine to start. Videos use bandwidth: when the Workshop gets popular, expect the Pro plan (~$25/month)
-or move files to cheaper storage.
+The beta fits Supabase's Free plan, with upload limits and a storage cap that stop uploads before the plan's quota.
+Usage is monitored on the Workshop page (admins). Limits, estimates for 100–1,000 users and what's needed beyond
+Free are in [docs/FREE_TIER.md](docs/FREE_TIER.md).
