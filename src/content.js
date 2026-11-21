@@ -1039,12 +1039,14 @@
   const surfSeen = new WeakSet();   // elements already looked at: getComputedStyle once per element, not every rescan
   function markSurfaces() {
     surfT = 0;
-    const root = document.querySelector("[data-bd-lwroot], .tv-lightweight-charts");
+    const roots = [...document.querySelectorAll("[data-bd-lwroot], .tv-lightweight-charts")];   // every chart, not just the first
     let n = 0;
     for (const el of document.body ? document.body.querySelectorAll("div, aside, header, nav, section, main, footer, ul, li, table, td, th, button, input, select") : []) {
       if (++n > 6000) break;
       if (surfSeen.has(el)) continue; surfSeen.add(el);
-      if (el.hasAttribute("data-bd-surf") || el.closest("#bd-layer, #bd-timer, #bd-goal, #bd-pnl, #bd-wm, #bd-tip") || (root && root.contains(el))) continue;
+      // never Priism's own layers (in a layout each chart's wallpaper, with its dim, is a .bd-emb box inside that chart: it
+      // was taken for the app's panel and painted the panel colour, a tint over the wallpaper) nor any chart's insides
+      if (el.hasAttribute("data-bd-surf") || el.closest("#bd-layer, .bd-emb, .bd-num, #bd-lens, #bd-timer, #bd-goal, #bd-pnl, #bd-wm, #bd-tip") || roots.some((r) => r.contains(el))) continue;
       const bg = getComputedStyle(el).backgroundColor, m = bg.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/);
       if (!m || (m[4] !== undefined && +m[4] < 0.5)) continue;
       const r = el.getBoundingClientRect(); if (r.width * r.height < 600) continue;
@@ -1102,7 +1104,7 @@
     if (!appWanted()) { if (surfObs) { surfObs.disconnect(); surfObs = null; } return; }
     if (surfObs || !document.body) return;
     surfObs = new MutationObserver(() => {
-      if (panelApplied && !surfT) surfT = setTimeout(markSurfaces, 2000);
+      if (panelCol && !surfT) surfT = setTimeout(markSurfaces, 2000);
       if (!tkT) tkT = setTimeout(() => { tkT = 0; markTickers(); }, 2000);
     });
     surfObs.observe(document.body, { childList: true, subtree: true, characterData: true });
@@ -1120,14 +1122,14 @@
     st.textContent = `html.bd-app-panels [data-bd-surf="d"]{background-color:${col}!important;border-color:${up(0.12)}!important}` +
       `html.bd-app-panels [data-bd-surf="l"]{background-color:${up(0.86)}!important}`;
   }
-  let panelApplied = null;
+  let panelApplied = null, panelCol = "";   // what was applied (colour + glass, to skip repeats) / the panel colour itself
   function applyPanels() {
     const h = document.documentElement, glass = cfg.enabled && cfg.pnStyle === "glass";
     // Glass needs a colour to make see-through: TradingView's own dark / light panel colour if Panels is TradingView's
     const col = cfg.enabled ? (panelColour() || (glass ? (h.classList.contains("theme-light") ? "#ffffff" : "#10131c") : "") ) : "";
     applyPanelDeco();
     if (col + glass === panelApplied) return;    // nothing changed: never restyle the page for nothing (keeps it smooth)
-    panelApplied = col + glass;
+    panelApplied = col + glass; panelCol = col;
     applyAppPanels(col);
     h.classList.toggle("bd-panels", !!col && !focusAll());
     // ONE stylesheet holds every override, written in a single update (setting hundreds of properties one by one made
@@ -1375,7 +1377,7 @@
     if (isLwPage() && (accent || cfg.tkOn)) { markTickers(); watchApp(); }
   }
   // lw.js marks the page once it finds a Lightweight Charts chart (can be after we start): apply the app styling then
-  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelApplied) applyAppPanels(panelApplied); tkApplied = ""; applyTicker(); lgApplied = ""; applyLegend(); markTickers(); watchApp(); } })
+  new MutationObserver(() => { if (isLwPage() && !document.documentElement.classList.contains("bd-lwpage")) { applyUiStyle(); if (panelCol) applyAppPanels(panelCol); tkApplied = ""; applyTicker(); lgApplied = ""; applyLegend(); markTickers(); watchApp(); } })
     .observe(document.documentElement, { attributes: true, attributeFilter: ["data-bd-lw"] });
 
   // Pages built on Lightweight Charts (not TradingView's own charts), like nq.vision: the app around the chart has solid
@@ -3179,7 +3181,7 @@
     const h = document.documentElement, f = !!(cfg.enabled && cfg.focus);
     h.classList.toggle("bd-focus", f);
     const wantOn = cfg.enabled && !focusAll();
-    if (h.classList.contains("bd-on") !== wantOn && cfg.enabled) { h.classList.toggle("bd-on", wantOn); h.classList.toggle("bd-panels", wantOn && !!panelApplied); repaint(); }
+    if (h.classList.contains("bd-on") !== wantOn && cfg.enabled) { h.classList.toggle("bd-on", wantOn); h.classList.toggle("bd-panels", wantOn && !!panelCol); repaint(); }
   }
 
   // ---------- session timer ----------
@@ -3484,4 +3486,221 @@
       if (keys.includes("pass") || keys.includes("deviceId")) refreshPass().then(go); else go();
     };
   }
+
+  // ---------- TopstepX: the platform's own panels in your look ----------
+  // TopstepX (the ProjectX platform) keeps its chart in a frame; its panels, order ticket, tables and menus are in the
+  // top page, where nothing else of Priism runs. This styles them with the same settings as TradingView's panels
+  // (TradingView tab › Bars & panels: Panel colours, Panel style, Rounded, and the accent Match everything sets):
+  //  - TopstepX's own design tokens (--tds-*): surfaces, borders, accent, focus ring, selection. Its trading colours
+  //    (buy / sell, profit / loss, flashes) and status colours (warnings, errors) are never touched.
+  //  - its older parts that don't use the tokens yet: dock panels and tabs, tables, menus, dialogs, the order ticket's
+  //    surfaces. Only colours, borders and corner radius: nothing moves, resizes or changes how it works.
+  // One stylesheet, no observers; if TopstepX changes these parts, the rules simply stop matching.
+  if (window === window.top && (/(^|\.)(topstepx|projectx)\.com$/.test(location.hostname) || document.documentElement.hasAttribute("data-tds-brand"))) (function topstepx() {
+    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look" };
+    let c = { ...KEYS }, st = null, tries = 0, pro = false;
+    const hex = (h) => /^#[0-9a-f]{6}$/i.test(h || "") ? h : null;
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), toHex = (a) => "#" + a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+    const rgba = (h, a) => `rgba(${rgb(h).join(",")},${a})`, mix = (a, b, f) => toHex(rgb(a).map((v, i) => v + (rgb(b)[i] - v) * f));
+    const accent = () => hex(c.uiAccent) || (c.wallMatch && Array.isArray(c.wallMatch.colors) && hex(c.wallMatch.colors[0])) || hex(c.candleUp) || "#7c6cff";
+    // the panel colour, exactly as on TradingView (panelColour): your colour, or a deep tint of the wallpaper's accent
+    const panel = () => c.panelMode === "color" ? hex(c.panelColor) : c.panelMode === "skin" ? toHex(rgb(accent()).map((v, i) => [11, 13, 19][i] + (v - [11, 13, 19][i]) * 0.14)) : null;
+    function css() {
+      const P = panel(); if (!P || !c.enabled || !pro) return "";
+      const A = accent(), lum = (x) => { const [r, g, b] = rgb(x).map((v) => v / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const S0 = mix(P, "#000000", 0.35), S1 = mix(P, "#ffffff", 0.04), S2 = mix(P, "#ffffff", 0.07), S3 = mix(P, "#ffffff", 0.1), glass = c.pnStyle === "glass";
+      const BG = glass ? rgba(P, 0.74) : P, L1 = rgba(mix("#ffffff", A, 0.25), 0.08), L2 = rgba(mix("#ffffff", A, 0.25), 0.13);
+      const edge = c.pnStyle === "neon" || c.pnStyle === "aurora" ? rgba(A, 0.5) : c.pnStyle === "outline" ? rgba(A, 0.3) : L2, R = c.pnRound ? "10px" : null;
+      const H = "html.bd-tsx", on = lum(A) > 0.55 ? "#0b0c10" : "#ffffff";
+      const barBG = glass ? rgba(S0, 0.55) : S0, blur = glass ? "backdrop-filter:blur(14px) saturate(1.2);" : "";
+      const barEdge = (o) => c.pnStyle === "neon" || c.pnStyle === "aurora" ? `inset ${o} 0 ${rgba(A, 0.6)},0 0 14px ${rgba(A, 0.16)}`
+        : c.pnStyle === "outline" ? `inset ${o} 0 ${rgba(A, 0.35)}` : `inset ${o} 0 ${L1}`;
+      return `${H},${H} [data-tds-brand]{--tds-color-surface-sunken:${S0}!important;--tds-color-surface-base:${BG}!important;--tds-color-surface-raised:${S1}!important;--tds-color-surface-elevated:${S2}!important;--tds-color-surface-overlay:${S3}!important;` +
+        `--tds-color-brand-panel:${glass ? rgba(P, 0.7) : P}!important;--tds-color-topstepx-panel-glass:${rgba(P, 0.7)}!important;--tds-color-brand-page:${S0}!important;--tds-brand-page-gradient:radial-gradient(ellipse at top,${rgba(A, 0.12)} 0%,${S0} 58%,#000 100%)!important;` +
+        `--tds-color-border-subtle:${L1}!important;--tds-color-border-default:${L2}!important;--tds-color-accent-solid:${A}!important;--tds-color-accent-solid-hover:${mix(A, "#ffffff", 0.15)}!important;--tds-color-accent-on-solid:${on}!important;` +
+        `--tds-color-accent-fg:${A}!important;--tds-color-accent-indicator:${A}!important;--tds-color-accent-subtle:${rgba(A, 0.16)}!important;--tds-color-accent-border:${rgba(A, 0.6)}!important;--tds-color-focus-ring:${A}!important;` +
+        `--tds-color-state-selected:${rgba(A, 0.12)}!important;--tds-color-state-selected-hover:${rgba(A, 0.16)}!important;${R ? `--tds-radius-md:${R}!important;--tds-shape-container:${R}!important;` : ""}}` +
+        // the dock: panels, tab bars, the active tab's line, its menus
+        `${H} .dock-panel{background-color:${BG}!important;border-color:${edge}!important;${R ? `border-radius:${R}!important;` : ""}}` +
+        `${H} .dock-bar,${H} .dock-nav{background-color:${S1}!important}${H} .dock-tab{border-bottom-color:${L1}!important}${H} .dock-ink-bar{background-color:${A}!important}` +
+        `${H} .dock-dropdown-menu,${H} .dropdown-menu,${H} .react-contextmenu,${H} .MuiMenu-paper,${H} .MuiPopover-paper{background-color:${S3}!important;border:1px solid ${L2}!important}` +
+        `${H} .dock-dropdown-menu-item:hover,${H} .dropdown-item:hover,${H} .react-contextmenu-item:hover,${H} .MuiMenuItem-root:hover{background-color:${rgba(A, 0.12)}!important}` +
+        `${H} .modal-content,${H} .MuiDialog-paper{background-color:${S2}!important;border-color:${L2}!important}` +
+        // tables (positions, orders, trades): headers, separators, row hover. Values and their colours stay as they are.
+        `${H} .MuiTableHead-root .MuiTableCell-head,${H} .rt-thead.-header{background-color:${S1}!important}` +
+        `${H} .MuiTableCell-root,${H} .rt-tr-group,${H} .rt-thead.-header{border-bottom-color:${L1}!important}` +
+        `${H} .MuiTableBody-root .MuiTableRow-root:hover,${H} .rt-tbody .rt-tr:hover{background-color:${rgba(A, 0.07)}!important}` +
+        // the order ticket: its surface and fields (Buy / Sell, their colours and every button stay TopstepX's own)
+        `${H} [class*="ordercard-module__cardWrapper"]{background-color:${BG}!important}` +
+        `${H} [class*="ordercard-module__inputContent"],${H} [class*="ordercard-module__inputMarketContent"]{background-color:${S0}!important;border-color:${L2}!important}` +
+        `${H} [class*="ordercard-module__inputContent"]:focus-within{border-color:${A}!important;box-shadow:0 0 0 1px ${rgba(A, 0.35)}!important}` +
+        `${H} [class*="dom-module__domHeader"]{background-color:${S1}!important}` +
+        // the left icon bar and the top account bar (found by where they are: see markBars), and their known classes
+        // They follow your panel settings like the panels do: Panel style (glass = see-through and frosted, over the
+        // backdrop; neon / aurora = a glowing accent edge; outline = an accent line), Rounded, colour, accent.
+        // Edges are shadows, never borders, so nothing resizes.
+        `${H} [data-testid="user-layout-container"]{background:radial-gradient(ellipse at top,${rgba(A, 0.14)} 0%,${S0} 55%,${mix(S0, "#000000", 0.5)} 100%)!important;background-color:${S0}!important}` +
+        `${H} [data-bd-tsx="side"],${H} [data-testid="sidebar-container"],${H} .sidebar .main-menu,${H} .MuiDrawer-paper{background-color:${barBG}!important;box-shadow:${barEdge("-1px 0")}!important;${blur}}` +
+        `${H} [data-bd-tsx="top"],${H} [data-testid="navbar-container"],${H} .navbar,${H} .MuiAppBar-root{background-color:${barBG}!important;box-shadow:${barEdge("0 -1px")}!important;${blur}${R ? `border-radius:0 0 ${R} ${R}!important;` : ""}}` +
+        `${H} [data-bd-tsx="fill"]{background-color:transparent!important}` +
+        // every other page (Platform Settings, Stats, Store…): its dark neutral surfaces, by how dark they were (see markSurfaces)
+        `${H} [data-bd-tsx-surf="0"]{background-color:${S0}!important}${H} [data-bd-tsx-surf="1"]{background-color:${BG}!important}` +
+        `${H} [data-bd-tsx-surf="2"]{background-color:${S1}!important}${H} [data-bd-tsx-surf="3"]{background-color:${S2}!important}` +
+        `${H} [data-bd-tsx="field"]{background-color:${S1}!important;border-color:${L2}!important}` +
+        `html.bd-tsx-logo [data-bd-tsx-logo]{opacity:0!important}@keyframes bd-tsx-sheen{0%,62%{transform:translateX(-120%)}100%{transform:translateX(120%)}}` +
+        `@keyframes bd-tsx-spin{to{transform:rotate(1turn)}}@keyframes bd-tsx-pulse{50%{opacity:.55}}` +
+        `@media (prefers-reduced-motion:reduce){#bd-tsx-logo i{animation:none!important;opacity:0}#bd-tsx-logo b,#bd-tsx-logo u{animation:none!important}}` +
+        `${H} .sidebar .main-menu ul li.active a i{background:${A}!important;color:${on}!important}`;
+    }
+    // The left icon bar and the top account bar are built at run time with generated class names, so they're found by
+    // where they are: the element stack at a few points (left edge, top edge), no page-wide search and no observer.
+    //  side / top = the bar itself; fill = an inner box in the bar's own colour (made see-through, so the bar's new
+    //  colour shows); field = a box in another solid colour inside the top bar (the account picker)
+    const solid = (el) => { const c = getComputedStyle(el).backgroundColor, m = c.match(/[\d.]+/g); return m && (m.length < 4 || +m[3] > 0.6) ? c : null; };
+    function markBars() {
+      if (!document.body) return false;
+      const W = innerWidth, Hh = innerHeight, found = { side: null, top: null };
+      const isSide = (r) => r.left <= 2 && r.width >= 24 && r.width <= 140 && r.height >= Hh * 0.6;
+      const isTop = (r) => r.top <= 2 && r.height >= 18 && r.height <= 90 && r.width >= W * 0.5;
+      // the outermost element at those points with the bar's shape (whatever its own colour: the live app's bars are
+      // often see-through, their black coming from the page or a full-size box inside)
+      const pick = (pts, test) => { let best = null, bestA = 0;
+        for (const [x, y] of pts) for (const el of document.elementsFromPoint(x, y)) {
+          if (el === document.documentElement || el === document.body || el.tagName === "IFRAME") continue;
+          const r = el.getBoundingClientRect(); if (test(r) && r.width * r.height >= bestA) { best = el; bestA = r.width * r.height; } }   // (>=: the outer of same-size boxes)
+        return best; };
+      // TopstepX names both bars for its own tests (data-testid, from its app code): use those first. The top bar
+      // sits in the column right of the left bar, under any banner, so it isn't always at the window's top edge.
+      found.side = document.querySelector('[data-testid="sidebar-container"]') || pick([[10, Hh * 0.5], [10, Hh * 0.7], [10, Hh * 0.35]], isSide);
+      found.top = document.querySelector('[data-testid="navbar-container"]') || pick([[W * 0.5, 10], [W * 0.35, 10], [W * 0.65, 10], [W * 0.8, 10]], isTop);
+      // the logo: TopstepX's own picture at the top of the left bar (your logo goes exactly over it)
+      if (found.side && !(logoEl && logoEl.isConnected)) {
+        const rb = found.side.getBoundingClientRect();
+        logoEl = [...found.side.querySelectorAll("img, svg")].find((e) => { const r = e.getBoundingClientRect(); return r.width >= 20 && r.height >= 16 && r.height <= 90 && r.top - rb.top < 80; }) || null;
+        if (!logoEl) for (const el of document.elementsFromPoint(rb.left + rb.width / 2, rb.top + 22)) {
+          if (el === found.side || !found.side.contains(el)) continue;
+          const r = el.getBoundingClientRect(); if (r.width >= 20 && r.height >= 16 && r.height <= 90 && r.top - rb.top < 60) logoEl = el; }
+        if (logoEl) logoEl.setAttribute("data-bd-tsx-logo", "");
+      }
+      for (const [k, el] of Object.entries(found)) {
+        if (!el) continue;
+        if (el.getAttribute("data-bd-tsx") !== k) el.setAttribute("data-bd-tsx", k);
+        const rb = el.getBoundingClientRect();
+        // boxes inside the bar that paint it black: full-size ones go see-through (the bar's new colour shows); a smaller
+        // dark box in the top bar (the account picker) takes the raised colour. Buttons, inputs, images keep theirs.
+        const pts = k === "side" ? [[rb.left + rb.width / 2, Hh * 0.3], [rb.left + 6, Hh * 0.5], [rb.left + rb.width / 2, Hh * 0.75], [rb.left + 4, rb.bottom - 8]]
+          : [[W * 0.1, rb.top + rb.height / 2], [W * 0.35, rb.top + rb.height / 2], [W * 0.5, rb.top + 3], [W * 0.65, rb.top + rb.height / 2], [W * 0.9, rb.top + rb.height / 2]];
+        for (const [x, y] of pts) for (const c of document.elementsFromPoint(x, y)) {
+          if (c === el || !el.contains(c) || c.hasAttribute("data-bd-tsx") || c.matches("button, [role=button], input, select, img, svg, svg *, canvas")) continue;
+          const bg = solid(c); if (!bg) continue;
+          const m = bg.match(/[\d.]+/g).slice(0, 3).map(Number), dark = m[0] + m[1] + m[2] < 150, r = c.getBoundingClientRect();
+          if (!dark) continue;
+          const full = k === "side" ? r.width >= rb.width * 0.8 : r.height >= rb.height * 0.8 && r.width >= rb.width * 0.4;
+          if (full) c.setAttribute("data-bd-tsx", "fill");
+          else if (k === "top" && r.width > 60 && r.height < rb.height) c.setAttribute("data-bd-tsx", "field");
+        }
+      }
+      // for troubleshooting: what was found (read with document.documentElement.dataset.bdTsxFound)
+      const d = (el) => el ? `${el.tagName.toLowerCase()}.${String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className).split(/\s+/)[0] || ""} ${[...Object.values(el.getBoundingClientRect().toJSON())].slice(0, 4).map(Math.round).join(",")}` : "none";
+      document.documentElement.dataset.bdTsxFound = `side: ${d(found.side)} | top: ${d(found.top)}`;
+      return !!(found.side && found.top);
+    }
+    // Your logo on TopstepX: a badge drawn exactly over TopstepX's own logo (same box: nothing moves; clicks go through
+    // to its link). Priism = the Priism mark, Your name = your text. Both in your look: a dark glass tile in the panel
+    // colour, an accent edge and glow, the mark / letters filled with your wallpaper's colours, and a slow light sweep
+    // (off with reduced motion). Drawn once as an SVG (crisp at any zoom), redrawn only when the look changes.
+    let logoEl = null, logoDiv = null, logoSig = "";
+    function renderLogo() {
+      const H = document.documentElement, mode = c.tsxLogo === "look" || c.tsxLogo === "text" ? c.tsxLogo : "own";
+      const show = mode !== "own" && H.classList.contains("bd-tsx") && logoEl && logoEl.isConnected;
+      H.classList.toggle("bd-tsx-logo", !!show);
+      if (!show) { if (logoDiv) { logoDiv.remove(); logoDiv = null; logoSig = ""; } return; }
+      const r = logoEl.getBoundingClientRect(), W = Math.max(20, Math.round(r.width)), Hh = Math.max(16, Math.round(r.height));
+      // Logo colours: your look's (accent + wallpaper colours), a rainbow, or one colour you pick (in light-to-deep shades)
+      const P = panel() || "#0b0d12", wall = (c.wallMatch && Array.isArray(c.wallMatch.colors) ? c.wallMatch.colors.map(hex).filter(Boolean) : []);
+      const RAINBOW = ["#ff3b6b", "#ff9a3c", "#ffe14a", "#3dff9a", "#38d6ff", "#6f6bff", "#ff4ff0"];
+      const pick = hex(c.tsxLogoColor), rainbow = c.tsxLogoColor === "rainbow";
+      const A = rainbow ? "#9b6bff" : pick || accent();
+      const stops = rainbow ? RAINBOW : pick ? [mix(pick, "#ffffff", 0.6), pick, mix(pick, "#000000", 0.35)]
+        : [mix(A, "#ffffff", 0.55), A, wall.find((x) => x.toLowerCase() !== A.toLowerCase()) || mix(A, "#000000", 0.25)];
+      const name = mode === "text" ? String(c.tsxLogoText || "").trim().slice(0, 24) : "";
+      const sig = [mode, name, W, Hh, A, P, stops.join(""), c.tsxLogoColor].join("|");
+      if (!logoDiv) { logoDiv = document.createElement("div"); logoDiv.id = "bd-tsx-logo"; logoDiv.setAttribute("aria-hidden", "true"); document.documentElement.appendChild(logoDiv); }
+      logoDiv.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${W}px;height:${Hh}px;z-index:2147483000;pointer-events:none;border-radius:${Math.min(10, Hh * 0.24)}px;overflow:hidden;isolation:isolate;` +
+        `box-shadow:0 0 18px -2px ${rgba(A, 0.7)},0 0 4px ${rgba(A, 0.55)},0 0 30px -6px ${rgba(stops[2], 0.6)}`;
+      if (sig === logoSig) return; logoSig = sig;
+      const esc = (t) => t.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m]);
+      const still = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
+      const rad = Math.min(10, Hh * 0.24), ring = rainbow ? [...stops, stops[0]] : [...stops, mix(A, "#ffffff", 0.2), stops[0]];
+      // the fill sweeps slowly through your look's colours (a holographic shimmer), unless you've asked for less motion
+      const grad = `<linearGradient id="bdtsx-f" x1="0" y1="1" x2="1" y2="0" spreadMethod="reflect">${stops.map((x, i) => `<stop offset="${i / (stops.length - 1)}" stop-color="${x}"/>`).join("")}` +
+        (still ? "" : `<animateTransform attributeName="gradientTransform" type="rotate" values="0 .5 .5;360 .5 .5" dur="9s" repeatCount="indefinite"/>`) + `</linearGradient>`;
+      let art;
+      if (mode === "look") {   // the Priism mark (the same three candles as the Priism icon), centred, with a soft glow
+        const k = Math.min(W, Hh) * 0.78 / 32, ox = (W - 32 * k) / 2, oy = (Hh - 32 * k) / 2;
+        art = `<g transform="translate(${ox.toFixed(2)} ${oy.toFixed(2)}) scale(${k.toFixed(4)})" fill="url(#bdtsx-f)" filter="url(#bdtsx-g)"><rect x="5" y="17" width="6" height="9" rx="1.5"/><rect x="13" y="11" width="6" height="12" rx="1.5"/><rect x="21" y="5" width="6" height="15" rx="1.5"/><rect x="7.25" y="15" width="1.5" height="13" rx=".75"/><rect x="15.25" y="8" width="1.5" height="17" rx=".75"/><rect x="23.25" y="3" width="1.5" height="19" rx=".75"/></g>`;
+      } else {                 // your name: up to two lines, as big as fits, squeezed (never cut) when long
+        const words = (name || "PRIISM").split(/\s+/).filter(Boolean), lines = words.length > 1 && name.length > 9 ? [words.slice(0, Math.ceil(words.length / 2)).join(" "), words.slice(Math.ceil(words.length / 2)).join(" ")] : [words.join(" ")];
+        const fs = Math.min(Hh * (lines.length > 1 ? 0.34 : 0.42), (W - 8) / (Math.max(...lines.map((l) => l.length)) * 0.58)), lh = fs * 1.05, y0 = Hh / 2 - (lines.length - 1) * lh / 2;
+        art = `<g fill="url(#bdtsx-f)" filter="url(#bdtsx-g)" font-family="system-ui,-apple-system,'Segoe UI',sans-serif" font-weight="800" font-size="${fs.toFixed(1)}" text-anchor="middle" dominant-baseline="central" letter-spacing="${(fs * 0.04).toFixed(2)}">` +
+          lines.map((l, i) => `<text x="${W / 2}" y="${(y0 + i * lh).toFixed(1)}"${l.length * fs * 0.6 > W - 6 ? ` textLength="${W - 6}" lengthAdjust="spacingAndGlyphs"` : ""}>${esc(l)}</text>`).join("") + "</g>";
+      }
+      // an edge of light that circles the badge: a slowly turning ring of your look's colours, seen as a 1.5px rim
+      // around the glass tile drawn just inside it
+      logoDiv.innerHTML = `<b style="position:absolute;left:50%;top:50%;width:${Math.ceil(Math.hypot(W, Hh)) + 4}px;height:${Math.ceil(Math.hypot(W, Hh)) + 4}px;margin:-${Math.ceil(Math.hypot(W, Hh) / 2) + 2}px;` +
+        `background:conic-gradient(from 0deg,${ring.join(",")});animation:bd-tsx-spin 6s linear infinite"></b>` +
+        `<div style="position:absolute;inset:1.5px;border-radius:${Math.max(0, rad - 1.5)}px;overflow:hidden">` +
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${W - 3}" height="${Hh - 3}" viewBox="1.5 1.5 ${W - 3} ${Hh - 3}" style="display:block"><defs>${grad}` +
+        `<linearGradient id="bdtsx-t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${mix(P, A, 0.2)}"/><stop offset="1" stop-color="${mix(P, "#000000", 0.45)}"/></linearGradient>` +
+        `<linearGradient id="bdtsx-e" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${rgba(stops[0], 0.9)}"/><stop offset=".5" stop-color="${rgba(A, 0.35)}"/><stop offset="1" stop-color="${rgba(stops[2], 0.8)}"/></linearGradient>` +
+        `<filter id="bdtsx-g" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="${(Math.min(W, Hh) / 28).toFixed(2)}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>` +
+        `<rect x="1.5" y="1.5" width="${W - 3}" height="${Hh - 3}" fill="url(#bdtsx-t)"/>` +
+        `<rect x="1.5" y="1.5" width="${W - 3}" height="${(Hh - 3) / 2}" rx="${Math.max(0, rad - 1)}" fill="#ffffff" opacity=".06"/>${art}</svg>` +
+        `<u style="position:absolute;inset:0;background:radial-gradient(70% 60% at 50% 55%,${rgba(A, 0.28)},transparent 70%);mix-blend-mode:screen;animation:bd-tsx-pulse 3.2s ease-in-out infinite"></u>` +
+        `<i style="position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.26) 50%,transparent 65%);animation:bd-tsx-sheen 7s ease-in-out infinite"></i></div>`;
+    }
+    // Every page, not just the trading screen: TopstepX's other pages (Platform Settings, Stats, Store…) are built from
+    // components with fixed dark colours of their own. Their dark, neutral surfaces take your panel colours, the darkest
+    // the deepest shade. Anything coloured (the red RP&L badge, Save, buy / sell, profit / loss, status) keeps its colour,
+    // and so do buttons, inputs, pictures, the chart frame and the bars (styled above). Only elements not seen before are
+    // looked at, every few seconds while the look is on (a page or tab opening adds new ones): no observer, no cost at rest.
+    const surfSeen = new WeakSet();
+    function markSurfaces() {
+      const root = document.body; if (!root) return;      // (the whole page: order toasts and dialogs live outside the layout)
+      let n = 0;
+      for (const el of root.querySelectorAll("div, section, aside, header, nav, main, ul, li, form, table, thead, tbody, tr, td, th, fieldset")) {
+        if (surfSeen.has(el)) continue; surfSeen.add(el);
+        if (++n > 2500) break;
+        if (el.hasAttribute("data-bd-tsx") || el.closest('[data-bd-tsx="side"], [data-bd-tsx="top"], [data-bd-tsx-logo], #bd-tsx-logo, iframe, button, [role="button"], .dock-panel, [id^="bd-"], [class*="bd-ui"]')) continue;
+        const m = getComputedStyle(el).backgroundColor.match(/[\d.]+/g); if (!m || (m.length > 3 && +m[3] < 0.5)) continue;
+        const [r, g, b] = m.slice(0, 3).map(Number), L = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+        if (Math.max(r, g, b) - Math.min(r, g, b) > 34 || L > 0.2) continue;                      // coloured, or not a dark surface
+        const q = el.getBoundingClientRect(); if (q.width * q.height < 2000) continue;           // a tiny box (a dot, a chip)
+        el.setAttribute("data-bd-tsx-surf", L < 0.035 ? "0" : L < 0.075 ? "1" : L < 0.12 ? "2" : "3");
+      }
+    }
+    let surfT = 0;
+    const surfLoop = () => { clearInterval(surfT); surfT = 0; if (document.documentElement.classList.contains("bd-tsx")) { markSurfaces(); surfT = setInterval(() => { if (!document.hidden) markSurfaces(); }, 3000); } };
+    let barsDone = false, rsT = 0;
+    addEventListener("resize", () => { clearTimeout(rsT); rsT = setTimeout(() => { if (document.documentElement.classList.contains("bd-tsx")) { markBars(); renderLogo(); } }, 500); }, { passive: true });
+    const apply = () => {
+      const want = css(), here = !!document.querySelector(".dock-panel, .dock-layout, [data-tds-brand], [data-testid='user-layout-container']");
+      document.documentElement.classList.toggle("bd-tsx", !!want && here);
+      if (!want || !here) { if (st) st.textContent = ""; renderLogo(); clearInterval(surfT); surfT = 0; return !here; }
+      if (!st) { st = document.createElement("style"); st.id = "bd-tsx-css"; (document.head || document.documentElement).appendChild(st); }
+      if (st.textContent !== want) st.textContent = want;
+      if (!barsDone) barsDone = markBars();
+      if (!surfT) surfLoop();
+      renderLogo();
+      return !barsDone;   // keep looking (a few times) until both bars are found
+    };
+    const plan = async () => { const P = window.PriismPass; let info = null; try { info = P ? await P.verify(c.pass, c.deviceId) : null; } catch {}
+      pro = P ? P.planOf(info, c.invite) === "pro" : !!(c.invite && c.invite.ok); };
+    // TopstepX builds its screen after loading: look for its panels a few times (cheap), then stop
+    const look = () => { if (apply() && ++tries < 30) setTimeout(look, 2000); };
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get(KEYS, async (s) => { c = { ...KEYS, ...s }; await plan(); look(); });
+      chrome.storage.onChanged.addListener(async (ch, area) => { if (area !== "local") return; let hit = false; for (const k of Object.keys(ch)) if (k in KEYS) { c[k] = ch[k].newValue; hit = true; } if (!hit) return; if (ch.pass || ch.invite || ch.deviceId) await plan(); apply(); });
+    }
+  })();
 })();
