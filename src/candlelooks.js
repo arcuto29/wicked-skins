@@ -12,7 +12,7 @@
      px              — one device pixel in user units        yfrac     — 0 top .. 1 bottom of the chart (Heat)
    } */
 (function () {
-  if (window.__bdCandleLooks && window.__bdCandleLooks.fxv >= 5) return;   // an older copy (before an update) is replaced: keep this number the same as fxv below
+  if (window.__bdCandleLooks && window.__bdCandleLooks.fxv >= 6) return;   // an older copy (before an update) is replaced: keep this number the same as fxv below
   // Lite (Power saver, Auto quality easing off, or the safety floor while trading is slowed down; set by hook.js /
   // lw.js from content.js): glows on the chart are drawn without their blur. Canvas blur is the costliest thing on a
   // chart, most of all without a fast graphics card, and every glow is redrawn on each move of the crosshair.
@@ -116,6 +116,41 @@
   const tri = (g, k, a, b, c2, d2, e, f, s) => { k.style(s); g.beginPath(); g.moveTo(a, b); g.lineTo(c2, d2); g.lineTo(e, f); g.closePath(); k.fillPath(); };
   // Lite: each material drawn as its closest classic look
   const LITE_OF = { liquid: "chrome", diamond: "gem", plasma: "core", obsidian: "core", hologram: "holo", fiber: "lines", crystal: "ice", nebula: "dusk" };
+
+  // ---------- scale: how big a look's details are on this canvas ----------
+  // The looks are drawn in the chart's own device pixels. Their details (outlines, caps, insets, the glow) are sized
+  // in CSS pixels, as in the panel's previews, so a look is the same physical size on any screen:
+  //  - r: the canvas's backing pixels per CSS pixel (1 on a standard screen, 2 on Retina / 4K at 200%). Read from the
+  //    canvas itself (backing width / CSS width), not window.devicePixelRatio, which isn't always right inside
+  //    frames. Cached per canvas size, so layout isn't read on every candle.
+  //  - u: the width of one crisp line, in device pixels: floor(r), the rule the platforms use for their own wicks and
+  //    borders (1 px up to 1.99x, 2 px at 2x...). Hairlines stay sharp at 125% / 150%.
+  // On a standard (1x) screen both are 1, so every look draws exactly as it always has.
+  const scales = new WeakMap();
+  function scaleOf(c) {
+    if (!c) return { r: 1, u: 1 };
+    let s = scales.get(c);
+    if (!s || s.w !== c.width || s.h !== c.height) {
+      const cw = c.clientWidth || 0, r = cw > 0 ? Math.max(1, Math.min(4, c.width / cw)) : 1;
+      s = { w: c.width, h: c.height, r, u: Math.max(1, Math.floor(r + 1e-3)) }; scales.set(c, s);
+    }
+    return s;
+  }
+  // The glow's blur (device px) for a body bodyCss wide (CSS px). base = the look's blur at its own size (CSS px). The
+  // glow keeps its size, except on bodies so thin it would swamp them: then it's at most 2.5x the body's width (never
+  // under 4 px), so a zoomed-out chart doesn't turn into haze. bodyCss 0 = unknown (no limit).
+  function glowBlur(base, r, bodyCss) {
+    const b = bodyCss > 0 ? Math.min(base, Math.max(4, 2.5 * bodyCss)) : base;
+    return b * (r || 1);
+  }
+  // Repeating details (stripes, blocks) are drawn only where the canvas shows them: a candle stretched far past the
+  // pane (a tall price scale) keeps its pattern all the way, anchored to the body, with no limit cutting it short and
+  // no work spent off screen. k.vy0 / k.vy1 = the canvas's visible top / bottom in the body's units (unknown = all).
+  function rows(k, y, h, step) {
+    const n = Math.ceil(h / step), a = isFinite(k.vy0) ? Math.max(0, Math.floor((k.vy0 - y) / step)) : 0;
+    const b = isFinite(k.vy1) ? Math.min(n, Math.ceil((k.vy1 - y) / step) + 1) : n;
+    return [a, Math.min(b, a + 4000)];
+  }
 
   // ---------- bodies ----------
   function draw(g, look, x, y, w, h, col, isUp, k) {
@@ -236,8 +271,8 @@
       }
       case "lines": {
         k.style(css(c, 0.18)); k.fill(x, y, w, h);
-        k.style(col); const step = 3 * px, n = Math.min(200, Math.ceil(h / step));
-        for (let i = 0; i < n; i++) k.fill(x, y + i * step, w, Math.min(px, y + h - (y + i * step)));
+        k.style(col); const step = 3 * px, [i0, i1] = rows(k, y, h, step);
+        for (let i = i0; i < i1; i++) k.fill(x, y + i * step, w, Math.min(px, y + h - (y + i * step)));
         k.fill(x, y + h - px, w, px); return;
       }
       case "dusk": {
@@ -248,8 +283,8 @@
       case "pixel": {
         const b = Math.max(2 * px, Math.round(w / px) * px), gap = px;
         k.style(col);
-        const n = Math.min(80, Math.ceil(h / b));
-        for (let i = 0; i < n; i++) { const yy = y + i * b, hh = Math.min(b - gap, y + h - yy); if (hh > 0) k.fill(x, yy, w, hh); }
+        const [i0, i1] = rows(k, y, h, b);
+        for (let i = i0; i < i1; i++) { const yy = y + i * b, hh = Math.min(b - gap, y + h - yy); if (hh > 0) k.fill(x, yy, w, hh); }
         return;
       }
       // ----- Candle FX materials. Every one stays inside the body's own rectangle. Lite (Power saver / Auto quality
@@ -1002,5 +1037,5 @@
     return a ? { s: a.s, g: a.g, glow: gl } : null;
   }
 
-  window.__bdCandleLooks = { fxv: 5, spot, shapeBox, marker, MARK_MODES, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
+  window.__bdCandleLooks = { fxv: 6, scaleOf, glowBlur, spot, shapeBox, marker, MARK_MODES, fx, fxOver, FX_CORE, FX_EDGE, CLASSIC, MATERIALS, zoneHot, zoneHeat, priceLine, LOOKS, IDS, META, draw, wick, tone, preview, zoneBox, zoneOwn, ZONE_SHAPES, ZONE_BORDERS, ZONE_STYLES, parts, wickOf, wickRect, candle, nestedDupe, paintTracker, hueRotate, toHex, rgbOf, indicator, zone, noteSeen, setNames, keyOf, chartText, setWallColors, live };
 })();

@@ -1423,7 +1423,7 @@
 
   // ---------- fillRect: transparent pane background + candle looks / glow ----------
   const origFill = proto.fillRect;
-  const lastBody = new WeakMap();
+  const lastBody = new WeakMap(), barW = new WeakMap();   // barW: canvas -> its candles' latest body width (device px)
   // drawing kit handed to candlelooks.js: the REAL canvas calls, so our own hooks don't re-process the look's shapes
   const lookK = { g: null, px: 1, yfrac: 0,
     fill(x, y, w, h) { origFill.call(lookK.g, x, y, w, h); },
@@ -1481,10 +1481,13 @@
         return this.clearRect(x, y, w, h);
       }
     }
-    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P || candles.F || candles.A || candles.closed) && h < c.height * 0.8 && isPane(c)) {
+    if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P || candles.F || candles.A || candles.closed) && isPane(c)) {
       const fs = this.fillStyle; // already remapped, normalised to "#rrggbb" for opaque colours
-      if (fs === candles.upHex || fs === candles.downHex) {
-        const L = window.__bdCandleLooks, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, body = w * sx >= 3;
+      // A fill in your candle colours is a candle at any size: on any timeframe, zoomed in or out, with the price scale
+      // stretched so far that bodies run past the pane's edges. (The pane's background is handled above.)
+      const t = fs === candles.upHex || fs === candles.downHex ? this.getTransform() : null, sx = t ? t.a || 1 : 1, sy = t ? t.d || 1 : 1;
+      if (t) {
+        const L = window.__bdCandleLooks, body = w * sx >= 3;
         const cd = candles, isUp = fs === cd.upHex, look0 = L ? cd.look : (cd.look === "neon" ? "neon" : "solid");
         if (cd.A && L && L.spot) L.spot.add(c, Math.min(x, x + w) * sx + t.e, Math.abs(w * sx), y * sy + t.f, (y + h) * sy + t.f, fs, isUp);   // only noted: drawn as before
         const split = !!(L && L.live && cd.closed);   // closed candles have a look of their own
@@ -1505,10 +1508,15 @@
           let col = fs;
           if (look === "prism") col = prismColour(isUp, (x * sx) / c.width);
           const meta = L && L.META[look], glow = Math.max(cd.glow, meta ? meta.minGlow : 0);
-          lookK.g = g; lookK.px = 1 / sx; lookK.yfrac = c.height ? (y * sy + t.f) / c.height : 0; lookK.xfrac = c.width ? (x * sx + t.e) / c.width : 0;
+          // details in CSS px (see scaleOf in candlelooks.js: on a 1x screen this is 1 device px, as before)
+          const sc = L && L.scaleOf ? L.scaleOf(c) : { r: 1, u: 1 }, bw = Math.abs(w * sx);
+          if (L && body && h * sy >= 3) barW.set(c, bw);   // (a wick's glow follows its candle's body)
+          lookK.g = g; lookK.px = sc.u / sx; lookK.yfrac = c.height ? (y * sy + t.f) / c.height : 0; lookK.xfrac = c.width ? (x * sx + t.e) / c.width : 0;
+          { const a = (0 - t.f) / sy, b = (c.height - t.f) / sy; lookK.vy0 = Math.min(a, b); lookK.vy1 = Math.max(a, b); }   // the visible rows, in the body's units
           g.save();
           if (split) { g.setTransform(t); g.setLineDash([]); g.shadowBlur = 0; g.globalCompositeOperation = "source-over"; }   // drawn a moment later: in the state it was asked for
-          if (glow > 0) { g.shadowColor = L ? L.tone(look, col, lookK) : col; g.shadowBlur = 4 + glow * 22; }
+          if (glow > 0) { g.shadowColor = L ? L.tone(look, col, lookK) : col; const base = 4 + glow * 22, bc = (body && h * sy >= 3 ? bw : barW.get(c) || 0) / sc.r;
+            g.shadowBlur = L && L.glowBlur ? L.glowBlur(base, sc.r, bc) : base; }
           if (L && body && h * sy >= 3) { if (tr) tr.note(c, true, w * sx); P || F ? L.candle(g, look, x, y, w, h, col, isUp, lookK, P, F) : L.draw(g, look, x, y, w, h, col, isUp, lookK); }
           else {
             // a wick (or a body too thin to style): your wick colour / width only when this chart's bodies are wide enough
