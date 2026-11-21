@@ -78,6 +78,7 @@ class MainActivity : Activity() {
             append(asset("shared/src/skins.js")).append("\n")
             append(asset("shared/src/sounds.js")).append("\n")
             append(asset("shared/src/pass.js")).append("\n")
+            append(asset("shared/src/acct.js")).append("\n")
             append(asset("shared/src/content.js"))
             append("}})();")
         }
