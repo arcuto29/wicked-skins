@@ -258,6 +258,12 @@
   // the widest bar that can be a candle body: zoomed in, bodies get wide (they used to stop being recognised past
   // 60 px and fell back to the platform's own white / black, while the thin wicks kept your colours)
   const candleMaxW = (c) => Math.max(60, c.width * 0.2);
+  // ...and wider ones too (a high timeframe zoomed far in): a body is a candle when one of the candles' wicks runs
+  // through its middle in the same paint (the chart draws the wicks first). Grey / black boxes that aren't candles have
+  // none, so they're never recoloured.
+  const wicks = new WeakMap();   // canvas -> centres (device px) of this paint's wicks
+  function noteWick(c, cx) { let a = wicks.get(c); if (!a) { a = []; wicks.set(c, a); queueMicrotask(() => wicks.delete(c)); } if (a.length < 4000) a.push(cx); }
+  const wickAt = (c, cx) => { const a = wicks.get(c); if (!a) return false; for (let i = a.length - 1; i >= 0; i--) if (Math.abs(a[i] - cx) <= 2) return true; return false; };
   let lastShape = [], apiSides = 0;
   // the platform's OWN candle colours are known (from its chart API, or found by their shape): only then can a filled
   // bar safely be called an indicator zone for the all-indicators colours, and never a candle
@@ -354,8 +360,6 @@
       const glowOf = (look) => { const meta = L && L.META[look]; return cd ? Math.max(cd.glow, meta ? meta.minGlow : 0) : 0; };
       if (!(on && cd && (glowOf(look0) > 0 || (look0 !== "solid" && look0 !== "shift") || P || F || cd.A || split) && c && isChart(c) && isCandleCol(g.fillStyle))) return false;
       const t = g.getTransform(), sx = t.a || 1, sy = t.d || 1, col0 = toHexCol(g.fillStyle), isUp = col0 === cd.upHex;
-      // bar-sized: a stretched price scale draws bodies taller than the pane, still candles; only tall AND wide isn't
-      if (!(Math.abs(h * sy) < c.height * 0.8 || Math.abs(w * sx) <= candleMaxW(c))) return false;
       const isBody = Math.abs(w * sx) >= 3 && Math.abs(h * sy) >= 3, tr = P ? tracker() : null;
       if (cd.A && L.spot) L.spot.add(c, Math.min(x, x + w) * sx + t.e, Math.abs(w * sx), y * sy + t.f, (y + h) * sy + t.f, col0, isUp);   // only noted
       // a bordered candle comes as two nested rects in the same colour: style it once
@@ -505,9 +509,11 @@
       }
       if (on && isPaneC(c) && !inLook) {
         const t = this.getTransform(), W = Math.abs(w * (t.a || 1)), H = Math.abs(h * (t.d || 1));
-        if (W > 0 && W <= candleMaxW(c)) {
-          if (H < c.height * 0.8) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // (learning: ordinary candles only)
+        const X = Math.min(x, x + w) * (t.a || 1) + t.e;
+        if (W > 0 && (W <= candleMaxW(c) || wickAt(c, X + W / 2))) {
+          if (H < c.height * 0.8 && W <= candleMaxW(c)) noteShape(this.__bdLwOrig, x * (t.a || 1) + t.e, Math.max(y, y + h) * (t.d || 1) + t.f);   // (learning: ordinary candles only)
           const side = candles && shapeSides.size ? shapeSides.get((rgbKey(this.__bdLwOrig) || {}).key) : null;
+          if (side && W <= 6) noteWick(c, X + W / 2);
           if (side) {                                          // a grey / black candle: paint it in your candle colour
             const p = this.fillStyle; fillDesc.set.call(this, side === "up" ? candles.upHex : candles.downHex);
             if (!candleLook(this, c, x, y, w, h)) origFillRect.call(this, x, y, w, h);
@@ -532,7 +538,8 @@
       if (on && c && !a.length && !inLook && isPaneC(c)) { const b = pbox.get(this);
         if (b) {                                             // candles drawn as one-rectangle shapes
           const t = this.getTransform(), W = Math.abs(b.w * (t.a || 1)), H = Math.abs(b.h * (t.d || 1));
-          if (W > 0 && W <= candleMaxW(c)) { if (H < c.height * 0.8) noteShape(this.__bdLwOrig, b.x * (t.a || 1) + t.e, Math.max(b.y, b.y + b.h) * (t.d || 1) + t.f);
+          const X = Math.min(b.x, b.x + b.w) * (t.a || 1) + t.e;
+          if (W > 0 && (W <= candleMaxW(c) || wickAt(c, X + W / 2))) { if (H < c.height * 0.8 && W <= candleMaxW(c)) noteShape(this.__bdLwOrig, b.x * (t.a || 1) + t.e, Math.max(b.y, b.y + b.h) * (t.d || 1) + t.f);
             const side = candles && shapeSides.size ? shapeSides.get((rgbKey(this.__bdLwOrig) || {}).key) : null;
             if (side) { const p = this.fillStyle; fillDesc.set.call(this, side === "up" ? candles.upHex : candles.downHex);
               if (!candleLook(this, c, b.x, b.y, b.w, b.h)) origFillP.apply(this, a); fillDesc.set.call(this, p); return; } }

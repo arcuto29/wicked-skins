@@ -1483,10 +1483,10 @@
     }
     if (candles && c && (candles.glow > 0 || (candles.look !== "solid" && candles.look !== "shift") || candles.P || candles.F || candles.A || candles.closed) && isPane(c)) {
       const fs = this.fillStyle; // already remapped, normalised to "#rrggbb" for opaque colours
-      // A candle is bar-sized. It can be taller than the pane (a stretched price scale draws bodies far past its
-      // edges), so height alone doesn't rule it out; only a fill that's both tall and wide isn't a candle.
+      // A fill in your candle colours is a candle at any size: on any timeframe, zoomed in or out, with the price scale
+      // stretched so far that bodies run past the pane's edges. (The pane's background is handled above.)
       const t = fs === candles.upHex || fs === candles.downHex ? this.getTransform() : null, sx = t ? t.a || 1 : 1, sy = t ? t.d || 1 : 1;
-      if (t && (Math.abs(h * sy) < c.height * 0.8 || Math.abs(w * sx) <= Math.max(60, c.width * 0.2))) {
+      if (t) {
         const L = window.__bdCandleLooks, body = w * sx >= 3;
         const cd = candles, isUp = fs === cd.upHex, look0 = L ? cd.look : (cd.look === "neon" ? "neon" : "solid");
         if (cd.A && L && L.spot) L.spot.add(c, Math.min(x, x + w) * sx + t.e, Math.abs(w * sx), y * sy + t.f, (y + h) * sy + t.f, fs, isUp);   // only noted: drawn as before
