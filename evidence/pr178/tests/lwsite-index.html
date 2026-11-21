@@ -1,0 +1,174 @@
+<!doctype html><html><head><meta charset="utf8"><title>NQ test app</title>
+<style>
+  html,body{margin:0;height:100%} body{background:#0b0e14;color:#cfd3dc;font:13px system-ui,sans-serif}
+  #app{display:flex;height:100vh;background:#0b0e14}
+  aside{width:170px;background:#10141c;padding:12px;box-sizing:border-box}
+  main{flex:1;display:flex;flex-direction:column;background:#0b0e14;min-width:0}
+  header{height:44px;background:#10141c;display:flex;align-items:center;padding:0 14px}
+  #chartwrap{flex:1;background:#0b0e14;padding:8px;min-height:0}
+  #chart{width:100%;height:100%;background:#0b0e14}
+  #chartwrap.grid{display:grid;gap:4px} #chartwrap.grid .cell{min-width:0;min-height:0;background:#0b0e14;position:relative}
+</style></head><body>
+<div id="app"><aside>NQ.VISION (test)<br><br>Watchlist<div class="wl"><div class="row"><span>ES1!</span> <span>6,012.25</span></div><div class="row"><span>MNQZ5</span> <span>21,402.50</span></div><div class="row"><span>GC</span> <span>2,640.1</span></div></div></aside><main><header><span class="sym">NQ1!</span> <span class="tfs"><button>1m</button><button>5m</button><button>15m</button><button>1H</button></span></header><section id="chartwrap"><div id="chart"></div></section></main></div>
+<script>
+  const Q = new URLSearchParams(location.search);
+  if (Q.get("cls")) document.getElementById("chartwrap").classList.add(Q.get("cls"));        // e.g. a generic "chart-container"
+  if (Q.get("bgpath")) {   // a build that paints the chart background as a filled shape (rect + fill), not fillRect
+    const P = CanvasRenderingContext2D.prototype, fr = P.fillRect;
+    window.__bgPath = () => { P.fillRect = function (x, y, w, h) { if (Math.abs(w) >= this.canvas.width * 0.5 && Math.abs(h) >= this.canvas.height * 0.5) { this.beginPath(); this.rect(x, y, w, h); this.fill(); return; } return fr.call(this, x, y, w, h); }; };
+    if (Q.get("bgpath") === "1") window.__bgPath();
+  }
+  if (Q.get("path")) {   // a "modified" build that draws candle bodies as paths, not fillRect
+    const P = CanvasRenderingContext2D.prototype, fr = P.fillRect;
+    P.fillRect = function (x, y, w, h) { if (Math.abs(w) < this.canvas.width * 0.5 && Math.abs(h) < this.canvas.height * 0.5) { this.beginPath(); this.rect(x, y, w, h); this.fill(); return; } return fr.call(this, x, y, w, h); };
+  }
+  const v = new URLSearchParams(location.search).get("v") || "4.2.0";
+  const s = document.createElement("script");
+  s.src = "https://unpkg.com/lightweight-charts@" + v + "/dist/lightweight-charts.standalone.production.js";
+  let LWB = null;
+  s.onload = () => { LWB = window.LightweightCharts; if (Q.get("nolib")) delete window.LightweightCharts; setTimeout(boot, (+Q.get("late") || 0) * 1000); };   // late=N: chart appears N s after load (login)
+  const LAYOUTS = { "2v": ["1fr 1fr", "1fr", ["1/1/2/2", "1/2/2/3"]], "2h": ["1fr", "1fr 1fr", ["1/1/2/2", "2/1/3/2"]],
+    "3a": ["1fr 1fr", "1fr 1fr", ["1/1/3/2", "1/2/2/3", "2/2/3/3"]], "3b": ["1fr 1fr 1fr", "1fr", ["1/1/2/2", "1/2/2/3", "1/3/2/4"]],
+    "3c": ["1fr 1fr", "1fr 1fr", ["1/1/2/2", "1/2/2/3", "2/1/3/3"]], "3d": ["1fr 1fr", "1fr 1fr", ["1/1/2/3", "2/1/3/2", "2/2/3/3"]] };
+  function boot() {
+    if (/^f\d$/.test(Q.get("layout") || "")) {   // f3: each chart in its own frame (some brokers embed charts like this)
+      const n = +Q.get("layout")[1], wrap = document.getElementById("chartwrap"); wrap.innerHTML = ""; wrap.classList.add("grid");
+      wrap.style.gridTemplateColumns = n > 2 ? "1fr 1fr" : "1fr " .repeat(n).trim(); wrap.style.gridTemplateRows = n > 2 ? "1fr 1fr" : "1fr";
+      for (let i = 0; i < n; i++) { const c = document.createElement("div"); c.className = "cell"; if (n === 3 && i === 0) c.style.gridArea = "1/1/3/2";
+        const f = document.createElement("iframe"); f.src = location.pathname + "?v=" + (Q.get("v") || "4.2.0") + "&embed=1"; f.style.cssText = "border:0;width:100%;height:100%;display:block"; c.appendChild(f); wrap.appendChild(c); }
+      window.__ready = true; return;
+    }
+    if (Q.get("embed")) { document.getElementById("app").innerHTML = '<div id="chart" style="position:fixed;inset:0"></div>'; return bootOne(document.getElementById("chart"), true); }
+    const lay = LAYOUTS[Q.get("layout")];
+    if (Q.get("lightbg")) document.getElementById("chartwrap").style.background = "#e6e6e6";
+    window.__shrink = () => { for (const el of document.querySelectorAll("#chartwrap.grid .cell > div, #chart")) { el.style.width = "60%"; if (el.id !== "chart") el.style.right = "auto"; } };
+    if (!lay) return bootOne(document.getElementById("chart"), true);
+    const wrap = document.getElementById("chartwrap"); wrap.innerHTML = ""; wrap.classList.add("grid");
+    wrap.style.gridTemplateColumns = lay[0]; wrap.style.gridTemplateRows = lay[1];
+    window.__charts = lay[2].map((area, i) => { const c = document.createElement("div"); c.className = "cell"; c.style.gridArea = area; wrap.appendChild(c);
+      if (Q.get("lightbg")) c.style.background = "#e6e6e6";
+      const inner = document.createElement("div"); inner.style.cssText = "position:absolute;inset:0"; c.appendChild(inner); return bootOne(inner, i === 0); });
+  }
+  function bootOne(el, first) {
+    const LW = LWB;
+    const chart = LW.createChart(el, { width: el.clientWidth, height: el.clientHeight,
+      layout: { background: { type: "solid", color: "#0b0e14" }, textColor: "#d1d4dc" },
+      grid: { vertLines: { color: "#1b2030" }, horzLines: { color: "#1b2030" } } });
+    const q = Q, A = q.get("alpha"), hx = (h) => A ? `rgba(${[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)).join(",")},${A})` : h;
+    const U = hx(q.get("u") || "#26a69a"), D = hx(q.get("d") || "#ef5350");
+    const opts = { upColor: U, downColor: D, borderUpColor: U, borderDownColor: D, wickUpColor: U, wickDownColor: D };
+    const series = LW.CandlestickSeries ? chart.addSeries(LW.CandlestickSeries, opts) : chart.addCandlestickSeries(opts);
+    // repeatable prices (seeded), so pixel tests see the same chart on every run (?seed=N for another one)
+    let seed = +(Q.get("seed") || 7); const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+    const data = []; let p = 100; const t0 = Math.floor(Date.now() / 1000) - 160 * 86400;
+    for (let i = 0; i < 160; i++) { const o = p, c = p + (rnd() - 0.48) * 4; data.push({ time: t0 + i * 86400, open: o, high: Math.max(o, c) + rnd() * 2, low: Math.min(o, c) - rnd() * 2, close: c }); p = c; }
+    series.setData(data);
+    if (Q.get("vol")) {   // opaque volume bars in blue / pink (like nq.vision's other colourful drawing)
+      const hs = LW.HistogramSeries ? chart.addSeries(LW.HistogramSeries, { priceScaleId: "", priceFormat: { type: "volume" } }) : chart.addHistogramSeries({ priceScaleId: "", priceFormat: { type: "volume" } });
+      hs.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+      hs.setData(data.map((d, i) => ({ time: d.time, value: 100 + Math.random() * 900, color: d.close >= d.open ? "#2962ff" : "#f77c80" })));
+    }
+    if (Q.get("spacing")) chart.timeScale().applyOptions({ barSpacing: +Q.get("spacing") });
+    if (Q.get("ema")) {   // an indicator line (EMA) like platforms draw
+      const ema = []; let e = data[0].close; for (const d of data) { e = e + (d.close - e) * 0.15; ema.push({ time: d.time, value: e }); }
+      const ls = LW.LineSeries ? chart.addSeries(LW.LineSeries, { color: "#ffb300", lineWidth: 2, priceLineVisible: false, lastValueVisible: false }) : chart.addLineSeries({ color: "#ffb300", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+      ls.setData(ema);
+    }
+    if (Q.get("lines")) {   // order / position lines like a trading platform draws
+      series.createPriceLine({ price: p * 1.03, color: "#ff9800", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "TP +$120.00" });
+      series.createPriceLine({ price: p * 0.97, color: "#e040fb", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "SL -$80.00" });
+    }
+    if (Q.get("ctext")) {   // an indicator's text on the chart: black labels (made for a light chart), a coloured one, one in its own box, a faint watermark
+      const p0 = data[data.length - 1].close;
+      series.attachPrimitive({ paneViews() { return [{ renderer() { return { draw(target) { target.useBitmapCoordinateSpace((sc) => { const g = sc.context, w = sc.bitmapSize.width, r = sc.verticalPixelRatio;
+        g.font = `bold ${Math.round(16 * r)}px sans-serif`; g.textBaseline = "middle";
+        g.fillStyle = "#000000"; g.fillText("PDH 1H PRINT", w * 0.08, series.priceToCoordinate(p0 * 1.03) * r); g.fillText("LOW TF PRINT", w * 0.45, series.priceToCoordinate(p0 * 0.97) * r);
+        g.fillStyle = "#ff9800"; g.fillText("VWAP", w * 0.72, series.priceToCoordinate(p0 * 1.045) * r);
+        const by = series.priceToCoordinate(p0 * 0.94) * r; g.fillStyle = "#ffeb3b"; g.fillRect(w * 0.2 - 6 * r, by - 13 * r, 150 * r, 26 * r); g.fillStyle = "#000000"; g.fillText("BOXED LABEL", w * 0.2, by);
+        g.fillStyle = "rgba(255,255,255,0.06)"; g.font = `bold ${Math.round(60 * r)}px sans-serif`; g.fillText("WATERMARK", w * 0.3, sc.bitmapSize.height * 0.5); }); } }; } }]; } });
+      window.__ct = () => { const p = p0; return { black: series.priceToCoordinate(p * 1.03), black2: series.priceToCoordinate(p * 0.97), vwap: series.priceToCoordinate(p * 1.045), boxed: series.priceToCoordinate(p * 0.94) }; };
+    }
+    if (Q.get("many")) {   // a zones indicator with many colours (30 boxes), a live price, and a zone that changes colour when price taps it
+      const p0 = data[data.length - 1].close; let tapped = false;
+      const zs = Array.from({ length: 30 }, (_, i) => [0.04 + (i % 6) * 0.15, 0.04 + (i % 6) * 0.15 + 0.12, p0 * (0.93 + Math.floor(i / 6) * 0.03), `rgba(${(i * 47) % 256},${(i * 89 + 60) % 256},${(i * 131 + 120) % 256},0.3)`]);
+      series.attachPrimitive({ paneViews() { return [{ renderer() { return { draw(target) { target.useBitmapCoordinateSpace((sc) => { const g = sc.context, w = sc.bitmapSize.width;
+        zs.forEach(([a, b, pr, col], i) => { const y1 = series.priceToCoordinate(pr * 1.006) * sc.verticalPixelRatio, y2 = series.priceToCoordinate(pr) * sc.verticalPixelRatio;
+          g.fillStyle = i === 29 && tapped ? "rgba(255,255,255,0.35)" : col; g.fillRect(w * a, Math.min(y1, y2), w * (b - a), Math.abs(y2 - y1)); }); }); } }; } }]; } });
+      let n = 0; setInterval(() => { n++; const last = data[data.length - 1], c = last.close + Math.sin(n / 3) * 0.4; tapped = n % 4 < 2; series.update({ ...last, close: c, high: Math.max(last.high, c), low: Math.min(last.low, c) }); }, 250);
+      window.__zones = zs.map(([a, b, pr]) => ({ x: (a + b) / 2, p: pr * 1.003 }));
+      window.__zoneXY = () => window.__zones.map((z) => ({ x: z.x, y: series.priceToCoordinate(z.p) }));
+    }
+    if (Q.get("prints")) {   // an indicator's level lines (like single prints): short and long solid horizontal lines, no price tag
+      const p0 = data[data.length - 1].close;
+      const lv = [[0.10, 0.55, p0 * 1.04, "#ffffff", 2], [0.30, 1.0, p0 * 1.012, "#00e5ff", 2], [0.55, 0.95, p0 * 0.985, "#ffee58", 3], [0.05, 0.40, p0 * 0.96, "#00e5ff", 2]];
+      series.attachPrimitive({ paneViews() { return [{ renderer() { return { draw(target) { target.useBitmapCoordinateSpace((sc) => { const g = sc.context, w = sc.bitmapSize.width;
+        for (const [a, b, pr, col, lw] of lv) { const y = Math.round(series.priceToCoordinate(pr) * sc.verticalPixelRatio); g.beginPath(); g.strokeStyle = col; g.lineWidth = lw * sc.verticalPixelRatio; g.moveTo(w * a, y); g.lineTo(w * b, y); g.stroke(); } }); } }; } }]; } });
+    }
+    if (Q.get("box")) {   // translucent zone boxes like a plugin / indicator draws (supply / demand zones, prints)
+      const p0 = data[data.length - 1].close;
+      const boxes = [[0.15, 0.45, p0 * 1.02, p0 * 1.005, "rgba(255,82,82,0.18)"], [0.5, 0.85, p0 * 0.99, p0 * 0.975, "rgba(41,98,255,0.2)"]];
+      if (Q.get("pos")) boxes.push([0.55, 0.75, p0 * 0.95, p0 * 0.93, "rgba(8,153,129,0.22)"], [0.55, 0.75, p0 * 0.93, p0 * 0.92, "rgba(242,54,69,0.22)"]);   // a Long position tool: two areas touching
+      if (Q.get("hot")) boxes.push([0.6, 1.0, p0 * 1.006, p0 * 0.994, "rgba(0,200,255,0.18)"]);   // a zone price is in right now
+      if (Q.get("tall")) boxes.push([0.86, 0.95, p0 * 1.05, p0 * 0.93, "rgba(255,170,0,0.2)"]);   // a session box: taller than wide
+      if (Q.get("thin")) boxes.push([0.1, 0.9, p0 * 0.9, p0 * 0.8995, "rgba(255,200,0,0.25)"]);   // a sliver (zoomed out)
+      series.attachPrimitive({ paneViews() { return [{ renderer() { return { draw(target) { target.useBitmapCoordinateSpace((sc) => { const g = sc.context, w = sc.bitmapSize.width;
+        for (const [a, b, hi, lo, col] of boxes) { const y1 = series.priceToCoordinate(hi) * sc.verticalPixelRatio, y2 = series.priceToCoordinate(lo) * sc.verticalPixelRatio; g.fillStyle = col; g.fillRect(w * a, Math.min(y1, y2), w * (b - a), Math.abs(y2 - y1)); } }); } }; } }]; } });
+    }
+    if (Q.get("azone")) {   // zone audit: two clear zones ABOVE the candles (no candle or grid under them), drawn as
+      // fillRect (default), a path (zdraw=path: rect + fill) or a rounded path (zdraw=round), like different plugins draw
+      if (Q.get("nogrid")) chart.applyOptions({ grid: { vertLines: { visible: false }, horzLines: { visible: false } }, crosshair: { mode: 2 } });
+      series.priceScale().applyOptions({ scaleMargins: { top: 0.42, bottom: 0.06 } });
+      const hi = Math.max(...data.map((d) => d.high)), lo = Math.min(...data.map((d) => d.low)), R = hi - lo, mode = Q.get("zdraw") || "rect";
+      const az = [[0.08, 0.46, hi + R * 0.42, hi + R * 0.22, "rgba(156,39,176,0.25)"], [0.52, 0.9, hi + R * 0.42, hi + R * 0.22, "rgba(0,150,136,0.25)"]];
+      window.__az = () => { const sc = window.__series || series, r = el.querySelector("canvas").getBoundingClientRect(); const cw = el.querySelector(".tv-lightweight-charts td:nth-child(2) canvas, canvas");
+        return az.map(([a, b, p1, p2]) => ({ a, b, y1: sc.priceToCoordinate(p1), y2: sc.priceToCoordinate(p2) })); };
+      series.attachPrimitive({ paneViews() { return [{ renderer() { return { draw(target) { target.useBitmapCoordinateSpace((sc) => { const g = sc.context, w = sc.bitmapSize.width;
+        window.__azPx = [];
+        for (const [a, b, p1, p2, col] of az) { const y1 = series.priceToCoordinate(p1) * sc.verticalPixelRatio, y2 = series.priceToCoordinate(p2) * sc.verticalPixelRatio, X = w * a, W = w * (b - a), Y = Math.min(y1, y2), H = Math.abs(y2 - y1);
+          window.__azPx.push({ X, Y, W, H, k: sc.horizontalPixelRatio });
+          g.fillStyle = col;
+          if (mode === "path") { g.beginPath(); g.rect(X, Y, W, H); g.fill(); }
+          else if (mode === "round" && g.roundRect) { g.beginPath(); g.roundRect(X, Y, W, H, 0); g.fill(); }
+          else g.fillRect(X, Y, W, H); } }); } }; } }]; } });
+    }
+    if (Q.get("mk")) {   // series markers, like an app / indicator puts on candles: arrows, circles, squares, with text
+      const mk = [], col = { b: "#2196f3", s: "#d500f9", c: "#ff9800", q: "#9c27b0" };
+      for (let i = 20; i < data.length - 2; i += 9) { const k = (i / 9) % 4 | 0;
+        mk.push(k === 0 ? { time: data[i].time, position: "belowBar", color: col.b, shape: "arrowUp", text: "B" } : k === 1 ? { time: data[i].time, position: "aboveBar", color: col.s, shape: "arrowDown", text: "S" }
+          : k === 2 ? { time: data[i].time, position: "aboveBar", color: col.c, shape: "circle" } : { time: data[i].time, position: "belowBar", color: col.q, shape: "square" }); }
+      if (LW.createSeriesMarkers) LW.createSeriesMarkers(series, mk); else series.setMarkers(mk);
+      window.__mk = mk;
+    }
+    if (Q.get("wline")) {   // a white / grey level an indicator draws across the chart (session high), not grid
+      series.createPriceLine({ price: p * 1.015, color: "#ffffff", lineWidth: 2, lineStyle: 0, axisLabelVisible: false, title: "" });
+      series.createPriceLine({ price: p * 0.985, color: "#9598a1", lineWidth: 1, lineStyle: 0, axisLabelVisible: false, title: "" });
+    }
+    if (!Q.get("fixed")) new ResizeObserver(() => chart.applyOptions({ width: el.clientWidth, height: el.clientHeight })).observe(el);   // fixed=1: an app that never resizes the chart (like nq.vision?)
+    if (Q.get("rename")) document.querySelectorAll(".tv-lightweight-charts").forEach((e) => { e.classList.remove("tv-lightweight-charts"); e.classList.add("nqv-chart"); });
+    if (Q.get("dragbg")) {   // like some apps: while you hold the chart to drag it, its wrapper gets a solid background
+      const root = el.querySelector(".tv-lightweight-charts") || el;
+      el.addEventListener("pointerdown", () => { root.style.background = "#1f1f1f"; el.style.background = "#1f1f1f"; });
+      addEventListener("pointerup", () => { root.style.background = ""; el.style.background = ""; });
+    }
+    // tests: move the live candle's price (setClose), and see the series / its data
+    if (first) { if (Q.get("noapi")) window.__lwsSeries = series; else window.__series = series; window.__data = data;   // noapi=1: like nq.vision, the series is in no global (colours are found by shape)
+      window.__setClose = (c) => { const last = data[data.length - 1]; const b = { ...last, close: c, high: Math.max(last.high, c), low: Math.min(last.low, c) }; data[data.length - 1] = b; series.update(b); }; }
+    if (first) window.__chart = chart; window.__ready = true;
+    if (Q.get("legend")) {   // like nq.vision: the app's own legend over the chart, in dark text made for its own background
+      const lg = document.createElement("div"); lg.id = "legend";
+      lg.style.cssText = "position:absolute;left:12px;top:8px;z-index:5;font:600 13px system-ui;color:#2b2f3a;pointer-events:none;line-height:1.6";
+      lg.innerHTML = '<div><span class="lsym">NQ1! · 1m · CME</span> <span style="color:#2b2f3a">O 27,040 H 27,090</span></div><div><span>EMA 20</span> <span style="color:#ffb300">115.23</span></div><div><span>VWAP</span> <span style="color:#3b3f4a">114.80</span></div>';
+      el.parentElement.style.position = "relative"; el.parentElement.appendChild(lg);
+    }
+    if (Q.get("switch")) setTimeout(() => {   // like nq.vision: default colours first, then the app's own grey / black a moment later
+      series.applyOptions({ upColor: "#dbdbdb", downColor: "#000000", borderUpColor: "#dbdbdb", borderDownColor: "#000000", wickUpColor: "#dbdbdb", wickDownColor: "#000000" });
+    }, 2500);
+    if (Q.get("path") === "2") setTimeout(() => {   // a build that draws bodies as paths, installed AFTER Priism's hooks (like a real app)
+      const P = CanvasRenderingContext2D.prototype, fr = P.fillRect;
+      P.fillRect = function (x, y, w, h) { if (Math.abs(w) < this.canvas.width * 0.5 && Math.abs(h) < this.canvas.height * 0.5) { this.beginPath(); this.rect(x, y, w, h); this.fill(); return; } return fr.call(this, x, y, w, h); };
+      chart.applyOptions({ width: el.clientWidth - 1 }); setTimeout(() => chart.applyOptions({ width: el.clientWidth }), 50);
+    }, 2500);
+    return chart;
+  }
+  document.head.appendChild(s);
+</script></body></html>

@@ -1,0 +1,11 @@
+PASS both versions load
+PASS 34 looks  34
+PASS candles the old code cut short (12: narrow Pixel bodies) are drawn differently now  [["pixel",3,400],["pixel",3,400],["pixel",3,590]]
+PASS 1x: every look draws the same pixels as before (9508 candles: 34 looks x 14 widths 1-300 px x 10 heights 1-590 px x up/down)  []
+PASS stretched candle: Lines and Pixel reach the bottom of the pane, narrow and wide  [{"kind":"tall","look":"pixel","W":29,"H":700,"x":10,"w":9,"aBottom":0,"bBottom":53},{"kind":"tall","look":"pixel","W":140,"H":700,"x":10,"w":120,"aBottom":59,"bBottom":59},{"kind":"tall","look":"lines","W":29,"H":700,"x":10,"w":9,"aBottom":0,"bBottom":20},{"kind":"tall","look":"lines","W":140,"H":700,"x":10,"w":120,"aBottom":0,"bBottom":20}]
+PASS ...including every case that stopped part-way before (Lines narrow + wide, Pixel narrow)  [["pixel",9],["lines",9],["lines",120]]
+PASS ...and no look has less ink on a stretched candle than before  []
+PASS 2x: B at 2x matches the 1x look better than before (mean alpha error 1.06 before -> 0.02 after)  {"before":1.06,"after":0.02}
+PASS 2x: no look further from its 1x appearance than before  []
+2x per look (before -> after): solid 0.0->0.0, neon 3.2->0.0, glass 1.7->0.0, chrome 0.0->0.0, ice 0.2->0.0, lava 0.0->0.0, fade 0.1->0.1, outline 3.4->0.0, bevel 0.0->0.0, holo 0.0->0.0, ghost 0.7->0.0, pill 0.5->0.1, pixel 1.2->0.0, matte 0.0->0.0, frame 2.9->0.0, halo 4.8->0.0, core 0.0->0.0, split 1.7->0.0, duo 0.0->0.0, gem 0.0->0.0, lifted 1.3->0.0, lines 9.4->0.0, dusk 0.0->0.0, heat 0.0->0.0, prism 0.0->0.0, shift 0.0->0.0, liquid 0.0->0.0, diamond 0.5->0.5, plasma 0.0->0.0, obsidian 0.0->0.0, hologram 0.0->0.0, fiber 4.3->0.1, crystal 0.2->0.0, nebula 0.0->0.0
+SUMMARY: 9/9
