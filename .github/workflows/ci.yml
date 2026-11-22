@@ -13,6 +13,7 @@ jobs:
         with: { node-version: 20 }
       - run: node scripts/check.js
       - run: node scripts/build-extension.js
+      - run: node test/perf/pacing.test.mjs   # wallpaper frame rate = the one chosen, on 60-360 Hz screens
 
   desktop-smoke:
     # Launches the real desktop app against tradingview.com under a virtual display.
