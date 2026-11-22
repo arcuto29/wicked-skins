@@ -10,6 +10,8 @@
 - **Indicator level lines** (one straight line, like prints or session levels) take your colour in their very first frame
   instead of after about a second, on TradingView and on Lightweight Charts (nq.vision). They no longer go back to their
   own colour while the price scale is dragged or a price tag passes over them.
+- **Lightweight Charts (nq.vision): a new chart is styled from its first frame.** Priism looked for the chart every
+  250 ms, so a chart that drew at once (e.g. on a reload) showed its first frames in the platform's colours.
 - Nothing else is drawn differently: only when your colour is applied changed. No new settings.
 
 ## Unreleased: marker colours

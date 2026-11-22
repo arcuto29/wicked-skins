@@ -847,9 +847,25 @@
 
   // Wait until the page actually has a Lightweight Charts chart (and isn't an Advanced Charts page).
   let tries = 0;
+  // A chart is noticed the moment its elements go into the page, before its first paint (Lightweight Charts paints on
+  // the next frame): looking only every 250 ms let the first frames of a new chart go out in the platform's own colours
+  // (on a reload, the library comes from cache and draws at once). Only until the chart is found; then it's dropped.
+  let seen = null, checking = false;
+  const check = () => { checking = false; if (active || hasAdvanced()) { if (seen) { seen.disconnect(); seen = null; } return; }
+    if (hasLightweight()) { install(); if (seen) { seen.disconnect(); seen = null; } } };
+  try {
+    seen = new MutationObserver((muts) => {
+      if (checking) return;
+      for (const m of muts) for (const n of m.addedNodes) if (n.nodeType === 1 && (n.tagName === "CANVAS" || n.tagName === "TABLE" || (n.getElementsByTagName && n.getElementsByTagName("canvas").length))) {
+        checking = true; queueMicrotask(check); return; }
+    });
+    seen.observe(document.documentElement || document, { childList: true, subtree: true });
+    setTimeout(() => { if (seen) { seen.disconnect(); seen = null; } }, 120000);   // (a chart that comes later is still found below)
+  } catch { seen = null; }
   (function waitForChart() {
-    if (hasAdvanced()) return;                 // hook.js owns this page
-    if (hasLightweight()) { install(); return; }
+    if (active) return;
+    if (hasAdvanced()) { if (seen) { seen.disconnect(); seen = null; } return; }   // hook.js owns this page
+    if (hasLightweight()) { install(); if (seen) { seen.disconnect(); seen = null; } return; }
     // keep looking: on login-gated / single-page apps the chart can appear minutes after the page loads
     setTimeout(waitForChart, tries++ < 120 ? 250 : 1000);
   })();
