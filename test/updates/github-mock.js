@@ -41,14 +41,19 @@ https.createServer({ cert: fs.readFileSync(arg("cert")), key: fs.readFileSync(ar
   log({ method: req.method, url: u, status, mode: m, range: req.headers.range || null, bytes: stop - start + 1 });
   res.writeHead(status, { "content-type": "application/octet-stream", "content-length": stop - start + 1, "accept-ranges": "bytes", ...(r ? { "content-range": `bytes ${start}-${stop}/${size}` } : {}) });
   if (req.method === "HEAD") return res.end();
-  const s = fs.createReadStream(file, { start, end: stop, highWaterMark: 256 * 1024 });
-  let pos = start, flipped = false;
-  s.on("data", (c) => {
-    if (m === "corrupt" && !flipped && /\.(exe|AppImage|zip)$/.test(name)) { c = Buffer.from(c); c[Math.min(c.length - 1, 5000)] ^= 0xff; flipped = true; }   // one byte, like a broken download
-    pos += c.length;
-    if (!res.write(c)) { s.pause(); res.once("drain", () => s.resume()); }
-    if (m === "slow") { s.pause(); setTimeout(() => s.resume(), 240); }   // ~1 MB/s: even a small differential download shows its progress
-  });
-  s.on("end", () => res.end());
-  s.on("error", () => res.destroy());
+  // one piece at a time: write it, wait until the connection took it, and in "slow" mode also wait 240 ms
+  // (~1 MB/s, so the progress can be watched). (Waiting only for "drain" made slow mode run at full speed.)
+  (async () => {
+    let flipped = false;
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      for await (let c of fs.createReadStream(file, { start, end: stop, highWaterMark: 256 * 1024 })) {
+        if (m === "corrupt" && !flipped && /\.(exe|AppImage|zip)$/.test(name)) { c = Buffer.from(c); c[Math.min(c.length - 1, 5000)] ^= 0xff; flipped = true; }   // one byte, like a broken download
+        if (res.destroyed) return;
+        if (!res.write(c)) await new Promise((r) => { const done = () => { res.off("drain", done); res.off("close", done); r(); }; res.on("drain", done); res.on("close", done); });
+        if (m === "slow") await wait(240);
+      }
+      res.end();
+    } catch { res.destroy(); }
+  })();
 }).listen(PORT, "127.0.0.1", () => { log({ ready: true, port: PORT, tag: TAG, files: [...files.keys()] }); console.log(`github mock on :${PORT} for ${TAG}: ${[...files.keys()].join(", ")}`); });

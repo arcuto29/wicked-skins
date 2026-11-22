@@ -30,7 +30,7 @@ function exe() {
   return null;
 }
 function installedVersion() {
-  if (WIN) { const e = exe(); if (!e) return null; try { return cp.execFileSync("powershell", ["-NoProfile", "-Command", `(Get-Item '${e}').VersionInfo.ProductVersion`], { encoding: "utf8" }).trim(); } catch { return null; } }
+  if (WIN) { const e = exe(); if (!e) return null; try { return cp.execFileSync("powershell", ["-NoProfile", "-Command", `(Get-Item '${e}').VersionInfo.ProductVersion`], { encoding: "utf8" }).trim().replace(/^(\d+\.\d+\.\d+)\.0$/, "$1"); } catch { return null; } }   // (Windows writes 0.1.85 as 0.1.85.0)
   // Linux: the version inside the AppImage (its resources/app.asar package.json), read by extracting it
   if (!fs.existsSync(APPIMAGE)) return null;
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ai-"));
