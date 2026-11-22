@@ -13,7 +13,9 @@
 const fs = require("fs"), path = require("path"), os = require("os"), cp = require("child_process"), crypto = require("crypto");
 const WIN = process.platform === "win32", OUT = path.join(__dirname, "..", "..", "test-output", "desktop-" + process.platform); fs.mkdirSync(OUT, { recursive: true });
 const RES = path.join(OUT, "results.json"), results = fs.existsSync(RES) ? JSON.parse(fs.readFileSync(RES, "utf8")) : {};
-const ok = (k, v, d) => { results[k] = { pass: !!v, detail: d === undefined ? null : d }; fs.writeFileSync(RES, JSON.stringify(results, null, 1)); console.log((v ? "PASS " : "FAIL ") + k + (d !== undefined ? "  " + JSON.stringify(d).slice(0, 400) : "")); if (!v) process.exitCode = 1; };
+// (keyed by step too: the same check in two steps, e.g. 0.1.85 and 0.1.86 updating, must never overwrite the other)
+const STEP = process.argv.slice(2, 5).filter((x) => !/[\\/]/.test(x)).join(" ");
+const ok = (k, v, d) => { k = `[${STEP}] ${k}`; results[k] = { pass: !!v, detail: d === undefined ? null : d }; fs.writeFileSync(RES, JSON.stringify(results, null, 1)); console.log((v ? "PASS " : "FAIL ") + k + (d !== undefined ? "  " + JSON.stringify(d).slice(0, 400) : "")); if (!v) process.exitCode = 1; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MOCK_LOG = process.env.MOCK_LOG || path.join(OUT, "mock-log.jsonl"), MODE = process.env.MOCK_MODE_FILE || path.join(OUT, "mode.txt");
 const setMode = (m) => fs.writeFileSync(MODE, m);
@@ -75,7 +77,16 @@ const seedDiff = (s) => { const want = JSON.parse(fs.readFileSync(path.join(OUT,
 (async () => {
   const [cmd, a1, a2] = process.argv.slice(2);
   if (cmd === "install") {
-    if (WIN) { cp.execFileSync(a1, ["/S"], { stdio: "inherit" }); await waitFor(() => exe(), 120000); }
+    if (WIN) {
+      // installing an older version over a newer one (the test goes back to 0.1.86 after 0.1.85 updated itself):
+      // uninstall first, silently. The settings in AppData stay (the uninstaller keeps app data).
+      const cur = exe();
+      if (cur) {
+        const un = fs.readdirSync(path.dirname(cur)).find((f) => /^Uninstall .*\.exe$/i.test(f));
+        if (un) { cp.execFileSync(path.join(path.dirname(cur), un), ["/S", "/currentuser"], { stdio: "inherit" }); await waitFor(() => (exe() ? null : true), 120000, 1000); }
+      }
+      cp.execFileSync(a1, ["/S"], { stdio: "inherit" }); await waitFor(() => exe(), 120000);
+    }
     else { fs.mkdirSync(path.dirname(APPIMAGE), { recursive: true }); fs.copyFileSync(a1, APPIMAGE); fs.chmodSync(APPIMAGE, 0o755); }
     console.log("installed", exe(), installedVersion());
     return;

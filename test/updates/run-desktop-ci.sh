@@ -81,8 +81,13 @@ mock "$WORK/real086" v0.1.86
 run expect-404 0.1.85 0.1.86 || STATUS=1
 echo "::endgroup::"
 
-echo "::group::AFTER: installed 0.1.86 (what users have) updates itself to 0.1.990"
-run install "$OLD086"
+echo "::group::AFTER: the same installed 0.1.85 (its own old updater) updates itself to 0.1.990"
+mock "$WORK/rel-0.1.990" v0.1.990
+run self-update 0.1.85 0.1.990 || STATUS=1
+echo "::endgroup::"
+
+echo "::group::AFTER: installed 0.1.86 (what most users have) updates itself to 0.1.990"
+run install "$OLD086"; run seed
 mock "$WORK/rel-0.1.990" v0.1.990
 run self-update 0.1.86 0.1.990 || STATUS=1
 echo "::endgroup::"
