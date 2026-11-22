@@ -63,8 +63,14 @@ async function waitFor(fn, ms, step = 500) { const t = Date.now() + ms; while (D
 const pendingInfo = () => { try { return JSON.parse(fs.readFileSync(path.join(pending, "update-info.json"), "utf8")); } catch { return null; } };
 const stateFile = () => { try { return JSON.parse(fs.readFileSync(path.join(userData, "update-state.json"), "utf8")); } catch { return null; } };
 const settings = () => { try { return JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf8")); } catch { return null; } };
-const SEED_KEYS = ["skin", "mediaId", "media", "candleLook", "candleUp", "dim", "loadouts", "invite", "journal"];
-const seedOf = (s) => JSON.stringify(SEED_KEYS.map((k) => [k, s && s[k]]));
+// what must survive: your choices exactly, each wallpaper's file (its data) and name, looks, licence, journal.
+// (The app may add things next to them, e.g. a wallpaper's measured size, or lastVersion: that's not a loss.)
+const SEED_KEYS = ["skin", "mediaId", "candleLook", "candleUp", "dim", "invite", "journal"];
+const seedOf = (s) => JSON.stringify([...SEED_KEYS.map((k) => [k, s && s[k]]),
+  ["media", ((s && s.media) || []).map((m) => [m.id, m.name, m.type, crypto.createHash("sha256").update(String(m.src || "")).digest("hex")])],
+  ["loadouts", ((s && s.loadouts) || []).map((l) => [l.id, l.name, l.mediaId, JSON.stringify(l.look)])]]);
+const seedDiff = (s) => { const want = JSON.parse(fs.readFileSync(path.join(OUT, "seed.json"), "utf8")), have = JSON.parse(seedOf(s));
+  return want.filter((w, i) => JSON.stringify(w) !== JSON.stringify(have[i])).map((w) => w[0]); };
 
 (async () => {
   const [cmd, a1, a2] = process.argv.slice(2);
@@ -101,7 +107,7 @@ const seedOf = (s) => JSON.stringify(SEED_KEYS.map((k) => [k, s && s[k]]));
   if (cmd === "self-update") {         // AFTER: a copy that's out there today updates itself to the fixed release
     setMode("ok"); fs.rmSync(pending, { recursive: true, force: true }); fs.writeFileSync(MOCK_LOG, "");
     const before = settings();
-    ok(`${a1} is installed, with your settings`, installedVersion() === a1 && seedOf(before) === seed(), installedVersion());
+    ok(`${a1} is installed, with your settings`, installedVersion() === a1 && seedOf(before) === seed(), [installedVersion(), seedDiff(before)]);
     launch();
     const info = await waitFor(() => { const p = pendingInfo(); return p && p.fileName && fs.existsSync(path.join(pending, p.fileName)) ? p : null; }, 240000, 1000);
     const asked = mockLog().filter((l) => /\/download\//.test(l.url || "")).map((l) => `${l.status} ${l.url.split("/").pop()}`);
@@ -111,7 +117,7 @@ const seedOf = (s) => JSON.stringify(SEED_KEYS.map((k) => [k, s && s[k]]));
     ok("closing Priism: the app quits normally", closed);
     const v = await waitFor(() => (installedVersion() === a2 ? a2 : null), 180000, 2000);
     ok(`...and ${a2} is installed when it's closed (no reinstall by hand)`, v === a2, installedVersion());
-    ok("...your settings, wallpapers, looks and licence are all still there", seedOf(settings()) === seed());
+    ok("...your settings, wallpapers, looks and licence are all still there", seedOf(settings()) === seed(), seedDiff(settings()));
     launch();
     const st = await waitFor(() => { const s = stateFile(); return s && s.current === a2 && ["current", "available", "downloading", "ready", "error"].includes(s.state) ? s : null; }, 120000, 1000);
     ok(`${a2} starts, and its updater reports in`, !!st, st);
@@ -141,7 +147,8 @@ const seedOf = (s) => JSON.stringify(SEED_KEYS.map((k) => [k, s && s[k]]));
     setMode("corrupt"); await again();
     s = await waitFor(async () => { const x = await state(); return x.state === "error" && x.error.kind === "damaged" ? x : null; }, 240000, 1000);
     c = await card();
-    ok("damaged download (one byte changed): caught by its SHA-512, not installed, said plainly", s && c && /didn't match the release/.test(c.text) && stillA1() && !(pendingInfo() && fs.existsSync(path.join(pending, pendingInfo().fileName || "-"))), { s, c: c && c.text.slice(0, 160) });
+    await new Promise((r) => setTimeout(r, 800)); c = await card();
+    ok("damaged download (one byte changed): caught by its SHA-512, not installed, said plainly (the card switches from Downloading to the reason)", s && c && /pu-error/.test(c.cls) && /didn't match the release/.test(c.text) && stillA1() && !(pendingInfo() && fs.existsSync(path.join(pending, pendingInfo().fileName || "-"))), { s, c: c && c.text.slice(0, 160) });
     await shot("desktop-error-damaged");
     // 3. offline
     setMode("down"); await again();
@@ -172,7 +179,7 @@ const seedOf = (s) => JSON.stringify(SEED_KEYS.map((k) => [k, s && s[k]]));
     ok(`Restart & update: ${a2} is installed`, v === a2, installedVersion());
     const st = await waitFor(() => { const x = stateFile(); return x && x.current === a2 && running() ? x : null; }, 180000, 1000);
     ok(`...and Priism started again by itself on ${a2}`, !!st, st);
-    ok("...with your settings, wallpapers, looks and licence", seedOf(settings()) === seed());
+    ok("...with your settings, wallpapers, looks and licence", seedOf(settings()) === seed(), seedDiff(settings()));
     await closeGracefully();
     return;
   }

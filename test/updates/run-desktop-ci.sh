@@ -42,10 +42,12 @@ echo "::endgroup::"
 
 echo "::group::github.com -> the local stand-in (test certificate trusted on this runner only)"
 cd "$WORK"
-openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=Priism test CA" -keyout ca.key -out ca.crt 2>/dev/null
-openssl req -newkey rsa:2048 -nodes -subj "/CN=github.com" -keyout gh.key -out gh.csr 2>/dev/null
-printf "subjectAltName=DNS:github.com\nextendedKeyUsage=serverAuth\n" > ext.cnf
-openssl x509 -req -in gh.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 2 -extfile ext.cnf -out gh.crt 2>/dev/null
+export MSYS2_ARG_CONV_EXCL="*"   # (Git Bash on Windows would turn "/CN=..." into a file path)
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=Priism test CA" -keyout ca.key -out ca.crt
+openssl req -newkey rsa:2048 -nodes -subj "/CN=github.com" -keyout gh.key -out gh.csr
+printf "subjectAltName=DNS:github.com\nextendedKeyUsage=serverAuth\nbasicConstraints=CA:FALSE\n" > ext.cnf
+openssl x509 -req -in gh.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 2 -extfile ext.cnf -out gh.crt
+unset MSYS2_ARG_CONV_EXCL
 if [ $WIN = 1 ]; then
   powershell -NoProfile -Command "Import-Certificate -FilePath '$(cygpath -w "$WORK/ca.crt")' -CertStoreLocation Cert:\\LocalMachine\\Root | Out-Null; Add-Content -Path C:\\Windows\\System32\\drivers\\etc\\hosts -Value '127.0.0.1 github.com'; ipconfig /flushdns | Out-Null"
 else

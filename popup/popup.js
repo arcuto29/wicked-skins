@@ -2906,14 +2906,17 @@ function deskUpdates() {
         primary: "Download " + PV.label(v), href: `${RELEASES}/tag/v${PV.canon(v)}`, onLater: () => snooze("desk-manual", v) });
     }
     if (st === "error" && u.error) {
-      if (open && open !== "error") return;
+      // a download that failed: its card is replaced at once (it must never keep saying "Downloading")
+      if (open === "available" || open === "downloading") C.close();
+      else if (open && open !== "error") return;
       if (sessionStorage.getItem("updErrSeen") === u.error.kind + (v || "")) return;
       if (u.error.kind === "offline" && !v) return;           // nothing to say yet: no update was found
       return C.show({ mode: "error", from: v ? APP_VER : "", to: v || APP_VER, error: u.error,
         foot: u.error.detail ? u.error.detail.slice(0, 120) : "Nothing was changed.",
         onPrimary: () => a.check(), onLater: () => sessionStorage.setItem("updErrSeen", u.error.kind + (v || "")) });
     }
-    if ((st === "current" || st === "checking") && (open === "error")) C.close();
+    if ((st === "current" || st === "checking") && (open === "error" || open === "available" || open === "downloading")) C.close();
+    if (st === "ready" && open && open !== "ready" && v && !newer(v, APP_VER)) C.close();
   };
   a.state().then(render).catch(() => {});
   a.onState(render);

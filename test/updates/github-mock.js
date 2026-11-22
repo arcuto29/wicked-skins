@@ -7,7 +7,7 @@
 //   GET /<owner>/<repo>/releases/download/<tag>/<file>      the release's files, under the names GITHUB gives
 //                                                           uploaded files (a space becomes a dot), Range supported
 // Every request is logged (JSON lines) with its status. A mode file switches failures on and off while it runs:
-//   ok | slow (8 MB/s, so progress can be watched) | 404 (installers missing) | corrupt (bytes changed) | down (resets)
+//   ok | slow (~1 MB/s, so progress can be watched) | 404 (installers missing) | corrupt (bytes changed) | down (resets)
 //   node github-mock.js --dir <release files> --tag v0.1.990 --cert c.pem --key k.pem --log log.jsonl --mode mode.txt
 "use strict";
 const https = require("https"), fs = require("fs"), path = require("path");
@@ -47,7 +47,7 @@ https.createServer({ cert: fs.readFileSync(arg("cert")), key: fs.readFileSync(ar
     if (m === "corrupt" && !flipped && /\.(exe|AppImage|zip)$/.test(name)) { c = Buffer.from(c); c[Math.min(c.length - 1, 5000)] ^= 0xff; flipped = true; }   // one byte, like a broken download
     pos += c.length;
     if (!res.write(c)) { s.pause(); res.once("drain", () => s.resume()); }
-    if (m === "slow") { s.pause(); setTimeout(() => s.resume(), 30); }   // ~8 MB/s
+    if (m === "slow") { s.pause(); setTimeout(() => s.resume(), 240); }   // ~1 MB/s: even a small differential download shows its progress
   });
   s.on("end", () => res.end());
   s.on("error", () => res.destroy());
