@@ -68,7 +68,7 @@ curl -s -X POST https://tsazewpipzgfwgcepcsb.supabase.co/functions/v1/licence \
 # -> {"status":"invalid"}
 ```
 
-Until the function is deployed, Priism checks invite codes the old way, so nothing breaks in between.
+Then set `LICENCE_LIVE = true` in `src/pass.js` and release. Until then Priism checks invite codes the old way (and doesn't ask the function at all, so Chrome logs no errors); Whop keys can only be checked once it's on.
 
 ## 3. Test a real purchase
 1. Make a 100% off promo code on Whop and "buy" Pro with it.
