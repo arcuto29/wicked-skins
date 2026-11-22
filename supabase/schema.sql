@@ -110,6 +110,8 @@ begin
   if public.is_admin(auth.uid()) then
     new.status := 'approved'; new.reviewed_at := now();
   else
+    -- your files, in your folder, within the limits (app_limits); the size is the stored file's real size
+    new.size_bytes := public.workshop_check_upload(new.kind, new.file_path, new.thumb_path, new.size_bytes);
     new.status := 'pending'; new.reviewed_at := null;
   end if;
   return new;
@@ -171,11 +173,19 @@ $$;
 -- Someone used a wallpaper (only counts approved ones).
 create or replace function public.count_use(wallpaper uuid)
 returns void
-language sql
+language plpgsql
 security definer
 set search_path = ''
 as $$
-  update public.wallpapers set uses = uses + 1 where id = wallpaper and status = 'approved';
+declare b bigint;
+begin
+  update public.wallpapers set uses = uses + 1 where id = wallpaper and status = 'approved' returning size_bytes into b;
+  -- for the usage monitor: one download of that file today (an estimate of the bandwidth wallpapers use)
+  if b is not null then
+    insert into public.usage_daily (day, downloads, bytes) values (current_date, 1, b)
+    on conflict (day) do update set downloads = public.usage_daily.downloads + 1, bytes = public.usage_daily.bytes + excluded.bytes;
+  end if;
+end;
 $$;
 
 -- ---------- likes ----------
@@ -524,3 +534,160 @@ end;
 $$;
 revoke execute on function public.report_bug(text, text, jsonb, text) from public;
 grant execute on function public.report_bug(text, text, jsonb, text) to anon, authenticated;
+
+-- =====================================================================================================================
+-- ---------- free-tier limits, upload quotas and usage (keeps the beta inside Supabase's Free plan) ----------
+-- One row of limits the owner can change any time (Workshop page › Usage, or here). Uploads are refused with a clear
+-- message once a limit is reached, so storage can't run past the plan's quota and pause the Workshop for everyone.
+-- The free_* columns are just the plan's quotas, for the usage monitor's bars (update them if the plan changes).
+create table if not exists public.app_limits (
+  id smallint primary key default 1 check (id = 1),
+  max_uploads_per_user integer not null default 15 check (max_uploads_per_user between 0 and 1000),
+  max_bytes_per_user bigint not null default 62914560 check (max_bytes_per_user between 0 and 53687091200),         -- 60 MB
+  max_image_bytes bigint not null default 20971520 check (max_image_bytes between 1 and 52428800),                  -- 20 MB
+  max_video_bytes bigint not null default 31457280 check (max_video_bytes between 1 and 52428800),                  -- 30 MB
+  max_image_px integer not null default 3840 check (max_image_px between 640 and 16384),                            -- longest side kept
+  max_total_bytes bigint not null default 943718400 check (max_total_bytes between 0 and 1099511627776),            -- 900 MB, under the 1 GB quota
+  free_storage_bytes bigint not null default 1073741824,     -- Free plan: 1 GB file storage
+  free_db_bytes bigint not null default 524288000,           -- Free plan: 500 MB database
+  free_egress_bytes bigint not null default 10737418240,     -- Free plan: 5 GB uncached + 5 GB cached egress a month
+  updated_at timestamptz not null default now()
+);
+insert into public.app_limits (id) values (1) on conflict (id) do nothing;
+alter table public.app_limits enable row level security;
+drop policy if exists "app_limits: anyone reads" on public.app_limits;
+create policy "app_limits: anyone reads" on public.app_limits for select to anon, authenticated using (true);
+drop policy if exists "app_limits: admins change" on public.app_limits;
+create policy "app_limits: admins change" on public.app_limits for update to authenticated
+  using (public.is_admin((select auth.uid()))) with check (public.is_admin((select auth.uid())));
+revoke insert, delete on public.app_limits from anon, authenticated;
+
+-- a user's files in the Workshop bucket (count and bytes, from Storage's own records: never what the browser says)
+create or replace function public.workshop_folder_usage(p_uid uuid, out files integer, out bytes bigint)
+language sql stable security definer set search_path = ''
+as $$
+  select count(*)::integer, coalesce(sum(nullif(o.metadata->>'size', '')::bigint), 0)::bigint
+  from storage.objects o where o.bucket_id = 'workshop' and (storage.foldername(o.name))[1] = p_uid::text;
+$$;
+create or replace function public.workshop_total_bytes()
+returns bigint language sql stable security definer set search_path = ''
+as $$ select coalesce(sum(nullif(o.metadata->>'size', '')::bigint), 0)::bigint from storage.objects o where o.bucket_id = 'workshop'; $$;
+revoke execute on function public.workshop_folder_usage(uuid) from public, anon, authenticated;
+revoke execute on function public.workshop_total_bytes() from public, anon, authenticated;
+
+-- may the signed-in user store another file? (Storage checks this before every upload; admins aren't limited)
+create or replace function public.workshop_can_upload()
+returns boolean language plpgsql stable security definer set search_path = ''
+as $$
+declare L public.app_limits; u record;
+begin
+  if (select auth.uid()) is null then return false; end if;
+  if public.is_admin((select auth.uid())) then return true; end if;
+  select * into L from public.app_limits where id = 1;
+  select * into u from public.workshop_folder_usage((select auth.uid()));
+  -- each wallpaper is a file and its thumbnail; one extra pair of room for an upload that's being replaced
+  return u.files < 2 * L.max_uploads_per_user + 2 and u.bytes < L.max_bytes_per_user and public.workshop_total_bytes() < L.max_total_bytes;
+end;
+$$;
+grant execute on function public.workshop_can_upload() to authenticated;
+
+-- on sharing a wallpaper (from wallpapers_before_insert, signed-in non-admins): the file and its thumbnail must be
+-- yours and already stored; the size recorded is the stored file's; then the limits. Returns the real size.
+create or replace function public.workshop_check_upload(p_kind text, p_file text, p_thumb text, p_claimed bigint)
+returns bigint language plpgsql security definer set search_path = ''
+as $$
+declare L public.app_limits; me text := (select auth.uid())::text; sz bigint; n integer; u record;
+begin
+  select * into L from public.app_limits where id = 1;
+  if p_file is null or (storage.foldername(p_file))[1] is distinct from me then raise exception 'quota: the file must be in your own folder'; end if;
+  if p_thumb is not null and (storage.foldername(p_thumb))[1] is distinct from me then raise exception 'quota: the thumbnail must be in your own folder'; end if;
+  select nullif(o.metadata->>'size', '')::bigint into sz from storage.objects o where o.bucket_id = 'workshop' and o.name = p_file;
+  if not found then raise exception 'quota: upload the file first'; end if;
+  sz := coalesce(sz, p_claimed);   -- (Storage always records the size; this is only for a project set up without it)
+  if p_kind = 'image' and sz > L.max_image_bytes then raise exception 'quota: images can be up to % MB', round(L.max_image_bytes / 1048576.0); end if;
+  if p_kind = 'video' and sz > L.max_video_bytes then raise exception 'quota: videos can be up to % MB', round(L.max_video_bytes / 1048576.0); end if;
+  select count(*) into n from public.wallpapers w where w.owner = (select auth.uid());
+  if n >= L.max_uploads_per_user then raise exception 'quota: you can share up to % wallpapers (delete one to share another)', L.max_uploads_per_user; end if;
+  select * into u from public.workshop_folder_usage((select auth.uid()));
+  if u.bytes > L.max_bytes_per_user then raise exception 'quota: your wallpapers can use up to % MB in total', round(L.max_bytes_per_user / 1048576.0); end if;
+  if public.workshop_total_bytes() > L.max_total_bytes then raise exception 'quota: the Workshop is full for now (the owner has been told)'; end if;
+  return sz;
+end;
+$$;
+revoke execute on function public.workshop_check_upload(text, text, text, bigint) from public, anon, authenticated;
+
+-- Storage: uploads into your own folder, and only while you're within the limits (replaces the policy above)
+do $$
+begin
+  drop policy if exists "workshop: upload to own folder" on storage.objects;
+  create policy "workshop: upload to own folder" on storage.objects for insert to authenticated
+    with check (bucket_id = 'workshop' and (storage.foldername(name))[1] = (select auth.uid())::text and public.workshop_can_upload());
+exception when others then
+  raise notice 'Storage upload policy not updated (%). In Storage -> Policies, add "and public.workshop_can_upload()" to the upload policy.', sqlerrm;
+end;
+$$;
+
+-- downloads per day (count_use adds each one): an estimate of the bandwidth wallpapers use, for the usage monitor
+create table if not exists public.usage_daily (
+  day date primary key,
+  downloads integer not null default 0,
+  bytes bigint not null default 0
+);
+alter table public.usage_daily enable row level security;   -- no policies: only the functions here read or write it
+
+-- your own usage and limits (the Workshop page shows "3 of 15 · 12 of 60 MB")
+create or replace function public.my_workshop_usage()
+returns jsonb language plpgsql stable security definer set search_path = ''
+as $$
+declare L public.app_limits; u record; n integer;
+begin
+  if (select auth.uid()) is null then raise exception 'sign in first'; end if;
+  select * into L from public.app_limits where id = 1;
+  select * into u from public.workshop_folder_usage((select auth.uid()));
+  select count(*) into n from public.wallpapers w where w.owner = (select auth.uid());
+  return jsonb_build_object('uploads', n, 'max_uploads', L.max_uploads_per_user, 'bytes', u.bytes, 'max_bytes', L.max_bytes_per_user,
+    'max_image_bytes', L.max_image_bytes, 'max_video_bytes', L.max_video_bytes, 'max_image_px', L.max_image_px,
+    'unlimited', public.is_admin((select auth.uid())));
+end;
+$$;
+revoke execute on function public.my_workshop_usage() from public, anon;
+grant execute on function public.my_workshop_usage() to authenticated;
+
+-- the owner's usage monitor: storage, database, estimated download bandwidth this month, top uploaders, and files
+-- with no wallpaper (an upload that didn't finish) older than a day, which can be cleaned up
+create or replace function public.workshop_usage()
+returns jsonb language plpgsql stable security definer set search_path = ''
+as $$
+declare L public.app_limits; r jsonb;
+begin
+  if not public.is_admin((select auth.uid())) then raise exception 'admins only'; end if;
+  select * into L from public.app_limits where id = 1;
+  select jsonb_build_object(
+    'limits', to_jsonb(L),
+    'storage_bytes', (select coalesce(sum(nullif(o.metadata->>'size', '')::bigint), 0) from storage.objects o),
+    'workshop_bytes', public.workshop_total_bytes(),
+    'objects', (select count(*) from storage.objects o where o.bucket_id = 'workshop'),
+    'db_bytes', pg_database_size(current_database()),
+    'wallpapers', (select count(*) from public.wallpapers),
+    'pending', (select count(*) from public.wallpapers where status = 'pending'),
+    'uploaders', (select count(distinct owner) from public.wallpapers),
+    'month_downloads', (select coalesce(sum(downloads), 0) from public.usage_daily where day >= date_trunc('month', current_date)),
+    'month_bytes', (select coalesce(sum(bytes), 0) from public.usage_daily where day >= date_trunc('month', current_date)),
+    'last30', (select coalesce(jsonb_agg(jsonb_build_object('day', day, 'downloads', downloads, 'bytes', bytes) order by day), '[]'::jsonb)
+               from public.usage_daily where day > current_date - 30),
+    'top', (select coalesce(jsonb_agg(t order by t.bytes desc), '[]'::jsonb) from (
+              select (storage.foldername(o.name))[1] as owner, p.display_name as name, count(*) as files,
+                     coalesce(sum(nullif(o.metadata->>'size', '')::bigint), 0) as bytes
+              from storage.objects o left join public.profiles p on p.id::text = (storage.foldername(o.name))[1]
+              where o.bucket_id = 'workshop' group by 1, 2 order by 4 desc limit 10) t),
+    'orphans', (select coalesce(jsonb_agg(jsonb_build_object('path', o.name, 'bytes', coalesce(nullif(o.metadata->>'size', '')::bigint, 0))), '[]'::jsonb)
+                from (select o.name, o.metadata from storage.objects o
+                      where o.bucket_id = 'workshop' and o.created_at < now() - interval '1 day'
+                        and not exists (select 1 from public.wallpapers w where w.file_path = o.name or w.thumb_path = o.name)
+                      limit 200) o)
+  ) into r;
+  return r;
+end;
+$$;
+revoke execute on function public.workshop_usage() from public, anon;
+grant execute on function public.workshop_usage() to authenticated;
