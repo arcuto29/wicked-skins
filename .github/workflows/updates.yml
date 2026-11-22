@@ -40,6 +40,8 @@ jobs:
       - run: npm install --no-save playwright@1.64.1 && npx playwright install --with-deps chromium
       - run: node test/updates/card.visual.js
       - run: node test/updates/extension.e2e.js
+      - name: Stable and beta side by side on the real TradingView chart
+        run: node test/updates/channels.e2e.js
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: updates-browser, path: test-output/updates, retention-days: 14 }
