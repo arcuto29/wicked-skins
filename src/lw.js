@@ -9,7 +9,7 @@
    There are NO broker position/order "bracket" pills in Lightweight Charts, so that feature does not apply here.
    Nothing is read or sent anywhere; this only changes how the chart is drawn. */
 (function () {
-  const LW_VERSION = 27;
+  const LW_VERSION = 28;
   if (window.__bdLwHooked && (window.__bdLwVer || 1) >= LW_VERSION) return;
   window.__bdLwHooked = true;
   window.__bdLwVer = LW_VERSION;
@@ -583,10 +583,10 @@
     const lineFx = () => on;   // (always: the "Each indicator" list needs to see the lines even with no styling on)
     // hz / hy / hp: the path is only horizontal straight lines (an indicator's levels, like prints); y in device px
     proto.beginPath = function () { if (lineFx()) seg.set(this, { n: 0, ok: true, h: 0, v: 0, p: null, hz: true, hy: null, hp: null }); pbox.delete(this); return oBegin.call(this); };
-    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) { k.p = [x, y]; if (k.hz) { const t = this.getTransform(); k.hp = y * (t.d || 1) + t.f; if (k.hy === null) k.hy = k.hp; } } if (on) pbox.set(this, null); return oMove.call(this, x, y); };
+    proto.moveTo = function (x, y) { const k = lineFx() && seg.get(this); if (k) { k.p = [x, y]; if (k.hz) { const t = this.getTransform(); k.hp = y * (t.d || 1) + t.f; if (k.hy === null) k.hy = k.hp; k.mx = x * (t.a || 1) + t.e; } } if (on) pbox.set(this, null); return oMove.call(this, x, y); };
     proto.lineTo = function (x, y) {
       const k = lineFx() && seg.get(this);
-      if (k && k.hz) { const t = this.getTransform(), Y = y * (t.d || 1) + t.f; if (k.hp === null || Math.abs(Y - k.hp) > 1.5) k.hz = false; else k.hp = Y; }
+      if (k && k.hz) { const t = this.getTransform(), Y = y * (t.d || 1) + t.f; if (k.hp === null || Math.abs(Y - k.hp) > 1.5) k.hz = false; else { k.hp = Y; k.lx = x * (t.a || 1) + t.e; } }
       if (k && !k.ok) k.n++;                    // a curve (indicator line): just count its points, for Line glow
       else if (k && k.ok) {
         const c = this.canvas, t = this.getTransform(), sx = t.a || 1, sy = t.d || 1, p = k.p;
@@ -659,15 +659,32 @@
     // order / position line (those have a coloured price tag on the scale at the same height)
     lineIsCurve = (ctx) => { const k = seg.get(ctx), col = strokeDesc.get.call(ctx); if (!k || typeof col !== "string" || isCandleCol(col)) return false;
       if (!k.ok && k.n >= 3 && !greyish(col)) return true;
-      return k.hz && k.n >= 1 && k.hy !== null && !ctx.getLineDash().length && !(greyish(col) && k.n >= 2) && !(shapeSides.has((rgbKey(col) || {}).key)) && !onTagRow(k.hy) && settled(col, k.hy); };
-    // a new level line counts only after ~1 s: by then an order line's price tag on the same row is known
-    const levelFirst = new Map();
-    // by colour: once settled it stays (no flashing back as lines move); the price-tag check still runs on every draw
-    const settled = (col) => { const key = col, now = performance.now(), f = levelFirst.get(key);
-      if (f === undefined) { if (levelFirst.size > 300) levelFirst.delete(levelFirst.keys().next().value); levelFirst.set(key, now);
-        if (!levelT) levelT = setTimeout(() => { levelT = 0; if (on) repaint(); }, 1100);   // a still chart may not repaint by itself
-        return false; } return now - f > 1000; };
-    let levelT = 0;
+      return k.hz && k.n >= 1 && k.hy !== null && !ctx.getLineDash().length && !(greyish(col) && k.n >= 2) && !(shapeSides.has((rgbKey(col) || {}).key)) && !onTagRow(k.hy) && settled(ctx, col, k); };
+    // By colour: once a colour has been a level it stays one (no flashing back as lines move); the price-tag check still
+    // runs on every draw. A colour not known as a level yet is drawn as it is and decided once this paint is over: no
+    // price tag on its row by then (an order line's tag is drawn in the same paint) = an indicator's level, from then
+    // on, and this line is drawn again in your style before the browser shows the frame. (It used to stay in its own
+    // colour for ~1 s and then have the chart redrawn: a flash of the original colour on every new level.)
+    const levelFirst = new Map();   // colour -> true once seen as a level with no tag on its row
+    let levelPend = null;
+    const settled = (ctx, col, k) => { const st = levelFirst.get(col); if (st === true) return true;
+      if (st === undefined) { if (levelFirst.size > 300) levelFirst.delete(levelFirst.keys().next().value); levelFirst.set(col, false); }
+      if (!levelPend) { levelPend = []; queueMicrotask(settleLevels); }
+      if (levelPend.length < 40) { const t = ctx.getTransform(); levelPend.push({ ctx, col, y: k.hy, one: k.n === 1, x0: k.mx, x1: k.lx, lw: ctx.lineWidth * (Math.hypot(t.a, t.b) || 1), alpha: ctx.globalAlpha, cap: ctx.lineCap }); }
+      return false; };
+    function settleLevels() {
+      const list = levelPend; levelPend = null; if (!list || !on) return;
+      for (const e of list) {
+        if (onTagRow(e.y)) continue;                          // a tag on its row: an order / position line, left as it is
+        levelFirst.set(e.col, true);
+        const changes = lfx && (lfx.indMode !== "own" || (lfx.indCustom && Object.keys(lfx.indCustom).length > 0) || lfx.lineGlow > 0);
+        if (!changes || !e.one || e.x0 == null || e.x1 == null || Math.abs(e.x1 - e.x0) < 2) continue;
+        const g = e.ctx; g.save();
+        try { g.setTransform(1, 0, 0, 1, 0, 0); strokeDesc.set.call(g, e.col); g.lineWidth = e.lw; g.setLineDash([]); g.globalAlpha = e.alpha; g.lineCap = e.cap;
+          proto.beginPath.call(g); proto.moveTo.call(g, e.x0, e.y); proto.lineTo.call(g, e.x1, e.y); proto.stroke.call(g);   // through the hooks: styled like any level
+        } catch {} finally { g.restore(); }
+      }
+    }
     lineHook = styleLines;
 
     // ---------- price scale text, bracket labels, P&L and last price ----------
@@ -696,11 +713,16 @@
       return isAxis(c) || (isPaneC(c) && W >= 24 && W < c.width * 0.5 && !greyish(g.fillStyle) && !isCandleCol(g.fillStyle)); };
     function noteBox(g, w, h) { if (labelBox(g, w, h)) lastBox.set(g, String(g.fillStyle)); }
     // rows (device y) of the coloured price tags on the price scale lately: order / position / price lines have one
-    const tagRows = [];
+    // the rows of the price tags drawn in the latest paint that drew any (a line is usually drawn before this paint's
+    // tags, so that's the previous paint's), however long ago: a still chart repaints rarely. (Rows used to be kept for
+    // 20 s, so a tag that moved, e.g. while you drag the price scale, left a trail, and a level line crossing it went
+    // back to its own colour.)
+    const tagRows = []; let tagLast = -1, tagPrev = -1;
     function noteTagRow(g, y, h) { const c = g.canvas; if (!c || !isAxis(c) || greyish(g.fillStyle)) return;   // grey = the crosshair's tag
-      const t = g.getTransform(), Y = (y + h / 2) * (t.d || 1) + t.f, now = performance.now(), i = tagRows.findIndex((e) => Math.abs(e.y - Y) <= 3);
-      if (i >= 0) tagRows[i] = { y: Y, t: now }; else { tagRows.push({ y: Y, t: now }); if (tagRows.length > 60) tagRows.shift(); } }
-    const onTagRow = (Y) => { const now = performance.now(); for (const e of tagRows) if (now - e.t < 20000 && Math.abs(e.y - Y) <= 6) return true; return false; };
+      if (frameNo !== tagLast) { tagPrev = tagLast; tagLast = frameNo; for (let j = tagRows.length - 1; j >= 0; j--) if (tagRows[j].f < tagPrev) tagRows.splice(j, 1); }
+      const t = g.getTransform(), Y = (y + h / 2) * (t.d || 1) + t.f, i = tagRows.findIndex((e) => Math.abs(e.y - Y) <= 3);
+      if (i >= 0) tagRows[i] = { y: Y, f: frameNo }; else { tagRows.push({ y: Y, f: frameNo }); if (tagRows.length > 60) tagRows.shift(); } }
+    const onTagRow = (Y) => { for (const e of tagRows) if (e.f === tagLast && Math.abs(e.y - Y) <= 6) return true; return false; };
     const oText = proto.fillText, oStrokeText = proto.strokeText;
     // solid boxes drawn on the chart lately (an indicator's label box): the text inside keeps its own colours
     const solidLw = new WeakMap();

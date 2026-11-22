@@ -31,6 +31,19 @@ jobs:
         if: always()
         with: { name: desktop-screenshots, path: desktop/test-output }
 
+  chart-colours:
+    # Your colours on the chart frame by frame (brackets, drawings, indicator levels), at normal and high-DPI scale,
+    # with the drawing sequences TradingView uses. Local page only, no website needed (test/colours/hook.unit.js).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-save playwright@1.64.1
+      - run: npx playwright install --with-deps chromium
+      - run: node test/colours/hook.unit.js
+      - run: node test/colours/hook.unit.js --dpr 2
+
   workshop-rules:
     # The Workshop's database rules (supabase/schema.sql) against a real Postgres
     runs-on: ubuntu-latest
