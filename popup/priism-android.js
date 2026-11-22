@@ -24,6 +24,14 @@
         }
         cb && cb(out);
       },
+      remove(keys, cb) {
+        const ks = Array.isArray(keys) ? keys : [keys];
+        if (N.remove) N.remove(JSON.stringify(ks));
+        const changes = {};
+        for (const k of ks) changes[k] = { newValue: undefined };
+        listeners.forEach((f) => { try { f(changes, "local"); } catch {} });
+        cb && cb();
+      },
       set(obj, cb) {
         N.set(JSON.stringify(obj));                 // native persists + pushes to the chart live
         const changes = {};

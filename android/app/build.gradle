@@ -11,7 +11,8 @@ android {
         applicationId "com.priism.skins"
         minSdk 24
         targetSdk 34
-        versionCode 86
+        // set by scripts/release.js (scripts/versions.js): every release is higher than the last
+        versionCode 108699
         versionName "0.1.86"
     }
 
@@ -30,6 +31,9 @@ android {
     buildTypes {
         release {
             minifyEnabled false
+            // tests only (the upgrade test in .github/workflows/updates.yml reads the app's saved settings):
+            // never set for a published build
+            debuggable project.hasProperty('PRIISM_TEST_DEBUGGABLE')
             if (project.hasProperty('PRIISM_KEYSTORE')) {
                 signingConfig signingConfigs.release
             }

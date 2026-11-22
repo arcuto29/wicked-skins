@@ -59,10 +59,22 @@
     return { plan: p.plan === "lifetime" ? "lifetime" : "pro", until: p.until || null, src: p.src || "" };
   }
   // "pro" | "free" | "none" (none = Priism stays off until a code / key is entered)
+  // Beta copies ("Priism Skins Beta" listing, a beta zip, a desktop / Android beta build) only open for invited
+  // testers whose access is tied to their account (a beta code added on the website, then this device linked with a
+  // link code: src/invite.js). Sharing the install link or a beta zip gives nobody access: without that account
+  // link a beta copy stays locked (no Free fallback either). Stable copies are unchanged.
+  const CHANNEL = (() => {
+    try { const m = root.chrome && root.chrome.runtime && root.chrome.runtime.getManifest && root.chrome.runtime.getManifest();
+      if (m && (m.version || m.name)) return /-beta/i.test(m.version_name || "") || /\bbeta\b/i.test(m.name || "") ? "beta" : "stable"; } catch {}
+    try { const a = root.wickedStore && root.wickedStore.app; if (a && a.version) return /-beta/i.test(a.version) ? "beta" : "stable"; } catch {}
+    try { if (root.PriismNative && root.PriismNative.version) return /-beta/i.test(String(root.PriismNative.version())) ? "beta" : "stable"; } catch {}
+    return root.__BD_CHANNEL === "beta" ? "beta" : "stable";
+  })();
   function planOf(passInfo, invite) {
+    if (CHANNEL === "beta") return (passInfo && passInfo.src === "account") || (!PASS_REQUIRED && invite && invite.ok && invite.kind === "account") ? "pro" : "none";
     if (passInfo) return "pro";
     if (!PASS_REQUIRED && invite && invite.ok && invite.code) return "pro";
     return FREE_TIER ? "free" : "none";
   }
-  root.PriismPass = { FREE_TIER, PASS_REQUIRED, STORE_URL, FREE_SKINS, isFreeSkin, isPro, freeValue, verify, planOf };
+  root.PriismPass = { FREE_TIER, PASS_REQUIRED, STORE_URL, CHANNEL, FREE_SKINS, isFreeSkin, isPro, freeValue, verify, planOf };
 })(typeof self !== "undefined" ? self : window);

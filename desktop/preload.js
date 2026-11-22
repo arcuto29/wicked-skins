@@ -10,15 +10,19 @@ contextBridge.exposeInMainWorld("wickedStore", {
         return cb ? p.then(cb) : p;
       },
       set: (obj, cb) => { const p = ipcRenderer.invoke("store:set", obj); return cb ? p.then(cb) : p; },
-      remove: () => Promise.resolve(),
+      remove: (keys, cb) => { const p = ipcRenderer.invoke("store:remove", keys); return cb ? p.then(cb) : p; },
     },
   },
-  // Desktop-only: this app's version and its updates (the panel shows the "Update ready" card).
+  // Desktop-only: this app's version and its updates (the panel's update card shows the real state, live).
   app: {
     version: (() => { try { return ipcRenderer.sendSync("app:version"); } catch { return ""; } })(),
+    platform: process.platform,
+    state: () => ipcRenderer.invoke("upd:state"),        // { state, version, current, percent, transferred, total, speed, error }
+    check: () => ipcRenderer.invoke("upd:check"),
+    install: () => ipcRenderer.invoke("upd:install"),    // only does anything when state is "ready"
+    onState: (cb) => ipcRenderer.on("upd:state", (_e, s) => cb(s)),
     pending: () => ipcRenderer.invoke("upd:pending"),
-    install: () => ipcRenderer.invoke("upd:install"),
-    onReady: (cb) => ipcRenderer.on("upd:ready", (_e, p) => cb(p)),
+    onReady: (cb) => ipcRenderer.on("upd:state", (_e, s) => { if (s && s.state === "ready") cb({ version: s.version }); }),
   },
   // Desktop-only: open / close the skinned TradingView window, and hear when it opens or closes.
   tv: {

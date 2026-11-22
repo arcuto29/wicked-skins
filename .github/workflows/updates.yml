@@ -1,0 +1,117 @@
+# Update paths, tested for real on every pull request that touches them (nothing here publishes anything):
+#   unit     settings upgrades, versions, backup files, the release checker against the real 0.1.86 metadata
+#   browser  the extension in Chrome: backup / restore between two installs, the update card on each kind of install
+#   desktop  real installed apps (Windows, Linux) updating themselves: the 0.1.86 bug reproduced, 0.1.86 recovering
+#            by itself, and the new updater's errors, progress and Restart & update (test/updates/run-desktop-ci.sh)
+#   android  signed APKs in an emulator: updates keep settings, another key or an older version is refused
+name: Updates
+on:
+  pull_request:
+    paths: ["desktop/**", "popup/**", "src/**", "android/**", "scripts/**", "test/updates/**", ".github/workflows/updates.yml", ".github/workflows/release.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: node scripts/check.js
+      - run: node test/updates/version.test.mjs
+      - run: node test/updates/migrate.test.mjs
+      - run: node test/updates/backup.test.mjs
+      - name: The release checker catches the 0.1.86 bug in the real published metadata
+        run: |
+          mkdir r && cd r
+          for f in latest.yml latest-linux.yml latest-mac.yml; do curl -fsSL -o $f https://github.com/arcuto29/wicked-skins/releases/download/v0.1.86/$f; done
+          # the files as GitHub actually named them (empty stand-ins: the names are what matter here)
+          touch Priism.Skins.Setup.0.1.86.exe Priism.Skins.Setup.0.1.86.exe.blockmap Priism.Skins-0.1.86.AppImage Priism.Skins-0.1.86-arm64-mac.zip Priism.Skins-0.1.86-arm64-mac.zip.blockmap
+          if node ../scripts/check-desktop-release.js .; then echo "::error::the checker should have failed on 0.1.86"; exit 1; fi
+          echo "OK: refused, as it must be"
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-save playwright@1.64.1 && npx playwright install --with-deps chromium
+      - run: node test/updates/card.visual.js
+      - run: node test/updates/extension.e2e.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: updates-browser, path: test-output/updates, retention-days: 14 }
+
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install
+        working-directory: desktop
+      - run: npm install --no-save playwright@1.64.1
+      - name: Linux test machine (virtual display, AppImage support, the test certificate store)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb libnss3-tools libfuse2t64 >/dev/null
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - name: Real installed apps updating themselves
+        shell: bash
+        run: bash test/updates/run-desktop-ci.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: updates-desktop-${{ matrix.os }}, path: test-output, retention-days: 14 }
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+        with: { packages: "platform-tools platforms;android-34 build-tools;34.0.0" }
+      - name: Gradle wrapper
+        working-directory: android
+        run: for i in 1 2 3 4 5; do gradle wrapper --gradle-version 8.9 && exit 0; echo "retry $i"; sleep 30; done; exit 1
+      - name: Build v1 + v2 (one test key) and v2 (another test key)
+        run: |
+          set -e
+          mkdir -p .apks; K="$RUNNER_TEMP"
+          for n in a b; do keytool -genkeypair -keystore "$K/$n.jks" -storetype PKCS12 -alias t -keyalg RSA -keysize 2048 -validity 2 -storepass testpass -keypass testpass -dname "CN=Priism test $n" >/dev/null 2>&1; done
+          build() {   # versionCode versionName key out
+            sed -i -E "s/versionCode [0-9]+/versionCode $1/; s/versionName \"[^\"]*\"/versionName \"$2\"/" android/app/build.gradle
+            (cd android && ./gradlew --no-daemon -q assembleRelease -PPRIISM_KEYSTORE="$K/$3.jks" -PPRIISM_KEYSTORE_PASSWORD=testpass -PPRIISM_KEY_ALIAS=t -PPRIISM_KEY_PASSWORD=testpass -PPRIISM_TEST_DEBUGGABLE=true)
+            cp android/app/build/outputs/apk/release/app-release.apk ".apks/$4"
+          }
+          build 108699 0.1.86 a v1.apk
+          build 108799 0.1.87 a v2.apk
+          build 108799 0.1.87 b v2-otherkey.apk
+          git checkout -- android/app/build.gradle
+          ls -la .apks
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Upgrade on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          disable-animations: true
+          script: bash test/updates/android-upgrade.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: updates-android, path: test-output/android, retention-days: 14 }

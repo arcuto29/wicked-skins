@@ -16,4 +16,12 @@ class Store(ctx: Context) {
         for (k in add.keys()) cur.put(k, add.get(k))
         prefs.edit().putString("cfg", cur.toString()).apply()
     }
+
+    /** Remove keys (settings upgrades, undoing a restored backup). */
+    fun remove(keysJson: String) {
+        val cur = JSONObject(json())
+        val keys = org.json.JSONArray(keysJson)
+        for (i in 0 until keys.length()) cur.remove(keys.optString(i))
+        prefs.edit().putString("cfg", cur.toString()).apply()
+    }
 }

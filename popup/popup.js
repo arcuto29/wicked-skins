@@ -2834,43 +2834,99 @@ async function siteBar() {
 }
 
 // ---------- updates ----------
-// Store installs are updated by Chrome automatically; we just say what's new afterwards.
-// Zip / "Load unpacked" installs can't auto-update, so we check GitHub Releases (max every 6 h) and offer the download.
+// What each install can do, and what the update card shows (always the real state, popup/update-card.js):
+//  - Chrome Web Store (stable "Priism Skins", or the "Priism Skins Beta" listing for invited testers): Chrome
+//    downloads updates by itself. bg.js hears when one is downloaded and waiting (onUpdateAvailable); only then
+//    "Restart & update" (a few seconds; open charts are refreshed in place, TradingView doesn't reload).
+//  - Loaded unpacked (the zip): Chrome can't update these. We check GitHub (at most every 6 h) and say exactly what
+//    to do: unzip over the same folder and press Reload, which keeps everything. Never "downloading" or "ready".
+//  - Desktop app: the app's own updater (desktop/main.js) reports checking / downloading (real %) / ready / error.
+//  - Android: no silent installs outside Google Play: the card links the new APK, Android asks you to confirm.
+// Beta copies follow beta releases (and stable ones after them); stable copies only stable releases.
 const REPO = "arcuto29/wicked-skins";
 const RELEASES = `https://github.com/${REPO}/releases`;
 const STORE_URL = "https://chromewebstore.google.com/detail/priism-skins-for-tradingv/ilmoloilbeblmgkanbiekhdegagfdloa";
+const BETA_STORE_URL = "";   // the "Priism Skins Beta" listing (trusted testers), once it's approved
+const PV = window.PriismVersion;
+const ME = PV ? PV.self() : { version: "", channel: "stable", store: false, kind: "page" };
 // this copy's version: the extension's manifest, or the desktop app's (its preload passes it in)
-const APP_VER = (() => { try { const v = chrome.runtime.getManifest().version; if (v) return v; } catch {}
+const APP_VER = ME.version || (() => { try { const v = chrome.runtime.getManifest().version; if (v) return v; } catch {}
   return (window.wickedStore && window.wickedStore.app && window.wickedStore.app.version) || ""; })();
-const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+const newer = (a, b) => (PV ? PV.newer(a, b) : (() => { const x = a.split(".").map(Number), y = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; })());
 function notice(title, hintText, linkText, href, onClose) {
   const n = $("notice"); n.hidden = false;
   $("noticeTitle").textContent = title; $("noticeHint").textContent = hintText;
   $("noticeLink").textContent = linkText; $("noticeLink").href = href;
   $("noticeClose").innerHTML = ICON_X; $("noticeClose").onclick = () => { n.hidden = true; onClose && onClose(); };
 }
+// "Not now" for a version, kept for a while (so the card doesn't come back every time the panel opens)
+const snoozed = (k, v, hours) => { try { const s = JSON.parse(localStorage.getItem("updSnooze") || "{}")[k]; return s && s.v === v && Date.now() - s.at < hours * 3600e3; } catch { return false; } };
+const snooze = (k, v) => { try { const s = JSON.parse(localStorage.getItem("updSnooze") || "{}"); s[k] = { v, at: Date.now() }; localStorage.setItem("updSnooze", JSON.stringify(s)); } catch {} };
+// the newest release for this copy's channel from GitHub: { version, tag, url, assets } (null when unknown / offline)
+async function latestRelease(channel) {
+  const key = "updLatest:" + channel;
+  try { const c = JSON.parse(localStorage.getItem(key) || "null"); if (c && Date.now() - c.at < 6 * 3600e3) return c.r; } catch {}
+  let r = null;
+  try {
+    const res = await fetch(channel === "beta" ? `https://api.github.com/repos/${REPO}/releases?per_page=15` : `https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
+    if (res.ok) {
+      const list = [].concat(await res.json()).filter((x) => x && !x.draft && (channel === "beta" || !x.prerelease) && PV && PV.parse(x.tag_name));
+      list.sort((a, b) => PV.cmp(b.tag_name, a.tag_name));
+      const x = list[0];
+      if (x) r = { version: PV.canon(x.tag_name), tag: x.tag_name, url: x.html_url, assets: (x.assets || []).map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size })) };
+    }
+  } catch {}
+  if (r) try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), r })); } catch {}
+  return r;
+}
 function deskUpdates() {
-  const a = window.wickedStore && window.wickedStore.app; if (!a || IS_TAB) return;
-  const offer = (p) => {
-    if (!p || !p.version || !newer(p.version, APP_VER) || PriismUpdateCard.isOpen()) return;
-    if (sessionStorage.getItem("updLater") === p.version) return;          // "Not now": not again until the app restarts
-    PriismUpdateCard.show({ mode: "ready", from: APP_VER, to: p.version, primary: "Restart & update",
-      lead: "Downloaded and ready. Priism restarts in a few seconds and reopens your chart tabs where you left them.",
-      foot: "Not now? It installs by itself next time you close Priism.",
-      onPrimary: () => a.install(), onLater: () => sessionStorage.setItem("updLater", p.version) });
+  const a = window.wickedStore && window.wickedStore.app; if (!a || IS_TAB || !a.state) return;
+  const C = PriismUpdateCard;
+  const render = (u) => {
+    if (!u || !u.state) return;
+    const st = u.state, v = u.version, open = C.mode();
+    if ((st === "available" || st === "downloading") && v && newer(v, APP_VER)) {
+      if (open === "available" || open === "downloading") return C.update(u);
+      if (open || sessionStorage.getItem("updHide") === v) return;
+      return C.show({ mode: st, from: APP_VER, to: v, ...u, onLater: () => sessionStorage.setItem("updHide", v) });
+    }
+    if (st === "ready" && v && newer(v, APP_VER)) {
+      if (open === "ready" || snoozed("desk", v, 4)) return;
+      if (open) C.close();
+      return C.show({ mode: "ready", from: APP_VER, to: v, primary: "Restart & update",
+        lead: "Downloaded and checked against the release. Priism restarts in a few seconds and reopens your chart tabs where you left them. Your looks, wallpapers and settings stay as they are.",
+        foot: "Not now? It installs by itself the next time you close Priism.",
+        onPrimary: () => a.install(), onLater: () => snooze("desk", v) });
+    }
+    if (st === "manual" && v && newer(v, APP_VER)) {        // macOS without signing: Apple doesn't let it update itself
+      if (open || snoozed("desk-manual", v, 24)) return;
+      return C.show({ mode: "manual", from: APP_VER, to: v, lead: "On this Mac, Priism can't install updates by itself yet. It takes a minute by hand, and your settings stay:",
+        steps: ["Download the new version (the button below).", "Unzip it and drag Priism Skins into Applications, replacing the old one.", "Open it: your looks, wallpapers and settings are all there."],
+        primary: "Download " + PV.label(v), href: `${RELEASES}/tag/v${PV.canon(v)}`, onLater: () => snooze("desk-manual", v) });
+    }
+    if (st === "error" && u.error) {
+      if (open && open !== "error") return;
+      if (sessionStorage.getItem("updErrSeen") === u.error.kind + (v || "")) return;
+      if (u.error.kind === "offline" && !v) return;           // nothing to say yet: no update was found
+      return C.show({ mode: "error", from: v ? APP_VER : "", to: v || APP_VER, error: u.error,
+        foot: u.error.detail ? u.error.detail.slice(0, 120) : "Nothing was changed.",
+        onPrimary: () => a.check(), onLater: () => sessionStorage.setItem("updErrSeen", u.error.kind + (v || "")) });
+    }
+    if ((st === "current" || st === "checking") && (open === "error")) C.close();
   };
-  a.pending().then(offer).catch(() => {});
-  a.onReady(offer);
+  a.state().then(render).catch(() => {});
+  a.onState(render);
 }
 async function updates() {
-  if (!EXT_MODE || IS_TAB) return;
-  const me = chrome.runtime.getManifest().version;
-  if (window.WickedMigrate) await WickedMigrate.run().catch(() => {});
+  if (window.WickedMigrate) await WickedMigrate.run().catch(() => {});        // every platform: settings upgraded once per version
+  if (IS_TAB) return;
+  if (!EXT_MODE) return androidUpdates();
+  const me = APP_VER, C = PriismUpdateCard;
   // Another copy of the extension drew on a chart recently (content.js reports it).
   const { dupSeen } = await chrome.storage.local.get("dupSeen");
   if (dupSeen && Date.now() - dupSeen < 3 * 86400e3) {
-    notice("Two copies of Priism Skins are installed", `Remove the older one so they don't fight (keep version ${me}). It's under chrome://extensions.`,
+    notice("Two copies of Priism Skins are installed", `Only one draws on your charts (the one you used last). If you don't need both, save a backup (Settings \u203a Backup & restore), then remove the other one in chrome://extensions.`,
       "Open extensions", "#", () => chrome.storage.local.remove("dupSeen"));
     $("noticeLink").onclick = (e) => { e.preventDefault(); chrome.tabs.create({ url: "chrome://extensions" }); };
     return;
@@ -2878,16 +2934,17 @@ async function updates() {
   // after an update the "Updated" card says what's new (onboarding below), so the old one-line notice just clears
   const { justUpdated } = await chrome.storage.local.get("justUpdated");
   if (justUpdated) chrome.storage.local.remove("justUpdated");
-  // Store installs: Chrome downloads updates by itself. When one is waiting (bg.js hears onUpdateAvailable), offer
-  // to apply it now; bg.js then refreshes the open charts in place, so TradingView never reloads.
-  if ("update_url" in chrome.runtime.getManifest()) {
-    const { updateReady: u, updAsk } = await chrome.storage.local.get(["updateReady", "updAsk"]);
+  // Store installs: Chrome downloads updates by itself. Only once one is downloaded and waiting (bg.js hears
+  // onUpdateAvailable) is "Restart & update" offered; bg.js then refreshes the open charts in place.
+  if (ME.store) {
+    const { updateReady: u } = await chrome.storage.local.get("updateReady");
     if (u && u.version && newer(u.version, me)) {
-      if (!(updAsk && updAsk.v === u.version && Date.now() - updAsk.at < 12 * 3600e3) && !PriismUpdateCard.isOpen())
-        PriismUpdateCard.show({ mode: "ready", from: me, to: u.version,
+      if (!snoozed("store", u.version, 12) && !C.isOpen())
+        C.show({ mode: "ready", from: me, to: u.version,
+          lead: "Chrome has downloaded it. It takes a few seconds, and your looks, wallpapers and settings stay exactly as they are.",
           foot: "Your TradingView tabs stay open. No page refresh.",
           onPrimary: () => { chrome.storage.local.remove("updateReady"); chrome.runtime.reload(); },
-          onLater: () => chrome.storage.local.set({ updAsk: { v: u.version, at: Date.now() } }) });
+          onLater: () => snooze("store", u.version) });
       return;
     }
     // ask Chrome to look for an update now and then (it also checks by itself every few hours)
@@ -2898,22 +2955,188 @@ async function updates() {
     }
     return;
   }
-  // (the Chrome Web Store adds update_url to the manifest of store installs; zip/unpacked installs, below, don't have it)
-  const { updCheck } = await chrome.storage.local.get("updCheck");
-  let latest = updCheck && Date.now() - updCheck.at < 6 * 3600e3 ? updCheck.latest : null;
-  if (!latest) {
-    try {
-      const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: "application/vnd.github+json" } });
-      if (r.ok) latest = String((await r.json()).tag_name || "").replace(/^v/, "");
-    } catch {}
-    if (latest) chrome.storage.local.set({ updCheck: { at: Date.now(), latest } });
-  }
-  if (latest && newer(latest, me)) {
-    // the easiest fix is the store copy, which updates itself from then on (remove this copy afterwards)
-    notice(`Update available: ${latest}`, "Get Priism Skins from the Chrome Web Store and it updates itself from now on (then remove this copy in chrome://extensions). Or download the new zip and reload it as before.",
-      "Chrome Web Store", STORE_URL);
-  }
+  // Loaded unpacked: Chrome can't update it, so say exactly what to do (it keeps everything if done this way).
+  const r = await latestRelease(ME.channel);
+  if (!r || !newer(r.version, me) || C.isOpen() || snoozed("zip", r.version, 24)) return;
+  const zip = r.assets.find((x) => (ME.channel === "beta" ? /^priism-skins-beta-[\d.]+\.zip$/i : /^priism-skins-[\d.]+\.zip$/i).test(x.name));
+  const store = ME.channel === "beta" ? BETA_STORE_URL : STORE_URL;
+  C.show({ mode: "manual", from: me, to: r.version,
+    lead: "This copy was loaded unpacked, so Chrome can't update it by itself. Two minutes, and everything stays:",
+    steps: [`Download ${zip ? zip.name : "the new zip"}.`, "Unzip it over this copy's folder (replace the files).", "Press Reload on Priism in chrome://extensions."],
+    foot: store ? `Or use the ${ME.channel === "beta" ? "beta listing" : "Chrome Web Store"} copy: it updates itself (back up first).` : "Your looks, wallpapers and settings stay.",
+    primary: "Download " + PV.label(r.version), href: zip ? zip.url : r.url, onLater: () => snooze("zip", r.version) });
 }
+// Android: the app can't install updates by itself (only Google Play can). Link the new APK; Android asks you to
+// confirm, and your settings stay because every release is signed with the same key (from 0.1.87 on).
+async function androidUpdates() {
+  const N = window.PriismNative; if (!N || !N.version) return;
+  const r = await latestRelease(ME.channel), C = PriismUpdateCard;
+  if (!r || !newer(r.version, APP_VER) || C.isOpen() || snoozed("apk", r.version, 24)) return;
+  const apk = r.assets.find((x) => /\.apk$/i.test(x.name));
+  const legacy = !PV.newer(APP_VER, "0.1.86");   // 0.1.86 and older were signed with a temporary key
+  C.show({ mode: "manual", from: APP_VER, to: r.version,
+    lead: legacy ? "This update needs a one-time reinstall: older versions were signed with a temporary key. Save a backup first so nothing is lost:"
+      : "Download it and Android installs it over this one. Your looks, wallpapers and settings stay.",
+    steps: legacy ? ["Save a backup (Settings \u203a Backup & restore) and keep the file.", "Uninstall Priism Skins, then install the new APK (the button below).", "Open Priism and restore the backup. From then on, updates install over each other."]
+      : ["Download the APK (the button below).", "Open it and tap Update. Android asks you to confirm."],
+    primary: "Download " + PV.label(r.version), href: apk ? apk.url : r.url,
+    onPrimary: () => { if (N.openUrl) N.openUrl(apk ? apk.url : r.url); }, onLater: () => snooze("apk", r.version) });
+}
+
+// ---------- backup & restore (src/backup.js): everything you made, in one file you keep ----------
+// Save: every setting, saved look and candle style, and the actual files of your uploaded wallpapers (licences,
+// passes and this device's keys are never in it). Restore: the file is checked first (every wallpaper's size and
+// CRC-32); if anything is wrong nothing changes. Restoring only ADDS: your current wallpapers and looks stay, and
+// what was here before is kept so "Undo restore" brings it back exactly. Afterwards every restored wallpaper is read
+// back and checked again, and the result stays on screen until you choose "Keep" (only then is the undo copy
+// dropped). Moving to a new install: restore there, check it says Verified, and only then remove the old one.
+const BK = window.PriismBackup;
+const storeAll = () => new Promise((res) => chrome.storage.local.get(null, (v) => res(v || {})));
+const storeRemove = (keys) => new Promise((res) => { try { const r = chrome.storage.local.remove ? chrome.storage.local.remove(keys, () => res()) : res(); if (r && r.then) r.then(res, res); } catch { res(); } });
+const MBs = (b) => (b >= 1073741824 ? (b / 1073741824).toFixed(2) + " GB" : (b / 1048576).toFixed(1) + " MB");
+async function mediaBlob(m) {
+  try { if (m.file && EXT_MODE && window.WickedMediaDB) return (await WickedMediaDB.get(m.id)) || null; if (m.src) return await BK.dataUrlToBlob(m.src); } catch {}
+  return null;
+}
+function bkSay(html, kind) { const b = $("bkMsg"); if (!b) return; b.hidden = !html; b.className = "bk-msg" + (kind ? " " + kind : ""); b.innerHTML = html || ""; }
+const bkProg = (what) => (n, t) => bkSay(`${what}\u2026 <b>${t ? Math.floor((n / t) * 100) : 0}%</b> <span class="hint">${MBs(n)} of ${MBs(t)}</span>`);
+// save the file: a normal download (extension, desktop app), or Android's "Save to" screen
+async function saveBackupFile(blob, name) {
+  const N = window.PriismNative;
+  if (N && N.saveBegin) {
+    N.saveBegin(name);
+    const step = 3 * 1048576;   // a multiple of 3 bytes, so each piece is whole base64
+    for (let o = 0; o < blob.size; o += step) { const u = await BK.blobToDataUrl(blob.slice(o, o + step)); N.saveChunk(u.slice(u.indexOf(",") + 1)); bkProg("Preparing")(Math.min(blob.size, o + step), blob.size); }
+    return new Promise((res) => { window.__priismSaved = (ok, where) => res({ ok: !!ok, where }); N.saveEnd(); });
+  }
+  const a = document.createElement("a"), url = URL.createObjectURL(blob);
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
+  return { ok: true };
+}
+async function exportBackup() {
+  if (!BK) return;
+  $("bkSave").disabled = true;
+  try {
+    const s = await storeAll(), media = [];
+    for (const m of Array.isArray(s.media) ? s.media : []) if (!m.pending) media.push({ meta: m, blob: await mediaBlob(m) });
+    let local = {}; try { local.myLooks = JSON.parse(localStorage.getItem("myLooks") || "[]"); } catch {}
+    const me = window.PriismVersion ? PriismVersion.self() : { version: APP_VER };
+    const blob = await BK.build({ settings: s, media, local, app: { version: me.version, channel: me.channel, kind: me.kind }, onProgress: bkProg("Checking your wallpapers") });
+    const h = (await BK.open(blob)).header, d = new Date();
+    const name = `priism-backup-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}.priism`;
+    const r = await saveBackupFile(blob, name);
+    if (!r.ok) return bkSay("Not saved. Nothing was changed.", "bad");
+    bkSay(`<b>Backup saved</b>${r.where ? " to " + esc(r.where) : ""}: ${h.counts.wallpapers} wallpaper${h.counts.wallpapers === 1 ? "" : "s"} (${MBs(h.counts.bytes)}), ${h.counts.looks} saved look${h.counts.looks === 1 ? "" : "s"} and ${h.counts.settings} settings.` +
+      (h.missing.length ? ` <span class="warn">${h.missing.length} wallpaper file${h.missing.length === 1 ? " was" : "s were"} already missing on this device and couldn't be included: ${esc(h.missing.join(", "))}.</span>` : "") +
+      ` <span class="hint">Your licence and this device's keys aren't in it: activate Priism again after restoring on a new install.</span>`, "ok");
+  } catch (e) { bkSay("The backup couldn't be made: " + esc(String((e && e.message) || e)) + ". Nothing was changed.", "bad"); }
+  finally { $("bkSave").disabled = false; }
+}
+// how this install keeps a restored wallpaper: in IndexedDB (extension), or as a data URL (desktop / Android, 50 MB each)
+async function keepWallpaper(id, blob, meta) {
+  if (EXT_MODE && window.WickedMediaDB) { await WickedMediaDB.put(id, blob); return { ...meta, id, file: true, size: blob.size }; }
+  if (blob.size > MAX_MB * 1048576) return null;
+  return { ...meta, id, src: await BK.blobToDataUrl(blob), size: blob.size };
+}
+let bkOpened = null;
+async function pickRestore(file) {
+  if (!BK || !file) return;
+  bkOpened = null; $("bkConfirm").hidden = true;
+  try {
+    const o = await BK.open(file);
+    const v = await BK.verify(o, bkProg("Checking every wallpaper in the backup"));
+    if (!v.ok) return bkSay(`This backup is damaged: ${esc(v.bad.join(", "))} ${v.bad.length === 1 ? "doesn't" : "don't"} match what was saved. Nothing was changed.`, "bad");
+    const h = o.header, c = h.counts, when = new Date(h.created);
+    bkOpened = o;
+    bkSay(`<b>Backup from ${esc(when.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }))}</b> (Priism ${esc((window.PriismVersion ? PriismVersion.label(h.app.version) : h.app.version) || "?")}): ` +
+      `${c.wallpapers} wallpaper${c.wallpapers === 1 ? "" : "s"} (${MBs(c.bytes)}, all checked), ${c.looks} saved look${c.looks === 1 ? "" : "s"}, ${c.settings} settings.` +
+      ` Restoring adds its wallpapers and looks to yours and switches to its settings. You can undo it.`);
+    $("bkConfirm").hidden = false;
+  } catch (e) { bkSay(esc(String((e && e.message) || e)), "bad"); }
+}
+async function applyRestore() {
+  const o = bkOpened; if (!o) return; const h = o.header;
+  $("bkConfirm").hidden = true; $("bkRestoreBtn").disabled = true;
+  try {
+    const now = await storeAll();
+    // what's here now, so the restore can be undone exactly (wallpapers are never removed, only added)
+    const undo = { at: Date.now(), from: h.app.version, settings: {}, addedMedia: [] };
+    for (const [k, v] of Object.entries(now)) if (k !== "media" && k !== "restoreUndo") undo.settings[k] = v;
+    const cur = Array.isArray(now.media) ? now.media.slice() : [], map = {}, skipped = [], restored = [];
+    for (let i = 0; i < h.media.length; i++) {
+      const m = h.media[i], blob = o.file(i), meta = { ...m.meta };
+      bkSay(`Restoring wallpapers\u2026 <b>${i + 1} of ${h.media.length}</b> <span class="hint">${esc(meta.name || "")}</span>`);
+      // already here (the same file, same id): nothing to copy
+      const same = cur.find((x) => x.id === meta.id && x.size === m.size);
+      if (same) { const b = await mediaBlob(same); if (b && b.size === m.size && (await BK.crc32(b)) === m.crc) { restored.push({ id: same.id, m }); continue; } }
+      const id = cur.some((x) => x.id === meta.id) ? uid() : meta.id; if (id !== meta.id) map[meta.id] = id;
+      if (!meta.thumb) { const u = URL.createObjectURL(blob); try { const p = await probe(meta.type, u); if (p && p.thumb) meta.thumb = p.thumb; } finally { URL.revokeObjectURL(u); } }
+      const entry = await keepWallpaper(id, blob, meta);
+      if (!entry) { skipped.push(meta.name || id); continue; }
+      cur.push(entry); undo.addedMedia.push(id); restored.push({ id, m });
+    }
+    let next = BK.remapMedia(h.settings, map);
+    next.loadouts = BK.mergeList(now.loadouts, next.loadouts);
+    next.myCandles = BK.mergeList(now.myCandles, next.myCandles);
+    if (next.mediaId && !cur.some((x) => x.id === next.mediaId)) { next.mediaId = null; if (next.skin === "media") next.skin = DEFAULTS.skin; }   // (a wallpaper that couldn't come along)
+    // a backup from an older Priism goes through the same settings upgrades an update would
+    const me = window.PriismVersion ? PriismVersion.self() : { version: APP_VER };
+    const older = window.PriismVersion && h.app.version && PriismVersion.newer(me.version, h.app.version);
+    await new Promise((res) => chrome.storage.local.set({ ...next, media: cur, restoreUndo: undo, ...(older ? { lastVersion: String(h.app.version).replace(/-beta\.?(\d+)$/, ".$1") } : {}) }, res));
+    if (older && window.WickedMigrate) await WickedMigrate.run().catch(() => {});
+    try { const mine = JSON.parse(localStorage.getItem("myLooks") || "[]"); localStorage.setItem("myLooks", JSON.stringify(BK.mergeList(mine, (h.local && h.local.myLooks) || []).slice(0, 50))); } catch {}
+    // read everything back and check it again
+    const after = await storeAll(), bad = [];
+    for (const r of restored) { const e = (after.media || []).find((x) => x.id === r.id), b = e && (await mediaBlob(e)); if (!b || b.size !== r.m.size || (await BK.crc32(b)) !== r.m.crc) bad.push(r.m.meta.name || r.id); }
+    const migrated = new Set(Object.keys((older && after.migrateBackup && after.migrateBackup.prev) || {}));
+    const diff = Object.keys(next).filter((k) => !["loadouts", "myCandles"].includes(k) && !migrated.has(k) && JSON.stringify(after[k]) !== JSON.stringify(next[k]));
+    const looksOk = (Array.isArray(h.settings.loadouts) ? h.settings.loadouts : []).every((l) => (after.loadouts || []).some((x) => x.name === l.name));
+    bkShowResult({ ok: !bad.length && !diff.length && looksOk, wallpapers: restored.length, bad, skipped, diff, looks: (h.settings.loadouts || []).length, settings: Object.keys(next).length, migratedFrom: older ? h.app.version : "" });
+  } catch (e) { bkSay("The restore stopped: " + esc(String((e && e.message) || e)) + ". Use Undo restore to go back to how it was.", "bad"); $("bkResult").hidden = false; }
+  finally { $("bkRestoreBtn").disabled = false; }
+}
+function bkShowResult(r) {
+  const p = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  bkSay((r.ok ? `<b class="okc">Restored and verified.</b> ` : `<b class="warn">Restored, but not everything checks out.</b> `) +
+    `${p(r.wallpapers, "wallpaper")} read back byte for byte, ${p(r.looks, "saved look")}, ${r.settings} settings.` +
+    (r.migratedFrom ? ` Settings from ${esc(r.migratedFrom)} were upgraded for this version.` : "") +
+    (r.skipped.length ? ` <span class="warn">${p(r.skipped.length, "wallpaper")} over ${MAX_MB} MB can't be kept in this app: ${esc(r.skipped.join(", "))} (the file is still in your backup).</span>` : "") +
+    (r.bad.length ? ` <span class="warn">Didn't match after restoring: ${esc(r.bad.join(", "))}.</span>` : "") +
+    (r.diff.length ? ` <span class="warn">Settings that didn't stick: ${esc(r.diff.slice(0, 6).join(", "))}.</span>` : "") +
+    ` <span class="hint">Look around. Choose Keep when you're happy, or Undo restore to go back exactly to how it was. Activate Priism again if this is a new install.</span>`, r.ok ? "ok" : "bad");
+  $("bkResult").hidden = false;
+}
+async function keepRestore() { await storeRemove(["restoreUndo"]); location.reload(); }
+async function undoRestore() {
+  const { restoreUndo: u } = await new Promise((res) => chrome.storage.local.get({ restoreUndo: null }, res));
+  if (!u) return location.reload();
+  const now = await storeAll(), added = new Set(u.addedMedia || []);
+  const keepMedia = (now.media || []).filter((m) => !added.has(m.id));
+  const gone = Object.keys(now).filter((k) => !(k in u.settings) && k !== "media" && k !== "restoreUndo");
+  await new Promise((res) => chrome.storage.local.set({ ...u.settings, media: keepMedia }, res));
+  if (gone.length) await storeRemove(gone);
+  if (EXT_MODE && window.WickedMediaDB) for (const id of added) { try { await WickedMediaDB.del(id); } catch {} }
+  await storeRemove(["restoreUndo"]);
+  location.reload();
+}
+(function backupUi() {
+  if (!$("bkSave") || !BK) return;
+  $("bkSave").onclick = exportBackup;
+  $("bkFile").onchange = (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; pickRestore(f); };
+  $("bkRestoreBtn").onclick = applyRestore;
+  $("bkCancel").onclick = () => { bkOpened = null; $("bkConfirm").hidden = true; bkSay(""); };
+  $("bkKeep").onclick = keepRestore; $("bkUndo").onclick = undoRestore;
+  // a restore not yet confirmed (the panel was closed): ask again
+  chrome.storage.local.get({ restoreUndo: null }, (s) => {
+    if (!s.restoreUndo) return;
+    bkSay(`<b>You restored a backup on ${esc(new Date(s.restoreUndo.at).toLocaleString())}.</b> Keep it, or undo it to go back exactly to how it was.`, "ok"); $("bkResult").hidden = false;
+    const d = $("bkSave").closest("details"); if (d) d.open = true;
+    // also at the top of the panel, wherever it opens
+    notice("A restored backup is waiting for you", "Check your looks and wallpapers, then choose Keep or Undo restore.", "Open Backup & restore", "#");
+    $("noticeLink").onclick = (e) => { e.preventDefault(); const t = document.querySelector('#nav [data-tab="tune"]'); if (t) t.click(); if (d) { d.open = true; d.scrollIntoView({ block: "start" }); } };
+  });
+})();
 
 // ---------- plans: an invite code or a Pro licence key, or Free (src/pass.js, src/invite.js) ----------
 // No plan yet: the gate covers the panel (and content.js draws nothing). Free (when it's open): the panel works, and

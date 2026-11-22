@@ -9,3 +9,8 @@ site/lib/
 
 # signing keys for Priism passes: never commit (LICENCES.md)
 PRIVATE-*.json
+
+# test output and work folders (updater tests)
+test-output/
+.upd/
+.apks/

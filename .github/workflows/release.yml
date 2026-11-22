@@ -1,77 +1,81 @@
-# Push a tag like v0.3.0 (npm run release 0.3.0 does it) and this:
-#  1. builds the extension zip and creates the GitHub Release with your CHANGELOG notes
-#  2. uploads + publishes the extension to the Chrome Web Store (if the CWS_* secrets are set)
-#     -> Chrome updates every store user automatically
-#  3. builds the desktop app for Windows, macOS and Linux and attaches the installers
-#     -> installed apps find the new version and update themselves
+# Releasing Priism (RELEASING.md). Push a tag: v0.3.0 (stable) or v0.3.0-beta.1 (beta, for invited testers).
+#
+#  1. BUILD + TEST, nothing published: the extension zip, the desktop installers (Windows, macOS, Linux) with their
+#     update metadata checked against the real files, and the Android APK. They're kept as workflow artifacts
+#     for review only (no update feed, store or download page points at them).
+#  2. WAIT FOR THE OWNER: the "publish" job runs in the GitHub environment "release", which requires the owner's
+#     approval (Settings > Environments > release > Required reviewers). A check job first makes sure that
+#     protection is really switched on; if it isn't, the run stops here and nothing is published.
+#  3. PUBLISH, only after approval, all in one job: sign the APK with Priism's permanent key (environment secrets)
+#     and check it's that key, create the GitHub Release as a draft with every file, check every file is there,
+#     then make it public, and send the extension to the Chrome Web Store (stable listing, or the beta listing for a
+#     beta tag). Desktop apps and Android only ever see a release once it's public and complete.
 name: Release
 on:
   push:
     tags: ["v*"]
 permissions:
-  contents: write
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  extension:
+  prepare:
     runs-on: ubuntu-latest
-    env:
-      CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
-      CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
-      REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-      PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
-      EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      channel: ${{ steps.v.outputs.channel }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - name: Check code and that the tag matches the version
-        run: EXPECT_VERSION="${GITHUB_REF_NAME#v}" node scripts/check.js
-      - name: Build extension zip
-        run: node scripts/build-extension.js
+      - name: The tag, the version everywhere and the code
+        id: v
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          EXPECT_VERSION="$V" node scripts/check.js
+          node -e 'const p=require("./scripts/versions").parse(process.argv[1]); if(!p) process.exit(1); console.log("version="+p.semver); console.log("channel="+p.channel); console.log("prerelease="+(p.channel==="beta"))' "$V" >> "$GITHUB_OUTPUT"
       - name: Release notes from CHANGELOG.md
         run: |
           V="${GITHUB_REF_NAME#v}"
-          awk -v v="$V" '$0 ~ "^## "v {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
-          [ -s notes.md ] || echo "Priism Skins $V" > notes.md
+          awk -v v="$V" 'index($0, "## " v " ") == 1 || $0 == "## " v {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "::error::CHANGELOG.md has no '## $V' section. Add the release notes first."; exit 1; }
           cat notes.md
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Priism Skins ${{ github.ref_name }}
-          body_path: notes.md
-          files: dist/priism-skins-*.zip
-      # The store refuses a new upload while the last one is still in review. That must not stop the desktop apps
-      # from being built and attached: warn instead, and upload the latest zip in the dashboard once review is done.
-      - name: Publish to Chrome Web Store
-        if: env.EXTENSION_ID != '' && env.REFRESH_TOKEN != '' && env.CLIENT_ID != '' && env.PUBLISHER_ID != ''
+      - uses: actions/upload-artifact@v4
+        with: { name: notes, path: notes.md, retention-days: 14 }
+      - name: Updater and backup tests
         run: |
-          set -o pipefail
-          if ! npx --yes chrome-webstore-upload-cli@4 --source "dist/priism-skins-${GITHUB_REF_NAME#v}.zip" 2>&1 | tee cws.log; then
-            echo "::warning::Not sent to the Chrome Web Store: $(grep -o 'You may not.*review\.' cws.log || tail -1 cws.log). The release and desktop apps still go out; upload this zip in the dashboard later, or the next release will."
-          fi
-      - name: Chrome Web Store not connected yet
-        if: env.EXTENSION_ID == '' || env.REFRESH_TOKEN == '' || env.CLIENT_ID == '' || env.PUBLISHER_ID == ''
-        run: echo "::notice::Not published to the Chrome Web Store - add the CWS_* secrets (see RELEASING.md) and every tag publishes automatically."
+          node test/updates/version.test.mjs
+          node test/updates/migrate.test.mjs
+          node test/updates/backup.test.mjs
+
+  extension:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: node scripts/build-extension.js
+      - uses: actions/upload-artifact@v4
+        with: { name: extension, path: "dist/priism-skins-*.zip", if-no-files-found: error, retention-days: 14 }
 
   desktop:
-    needs: extension
+    needs: prepare
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: desktop
-    permissions:
-      contents: write
     env:
-      # Optional code signing. Without it the apps still install and update on Windows/Linux;
-      # macOS needs signing + notarization for silent auto-updates (see RELEASING.md).
+      # Optional code signing (none yet). Without it the apps still install and update on Windows/Linux;
+      # macOS needs signing + notarization before it can update itself (until then Macs get a "download" card).
       CSC_LINK: ${{ secrets.CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -81,9 +85,7 @@ jobs:
         if: env.CSC_LINK == ''
         shell: bash
         run: echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
-      # Build only (no publish). electron-builder's own uploader hit 403s here; we attach with the
-      # same action the extension job uses, which works reliably.
-      - name: Build installers
+      - name: Build installers (no publishing)
         shell: bash
         # retried: electron-builder downloads its tools from GitHub, which sometimes times out (504) for a few minutes
         run: |
@@ -93,13 +95,137 @@ jobs:
             *)              T=--linux ;;
           esac
           for i in 1 2 3 4; do npx electron-builder $T --publish never && exit 0; echo "retry $i"; sleep 45; done; exit 1
-      - name: Attach installers + update manifests to the release
-        uses: softprops/action-gh-release@v2
+      - name: Every update file matches its metadata (names GitHub keeps, sizes, SHA-512)
+        shell: bash
+        run: node ../scripts/check-desktop-release.js dist
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: desktop-${{ matrix.os }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
             desktop/dist/*.exe
             desktop/dist/*.exe.blockmap
             desktop/dist/*.AppImage
             desktop/dist/*.zip
             desktop/dist/*.zip.blockmap
-            desktop/dist/latest*.yml
+            desktop/dist/*.yml
+            !desktop/dist/builder-debug.yml
+            !desktop/dist/builder-effective-config.yaml
+
+  android:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: android-actions/setup-android@v3
+        with: { packages: "platform-tools platforms;android-34 build-tools;34.0.0" }
+      - name: Gradle wrapper (the jar isn't committed)
+        working-directory: android
+        run: for i in 1 2 3 4 5; do gradle wrapper --gradle-version 8.9 && exit 0; echo "retry $i"; sleep 30; done; exit 1
+      # unsigned here: it's signed with Priism's permanent key only in the approved publish job
+      - name: Build the release APK (unsigned)
+        working-directory: android
+        run: for i in 1 2 3; do ./gradlew --no-daemon assembleRelease && exit 0; echo "retry $i"; sleep 30; done; exit 1
+      - uses: actions/upload-artifact@v4
+        with: { name: android-unsigned, path: android/app/build/outputs/apk/release/app-release-unsigned.apk, if-no-files-found: error, retention-days: 14 }
+
+  approval-is-required:
+    # The publish job's protection must really be on: environment "release" with at least one required reviewer.
+    # If it isn't (never set up, or removed), stop now, so a tag can never publish by itself.
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Environment "release" requires the owner's approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          R=$(gh api "repos/${GITHUB_REPOSITORY}/environments/release" --jq '[.protection_rules[]? | select(.type=="required_reviewers") | .reviewers | length] | add // 0' 2>/dev/null || echo 0)
+          if [ "${R:-0}" -lt 1 ]; then
+            echo "::error::Environment 'release' doesn't require a reviewer, so nothing will be published. Set it up: Settings > Environments > release > Required reviewers (RELEASING.md)."
+            exit 1
+          fi
+          echo "Approval required: $R reviewer(s)."
+
+  publish:
+    needs: [prepare, extension, desktop, android, approval-is-required]
+    runs-on: ubuntu-latest
+    environment: release            # waits here for the owner's approval
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/download-artifact@v4
+        with: { path: art }
+      - name: Gather the files
+        run: |
+          mkdir -p out
+          cp art/extension/*.zip out/
+          for d in art/desktop-*; do cp -n "$d"/* out/; done
+          cp art/notes/notes.md notes.md
+          ls -la out
+      - name: Desktop update metadata still matches every file
+        run: node scripts/check-desktop-release.js out
+      - name: Sign the APK with Priism's permanent key, and check it's that key
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          [ -n "$KS_B64" ] && [ -n "$KS_PW" ] || { echo "::error::Android signing secrets aren't set in environment 'release' (RELEASING.md). Nothing was published."; exit 1; }
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/priism.jks"
+          "$BT/zipalign" -f -p 4 art/android-unsigned/app-release-unsigned.apk "$RUNNER_TEMP/aligned.apk"
+          APK="out/Priism-Skins-${VERSION}-android.apk"
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/priism.jks" --ks-key-alias "${KS_ALIAS:-priism}" --ks-pass env:KS_PW --key-pass env:KS_PW --out "$APK" "$RUNNER_TEMP/aligned.apk"
+          rm -f "$RUNNER_TEMP/priism.jks"
+          GOT=$("$BT/apksigner" verify --print-certs "$APK" | grep -m1 "SHA-256 digest" | sed 's/.*: //' | tr 'a-f' 'A-F')
+          WANT=$(tr -d ':\n ' < android/release-signing.sha256 | tr 'a-f' 'A-F')
+          [ "$GOT" = "$WANT" ] || { echo "::error::The APK is signed with a different key ($GOT) than Priism's ($WANT). Phones couldn't update. Nothing was published."; exit 1; }
+          echo "APK signed with Priism's key ($GOT)."
+      - name: Create the release as a draft, with every file
+        uses: softprops/action-gh-release@v2
+        id: rel
+        with:
+          name: Priism Skins ${{ github.ref_name }}
+          body_path: notes.md
+          draft: true
+          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
+          files: out/*
+          fail_on_unmatched_files: true
+      - name: Every file is on the release, then make it public
+        run: |
+          ID="${{ steps.rel.outputs.id }}"
+          HAVE=$(gh api "repos/${GITHUB_REPOSITORY}/releases/$ID/assets?per_page=100" --jq '.[].name' | sort)
+          WANT=$(ls out | sort)
+          [ "$HAVE" = "$WANT" ] || { echo "::error::Release files differ from the build:"; diff <(echo "$WANT") <(echo "$HAVE"); exit 1; }
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/$ID" -F draft=false -F prerelease="$PRERELEASE" > /dev/null
+          echo "Published $(echo "$HAVE" | wc -l) files."
+      - name: Chrome Web Store
+        env:
+          CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          STABLE_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          BETA_ID: ${{ secrets.CWS_BETA_EXTENSION_ID }}
+        run: |
+          if [ "$CHANNEL" = "beta" ]; then EXTENSION_ID="$BETA_ID"; ZIP=$(ls out/priism-skins-beta-*.zip); else EXTENSION_ID="$STABLE_ID"; ZIP=$(ls out/priism-skins-[0-9]*.zip); fi
+          export EXTENSION_ID
+          if [ -z "$EXTENSION_ID" ] || [ -z "$REFRESH_TOKEN" ] || [ -z "$CLIENT_ID" ]; then
+            echo "::notice::No Chrome Web Store listing connected for the $CHANNEL channel: upload $ZIP in the dashboard (RELEASING.md)."; exit 0; fi
+          set -o pipefail
+          if ! npx --yes chrome-webstore-upload-cli@4 --source "$ZIP" 2>&1 | tee cws.log; then
+            echo "::warning::Not sent to the Chrome Web Store: $(grep -o 'You may not.*review\.' cws.log || tail -1 cws.log). The release is out; upload $ZIP in the dashboard once review is done."
+          fi
