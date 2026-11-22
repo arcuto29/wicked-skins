@@ -26,17 +26,21 @@ import sys, html
 print("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name=\"cfg\">%s</string>\n</map>" % html.escape(sys.argv[1], quote=True))
 EOF
 adb shell am force-stop $PKG
-adb exec-in run-as $PKG sh -c "mkdir -p shared_prefs && cat > shared_prefs/priism.xml" < "$OUT/priism.xml"
+# into the app's own storage (run-as: the app's user), like the app writing them itself
+adb push "$OUT/priism.xml" /data/local/tmp/priism.xml >/dev/null && adb shell chmod 644 /data/local/tmp/priism.xml
+adb shell "run-as $PKG sh -c 'mkdir -p shared_prefs && cp /data/local/tmp/priism.xml shared_prefs/priism.xml'"
+adb shell rm /data/local/tmp/priism.xml
 [ "$(launch)" = running ] && pass "v1 opens with the settings" || fail "v1 opens with the settings"
 adb shell am force-stop $PKG
 BEFORE=$(prefs | sha256sum | cut -c1-64); echo "settings before: $BEFORE ($(prefs | wc -c) bytes)"
-grep -q "PRIISM-ANDR-TEST" <(prefs) && pass "the settings are stored ($(prefs | wc -c) bytes)" || fail "the settings are stored"
+SIZE=$(prefs | wc -c)
+if grep -q "PRIISM-ANDR-TEST" <(prefs) && [ "$SIZE" -gt 300000 ]; then pass "the settings (with a 300 KB wallpaper) are stored: $SIZE bytes"; else fail "the settings are stored ($SIZE bytes)"; echo "nothing to compare: stopping"; exit 1; fi
 
 V1=$(vcode); OUTP=$(adb install -r "$APKS/v2.apk" 2>&1); echo "$OUTP" | tail -1
 echo "$OUTP" | grep -q Success && pass "v2 (same key) installs over v1" || fail "v2 (same key) installs over v1: $OUTP"
 V2=$(vcode); [ "$V2" -gt "$V1" ] && pass "versionCode went up ($V1 -> $V2)" || fail "versionCode went up ($V1 -> $V2)"
 AFTER=$(prefs | sha256sum | cut -c1-64)
-[ "$AFTER" = "$BEFORE" ] && pass "after the update: every setting, wallpaper, look and the licence byte for byte the same" || fail "settings changed by the update"
+[ "$AFTER" = "$BEFORE" ] && [ "$(prefs | wc -c)" -gt 300000 ] && pass "after the update: every setting, wallpaper, look and the licence byte for byte the same" || fail "settings changed by the update"
 [ "$(launch)" = running ] && pass "v2 opens" || fail "v2 opens"
 adb shell am force-stop $PKG
 
