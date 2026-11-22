@@ -1246,7 +1246,7 @@ function renderMedia() {
       if (e.target.classList.contains("x")) {
         const media = cfg.media.filter((x) => x.id !== m.id);
         const wasActive = cfg.skin === "media" && cfg.mediaId === m.id;
-        if (m.file && window.WickedMediaDB) WickedMediaDB.del(m.id).catch(() => {});
+        if (m.file && window.WickedMediaDB) { WickedMediaDB.del(m.id).catch(() => {}); if (m.pending) WickedMediaDB.del(m.id + ":src").catch(() => {}); }   // (a video still to convert: its original too)
         const chartSkins = Object.fromEntries(Object.entries(cfg.chartSkins || {}).filter(([, v]) => v !== "media:" + m.id));
         set(wasActive ? { media, chartSkins, skin: "aurora", mediaId: null } : { media, chartSkins });
       } else if (!m.pending) return pickSource("media:" + m.id);
@@ -1310,6 +1310,8 @@ const readAsDataURL = (f, mime) => new Promise((res, rej) => {
 const hint = (t) => { $("mediaHint").textContent = t; };
 const saveMedia = (media, extra = {}) => { set({ media, ...extra }); if (extra.skin === "media") autoMatchPick(); };
 
+// why the browser wouldn't store a file, in plain words
+const storeMsg = (e) => /quota/i.test(String(e && (e.name || e.message))) ? "your disk or the browser's storage is full: free some space and try again" : String((e && e.message) || "the browser refused to store it");
 async function addFiles(files) {
   const problems = []; let added = 0, needConvert = 0, lastId = null;
   hint("Checking files…");
@@ -1331,13 +1333,14 @@ async function addFiles(files) {
     const url = URL.createObjectURL(f);
     const p = await probe(c.type, url);
     URL.revokeObjectURL(url);
+    // (saved file by file: one that can't be stored is reported and the rest are kept, nothing is left half-saved)
     if (p) {
-      await WickedMediaDB.put(id, f);
+      try { await WickedMediaDB.put(id, f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }
       let q = null; try { q = await window.PriismWallInfo.measure(f, c.type); } catch {}
       cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size, ...(q ? { w: q.w, h: q.h, oled: q.oled } : {}) }];
       lastId = id; added++;
     } else if (c.type === "video") {
-      await WickedMediaDB.put(id + ":src", f); // original kept until converted
+      try { await WickedMediaDB.put(id + ":src", f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }   // original kept until converted
       cfg.media = [...cfg.media, { id, name, type: "video", file: true, pending: true, origName: f.name, size: f.size }];
       needConvert++;
     } else problems.push(`${f.name}: this image's format can't be shown in the browser`);

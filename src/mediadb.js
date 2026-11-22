@@ -16,7 +16,7 @@
       const t = db.transaction(STORE, mode), s = t.objectStore(STORE);
       const req = fn(s);
       t.oncomplete = () => res(req && req.result);
-      t.onerror = t.onabort = () => rej(t.error);
+      t.onerror = t.onabort = () => rej(t.error || new Error("the browser refused to store it (storage full or unavailable)"));
     });
   };
   window.WickedMediaDB = {
