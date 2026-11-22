@@ -12,7 +12,7 @@
 (function () {
   // Bump HOOK_VERSION whenever this file learns something new. A newer hook still installs if an older one is
   // already on the page (e.g. two copies of the extension installed), so new settings always work.
-  const HOOK_VERSION = 39;
+  const HOOK_VERSION = 40;
   if (window.__bdHooked && (window.__bdHookVer || 1) >= HOOK_VERSION) return;
   const olderHook = !!window.__bdHooked;
   window.__bdHooked = true;
@@ -270,20 +270,50 @@
           try { const col = ch[k].childs().color.value(), r = L.keyOf(col); if (r && !m.has(r.k)) m.set(r.k, title.slice(0, 28) + (Object.keys(ch).filter((x) => x[0] !== "_").length > 1 ? " \u00b7 " + k : "")); } catch {} }
       }
     } catch {}
-    // your drawings: the line / fill colours of each one (not its text colour, which isn't drawn as a shape)
+    // your drawings (for the names, and in case one changed colour without being looked up while drawn)
     try {
-      const api = chartApi(), ac = api && api.activeChart && api.activeChart(), d = new Map();
-      const walk = (o, n, name) => { if (!o || n > 4) return; for (const k in o) { if (/text|font/i.test(k)) continue; const v = o[k];
-        if (typeof v === "string") { const r = L.keyOf(v); if (r && !d.has(r.k)) d.set(r.k, name); } else if (v && typeof v === "object") walk(v, n + 1, name); } };
-      const shapes = ac && ac.getAllShapes ? ac.getAllShapes().slice(0, 300) : [];
-      for (const sh of shapes) { const name = String(sh.name || "drawing").replace(/^LineTool/, "").replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/^./, (c) => c.toUpperCase());
-        try { walk(ac.getShapeById(sh.id).getProperties(), 0, name); } catch {} }
-      const was = [...drawCols.keys()].join("|"); drawCols = d;
-      if ([...d.keys()].join("|") !== was && on) forceRepaint(true);   // a new / changed drawing: redraw once so it's styled and listed
-      for (const [k, name] of d) if (!m.has(k)) m.set(k, name.slice(0, 24) + " (your drawing)");
+      const was = [...drawCols.keys()].join("|"), d = scanDrawings();
+      if (d) { if ([...d.keys()].join("|") !== was && on) forceRepaint(true);   // e.g. one was deleted: redraw once, listed right
+        for (const [k, name] of d) if (!m.has(k)) m.set(k, name.slice(0, 24) + " (your drawing)"); }
     } catch {}
     if (m.size) L.setNames(m);
   }, 3000);
+  // Your drawings: the line / fill colours of each one (not its text colour, which isn't drawn as a shape), read from
+  // the chart. -> the new list (also kept in drawCols), or null if the chart can't be asked.
+  let drawSig = "", drawMiss = new Set(), drawAt = -1e9, drawSigFrame = -1;
+  const drawApi = () => { const api = chartApi(), ac = api && api.activeChart && api.activeChart(); return ac && ac.getAllShapes ? ac : null; };
+  const shapesSig = (sh) => sh.length + ":" + (sh.length ? sh[0].id + "/" + sh[sh.length - 1].id : "");
+  function scanDrawings() {
+    const L = window.__bdCandleLooks, ac = drawApi(); if (!L || !L.keyOf || !ac) return null;
+    const d = new Map();
+    const walk = (o, n, name) => { if (!o || n > 4) return; for (const k in o) { if (/text|font/i.test(k)) continue; const v = o[k];
+      if (typeof v === "string") { const r = L.keyOf(v); if (r && !d.has(r.k)) d.set(r.k, name); } else if (v && typeof v === "object") walk(v, n + 1, name); } };
+    let all; try { all = ac.getAllShapes(); } catch { return null; }
+    for (const sh of all.slice(0, 300)) { const name = String(sh.name || "drawing").replace(/^LineTool/, "").replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().replace(/^./, (c) => c.toUpperCase());
+      try { walk(ac.getShapeById(sh.id).getProperties(), 0, name); } catch {} }
+    drawCols = d; drawSig = shapesSig(all); drawMiss = new Set(); drawAt = performance.now();
+    return d;
+  }
+  // Is this colour one of your drawings'? Asked while the line is being drawn. The list above alone was up to 3 s old,
+  // so a drawing that came back (switching back to its symbol or timeframe, undo, a layout) or a new one was drawn in
+  // its own colour first and switched to yours only when the list caught up: a flash. Now a colour the list doesn't
+  // have is checked against the chart right then: once a frame, a quick look at which drawings there are (the list is
+  // read again if they changed), and a colour never looked up before reads the list again (at most every 250 ms). A
+  // colour that isn't a drawing's is remembered as such until the drawings change, so this costs nothing per line.
+  function drawColHas(k) {
+    if (drawCols.has(k)) return true;
+    if (drawSigFrame !== frameNo) {
+      drawSigFrame = frameNo;
+      const ac = drawApi(); let sig = drawSig; try { if (ac) sig = shapesSig(ac.getAllShapes()); } catch {}
+      if (sig !== drawSig) { scanDrawings(); if (drawCols.has(k)) return true; }
+    }
+    if (drawMiss.has(k)) return false;
+    if (performance.now() - drawAt < 250) return false;          // looked up a moment ago: ask again next frame
+    scanDrawings();
+    if (drawCols.has(k)) return true;
+    if (drawMiss.size < 500) drawMiss.add(k);
+    return false;
+  }
   function chartWidgets() {
     const api = window.TradingViewApi || window.tradingViewApi, out = [];
     try { const a = api && api._activeChartWidgetWV && api._activeChartWidgetWV.value(); if (a) out.push(a); } catch {}
@@ -384,11 +414,12 @@
     }
     // its own settings (Each indicator), or the all-indicators colour: your drawings (a rectangle, the Long / Short
     // tool) only with "Your drawings: Style them too"; greys stay grey like grey lines do
-    const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && (fx.drawOn || !drawCols.has(r.k)) && glowable(`rgb(${r.k})`);
-    const dim = fx.zoneDim && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k));   // Dim all zones (your drawings only with "Style them too")
+    const notDraw = fx.drawOn || !drawColHas(r.k);   // (a drawing of yours: only with "Style them too")
+    const own = fx.indCustom && fx.indCustom[r.k], all = fx.indMode !== "own" && notDraw && glowable(`rgb(${r.k})`);
+    const dim = fx.zoneDim && r.a < 0.9 && notDraw;   // Dim all zones (your drawings only with "Style them too")
     // the Glow slider (Indicators) also glows zones left in their own colours, on their edge (drawings with "Style them too")
-    const glowOwn = fx.lineGlow > 0 && r.a < 0.9 && H < c.height * 0.9 && W >= 16 && H >= 4 && (fx.drawOn || !drawCols.has(r.k)) && glowable(`rgb(${r.k})`);
-    const shaped = zoneStyled(ctx) && (w !== 1e4 || !!rectPath(ctx)) && r.a < 0.9 && (fx.drawOn || !drawCols.has(r.k))   // shape / border only
+    const glowOwn = fx.lineGlow > 0 && r.a < 0.9 && H < c.height * 0.9 && W >= 16 && H >= 4 && notDraw && glowable(`rgb(${r.k})`);
+    const shaped = zoneStyled(ctx) && (w !== 1e4 || !!rectPath(ctx)) && r.a < 0.9 && notDraw   // shape / border only
       && H >= 8 * dpr && W >= 24 * dpr && !stackedCols.has(r.k + "|" + r.a);                                      // (not slivers, not the position tool)
     // price is in this zone right now (Price in a zone: Glow), and it's a box, not full-height shading
     let hot = 0, at = null;
@@ -409,30 +440,59 @@
   // grid (TradingView's grid colour, or any grey when that isn't known), the crosshair (top canvas), the dotted price
   // line (candle colour + dashed), or an order / position line: those always have a solid price tag on the same row.
   const labelRows = new WeakMap();   // canvas -> [{ y, t }] centres (device px) of solid tags drawn on it lately
+  // The rows of the tags drawn in the latest paint that drew any (a line is usually drawn before this paint's tags, so
+  // that's the previous paint's), however long ago that was: a still chart repaints rarely. (Rows used to be kept for 20 s, so a tag
+  // that moved (dragging the price scale, an order line moving) left a trail of rows behind it, and any level line
+  // that crossed the trail went back to its own colour.)
   function noteLabelRow(ctx, yDev) {
-    const c = ctx.canvas; let a = labelRows.get(c); if (!a) { a = []; labelRows.set(c, a); }
-    const now = performance.now(), i = a.findIndex((e) => Math.abs(e.y - yDev) <= 3);
-    if (i >= 0) a[i] = { y: yDev, t: now }; else { a.push({ y: yDev, t: now }); if (a.length > 60) a.shift(); }
+    const c = ctx.canvas; let a = labelRows.get(c); if (!a) { a = []; a.last = -1; a.prev = -1; labelRows.set(c, a); }
+    if (frameNo !== a.last) { a.prev = a.last; a.last = frameNo; for (let j = a.length - 1; j >= 0; j--) if (a[j].f < a.prev) a.splice(j, 1); }
+    const i = a.findIndex((e) => Math.abs(e.y - yDev) <= 3);
+    if (i >= 0) a[i] = { y: yDev, f: frameNo }; else { a.push({ y: yDev, f: frameNo }); if (a.length > 60) a.shift(); }
   }
-  const onLabelRow = (c, yDev) => { const a = labelRows.get(c); if (!a) return false; const now = performance.now();
-    for (const e of a) if (now - e.t < 20000 && Math.abs(e.y - yDev) <= 6) return true; return false; };   // a still chart repaints rarely: remember rows a while
+  const onLabelRow = (c, yDev) => { const a = labelRows.get(c); if (!a) return false;
+    for (const e of a) if (e.f === a.last && Math.abs(e.y - yDev) <= 6) return true; return false; };
   function levelLine(ctx, c, cur) {
     const z = hzs.get(ctx); if (!z || !z.ok || !z.n || z.y === null || isTop(c) || ctx.getLineDash().length) return false;
     const r = rgbKey(cur); if (!r) return false;
     const grid = knownLines().grid; if (grid.size ? grid.has(r.key) : greyish(cur)) return false;
     if (onLabelRow(c, z.y)) return false;
-    // a new line counts only after ~1 s: by then any price tag on its row has been drawn (an order line's tag is
-    // painted just after its line), so an order / position line is never taken for a level, not even for one frame
-    // by colour: once a colour has been a level for a second it stays one (no flashing back as lines move or as more
-    // levels appear); the price-tag check above still runs on every draw, row by row
-    const key = r.key, now = performance.now(), first = levelFirst.get(key);
-    if (first === undefined) { if (levelFirst.size > 300) levelFirst.delete(levelFirst.keys().next().value); levelFirst.set(key, now);
-      if (!levelT) levelT = setTimeout(() => { levelT = 0; if (on) forceRepaint(true); }, 1100);   // a still chart may not repaint by itself
-      return false; }
-    return now - first > 1000;
+    // By colour: once a colour has been a level it stays one (no flashing back as lines move or as more levels appear);
+    // the price-tag check above still runs on every draw, row by row.
+    // A colour not known as a level yet is drawn as it is and decided once this paint is over: no price tag on its row
+    // by then (an order line's tag is painted just after its line) = an indicator's level. It's one from then on, and
+    // this line is drawn again in your style right away, before the browser shows the frame. (It used to stay in its
+    // own colour for ~1 s and then have the whole chart redrawn: a flash of the original colour on every new level,
+    // every time a chart opened.)
+    const key = r.key, st = levelFirst.get(key);
+    if (st === true) return true;
+    if (st === undefined) { if (levelFirst.size > 300) levelFirst.delete(levelFirst.keys().next().value); levelFirst.set(key, false); }
+    notePendLevel(ctx, c, z, cur, key);
+    return false;
   }
-  const levelFirst = new Map();   // "r,g,b" -> when a level line in that colour was first seen
-  let levelT = 0;
+  const levelFirst = new Map();   // "r,g,b" -> true once a level line in that colour was seen with no tag on its row
+  let levelPend = null;           // this paint's lines in a colour not known as a level yet
+  function notePendLevel(ctx, c, z, cur, key) {
+    if (!levelPend) { levelPend = []; queueMicrotask(settleLevels); }
+    if (levelPend.length >= 40) return;
+    const b = pathBox.get(ctx), t = ctx.getTransform(), k = Math.hypot(t.a, t.b) || 1;
+    levelPend.push({ ctx, c, y: z.y, key, cur, one: z.n === 1, x0: b ? b.x0 : null, x1: b ? b.x1 : null, lw: ctx.lineWidth * k, alpha: ctx.globalAlpha, cap: ctx.lineCap, comp: ctx.globalCompositeOperation });
+  }
+  function settleLevels() {
+    const list = levelPend; levelPend = null; if (!list || !on) return;
+    for (const e of list) {
+      if (onLabelRow(e.c, e.y)) continue;                       // a tag on its row: an order / position line, left as it is
+      levelFirst.set(e.key, true);
+      // drawn again only if your settings change it (else it's already right), and only a single straight line
+      const changes = (fx.indMode !== "own" && glowable(e.cur)) || (fx.indCustom && fx.indCustom[e.key]) || fx.lineGlow > 0;
+      if (!changes || !e.one || e.x0 === null || e.x1 - e.x0 < 2) continue;
+      const g = e.ctx; g.save();
+      try { g.setTransform(1, 0, 0, 1, 0, 0); strokeDesc.set.call(g, e.cur); g.lineWidth = e.lw; g.setLineDash([]); g.globalAlpha = e.alpha; g.lineCap = e.cap; g.globalCompositeOperation = e.comp;
+        const p = new Path2D(); p.moveTo(e.x0, e.y); p.lineTo(e.x1, e.y);
+        proto.stroke.call(g, p);                                  // through the hook: it's styled like any indicator line
+      } catch {} finally { g.restore(); }
+    }
+  }
   // solid boxes drawn on the chart lately (an indicator's label, a table cell): text drawn inside one keeps its colours
   const solidBoxes = new WeakMap();   // ctx -> [{ x0, y0, x1, y1, t }] in device px
   function noteSolidBox(ctx, x0, y0, x1, y1) {
@@ -702,8 +762,9 @@
       const s = lastSeg.get(this);
       // horizontal segment (any width) whose y lands exactly on a pill row — the pill-row match is the real filter
       // (so grid lines, which never sit on a pill row, are left alone), covering both stubs either side of the box.
-      if (s && s.x1 !== null && Math.abs(s.y0 - s.y1) <= 1.5 && Math.abs(s.x1 - s.x0) >= 20
-          && bracketRowSign(this, (s.y0 + s.y1) / 2) !== null) {
+      const hz = s && s.x1 !== null && Math.abs(s.y0 - s.y1) <= 1.5 && Math.abs(s.x1 - s.x0) >= 20;
+      const cur0 = hz ? strokeDesc.get.call(this) : null, lk = hz ? lineKey(cur0) : null, yRow = hz ? (s.y0 + s.y1) / 2 : 0;
+      if (hz && (bracketRowSign(this, yRow) !== null || knownBracketLine(this, yRow, lk, s))) {
         const sx = this.getTransform().a || 1, cur = strokeDesc.get.call(this);
         const col = fx.bracketLineColor || cur;
         const pS = cur, pLW = this.lineWidth;
@@ -712,8 +773,10 @@
         origStroke.apply(this, arguments);
         if (col !== cur) strokeDesc.set.call(this, pS);
         this.lineWidth = pLW;
+        notePendLine(this, s, cur0, lk, true);   // (its label, drawn next, tells where labels sit: see knownBracketLine)
         return;
       }
+      if (hz) notePendLine(this, s, cur0, lk);   // maybe a bracket whose label comes next: see confirmPendLines
     }
     if (!on || !c || !isPane(c)) return origStroke.apply(this, arguments);
     const k = segs.get(this) || [0, 0];
@@ -726,7 +789,11 @@
     const candleCol = typeof cur === "string" && ((candles && remap(cur) !== cur) || (() => { const r = rgbKey(cur); return !!r && sides.has(r.key); })());
     // a line of one of your drawings (a trend line, a rectangle's border): listed and styled like an indicator line,
     // but the all-indicators colour only reaches it with "Your drawings: Style them too"
-    const dk = drawCols.size && typeof cur === "string" ? rgbKey(cur) : null, isDraw = !!dk && drawCols.has(dk.key);
+    // (looked up on the chart right then only when the answer changes how it's drawn: indicator colours, Each indicator
+    // or the Glow slider are on; otherwise it only names it in the panel's list, and the list of a few seconds ago does)
+    const restyles = fx.indMode !== "own" || fx.lineGlow > 0 || (fx.indCustom && Object.keys(fx.indCustom).length > 0);
+    const dk = typeof cur === "string" && !candleCol && (drawCols.size || restyles) ? rgbKey(cur) : null;
+    const isDraw = !!dk && (restyles ? drawColHas(dk.key) : drawCols.has(dk.key));
     const indLine = (polyline && typeof cur === "string" && !candleCol && (path !== undefined || k[1] >= 3)) || (isDraw && !candleCol)
       || (path === undefined && typeof cur === "string" && !candleCol && levelLine(this, c, cur));
     if (indLine && L && L.noteSeen) L.noteSeen(cur, "line");                     // for the panel's "Each indicator" list
@@ -931,6 +998,7 @@
     const own = String(ctx.fillStyle);
     lastPill.set(ctx, { used: false, t: performance.now(), box, sign: boxSign(own) });
     if (!fx.bracketOn) { pillFill.delete(ctx); return null; }          // Streamer mode only: find the labels, don't restyle them
+    if (bracketLines()) confirmPendLines(ctx, box);                     // its line, drawn a moment ago in its own colour
     if (fx.bracketFill) { pillFill.set(ctx, fx.bracketFill); return fx.bracketFill; }
     if (fx.bracketBack !== "keep") {
       const r = rgbKey(own), base = [16, 19, 28], rgb = r ? r.key.split(",").map(Number) : base;
@@ -1068,11 +1136,104 @@
     if (i >= 0) a[i] = { y: yDev, sign, t: now };
     else { a.push({ y: yDev, sign, t: now }); if (a.length > 40) a.shift(); }
   }
-  function bracketRowSign(ctx, yDev) {     // is yDev on a recently-seen pill row? returns its +/- sign, or null
+  function bracketRowSign(ctx, yDev, ms = 500) {     // is yDev on a recently-seen pill row? returns its +/- sign, or null
     const a = pillRows.get(ctx); if (!a) return null;
     const now = performance.now();
-    for (const e of a) if (now - e.t < 500 && Math.abs(e.y - yDev) <= 5) return e.sign;
+    for (const e of a) if (now - e.t < ms && Math.abs(e.y - yDev) <= 5) return e.sign;
     return null;
+  }
+  // Bracket lines in your colour from their very first frame. TradingView strokes a bracket's line BEFORE its label,
+  // in the same paint, so when the line is drawn nothing says yet that it belongs to a bracket. The row match above
+  // only knew it from the previous paint: on a live chart that repaints about once a second, that was too long ago
+  // and the line went back to its own colour on most paints (and for a frame whenever the line moved). Now:
+  //  1. a line in a colour already confirmed as a bracket's line, on a row where a label has been lately, is drawn in
+  //     your colour straight away;
+  //     A line that stops exactly at a known label edge counts too (labels only move up and down), so a paint that
+  //     redraws just the lines on a new row (zooming, dragging the price scale) is right as well;
+  //  2. a wide horizontal line that isn't known yet is drawn as it is and noted. When its label is drawn in the same
+  //     paint (its box, or its text: the charting library draws the box first, then the line, then the text), on its
+  //     row and with the line ending at the label's edge, the line is drawn again in your colour (under the label).
+  //     The browser shows the canvas only once the paint is over, so its own colour is never seen.
+  // Nothing is repainted later and nothing polls: it all happens inside the chart's own paint.
+  const bracketCols = new Map();   // "r,g,b|alpha" of lines confirmed as a bracket's -> when last confirmed
+  const pendLines = new WeakMap(); // ctx -> wide horizontal lines drawn in their own colour in this paint
+  const lineKeys = new Map();
+  const lineKey = (col) => { if (typeof col !== "string") return null; let v = lineKeys.get(col);
+    if (v === undefined) { const r = rgbKey(col); v = r ? r.key + "|" + (r.a === null ? 1 : +r.a) : null; if (lineKeys.size > 300) lineKeys.clear(); lineKeys.set(col, v); } return v; };
+  const bracketLines = () => on && fx.bracketOn && (fx.bracketLineColor || fx.bracketLineW > 0);
+  // where labels' edges are, across (device px): a label keeps its place across the chart and only moves up and down,
+  // so a line in a bracket's colour that stops exactly at one of these is that bracket's line, on whatever row
+  const bracketEdges = new WeakMap();   // ctx -> [{ x, side: "end" (line ends at a label's left) | "start", t }]
+  function noteEdge(ctx, x, side) {
+    let a = bracketEdges.get(ctx); if (!a) { a = []; bracketEdges.set(ctx, a); }
+    const now = performance.now(), i = a.findIndex((e) => e.side === side && Math.abs(e.x - x) <= 1.5);
+    if (i >= 0) a[i] = { x, side, t: now }; else { a.push({ x, side, t: now }); if (a.length > 16) a.shift(); }
+  }
+  function knownBracketLine(ctx, yDev, lk, s) {
+    const t = lk && bracketCols.get(lk), now = performance.now();
+    if (!t || now - t > 60000) return false;
+    if (bracketRowSign(ctx, yDev, 10000) !== null) return true;
+    const a = bracketEdges.get(ctx); if (!a || !s) return false;
+    const lo = Math.min(s.x0, s.x1), hi = Math.max(s.x0, s.x1);
+    // (a line that sits at a label's edge but goes across the whole pane isn't a bracket's stub)
+    return a.some((e) => now - e.t < 60000 && (e.side === "end" ? Math.abs(hi - e.x) <= 1.5 : Math.abs(lo - e.x) <= 1.5));
+  }
+  function notePendLine(ctx, s, cur, lk, done) {   // done: already drawn in your colour (only learn from its label)
+    // (a line across the whole pane is never a bracket's: those stop at their label. Grid lines, levels: not noted)
+    const c = ctx.canvas; if (c && Math.min(s.x0, s.x1) <= 1 && Math.max(s.x0, s.x1) >= c.width - 1) return;
+    let a = pendLines.get(ctx); if (!a || a.f !== frameNo) { a = []; a.f = frameNo; pendLines.set(ctx, a); }
+    if (a.length >= 32) a.shift();
+    const t = ctx.getTransform(), k = Math.hypot(t.a, t.b) || 1;
+    a.push({ x0: s.x0, x1: s.x1, y: (s.y0 + s.y1) / 2, lw: ctx.lineWidth * k, dash: ctx.getLineDash().map((d) => d * k), off: ctx.lineDashOffset * k,
+      cap: ctx.lineCap, alpha: ctx.globalAlpha, comp: ctx.globalCompositeOperation, col: cur, lk, done: !!done, t: performance.now() });
+  }
+  // a label box was just drawn (device px): the lines of this paint that end at its edge, on its row, are its bracket's.
+  // later = the label is a picture pasted in (drawImage): TradingView pastes those clipped to the label, so a line drawn
+  // now would be clipped away. Those lines are drawn once the paint is over instead (still before the browser shows
+  // the canvas), leaving out any part under a label so the labels stay on top.
+  const pasted = new WeakMap();   // ctx -> { f, boxes: [...], lines: [...] } waiting for the end of this paint
+  function confirmPendLines(ctx, b, later) {
+    const a = pendLines.get(ctx); if (!a || !a.length || a.f !== frameNo) { if (later) notePasted(ctx, b, null); return; }
+    const now = performance.now();
+    for (let i = a.length - 1; i >= 0; i--) {
+      const e = a[i], lo = Math.min(e.x0, e.x1), hi = Math.max(e.x0, e.x1);
+      if (now - e.t > 40 || e.y < b.y - 1 || e.y > b.y + b.h + 1) continue;
+      const endsAt = Math.abs(hi - b.x) <= 3, startsAt = Math.abs(lo - (b.x + b.w)) <= 3;
+      if (!endsAt && !startsAt) continue;
+      a.splice(i, 1);
+      if (endsAt) noteEdge(ctx, hi, "end"); else noteEdge(ctx, lo, "start");
+      if (e.lk) { bracketCols.set(e.lk, now); if (bracketCols.size > 24) bracketCols.delete(bracketCols.keys().next().value); }
+      if (e.done) continue;
+      if (later) notePasted(ctx, null, e); else redrawLine(ctx, e, e.x0, e.x1);
+    }
+    if (later) notePasted(ctx, b, null);
+  }
+  function redrawLine(ctx, e, x0, x1) {
+    ctx.save();
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      strokeDesc.set.call(ctx, fx.bracketLineColor || e.col);
+      ctx.lineWidth = fx.bracketLineW > 0 ? Math.max(e.lw, fx.bracketLineW + 1) : e.lw;
+      ctx.setLineDash(e.dash); ctx.lineDashOffset = e.off; ctx.lineCap = e.cap; ctx.globalAlpha = e.alpha; ctx.globalCompositeOperation = e.comp; ctx.shadowBlur = 0;
+      const p = new Path2D(); p.moveTo(x0, e.y); p.lineTo(x1, e.y);
+      origStroke.call(ctx, p);   // (a Path2D: the label's own path, maybe being built right now, stays as it is)
+    } catch {} finally { ctx.restore(); }
+  }
+  function notePasted(ctx, box, line) {
+    let q = pasted.get(ctx);
+    if (!q || q.f !== frameNo) { q = { f: frameNo, boxes: [], lines: [] }; pasted.set(ctx, q);
+      queueMicrotask(() => { if (pasted.get(ctx) !== q) return; pasted.delete(ctx); if (q.lines.length && on) flushPasted(ctx, q); }); }
+    if (box && q.boxes.length < 40) q.boxes.push(box);
+    if (line) q.lines.push(line);
+  }
+  function flushPasted(ctx, q) {
+    for (const e of q.lines) {
+      // the line's span minus every label on its row (pasted this paint): the pieces left are drawn
+      let parts = [[Math.min(e.x0, e.x1), Math.max(e.x0, e.x1)]];
+      for (const b of q.boxes) { if (e.y < b.y - 1 || e.y > b.y + b.h + 1) continue;
+        parts = parts.flatMap(([lo, hi]) => (b.x >= hi || b.x + b.w <= lo ? [[lo, hi]] : [[lo, b.x], [b.x + b.w, hi]].filter(([u, v]) => v - u >= 1))); }
+      for (const [lo, hi] of parts) e.x0 <= e.x1 ? redrawLine(ctx, e, lo, hi) : redrawLine(ctx, e, hi, lo);
+    }
   }
   // minimal path geometry (just the first move + last line) so stroke() can tell a wide horizontal line apart
   const lastSeg = new WeakMap();   // ctx -> { x0, y0, x1, y1 }
@@ -1179,6 +1340,8 @@
   };
   function drawStyledPill(ctx, x, y, w, h, info) {
     const sign = pillSign(info.text), sx = ctx.getTransform().a || 1;
+    if (bracketLines()) { const t = ctx.getTransform(), sy = t.d || 1;   // its line, drawn a moment ago in its own colour
+      confirmPendLines(ctx, { x: Math.min(x, x + w) * sx + t.e, y: Math.min(y, y + h) * sy + t.f, w: Math.abs(w * sx), h: Math.abs(h * sy) }, true); }
     ctx.save();
     // box: your colour, or the label's own colour strengthened into a dark tinted box (same rule as drawn pills)
     let fill = fx.bracketFill;
@@ -1233,6 +1396,15 @@
         const rowY = pill && pill.box ? pill.box.y + pill.box.h / 2 : (() => { const t = this.getTransform(); return (a[2] || 0) * (t.d || 1) + t.f; })();
         if (fx.bracketDebug) noteBracketDebug(a[0], this.font, this.textAlign, String(this.fillStyle), pill && pill.box);
         notePillRow(this, rowY, sign);
+        // its line: some platforms draw the label's box, then the line, then the text, so the line only exists now
+        // (finished once the paint is over: text can be drawn clipped to its label)
+        if (bracketLines()) {
+          let bx = pill && pill.box && performance.now() - pill.t < 40 ? pill.box : null;
+          if (!bx) { const t = this.getTransform(), w = origMeasure.call(this, String(a[0])).width * (t.a || 1), cx = (a[1] || 0) * (t.a || 1) + t.e;
+            const al = this.textAlign, x0 = al === "center" ? cx - w / 2 : al === "right" || al === "end" ? cx - w : cx;
+            bx = { x: x0 - 6, y: rowY - 9, w: w + 12, h: 18 }; }
+          confirmPendLines(this, bx, true);
+        }
         const pFont = this.font, pFill = this.fillStyle, sx = this.getTransform().a || 1;
         // Enlarge, but NEVER clip: TradingView centers text in a fixed-width box, so a bigger font can spill over
         // the edges and look broken ("can't see the number"). Clamp the font so the text still fits the box.
@@ -1557,9 +1729,9 @@
       }
     }
     // the border of one of your drawings (a rectangle): the same colour / glow / width as the rest of that drawing
-    if (on && c && drawCols.size && isPane(c)) {
+    if (on && c && ((fx.drawOn && fx.indMode !== "own") || (fx.indCustom && Object.keys(fx.indCustom).length)) && isPane(c)) {
       const cur = strokeDesc.get.call(this), k = typeof cur === "string" ? rgbKey(cur) : null, L = window.__bdCandleLooks;
-      if (k && drawCols.has(k.key) && L && L.indicator && ((fx.drawOn && fx.indMode !== "own") || (fx.indCustom && fx.indCustom[k.key]))) {
+      if (k && L && L.indicator && ((fx.drawOn && fx.indMode !== "own") || (fx.indCustom && fx.indCustom[k.key])) && drawColHas(k.key)) {
         const r = L.indicator(this, cur, { mode: fx.drawOn && glowable(cur) ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom, grad: fx.indGrad });
         if (r && r.hide) return;
         if (r) { const pS = cur, pB = this.shadowBlur, pC = this.shadowColor, pW = this.lineWidth, gl = r.glow !== undefined ? r.glow : fx.lineGlow;
