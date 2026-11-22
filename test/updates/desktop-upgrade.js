@@ -117,6 +117,7 @@ const seedDiff = (s) => { const want = JSON.parse(fs.readFileSync(path.join(OUT,
   }
   if (cmd === "self-update") {         // AFTER: a copy that's out there today updates itself to the fixed release
     setMode("ok"); fs.rmSync(pending, { recursive: true, force: true }); fs.writeFileSync(MOCK_LOG, "");
+    fs.rmSync(path.join(userData, "update-state.json"), { force: true });   // (a report from an earlier step must not count)
     const before = settings();
     ok(`${a1} is installed, with your settings`, installedVersion() === a1 && seedOf(before) === seed(), [installedVersion(), seedDiff(before)]);
     launch();
@@ -152,6 +153,13 @@ const seedDiff = (s) => { const want = JSON.parse(fs.readFileSync(path.join(OUT,
     // 1. the file isn't on the server
     let s = await waitFor(async () => { const x = await state(); return x.state === "error" ? x : null; }, 120000);
     let c = await card();
+    if (c && /pu-updated/.test(c.cls)) {
+      // first open after an update: the one-time "Updated" card is up. Close it like a user; what came in
+      // meanwhile (here the failed update) must show right after, not be lost
+      await panel.click(".pu-veil .pu-go").catch(() => {});
+      c = await waitFor(async () => { const x = await card(); return x && /pu-error/.test(x.cls) ? x : null; }, 5000, 250);
+      ok("the one-time 'Updated' card first; closing it shows what came in meanwhile (the failed update)", !!c, c && c.text.slice(0, 120));
+    }
     ok("installer missing on the server: 'Update paused' with the plain reason, nothing installed", s && s.error.kind === "missing" && c && /pu-error/.test(c.cls) && /isn't on the server/.test(c.text) && stillA1(), { s, c: c && c.text.slice(0, 160) });
     await shot("desktop-error-missing");
     // 2. a damaged download

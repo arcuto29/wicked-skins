@@ -2920,7 +2920,11 @@ function deskUpdates() {
   };
   a.state().then(render).catch(() => {});
   a.onState(render);
+  // the desktop panel stays open for hours: whatever came in while the one-time "Updated" card was open
+  // (a failed download, a new download) is shown as soon as it's closed, instead of being lost
+  deskRecheck = () => a.state().then(render).catch(() => {});
 }
+var deskRecheck = null;   // (var: deskUpdates may run before this line is reached)
 async function updates() {
   if (window.WickedMigrate) await WickedMigrate.run().catch(() => {});        // every platform: settings upgraded once per version
   if (IS_TAB) return;
@@ -3408,7 +3412,7 @@ const WHATS_NEW = ["Trading comes first: Auto quality watches how fast your clic
   }
   if (ver && seen !== ver && !IS_TAB) {
     // once after each update: the version you came from, the one you're on, and its headlines
-    const ok = () => localStorage.setItem("seenVer", ver);
+    const ok = () => { localStorage.setItem("seenVer", ver); if (deskRecheck) deskRecheck(); };
     const from = /^\d+\.\d+\.\d+$/.test(seen) && newer(ver, seen) ? seen : "";
     setTimeout(() => { if (!PriismUpdateCard.isOpen()) PriismUpdateCard.show({ mode: "updated", from, to: ver, items: WHATS_NEW.slice(0, 4), onPrimary: ok, onLater: ok }); else ok(); }, 350);
   }
