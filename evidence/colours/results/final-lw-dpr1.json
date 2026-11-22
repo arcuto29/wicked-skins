@@ -1,0 +1,238 @@
+{
+ "results": {
+  "setup: Priism is on (Lightweight Charts) and the recorder sits under it": {
+   "pass": true,
+   "detail": {
+    "lw": true,
+    "ver": 28,
+    "on": true,
+    "under": true,
+    "dpr": 1,
+    "canvasScale": 0.75
+   }
+  },
+  "open: once Priism is on, no native colour reaches the chart (frames before it started: 0)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "chosenDraws": {}
+   }
+  },
+  "live-updates: no native colour reaches the chart (frame by frame)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "chosenDraws": {
+     "lvl|chosen|pane": 50,
+     "ema|chosen|pane": 50
+    }
+   }
+  },
+  "zoom: no native colour reaches the chart (frame by frame)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "chosenDraws": {
+     "ema|chosen|pane": 102,
+     "lvl|chosen|pane": 27
+    }
+   }
+  },
+  "pan: no native colour reaches the chart (frame by frame)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "chosenDraws": {
+     "ema|chosen|pane": 130,
+     "lvl|chosen|pane": 64
+    }
+   }
+  },
+  "price-scale-drag: no native colour reaches the chart (frame by frame)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "chosenDraws": {
+     "lvl|chosen|pane": 55,
+     "ema|chosen|pane": 55
+    }
+   }
+  },
+  "timeframe: no native colour reaches the chart (frame by frame)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "chosenDraws": {
+     "ema|chosen|pane": 37
+    }
+   }
+  },
+  "symbol: no native colour reaches the chart (frame by frame)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "chosenDraws": {
+     "ema|chosen|pane": 36,
+     "lvl|chosen|pane": 11
+    }
+   }
+  },
+  "window-size: no native colour reaches the chart (frame by frame)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "chosenDraws": {
+     "ema|chosen|pane": 49
+    }
+   }
+  },
+  "reopen: once Priism is on, no native colour reaches the chart (frames before it started: 8)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 8,
+    "beforePriismOn": 8,
+    "nativeFrames": 2,
+    "nativePixels": {
+     "ema|pane": 567,
+     "lvl|pane": 620
+    },
+    "coveredInSamePaint": 2,
+    "chosenDraws": {
+     "ema|chosen|pane": 73,
+     "lvl|chosen|pane": 73
+    }
+   }
+  }
+ },
+ "byStep": {
+  "open": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "chosenDraws": {}
+  },
+  "live-updates": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "chosenDraws": {
+    "lvl|chosen|pane": 50,
+    "ema|chosen|pane": 50
+   }
+  },
+  "zoom": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "chosenDraws": {
+    "ema|chosen|pane": 102,
+    "lvl|chosen|pane": 27
+   }
+  },
+  "pan": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "chosenDraws": {
+    "ema|chosen|pane": 130,
+    "lvl|chosen|pane": 64
+   }
+  },
+  "price-scale-drag": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "chosenDraws": {
+    "lvl|chosen|pane": 55,
+    "ema|chosen|pane": 55
+   }
+  },
+  "timeframe": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "chosenDraws": {
+    "ema|chosen|pane": 37
+   }
+  },
+  "symbol": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "chosenDraws": {
+    "ema|chosen|pane": 36,
+    "lvl|chosen|pane": 11
+   }
+  },
+  "window-size": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "chosenDraws": {
+    "ema|chosen|pane": 49
+   }
+  },
+  "reopen": {
+   "nativeDraws": 8,
+   "beforePriismOn": 8,
+   "nativeFrames": 2,
+   "nativePixels": {
+    "ema|pane": 567,
+    "lvl|pane": 620
+   },
+   "coveredInSamePaint": 2,
+   "chosenDraws": {
+    "ema|chosen|pane": 73,
+    "lvl|chosen|pane": 73
+   }
+  }
+ }
+}

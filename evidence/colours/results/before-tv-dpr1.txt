@@ -1,0 +1,13 @@
+PASS setup: Priism is on and the recorder sits under its hook (it sees the final colours)  {"hook":true,"ver":39,"recorderUnderHook":true,"on":true,"dpr":1,"canvasScale":1}
+PASS setup: an indicator and a take-profit / stop-loss on the chart  {"ids":{"ma":"0stVJM","maPlot":"MovAvgSimple"},"px":59160.32}
+FAIL live-updates: no native colour reaches the chart (frame by frame)  {"nativeDraws":24,"beforePriismOn":0,"nativeFrames":6,"native":{"oline stroke (pane)":24},"nativePixels":{"oline|pane":1654},"coveredInSamePaint":0,"scaleTagsNotStyled":57,"scaleTagPixels"
+FAIL zoom: no native colour reaches the chart (frame by frame)  {"nativeDraws":8,"beforePriismOn":0,"nativeFrames":2,"native":{"oline stroke (pane)":8},"nativePixels":{"oline|pane":1654},"coveredInSamePaint":0,"scaleTagsNotStyled":69,"scaleTagPixels":{"ma|scal
+FAIL pan: no native colour reaches the chart (frame by frame)  {"nativeDraws":4,"beforePriismOn":0,"nativeFrames":1,"native":{"oline stroke (pane)":4},"nativePixels":{"oline|pane":1636},"coveredInSamePaint":0,"scaleTagsNotStyled":174,"scaleTagPixels":{"ma|scal
+FAIL price-scale-drag: no native colour reaches the chart (frame by frame)  {"nativeDraws":108,"beforePriismOn":0,"nativeFrames":27,"native":{"oline stroke (pane)":108},"nativePixels":{"oline|pane":1630},"coveredInSamePaint":0,"scaleTagsNotStyled":585,"scaleTa
+FAIL move-order-line: no native colour reaches the chart (frame by frame)  {"nativeDraws":8,"beforePriismOn":0,"nativeFrames":2,"native":{"oline stroke (pane)":8},"nativePixels":{"oline|pane":1638},"coveredInSamePaint":32,"scaleTagsNotStyled":57,"scaleTagPixel
+FAIL timeframe: no native colour reaches the chart (frame by frame)  {"nativeDraws":20,"beforePriismOn":0,"nativeFrames":5,"native":{"oline stroke (pane)":20},"nativePixels":{"oline|pane":1604},"coveredInSamePaint":0,"scaleTagsNotStyled":75,"scaleTagPixels":{"
+FAIL symbol: no native colour reaches the chart (frame by frame)  {"nativeDraws":12,"beforePriismOn":0,"nativeFrames":3,"native":{"oline stroke (pane)":12},"nativePixels":{"oline|pane":1604},"coveredInSamePaint":0,"scaleTagsNotStyled":37,"scaleTagPixels":{"ma|
+FAIL window-size: no native colour reaches the chart (frame by frame)  {"nativeDraws":20,"beforePriismOn":0,"nativeFrames":5,"native":{"oline stroke (pane)":20},"nativePixels":{"oline|pane":814},"coveredInSamePaint":0,"scaleTagsNotStyled":42,"scaleTagPixels":{
+FAIL reopen: no native colour reaches the chart (frame by frame)  {"nativeDraws":32,"beforePriismOn":0,"nativeFrames":8,"native":{"oline stroke (pane)":32},"nativePixels":{"oline|pane":828},"coveredInSamePaint":0,"scaleTagsNotStyled":35,"scaleTagPixels":{"olin
+COLOURS (before, dpr 1): 2/11
+page errors: []

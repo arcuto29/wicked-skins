@@ -1,0 +1,3 @@
+PASS setup: Priism is on and the recorder sits under its hook (it sees the final colours)  {"hook":true,"ver":40,"recorderUnderHook":true,"on":true,"dpr":2,"canvasScale":2}
+COLOURS (after, dpr 2): 11/11
+page errors: []

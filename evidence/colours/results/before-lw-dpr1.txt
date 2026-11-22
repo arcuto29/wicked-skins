@@ -1,0 +1,11 @@
+PASS setup: Priism is on (Lightweight Charts) and the recorder sits under it  {"lw":true,"ver":27,"on":true,"under":true,"dpr":1,"canvasScale":0.75}
+PASS open: no native colour reaches the chart (frame by frame)  {"nativeDraws":0,"beforePriismOn":0,"nativeFrames":0,"nativePixels":{},"coveredInSamePaint":0,"chosenDraws":{}}
+PASS live-updates: no native colour reaches the chart (frame by frame)  {"nativeDraws":0,"beforePriismOn":0,"nativeFrames":0,"nativePixels":{},"coveredInSamePaint":0,"chosenDraws":{"lvl|chosen|pane":50,"ema|chosen|pane":50}}
+FAIL zoom: no native colour reaches the chart (frame by frame)  {"nativeDraws":4,"beforePriismOn":0,"nativeFrames":4,"nativePixels":{"lvl|pane":620},"coveredInSamePaint":0,"chosenDraws":{"ema|chosen|pane":106,"lvl|chosen|pane":24}}
+PASS pan: no native colour reaches the chart (frame by frame)  {"nativeDraws":0,"beforePriismOn":0,"nativeFrames":0,"nativePixels":{},"coveredInSamePaint":0,"chosenDraws":{"ema|chosen|pane":130,"lvl|chosen|pane":64}}
+FAIL price-scale-drag: no native colour reaches the chart (frame by frame)  {"nativeDraws":20,"beforePriismOn":0,"nativeFrames":20,"nativePixels":{"lvl|pane":620},"coveredInSamePaint":0,"chosenDraws":{"lvl|chosen|pane":37,"ema|chosen|pane":57}}
+PASS timeframe: no native colour reaches the chart (frame by frame)  {"nativeDraws":0,"beforePriismOn":0,"nativeFrames":0,"nativePixels":{},"coveredInSamePaint":0,"chosenDraws":{"ema|chosen|pane":37}}
+PASS symbol: no native colour reaches the chart (frame by frame)  {"nativeDraws":0,"beforePriismOn":0,"nativeFrames":0,"nativePixels":{},"coveredInSamePaint":0,"chosenDraws":{"ema|chosen|pane":37,"lvl|chosen|pane":11}}
+PASS window-size: no native colour reaches the chart (frame by frame)  {"nativeDraws":0,"beforePriismOn":0,"nativeFrames":0,"nativePixels":{},"coveredInSamePaint":0,"chosenDraws":{"ema|chosen|pane":43}}
+FAIL reopen: no native colour reaches the chart (frame by frame)  {"nativeDraws":32,"beforePriismOn":4,"nativeFrames":19,"nativePixels":{"ema|pane":567,"lvl|pane":620},"coveredInSamePaint":0,"chosenDraws":{"ema|chosen|pane":81,"lvl|chosen|pane":57}}
+COLOURS (before, lightweight charts, dpr 1): 7/10 

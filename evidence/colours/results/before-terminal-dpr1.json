@@ -1,0 +1,775 @@
+{
+ "results": {
+  "setup: Priism is on and the recorder sits under its hook (it sees the final colours)": {
+   "pass": true,
+   "detail": {
+    "hook": true,
+    "ver": 39,
+    "recorderUnderHook": true,
+    "on": true,
+    "dpr": 1,
+    "canvasScale": 1
+   }
+  },
+  "setup: drawings, an indicator and a take-profit / stop-loss on the chart": {
+   "pass": true,
+   "detail": {
+    "ids": {
+     "hline": "tWbAlV",
+     "trend": "bhnUlA",
+     "rect": "6ANaAM",
+     "ma": "zCzyEt",
+     "maPlot": "plot_0"
+    },
+    "px": 342.7
+   }
+  },
+  "live-updates: no native colour reaches the chart (frame by frame)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "native": {},
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 0,
+    "scaleTagPixels": {
+     "hline|scale": 336,
+     "ma|scale": 327,
+     "oline|scale": 665
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {},
+    "frames": 303
+   }
+  },
+  "zoom: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 4,
+    "beforePriismOn": 0,
+    "nativeFrames": 1,
+    "native": {
+     "oline stroke (pane)": 4
+    },
+    "nativePixels": {
+     "oline|pane": 1496
+    },
+    "coveredInSamePaint": 12,
+    "scaleTagsNotStyled": 48,
+    "scaleTagPixels": {
+     "hline|scale": 336,
+     "ma|scale": 327,
+     "oline|scale": 665
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "obox|chosen|pane": 106,
+     "ma|chosen|pane": 12,
+     "hline|chosen|pane": 12,
+     "trend|chosen|pane": 12,
+     "oborder|chosen|pane": 69,
+     "oline|chosen|pane": 38,
+     "rect|chosen|pane": 9
+    },
+    "frames": 123
+   }
+  },
+  "pan: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 4,
+    "beforePriismOn": 0,
+    "nativeFrames": 1,
+    "native": {
+     "oline stroke (pane)": 4
+    },
+    "nativePixels": {
+     "oline|pane": 1381
+    },
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 192,
+    "scaleTagPixels": {
+     "hline|scale": 336,
+     "ma|scale": 327,
+     "oline|scale": 665
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "obox|chosen|pane": 389,
+     "ma|chosen|pane": 48,
+     "hline|chosen|pane": 48,
+     "trend|chosen|pane": 48,
+     "oborder|chosen|pane": 288,
+     "oline|chosen|pane": 188
+    },
+    "frames": 196
+   }
+  },
+  "price-scale-drag: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 8,
+    "beforePriismOn": 0,
+    "nativeFrames": 2,
+    "native": {
+     "oline stroke (pane)": 8
+    },
+    "nativePixels": {
+     "oline|pane": 1369
+    },
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 260,
+    "scaleTagPixels": {
+     "hline|scale": 336,
+     "ma|scale": 327,
+     "oline|scale": 665
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "ma|chosen|pane": 65,
+     "hline|chosen|pane": 65,
+     "trend|chosen|pane": 65,
+     "obox|chosen|pane": 443,
+     "oborder|chosen|pane": 378,
+     "oline|chosen|pane": 282,
+     "rect|chosen|pane": 36
+    },
+    "frames": 1922
+   }
+  },
+  "select-and-move-drawing: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 4,
+    "beforePriismOn": 0,
+    "nativeFrames": 1,
+    "native": {
+     "oline stroke (pane)": 4
+    },
+    "nativePixels": {},
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 302,
+    "scaleTagPixels": {
+     "hline|scale": 336,
+     "ma|scale": 327,
+     "oline|scale": 665
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "ma|chosen|pane": 45,
+     "trend|chosen|pane": 45,
+     "rect|chosen|pane": 135,
+     "obox|chosen|pane": 360,
+     "oborder|chosen|pane": 225,
+     "hline|chosen|pane": 80,
+     "oline|chosen|pane": 176
+    },
+    "frames": 201
+   }
+  },
+  "hover-drawings: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 4,
+    "beforePriismOn": 0,
+    "nativeFrames": 1,
+    "native": {
+     "oline stroke (pane)": 4
+    },
+    "nativePixels": {
+     "oline|pane": 1369
+    },
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 45,
+    "scaleTagPixels": {
+     "hline|scale": 336,
+     "ma|scale": 327,
+     "oline|scale": 665
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "ma|chosen|pane": 11,
+     "hline|chosen|pane": 11,
+     "trend|chosen|pane": 11,
+     "rect|chosen|pane": 33,
+     "obox|chosen|pane": 97,
+     "oborder|chosen|pane": 55,
+     "oline|chosen|pane": 40
+    },
+    "frames": 120
+   }
+  },
+  "edit-drawing: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 8,
+    "beforePriismOn": 0,
+    "nativeFrames": 2,
+    "native": {
+     "oline stroke (pane)": 8
+    },
+    "nativePixels": {
+     "oline|pane": 1369
+    },
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 8,
+    "scaleTagPixels": {
+     "hline|scale": 336,
+     "ma|scale": 327,
+     "oline|scale": 665
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "ma|chosen|pane": 2,
+     "hline|chosen|pane": 2,
+     "trend|chosen|pane": 2,
+     "rect|chosen|pane": 6,
+     "obox|chosen|pane": 16,
+     "oborder|chosen|pane": 10
+    },
+    "frames": 97
+   }
+  },
+  "drawing-settings-dialog: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 8,
+    "beforePriismOn": 0,
+    "nativeFrames": 2,
+    "native": {
+     "oline stroke (pane)": 8
+    },
+    "nativePixels": {
+     "oline|pane": 1369
+    },
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 22,
+    "scaleTagPixels": {
+     "ma|scale": 327,
+     "oline|scale": 665,
+     "hline|scale": 353
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "ma|chosen|pane": 4,
+     "trend|chosen|pane": 4,
+     "rect|chosen|pane": 12,
+     "obox|chosen|pane": 31,
+     "oborder|chosen|pane": 20,
+     "hline|chosen|pane": 4,
+     "oline|chosen|pane": 8
+    },
+    "frames": 117
+   }
+  },
+  "move-order-line: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 8,
+    "beforePriismOn": 0,
+    "nativeFrames": 2,
+    "native": {
+     "oline stroke (pane)": 8
+    },
+    "nativePixels": {
+     "oline|pane": 1654
+    },
+    "coveredInSamePaint": 28,
+    "scaleTagsNotStyled": 60,
+    "scaleTagPixels": {
+     "ma|scale": 327,
+     "oline|scale": 670,
+     "hline|scale": 353
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "ma|chosen|pane": 12,
+     "trend|chosen|pane": 12,
+     "rect|chosen|pane": 36,
+     "obox|chosen|pane": 84,
+     "oborder|chosen|pane": 60,
+     "hline|chosen|pane": 12,
+     "oline|chosen|pane": 44
+    },
+    "frames": 90
+   }
+  },
+  "timeframe: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 12,
+    "beforePriismOn": 0,
+    "nativeFrames": 3,
+    "native": {
+     "oline stroke (pane)": 12
+    },
+    "nativePixels": {
+     "oline|pane": 1670
+    },
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 45,
+    "scaleTagPixels": {
+     "ma|scale": 342,
+     "oline|scale": 665,
+     "hline|scale": 353
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "ma|chosen|pane": 9,
+     "rect|chosen|pane": 27,
+     "obox|chosen|pane": 63,
+     "oborder|chosen|pane": 45,
+     "hline|chosen|pane": 9,
+     "oline|chosen|pane": 24,
+     "trend|chosen|pane": 3
+    },
+    "frames": 304
+   }
+  },
+  "symbol: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 17,
+    "beforePriismOn": 0,
+    "nativeFrames": 6,
+    "native": {
+     "hline stroke (pane)": 5,
+     "rect strokeRect (pane)": 4,
+     "oline stroke (pane)": 8
+    },
+    "nativePixels": {
+     "hline|pane": 906,
+     "oline|pane": 1625
+    },
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 35,
+    "scaleTagPixels": {
+     "ma|scale": 342,
+     "oline|scale": 665,
+     "hline|scale": 353
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "ma|chosen|pane": 16,
+     "obox|chosen|pane": 56,
+     "rect|chosen|pane": 14,
+     "oborder|chosen|pane": 30,
+     "oline|chosen|pane": 16,
+     "hline|chosen|pane": 2
+    },
+    "frames": 271
+   }
+  },
+  "window-size: no native colour reaches the chart (frame by frame)": {
+   "pass": false,
+   "detail": {
+    "nativeDraws": 16,
+    "beforePriismOn": 0,
+    "nativeFrames": 4,
+    "native": {
+     "oline stroke (pane)": 16
+    },
+    "nativePixels": {
+     "oline|pane": 1625
+    },
+    "coveredInSamePaint": 0,
+    "scaleTagsNotStyled": 36,
+    "scaleTagPixels": {
+     "hline|scale": 336,
+     "ma|scale": 342,
+     "oline|scale": 665
+    },
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "ma|chosen|pane": 9,
+     "hline|chosen|pane": 9,
+     "rect|chosen|pane": 27,
+     "obox|chosen|pane": 54,
+     "oborder|chosen|pane": 45,
+     "oline|chosen|pane": 20
+    },
+    "frames": 141
+   }
+  },
+  "reopen: no native colour reaches the chart (frame by frame)": {
+   "pass": true,
+   "detail": {
+    "nativeDraws": 0,
+    "beforePriismOn": 0,
+    "nativeFrames": 0,
+    "native": {},
+    "nativePixels": {},
+    "coveredInSamePaint": 22,
+    "scaleTagsNotStyled": 23,
+    "scaleTagPixels": {},
+    "offscreenNative": 0,
+    "chosenDraws": {
+     "obox|chosen|pane": 87,
+     "oborder|chosen|pane": 33,
+     "ma|chosen|pane": 12,
+     "hline|chosen|pane": 7,
+     "trend|chosen|pane": 7,
+     "oline|chosen|pane": 8
+    },
+    "frames": 0
+   }
+  }
+ },
+ "byStep": {
+  "live-updates": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "native": {},
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 0,
+   "scaleTagPixels": {
+    "hline|scale": 336,
+    "ma|scale": 327,
+    "oline|scale": 665
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {},
+   "frames": 303
+  },
+  "zoom": {
+   "nativeDraws": 4,
+   "beforePriismOn": 0,
+   "nativeFrames": 1,
+   "native": {
+    "oline stroke (pane)": 4
+   },
+   "nativePixels": {
+    "oline|pane": 1496
+   },
+   "coveredInSamePaint": 12,
+   "scaleTagsNotStyled": 48,
+   "scaleTagPixels": {
+    "hline|scale": 336,
+    "ma|scale": 327,
+    "oline|scale": 665
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "obox|chosen|pane": 106,
+    "ma|chosen|pane": 12,
+    "hline|chosen|pane": 12,
+    "trend|chosen|pane": 12,
+    "oborder|chosen|pane": 69,
+    "oline|chosen|pane": 38,
+    "rect|chosen|pane": 9
+   },
+   "frames": 123
+  },
+  "pan": {
+   "nativeDraws": 4,
+   "beforePriismOn": 0,
+   "nativeFrames": 1,
+   "native": {
+    "oline stroke (pane)": 4
+   },
+   "nativePixels": {
+    "oline|pane": 1381
+   },
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 192,
+   "scaleTagPixels": {
+    "hline|scale": 336,
+    "ma|scale": 327,
+    "oline|scale": 665
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "obox|chosen|pane": 389,
+    "ma|chosen|pane": 48,
+    "hline|chosen|pane": 48,
+    "trend|chosen|pane": 48,
+    "oborder|chosen|pane": 288,
+    "oline|chosen|pane": 188
+   },
+   "frames": 196
+  },
+  "price-scale-drag": {
+   "nativeDraws": 8,
+   "beforePriismOn": 0,
+   "nativeFrames": 2,
+   "native": {
+    "oline stroke (pane)": 8
+   },
+   "nativePixels": {
+    "oline|pane": 1369
+   },
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 260,
+   "scaleTagPixels": {
+    "hline|scale": 336,
+    "ma|scale": 327,
+    "oline|scale": 665
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "ma|chosen|pane": 65,
+    "hline|chosen|pane": 65,
+    "trend|chosen|pane": 65,
+    "obox|chosen|pane": 443,
+    "oborder|chosen|pane": 378,
+    "oline|chosen|pane": 282,
+    "rect|chosen|pane": 36
+   },
+   "frames": 1922
+  },
+  "select-and-move-drawing": {
+   "nativeDraws": 4,
+   "beforePriismOn": 0,
+   "nativeFrames": 1,
+   "native": {
+    "oline stroke (pane)": 4
+   },
+   "nativePixels": {},
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 302,
+   "scaleTagPixels": {
+    "hline|scale": 336,
+    "ma|scale": 327,
+    "oline|scale": 665
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "ma|chosen|pane": 45,
+    "trend|chosen|pane": 45,
+    "rect|chosen|pane": 135,
+    "obox|chosen|pane": 360,
+    "oborder|chosen|pane": 225,
+    "hline|chosen|pane": 80,
+    "oline|chosen|pane": 176
+   },
+   "frames": 201
+  },
+  "hover-drawings": {
+   "nativeDraws": 4,
+   "beforePriismOn": 0,
+   "nativeFrames": 1,
+   "native": {
+    "oline stroke (pane)": 4
+   },
+   "nativePixels": {
+    "oline|pane": 1369
+   },
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 45,
+   "scaleTagPixels": {
+    "hline|scale": 336,
+    "ma|scale": 327,
+    "oline|scale": 665
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "ma|chosen|pane": 11,
+    "hline|chosen|pane": 11,
+    "trend|chosen|pane": 11,
+    "rect|chosen|pane": 33,
+    "obox|chosen|pane": 97,
+    "oborder|chosen|pane": 55,
+    "oline|chosen|pane": 40
+   },
+   "frames": 120
+  },
+  "edit-drawing": {
+   "nativeDraws": 8,
+   "beforePriismOn": 0,
+   "nativeFrames": 2,
+   "native": {
+    "oline stroke (pane)": 8
+   },
+   "nativePixels": {
+    "oline|pane": 1369
+   },
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 8,
+   "scaleTagPixels": {
+    "hline|scale": 336,
+    "ma|scale": 327,
+    "oline|scale": 665
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "ma|chosen|pane": 2,
+    "hline|chosen|pane": 2,
+    "trend|chosen|pane": 2,
+    "rect|chosen|pane": 6,
+    "obox|chosen|pane": 16,
+    "oborder|chosen|pane": 10
+   },
+   "frames": 97
+  },
+  "drawing-settings-dialog": {
+   "nativeDraws": 8,
+   "beforePriismOn": 0,
+   "nativeFrames": 2,
+   "native": {
+    "oline stroke (pane)": 8
+   },
+   "nativePixels": {
+    "oline|pane": 1369
+   },
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 22,
+   "scaleTagPixels": {
+    "ma|scale": 327,
+    "oline|scale": 665,
+    "hline|scale": 353
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "ma|chosen|pane": 4,
+    "trend|chosen|pane": 4,
+    "rect|chosen|pane": 12,
+    "obox|chosen|pane": 31,
+    "oborder|chosen|pane": 20,
+    "hline|chosen|pane": 4,
+    "oline|chosen|pane": 8
+   },
+   "frames": 117
+  },
+  "move-order-line": {
+   "nativeDraws": 8,
+   "beforePriismOn": 0,
+   "nativeFrames": 2,
+   "native": {
+    "oline stroke (pane)": 8
+   },
+   "nativePixels": {
+    "oline|pane": 1654
+   },
+   "coveredInSamePaint": 28,
+   "scaleTagsNotStyled": 60,
+   "scaleTagPixels": {
+    "ma|scale": 327,
+    "oline|scale": 670,
+    "hline|scale": 353
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "ma|chosen|pane": 12,
+    "trend|chosen|pane": 12,
+    "rect|chosen|pane": 36,
+    "obox|chosen|pane": 84,
+    "oborder|chosen|pane": 60,
+    "hline|chosen|pane": 12,
+    "oline|chosen|pane": 44
+   },
+   "frames": 90
+  },
+  "timeframe": {
+   "nativeDraws": 12,
+   "beforePriismOn": 0,
+   "nativeFrames": 3,
+   "native": {
+    "oline stroke (pane)": 12
+   },
+   "nativePixels": {
+    "oline|pane": 1670
+   },
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 45,
+   "scaleTagPixels": {
+    "ma|scale": 342,
+    "oline|scale": 665,
+    "hline|scale": 353
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "ma|chosen|pane": 9,
+    "rect|chosen|pane": 27,
+    "obox|chosen|pane": 63,
+    "oborder|chosen|pane": 45,
+    "hline|chosen|pane": 9,
+    "oline|chosen|pane": 24,
+    "trend|chosen|pane": 3
+   },
+   "frames": 304
+  },
+  "symbol": {
+   "nativeDraws": 17,
+   "beforePriismOn": 0,
+   "nativeFrames": 6,
+   "native": {
+    "hline stroke (pane)": 5,
+    "rect strokeRect (pane)": 4,
+    "oline stroke (pane)": 8
+   },
+   "nativePixels": {
+    "hline|pane": 906,
+    "oline|pane": 1625
+   },
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 35,
+   "scaleTagPixels": {
+    "ma|scale": 342,
+    "oline|scale": 665,
+    "hline|scale": 353
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "ma|chosen|pane": 16,
+    "obox|chosen|pane": 56,
+    "rect|chosen|pane": 14,
+    "oborder|chosen|pane": 30,
+    "oline|chosen|pane": 16,
+    "hline|chosen|pane": 2
+   },
+   "frames": 271
+  },
+  "window-size": {
+   "nativeDraws": 16,
+   "beforePriismOn": 0,
+   "nativeFrames": 4,
+   "native": {
+    "oline stroke (pane)": 16
+   },
+   "nativePixels": {
+    "oline|pane": 1625
+   },
+   "coveredInSamePaint": 0,
+   "scaleTagsNotStyled": 36,
+   "scaleTagPixels": {
+    "hline|scale": 336,
+    "ma|scale": 342,
+    "oline|scale": 665
+   },
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "ma|chosen|pane": 9,
+    "hline|chosen|pane": 9,
+    "rect|chosen|pane": 27,
+    "obox|chosen|pane": 54,
+    "oborder|chosen|pane": 45,
+    "oline|chosen|pane": 20
+   },
+   "frames": 141
+  },
+  "reopen": {
+   "nativeDraws": 0,
+   "beforePriismOn": 0,
+   "nativeFrames": 0,
+   "native": {},
+   "nativePixels": {},
+   "coveredInSamePaint": 22,
+   "scaleTagsNotStyled": 23,
+   "scaleTagPixels": {},
+   "offscreenNative": 0,
+   "chosenDraws": {
+    "obox|chosen|pane": 87,
+    "oborder|chosen|pane": 33,
+    "ma|chosen|pane": 12,
+    "hline|chosen|pane": 7,
+    "trend|chosen|pane": 7,
+    "oline|chosen|pane": 8
+   },
+   "frames": 0
+  }
+ }
+}
