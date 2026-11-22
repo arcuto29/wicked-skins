@@ -1,9 +1,9 @@
 {
- "before: 0.1.85 is installed": {
+ "[expect-404 0.1.85 0.1.86] before: 0.1.85 is installed": {
   "pass": true,
   "detail": "0.1.85"
  },
- "before: 0.1.85 finds 0.1.86 but asks for a file name that isn't on the release -> 404": {
+ "[expect-404 0.1.85 0.1.86] before: 0.1.85 finds 0.1.86 but asks for a file name that isn't on the release -> 404": {
   "pass": true,
   "detail": [
    "200 latest.yml",
@@ -11,54 +11,54 @@
    "404 Priism-Skins-Setup-0.1.86.exe"
   ]
  },
- "before: so nothing is downloaded (users never get the update)": {
+ "[expect-404 0.1.85 0.1.86] before: so nothing is downloaded (users never get the update)": {
   "pass": true,
   "detail": null
  },
- "before: still 0.1.85 after closing": {
+ "[expect-404 0.1.85 0.1.86] before: still 0.1.85 after closing": {
   "pass": true,
   "detail": "0.1.85"
  },
- "0.1.86 is installed, with your settings": {
+ "[self-update 0.1.85 0.1.990] 0.1.85 is installed, with your settings": {
   "pass": true,
   "detail": [
-   "0.1.86",
+   "0.1.85",
    []
   ]
  },
- "0.1.86 found 0.1.990, downloaded it (200, verified by its updater) without any help": {
+ "[self-update 0.1.85 0.1.990] 0.1.85 found 0.1.990, downloaded it (200, verified by its updater) without any help": {
   "pass": true,
   "detail": {
    "asked": [
     "200 latest.yml",
     "200 Priism-Skins-Setup-0.1.990.exe.blockmap",
-    "404 Priism-Skins-Setup-0.1.86.exe.blockmap",
+    "404 Priism-Skins-Setup-0.1.85.exe.blockmap",
     "200 Priism-Skins-Setup-0.1.990.exe"
    ],
    "info": {
     "fileName": "Priism-Skins-Setup-0.1.990.exe",
-    "sha512": "s5wF8k1ezK0pEoRvXAZUqwPHHdwdQK0ftglIf8tzsLvS48C95eDHY47iI8XGViRbOcZglNq3spNwXF9R5judtQ==",
+    "sha512": "eNFGxqlt06UNs0DtqEXJ/AkjYxTyBw4Nm+a9RPJkbbhekKtovlKRYy0nUN0m5HTMGLnDv6/1pxLZr9cv7nwx1w==",
     "isAdminRightsRequired": false
    }
   }
  },
- "...still running 0.1.86 meanwhile (nothing installs while you use it)": {
+ "[self-update 0.1.85 0.1.990] ...still running 0.1.85 meanwhile (nothing installs while you use it)": {
   "pass": true,
   "detail": null
  },
- "closing Priism: the app quits normally": {
+ "[self-update 0.1.85 0.1.990] closing Priism: the app quits normally": {
   "pass": true,
   "detail": null
  },
- "...and 0.1.990 is installed when it's closed (no reinstall by hand)": {
+ "[self-update 0.1.85 0.1.990] ...and 0.1.990 is installed when it's closed (no reinstall by hand)": {
   "pass": true,
   "detail": "0.1.990"
  },
- "...your settings, wallpapers, looks and licence are all still there": {
+ "[self-update 0.1.85 0.1.990] ...your settings, wallpapers, looks and licence are all still there": {
   "pass": true,
   "detail": []
  },
- "0.1.990 starts, and its updater reports in": {
+ "[self-update 0.1.85 0.1.990] 0.1.990 starts, and its updater reports in": {
   "pass": true,
   "detail": {
    "state": "current",
@@ -69,34 +69,90 @@
    "total": 0,
    "speed": 0,
    "error": null,
-   "at": 1795321716930
+   "at": 1795324427860
   }
  },
- "0.1.990 is installed": {
+ "[self-update 0.1.86 0.1.990] 0.1.86 is installed, with your settings": {
+  "pass": true,
+  "detail": [
+   "0.1.86",
+   []
+  ]
+ },
+ "[self-update 0.1.86 0.1.990] 0.1.86 found 0.1.990, downloaded it (200, verified by its updater) without any help": {
+  "pass": true,
+  "detail": {
+   "asked": [
+    "200 latest.yml",
+    "200 Priism-Skins-Setup-0.1.990.exe.blockmap",
+    "200 Priism-Skins-Setup-0.1.990.exe"
+   ],
+   "info": {
+    "fileName": "Priism-Skins-Setup-0.1.990.exe",
+    "sha512": "eNFGxqlt06UNs0DtqEXJ/AkjYxTyBw4Nm+a9RPJkbbhekKtovlKRYy0nUN0m5HTMGLnDv6/1pxLZr9cv7nwx1w==",
+    "isAdminRightsRequired": false
+   }
+  }
+ },
+ "[self-update 0.1.86 0.1.990] ...still running 0.1.86 meanwhile (nothing installs while you use it)": {
+  "pass": true,
+  "detail": null
+ },
+ "[self-update 0.1.86 0.1.990] closing Priism: the app quits normally": {
+  "pass": true,
+  "detail": null
+ },
+ "[self-update 0.1.86 0.1.990] ...and 0.1.990 is installed when it's closed (no reinstall by hand)": {
   "pass": true,
   "detail": "0.1.990"
  },
- "installer missing on the server: 'Update paused' with the plain reason, nothing installed": {
+ "[self-update 0.1.86 0.1.990] ...your settings, wallpapers, looks and licence are all still there": {
+  "pass": true,
+  "detail": []
+ },
+ "[self-update 0.1.86 0.1.990] 0.1.990 starts, and its updater reports in": {
+  "pass": true,
+  "detail": {
+   "state": "current",
+   "version": null,
+   "current": "0.1.990",
+   "percent": 0,
+   "transferred": 0,
+   "total": 0,
+   "speed": 0,
+   "error": null,
+   "at": 1795324462695
+  }
+ },
+ "[restart-flow 0.1.990 0.1.991] 0.1.990 is installed": {
+  "pass": true,
+  "detail": "0.1.990"
+ },
+ "[restart-flow 0.1.990 0.1.991] the one-time 'Updated' card first; closing it shows what came in meanwhile (the failed update)": {
+  "pass": true,
+  "detail": "UPDATE PAUSED\n0.1.990\n0.1.991\n\nThe update file isn't on the server. Priism tries again later; nothing was changed.\n\nClos"
+ },
+ "[restart-flow 0.1.990 0.1.991] installer missing on the server: 'Update paused' with the plain reason, nothing installed": {
   "pass": true,
   "detail": {
    "s": {
     "state": "error",
     "version": "0.1.991",
     "current": "0.1.990",
-    "percent": 0.00007031311523975836,
+    "percent": 0.000070387429618436,
     "transferred": 9,
-    "total": 12799888,
-    "speed": 750,
+    "total": 12786374,
+    "speed": 1286,
     "error": {
      "kind": "missing",
      "message": "The update file isn't on the server. Priism tries again later; nothing was changed."
     },
-    "at": 1795321721498
+    "at": 1795324468213
    },
    "c": "UPDATE PAUSED\n0.1.990\n0.1.991\n\nThe update file isn't on the server. Priism tries again later; nothing was changed.\n\nClose\nTry again\nNothing was changed."
   }
  },
- "damaged download (one byte changed): caught by its SHA-512, not installed, said plainly (the card switches from Downloading to the reason)": {
+ "[restart-flow 0.1.990 0.1.991] damaged download (one byte changed): caught by its SHA-512, not installed, said plainly (the card switches from Downloading to the reason)": {
   "pass": true,
   "detail": {
    "s": {
@@ -104,52 +160,52 @@
     "version": "0.1.991",
     "current": "0.1.990",
     "percent": 100,
-    "transferred": 134757287,
-    "total": 134757287,
-    "speed": 484738442,
+    "transferred": 134757609,
+    "total": 134757609,
+    "speed": 298136303,
     "error": {
      "kind": "damaged",
      "message": "The download didn't match the release, so it wasn't installed. Priism downloads it again by itself."
     },
-    "at": 1795321723895
+    "at": 1795324472594
    },
    "c": "UPDATE PAUSED\n0.1.990\n0.1.991\n\nThe download didn't match the release, so it wasn't installed. Priism downloads it again by itself.\n\nClose\nTry again\nNothing was "
   }
  },
- "offline: 'No connection', the app keeps running, nothing changed": {
+ "[restart-flow 0.1.990 0.1.991] offline: 'No connection', the app keeps running, nothing changed": {
   "pass": true,
   "detail": {
    "state": "error",
    "version": "0.1.991",
    "current": "0.1.990",
    "percent": 100,
-   "transferred": 134757287,
-   "total": 134757287,
-   "speed": 484738442,
+   "transferred": 134757609,
+   "total": 134757609,
+   "speed": 298136303,
    "error": {
     "kind": "offline",
     "message": "No connection to the update server. Priism tries again by itself."
    },
-   "at": 1795321725888
+   "at": 1795324475416
   }
  },
- "...the error is kept for after a restart too (update-state.json)": {
+ "[restart-flow 0.1.990 0.1.991] ...the error is kept for after a restart too (update-state.json)": {
   "pass": true,
   "detail": null
  },
- "downloading: real progress from the download (rising percent, real bytes)": {
+ "[restart-flow 0.1.990 0.1.991] downloading: real progress from the download (rising percent, real bytes)": {
   "pass": true,
   "detail": {
-   "samples": 41,
+   "samples": 42,
    "first": 0,
    "last": 99
   }
  },
- "...the card's bar follows it, and 'Restart & update' never shows before it's ready": {
+ "[restart-flow 0.1.990 0.1.991] ...the card's bar follows it, and 'Restart & update' never shows before it's ready": {
   "pass": true,
   "detail": null
  },
- "ready: 0.1.991 downloaded and verified, 'Restart & update' offered, still on 0.1.990": {
+ "[restart-flow 0.1.990 0.1.991] ready: 0.1.991 downloaded and verified, 'Restart & update' offered, still on 0.1.990": {
   "pass": true,
   "detail": {
    "s": {
@@ -157,20 +213,20 @@
     "version": "0.1.991",
     "current": "0.1.990",
     "percent": 100,
-    "transferred": 12799888,
-    "total": 12799888,
-    "speed": 995635,
+    "transferred": 12786374,
+    "total": 12786374,
+    "speed": 972940,
     "error": null,
-    "at": 1795321739625
+    "at": 1795324489788
    },
    "c": "UPDATE READY\n0.1.990\n0.1.991\n\nDownloaded and checked against the release. Priism restarts in a few seconds and reopens y"
   }
  },
- "Restart & update: 0.1.991 is installed": {
+ "[restart-flow 0.1.990 0.1.991] Restart & update: 0.1.991 is installed": {
   "pass": true,
   "detail": "0.1.991"
  },
- "...and Priism started again by itself on 0.1.991": {
+ "[restart-flow 0.1.990 0.1.991] ...and Priism started again by itself on 0.1.991": {
   "pass": true,
   "detail": {
    "state": "current",
@@ -181,10 +237,10 @@
    "total": 0,
    "speed": 0,
    "error": null,
-   "at": 1795321752657
+   "at": 1795324507211
   }
  },
- "...with your settings, wallpapers, looks and licence": {
+ "[restart-flow 0.1.990 0.1.991] ...with your settings, wallpapers, looks and licence": {
   "pass": true,
   "detail": []
  }
