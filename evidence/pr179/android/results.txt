@@ -1,0 +1,10 @@
+PASS v1 installs
+PASS v1 opens with the settings
+PASS the settings (with a 300 KB wallpaper) are stored: 400636 bytes
+PASS v2 (same key) installs over v1
+PASS versionCode went up (108699 -> 108799)
+PASS after the update: every setting, wallpaper, look and the licence byte for byte the same
+PASS v2 opens
+PASS an APK signed with another key is refused (INSTALL_FAILED_UPDATE_INCOMPATIBLE): why 0.1.86 and older need one reinstall
+PASS ...and the settings are untouched by the refused install
+PASS an older version can't be installed over a newer one
