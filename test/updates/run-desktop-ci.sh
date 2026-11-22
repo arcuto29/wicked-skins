@@ -17,13 +17,17 @@ WORK="$ROOT/.upd"; mkdir -p "$WORK"
 echo "::group::Build 0.1.990 and 0.1.991 from this branch"
 for v in 0.1.990 0.1.991; do
   ( cd desktop && npm pkg set version=$v && rm -rf dist
+    # 0.1.991 carries 12 MB of extra (random, so incompressible) data: 0.1.990 -> 0.1.991 is then a download of
+    # real size, like a real release, instead of a few changed blocks, and its progress can be watched
+    if [ $v = 0.1.991 ]; then head -c 12000000 /dev/urandom > ci-padding.bin
+      node -e 'const f="package.json",p=require("./"+f);p.build.files.push("ci-padding.bin");require("fs").writeFileSync(f,JSON.stringify(p,null,2))'; fi
     T=--linux; [ $WIN = 1 ] && T=--win
     for i in 1 2 3; do npx electron-builder $T --publish never && break; echo "retry $i"; sleep 30; [ $i = 3 ] && exit 1; done
     node ../scripts/check-desktop-release.js dist
     mkdir -p "$WORK/rel-$v"; for f in dist/*; do [ -f "$f" ] && case "$f" in *.exe|*.blockmap|*.AppImage|*/latest*.yml) cp "$f" "$WORK/rel-$v/";; esac; done
     ls -la "$WORK/rel-$v" )
 done
-( cd desktop && git checkout -- package.json )
+( cd desktop && git checkout -- package.json && rm -f ci-padding.bin )
 echo "::endgroup::"
 
 echo "::group::The real published 0.1.85 and 0.1.86"
@@ -63,7 +67,9 @@ mock() {   # mock <dir> <tag>
   [ -n "$MOCK" ] && { kill $MOCK 2>/dev/null || sudo kill $MOCK 2>/dev/null || true; sleep 1; }
   if [ $WIN = 1 ]; then node test/updates/github-mock.js --dir "$1" --tag "$2" --cert "$WORK/gh.crt" --key "$WORK/gh.key" --log "$MOCK_LOG" --mode "$MOCK_MODE_FILE" & MOCK=$!
   else sudo -E env "PATH=$PATH" node test/updates/github-mock.js --dir "$1" --tag "$2" --cert "$WORK/gh.crt" --key "$WORK/gh.key" --log "$MOCK_LOG" --mode "$MOCK_MODE_FILE" & MOCK=$!; fi
-  for i in $(seq 1 30); do curl -fsS -o /dev/null "https://github.com/arcuto29/wicked-skins/releases/latest" --cacert "$WORK/ca.crt" && return 0; sleep 1; done
+  # (Windows curl asks the certificate's issuer about revocation; a test certificate has nobody to ask)
+  NOREV=""; [ $WIN = 1 ] && NOREV=--ssl-no-revoke
+  for i in $(seq 1 30); do curl -fsS $NOREV -o /dev/null "https://github.com/arcuto29/wicked-skins/releases/latest" --cacert "$WORK/ca.crt" && return 0; sleep 1; done
   echo "mock didn't start"; exit 1
 }
 run() { if [ $WIN = 1 ]; then node test/updates/desktop-upgrade.js "$@"; else xvfb-run -a node test/updates/desktop-upgrade.js "$@"; fi; }

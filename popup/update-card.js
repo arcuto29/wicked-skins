@@ -69,7 +69,8 @@
   // "48% · 56.3 of 117 MB · 4.2 MB/s" from the real numbers only (nothing shown that isn't known)
   function progressText(p) {
     const parts = [];
-    if (p.total > 0) parts.push(`${MB(p.transferred || 0)} of ${MB(p.total)}`);
+    // (a differential download can count its request overhead past the total: never show "0.3 of 0.2 MB")
+    if (p.total > 0) parts.push(`${MB(Math.min(p.transferred || 0, p.total))} of ${MB(p.total)}`);
     if (p.speed > 0) parts.push(`${MB(p.speed)}/s`);
     if (p.total > 0 && p.speed > 0 && p.transferred < p.total) { const s = Math.round((p.total - p.transferred) / p.speed); parts.push(s >= 90 ? `about ${Math.round(s / 60)} min left` : `${Math.max(1, s)} s left`); }
     return parts.join(" \u00B7 ");

@@ -19,12 +19,18 @@ vcode() { adb shell dumpsys package $PKG | grep -m1 -o 'versionCode=[0-9]*' | cu
 
 adb install "$APKS/v1.apk" >/dev/null && pass "v1 installs" || fail "v1 installs"
 # settings as the app stores them: one JSON object in SharedPreferences "priism" (Store.kt)
-IMG=$(head -c 300000 /dev/urandom | base64 -w0)
-CFG="{\"skin\":\"media\",\"mediaId\":\"seed0001\",\"media\":[{\"id\":\"seed0001\",\"name\":\"Mine.png\",\"type\":\"image\",\"src\":\"data:image/png;base64,$IMG\"}],\"candleLook\":\"neon\",\"loadouts\":[{\"id\":\"lk1\",\"name\":\"Night\",\"skin\":\"aurora\",\"look\":{}}],\"invite\":{\"code\":\"PRIISM-ANDR-TEST\",\"ok\":true}}"
-python3 - "$CFG" > "$OUT/priism.xml" <<'EOF'
-import sys, html
-print("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name=\"cfg\">%s</string>\n</map>" % html.escape(sys.argv[1], quote=True))
+# (made inside python: a 400 KB value is too long to pass as a command-line argument)
+python3 - > "$OUT/priism.xml" <<'EOF'
+import os, json, html, base64
+img = base64.b64encode(os.urandom(300000)).decode()
+cfg = {"skin": "media", "mediaId": "seed0001",
+       "media": [{"id": "seed0001", "name": "Mine.png", "type": "image", "src": "data:image/png;base64," + img}],
+       "candleLook": "neon", "loadouts": [{"id": "lk1", "name": "Night", "skin": "aurora", "look": {}}],
+       "invite": {"code": "PRIISM-ANDR-TEST", "ok": True}}
+print("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name=\"cfg\">%s</string>\n</map>"
+      % html.escape(json.dumps(cfg, separators=(",", ":")), quote=True))
 EOF
+echo "seed file: $(wc -c < "$OUT/priism.xml") bytes"
 adb shell am force-stop $PKG
 # into the app's own storage (run-as: the app's user), like the app writing them itself
 adb push "$OUT/priism.xml" /data/local/tmp/priism.xml >/dev/null && adb shell chmod 644 /data/local/tmp/priism.xml
