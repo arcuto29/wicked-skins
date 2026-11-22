@@ -444,7 +444,15 @@
   // that's the previous paint's), however long ago that was: a still chart repaints rarely. (Rows used to be kept for 20 s, so a tag
   // that moved (dragging the price scale, an order line moving) left a trail of rows behind it, and any level line
   // that crossed the trail went back to its own colour.)
+  // the same rows on the page (CSS px), for the price scale: a scale tag level with a label on the chart is that label's
+  // (an order / position / alert line), never an indicator's
+  const labelPage = []; let labelPageF = -1;
+  const rectMemo = new WeakMap();
+  const rectOf = (c) => { const m = rectMemo.get(c); if (m && m.f === frameNo) return m.r; const r = c.getBoundingClientRect(); rectMemo.set(c, { f: frameNo, r }); return r; };
   function noteLabelRow(ctx, yDev) {
+    try { const c0 = ctx.canvas, r = rectOf(c0), Y = r.top + yDev * (r.height / (c0.height || 1));
+      if (frameNo !== labelPageF) { for (let j = labelPage.length - 1; j >= 0; j--) if (labelPage[j].f < labelPageF) labelPage.splice(j, 1); labelPageF = frameNo; }
+      if (labelPage.length < 60) labelPage.push({ y: Y, f: frameNo }); } catch {}
     const c = ctx.canvas; let a = labelRows.get(c); if (!a) { a = []; a.last = -1; a.prev = -1; labelRows.set(c, a); }
     if (frameNo !== a.last) { a.prev = a.last; a.last = frameNo; for (let j = a.length - 1; j >= 0; j--) if (a[j].f < a.prev) a.splice(j, 1); }
     const i = a.findIndex((e) => Math.abs(e.y - yDev) <= 3);
@@ -453,6 +461,7 @@
   const onLabelRow = (c, yDev) => { const a = labelRows.get(c); if (!a) return false;
     for (const e of a) if (e.f === a.last && Math.abs(e.y - yDev) <= 6) return true; return false; };
   function levelLine(ctx, c, cur) {
+    if (replay === "level") return true; if (replay === "tagrow") return false;
     const z = hzs.get(ctx); if (!z || !z.ok || !z.n || z.y === null || isTop(c) || ctx.getLineDash().length) return false;
     const r = rgbKey(cur); if (!r) return false;
     const grid = knownLines().grid; if (grid.size ? grid.has(r.key) : greyish(cur)) return false;
@@ -467,30 +476,47 @@
     const key = r.key, st = levelFirst.get(key);
     if (st === true) return true;
     if (st === undefined) { if (levelFirst.size > 300) levelFirst.delete(levelFirst.keys().next().value); levelFirst.set(key, false); }
-    notePendLevel(ctx, c, z, cur, key);
+    // Hidden in Each indicator, or see-through: drawing it now and putting it right at the end of the paint can't work
+    // (a hidden line can't be taken back off; your colour drawn over a see-through line mixes with it). Those wait for
+    // the end of this paint instead and are drawn once, as they should be (one straight line only).
+    const e = fx.indCustom && fx.indCustom[key], al = (r.a === null ? 1 : +r.a) * ctx.globalAlpha;
+    const wait = z.n === 1 && !!pathBox.get(ctx) && (!!(e && e.h) || (al < 0.99 && levelChanges(cur, key)));
+    notePendLevel(ctx, c, z, cur, key, wait);
+    if (wait) levelWait = true;
     return false;
+  }
+  const levelChanges = (cur, key) => (fx.indMode !== "own" && glowable(cur)) || !!(fx.indCustom && fx.indCustom[key]) || fx.lineGlow > 0;
+  let levelWait = false;   // set by levelLine: this line waits for the end of the paint (stroke() draws nothing now)
+  // A line drawn again later in this paint, as the chart asked for it (device px), through this hook. replay says what
+  // it is by then: "level" (an indicator's level: styled as one), "tagrow" (a tag on its row: an order / position
+  // line, never a level) or "plain" (not a bracket's line: everything else as usual).
+  let replay = null;
+  function replayLine(e, as) {
+    const g = e.ctx; g.save();
+    try { g.setTransform(1, 0, 0, 1, 0, 0); strokeDesc.set.call(g, e.cur); g.lineWidth = e.lw; g.setLineDash(e.dash || []); g.lineDashOffset = e.off || 0;
+      g.globalAlpha = e.alpha; g.lineCap = e.cap; g.globalCompositeOperation = e.comp;
+      replay = as; proto.beginPath.call(g); proto.moveTo.call(g, e.x0, e.y); proto.lineTo.call(g, e.x1, e.y); proto.stroke.call(g);
+    } catch {} finally { replay = null; g.restore(); }
   }
   const levelFirst = new Map();   // "r,g,b" -> true once a level line in that colour was seen with no tag on its row
   let levelPend = null;           // this paint's lines in a colour not known as a level yet
-  function notePendLevel(ctx, c, z, cur, key) {
+  function notePendLevel(ctx, c, z, cur, key, wait) {
     if (!levelPend) { levelPend = []; queueMicrotask(settleLevels); }
-    if (levelPend.length >= 40) return;
+    if (levelPend.length >= 40) { if (wait) levelWait = false; return; }   // (too many: drawn now, as before)
     const b = pathBox.get(ctx), t = ctx.getTransform(), k = Math.hypot(t.a, t.b) || 1;
-    levelPend.push({ ctx, c, y: z.y, key, cur, one: z.n === 1, x0: b ? b.x0 : null, x1: b ? b.x1 : null, lw: ctx.lineWidth * k, alpha: ctx.globalAlpha, cap: ctx.lineCap, comp: ctx.globalCompositeOperation });
+    levelPend.push({ ctx, c, y: z.y, key, cur, wait, one: z.n === 1, x0: b ? b.x0 : null, x1: b ? b.x1 : null, lw: ctx.lineWidth * k, alpha: ctx.globalAlpha, cap: ctx.lineCap, comp: ctx.globalCompositeOperation,
+      dash: ctx.getLineDash().map((d) => d * k), off: ctx.lineDashOffset * k });
   }
   function settleLevels() {
     const list = levelPend; levelPend = null; if (!list || !on) return;
     for (const e of list) {
-      if (onLabelRow(e.c, e.y)) continue;                       // a tag on its row: an order / position line, left as it is
+      if (onLabelRow(e.c, e.y)) { if (e.wait) replayLine(e, "tagrow"); continue; }   // a tag on its row: an order / position line, as it is
       levelFirst.set(e.key, true);
-      // drawn again only if your settings change it (else it's already right), and only a single straight line
-      const changes = (fx.indMode !== "own" && glowable(e.cur)) || (fx.indCustom && fx.indCustom[e.key]) || fx.lineGlow > 0;
-      if (!changes || !e.one || e.x0 === null || e.x1 - e.x0 < 2) continue;
-      const g = e.ctx; g.save();
-      try { g.setTransform(1, 0, 0, 1, 0, 0); strokeDesc.set.call(g, e.cur); g.lineWidth = e.lw; g.setLineDash([]); g.globalAlpha = e.alpha; g.lineCap = e.cap; g.globalCompositeOperation = e.comp;
-        const p = new Path2D(); p.moveTo(e.x0, e.y); p.lineTo(e.x1, e.y);
-        proto.stroke.call(g, p);                                  // through the hook: it's styled like any indicator line
-      } catch {} finally { g.restore(); }
+      // a line that waited is drawn now, once; one already drawn is drawn again only if your settings change it (and
+      // only a single straight line)
+      if (e.wait) { replayLine(e, "level"); continue; }
+      if (!levelChanges(e.cur, e.key) || !e.one || e.x0 === null || e.x1 - e.x0 < 2) continue;
+      replayLine(e, "level");                                     // through the hook: styled like any indicator line
     }
   }
   // solid boxes drawn on the chart lately (an indicator's label, a table cell): text drawn inside one keeps its colours
@@ -755,10 +781,10 @@
     const c = this.canvas;
     if (c && !c.isConnected) noteHiddenOther(this);
     if (on && path === undefined && c && shapedBox.has(this)) { const b = rectPath(this); if (b && isShapedOutline(this, b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0)) return; }
-    if (on && path === undefined && c && styling() && (isPane(c) || (fx.axOn && isAxis(c))) && styleLine(this, c, arguments)) return;
+    if (on && !replay && path === undefined && c && styling() && (isPane(c) || (fx.axOn && isAxis(c))) && styleLine(this, c, arguments)) return;
     // Bracket level line: a wide, horizontal stroke sitting at a pill's height. Recolour / thicken it so the whole
     // bracket level is easy to see. Done before the candle/glow path because it can be on when those are off.
-    if (on && fx.bracketOn && (fx.bracketLineColor || fx.bracketLineW > 0) && c && path === undefined && isPane(c)) {
+    if (on && !replay && fx.bracketOn && (fx.bracketLineColor || fx.bracketLineW > 0) && c && path === undefined && isPane(c)) {
       const s = lastSeg.get(this);
       // horizontal segment (any width) whose y lands exactly on a pill row — the pill-row match is the real filter
       // (so grid lines, which never sit on a pill row, are left alone), covering both stubs either side of the box.
@@ -776,7 +802,15 @@
         notePendLine(this, s, cur0, lk, true);   // (its label, drawn next, tells where labels sit: see knownBracketLine)
         return;
       }
-      if (hz) notePendLine(this, s, cur0, lk);   // maybe a bracket whose label comes next: see confirmPendLines
+      if (hz) {   // maybe a bracket whose label comes next: see confirmPendLines
+        // in a colour not known to be a bracket's or not: it waits for its label (then drawn once, in your colour) or
+        // the end of the paint (drawn as it is). Your colour drawn over it later would mix with it: a 1 px line on a
+        // whole-pixel row is spread over two rows at half strength, a see-through one shows through. Known not to be
+        // a bracket's (seen with no label): drawn straight away.
+        const nb = lk && notBracket.get(lk);
+        const wait = !(nb && performance.now() - nb < 60000);
+        if (notePendLine(this, s, cur0, lk, false, wait) && wait) return;
+      }
     }
     if (!on || !c || !isPane(c)) return origStroke.apply(this, arguments);
     const k = segs.get(this) || [0, 0];
@@ -794,8 +828,10 @@
     const restyles = fx.indMode !== "own" || fx.lineGlow > 0 || (fx.indCustom && Object.keys(fx.indCustom).length > 0);
     const dk = typeof cur === "string" && !candleCol && (drawCols.size || restyles) ? rgbKey(cur) : null;
     const isDraw = !!dk && (restyles ? drawColHas(dk.key) : drawCols.has(dk.key));
+    levelWait = false;
     const indLine = (polyline && typeof cur === "string" && !candleCol && (path !== undefined || k[1] >= 3)) || (isDraw && !candleCol)
       || (path === undefined && typeof cur === "string" && !candleCol && levelLine(this, c, cur));
+    if (levelWait) { levelWait = false; return; }                // drawn at the end of this paint (see levelLine)
     if (indLine && L && L.noteSeen) L.noteSeen(cur, "line");                     // for the panel's "Each indicator" list
     const custom = fx.indCustom && Object.keys(fx.indCustom).length > 0, indOn = fx.indMode !== "own" || custom;
     if (!(candles || fx.lineGlow > 0 || indOn)) return origStroke.apply(this, arguments);
@@ -803,7 +839,7 @@
     if (indOn && indLine && (custom || glowable(cur))) {
       const r = L && L.indicator && L.indicator(this, cur, { mode: glowable(cur) && (!isDraw || fx.drawOn) ? fx.indMode : "own", color: fx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: fx.accent, custom: fx.indCustom, grad: fx.indGrad });
       if (r && r.hide) return;                                                    // hidden in "Each indicator"
-      if (r) { col = r.s; gcol = r.g; if (r.glow !== undefined) glowAmt = r.glow; if (r.w) extraW = r.w; }
+      if (r) { col = r.s; gcol = r.g; if (r.glow !== undefined) glowAmt = r.glow; if (r.w) extraW = r.w; if (typeof r.s === "string") noteLineCol(cur, r.s); }
     }
     const glow = glowAmt > 0 && (glowable(gcol) || (custom && indLine));
     if (col === cur && !glow && !extraW) return origStroke.apply(this, arguments);
@@ -998,7 +1034,7 @@
     const own = String(ctx.fillStyle);
     lastPill.set(ctx, { used: false, t: performance.now(), box, sign: boxSign(own) });
     if (!fx.bracketOn) { pillFill.delete(ctx); return null; }          // Streamer mode only: find the labels, don't restyle them
-    if (bracketLines()) confirmPendLines(ctx, box);                     // its line, drawn a moment ago in its own colour
+    if (bracketLines()) notePasted(ctx, box, null);                     // (a label: a waiting line is never drawn across it)
     if (fx.bracketFill) { pillFill.set(ctx, fx.bracketFill); return fx.bracketFill; }
     if (fx.bracketBack !== "keep") {
       const r = rgbKey(own), base = [16, 19, 28], rgb = r ? r.key.split(",").map(Number) : base;
@@ -1150,10 +1186,12 @@
   //     your colour straight away;
   //     A line that stops exactly at a known label edge counts too (labels only move up and down), so a paint that
   //     redraws just the lines on a new row (zooming, dragging the price scale) is right as well;
-  //  2. a wide horizontal line that isn't known yet is drawn as it is and noted. When its label is drawn in the same
-  //     paint (its box, or its text: the charting library draws the box first, then the line, then the text), on its
-  //     row and with the line ending at the label's edge, the line is drawn again in your colour (under the label).
-  //     The browser shows the canvas only once the paint is over, so its own colour is never seen.
+  //  2. a wide horizontal line that isn't known yet isn't drawn yet. When a trading label (its text: an amount, a
+  //     price, a quantity) is drawn in the same paint on its row, with the line ending at the label's edge, the line
+  //     is drawn once in your colour when the paint is over, leaving out the labels so they stay on top. If none
+  //     comes, it's drawn as it is then, and its colour is known as not a bracket's from then on (drawn straight away).
+  //     The browser shows the canvas only once the paint is over, so its own colour is never seen, and nothing is
+  //     drawn twice (your colour drawn over its own would mix with it at the edges).
   // Nothing is repainted later and nothing polls: it all happens inside the chart's own paint.
   const bracketCols = new Map();   // "r,g,b|alpha" of lines confirmed as a bracket's -> when last confirmed
   const pendLines = new WeakMap(); // ctx -> wide horizontal lines drawn in their own colour in this paint
@@ -1178,14 +1216,27 @@
     // (a line that sits at a label's edge but goes across the whole pane isn't a bracket's stub)
     return a.some((e) => now - e.t < 60000 && (e.side === "end" ? Math.abs(hi - e.x) <= 1.5 : Math.abs(lo - e.x) <= 1.5));
   }
-  function notePendLine(ctx, s, cur, lk, done) {   // done: already drawn in your colour (only learn from its label)
+  // done: already drawn in your colour (only learn from its label); wait: not drawn yet (see stroke()). -> noted?
+  function notePendLine(ctx, s, cur, lk, done, wait) {
     // (a line across the whole pane is never a bracket's: those stop at their label. Grid lines, levels: not noted)
-    const c = ctx.canvas; if (c && Math.min(s.x0, s.x1) <= 1 && Math.max(s.x0, s.x1) >= c.width - 1) return;
+    const c = ctx.canvas; if (c && Math.min(s.x0, s.x1) <= 1 && Math.max(s.x0, s.x1) >= c.width - 1) return false;
     let a = pendLines.get(ctx); if (!a || a.f !== frameNo) { a = []; a.f = frameNo; pendLines.set(ctx, a); }
-    if (a.length >= 32) a.shift();
+    if (a.length >= 32) { const old = a.shift(); if (old.wait && !old.ok) replayLine(old, "plain"); }
     const t = ctx.getTransform(), k = Math.hypot(t.a, t.b) || 1;
-    a.push({ x0: s.x0, x1: s.x1, y: (s.y0 + s.y1) / 2, lw: ctx.lineWidth * k, dash: ctx.getLineDash().map((d) => d * k), off: ctx.lineDashOffset * k,
-      cap: ctx.lineCap, alpha: ctx.globalAlpha, comp: ctx.globalCompositeOperation, col: cur, lk, done: !!done, t: performance.now() });
+    const e = { ctx, x0: s.x0, x1: s.x1, y: (s.y0 + s.y1) / 2, lw: ctx.lineWidth * k, dash: ctx.getLineDash().map((d) => d * k), off: ctx.lineDashOffset * k,
+      cap: ctx.lineCap, alpha: ctx.globalAlpha, comp: ctx.globalCompositeOperation, col: cur, cur, lk, done: !!done, wait: !!wait, ok: false, t: performance.now() };
+    a.push(e);
+    if (wait) { if (!waitLines) { waitLines = []; queueMicrotask(flushWaitLines); } waitLines.push(e); }
+    return true;
+  }
+  // colours of see-through wide lines seen with no label: drawn straight away from then on
+  const notBracket = new Map();   // "r,g,b|alpha" -> when
+  const lineAlpha = (lk) => { const a = lk ? parseFloat(lk.split("|")[1]) : 1; return isFinite(a) ? a : 1; };
+  let waitLines = null;
+  function flushWaitLines() {   // end of the paint: the waiting lines no label claimed are drawn as they are
+    const list = waitLines; waitLines = null; if (!list) return;
+    for (const e of list) { if (e.ok) continue; replayLine(e, "plain");
+      if (e.lk) { notBracket.set(e.lk, performance.now()); if (notBracket.size > 60) notBracket.delete(notBracket.keys().next().value); } }
   }
   // a label box was just drawn (device px): the lines of this paint that end at its edge, on its row, are its bracket's.
   // later = the label is a picture pasted in (drawImage): TradingView pastes those clipped to the label, so a line drawn
@@ -1202,7 +1253,8 @@
       if (!endsAt && !startsAt) continue;
       a.splice(i, 1);
       if (endsAt) noteEdge(ctx, hi, "end"); else noteEdge(ctx, lo, "start");
-      if (e.lk) { bracketCols.set(e.lk, now); if (bracketCols.size > 24) bracketCols.delete(bracketCols.keys().next().value); }
+      if (e.lk) { bracketCols.set(e.lk, now); notBracket.delete(e.lk); if (bracketCols.size > 24) bracketCols.delete(bracketCols.keys().next().value); }
+      e.ok = true;
       if (e.done) continue;
       if (later) notePasted(ctx, null, e); else redrawLine(ctx, e, e.x0, e.x1);
     }
@@ -1441,8 +1493,8 @@
     }
     if (on && c && isAxis(c)) noteQuote(lastTag.get(this), a[0]);   // Live mood: the price, on platforms without it in the title
     // Live-price tags (and other price boxes): same font/weight/size as the scale, text kept inside its box.
-    const tagsRecoloured = candles && fx.scaleLabels;
-    if (on && c && isAxis(c) && !isScaleLabel(this.fillStyle) && (tagsRecoloured || fx.scaleFont !== "default" || fx.scaleSize > 0 || fx.scaleBold)) {
+    const tagsRecoloured = candles && fx.scaleLabels, lt0 = on && c && isAxis(c) ? lastTag.get(this) : null, onLineTag = !!(lt0 && lt0.ind);
+    if (on && c && isAxis(c) && (onLineTag || !isScaleLabel(this.fillStyle)) && (onLineTag || tagsRecoloured || fx.scaleFont !== "default" || fx.scaleSize > 0 || fx.scaleBold)) {
       const pFont = this.font, pF = this.fillStyle, w0 = origMeasure.call(this, String(a[0])).width;
       const nf = styledFont(pFont);
       if (nf !== pFont) { this.font = nf; if (a[3] === undefined && w0 > 0) a[3] = w0 * 1.06; }
@@ -1450,7 +1502,7 @@
       // only the text drawn right after a price box sits on it (a price + countdown = 2 lines); later numbers are plain
       // scale labels. Remembering the box for longer turned every later number dark on dark wallpapers.
       const lt = lastTag.get(this); if (lt && --lt.left <= 0) lastTag.delete(this);
-      const tag = tagsRecoloured && lt && lt.col, r = tag && rgbKey(tag);
+      const tag = (tagsRecoloured || (lt && lt.ind)) && lt && lt.col, r = tag && rgbKey(tag);
       if (r) {
         const [R, G, B] = r.key.split(",").map((n) => { n /= 255; return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4); });
         const L = 0.2126 * R + 0.7152 * G + 0.0722 * B;
@@ -1524,6 +1576,44 @@
   const origFillPath = proto.fill;
   const chLabel = new WeakMap();      // axis top canvas -> colour we gave the crosshair label box
   const lastTag = new WeakMap();   // colour of the last price box drawn on each scale canvas
+  // Price-scale tags of your lines: the value tag an indicator puts on the scale, and a drawing's price / time label,
+  // are drawn in the line's own colour. When the line has a colour of yours, its tag takes it too (the value itself and
+  // its place are untouched; the text on it is made readable). Only for a colour of your own that's one solid colour:
+  // Each indicator's, or the one the line was just drawn in (all indicators'). Never the price / candle tags, never order or position
+  // tags (their lines aren't indicator lines: Trading's bracket colours don't touch tags), and a line hidden in Each
+  // indicator keeps its tag as it is, so its value stays readable.
+  const lineCols = new Map();   // "r,g,b" of a line's own colour -> { col, t } the solid colour it was last drawn in
+  function noteLineCol(orig, col) {
+    const r = rgbKey(String(orig)); if (!r) return;
+    const e = lineCols.get(r.key); if (e && e.col === col) { e.t = performance.now(); return; }
+    if (lineCols.size > 200) lineCols.delete(lineCols.keys().next().value); lineCols.set(r.key, { col, t: performance.now() });
+  }
+  function tagColour(orig) {
+    const r = rgbKey(String(orig)); if (!r || (r.a !== null && +r.a < 0.6)) return null;
+    if (sides.has(r.key) || (candles && (r.key === candles.up.join(",") || r.key === candles.down.join(",")))) return null;   // the price
+    const e = fx.indCustom && fx.indCustom[r.key];
+    let col = null;
+    if (e && e.h) return null;
+    // Each indicator's own colour for it: known before anything is drawn, so the tag is right in the very first paint (the
+    // scale can be drawn before the line). Otherwise the solid colour the line was just drawn in (all indicators' colour).
+    if (e && /^#[0-9a-f]{6}$/i.test(e.c || "")) col = e.c;
+    else { const l = lineCols.get(r.key); if (l && performance.now() - l.t < 10000) col = l.col; }
+    if (!col) return null;
+    const c = rgbKey(col); if (!c || c.key === r.key) return null;
+    return r.a === null ? `rgb(${c.key})` : `rgba(${c.key},${r.a})`;
+  }
+  // is this fill a tag on a scale (not the crosshair's: the top canvas), and what colour does it take? device px box
+  const lastScaleBox = { ctx: null, cy: 0 };   // the tag being looked at: its centre (device y), set by its caller
+  function scaleTag(ctx, W, H) {
+    const c = ctx.canvas; if (!on || !c || !isAxis(c) || isTop(c)) return null;
+    const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1, h = H / dpr;
+    if (h < 10 || h > 40 || W > c.width * 1.01 || W < 8) return null;
+    const tc = tagColour(ctx.__bdFill !== undefined ? ctx.__bdFill : ctx.fillStyle); if (!tc) return null;
+    // level with a label on the chart (an order / position line's): left as it is
+    if (labelPage.length) { const b = ctx === lastScaleBox.ctx ? lastScaleBox : null, r = rectOf(c), Y = r.top + (b ? b.cy : 0) * (r.height / (c.height || 1));
+      if (b && labelPage.some((e) => Math.abs(e.y - Y) <= 6)) return null; }
+    return tc;
+  }
   // Live mood ("Day's move") needs the price. tradingview.com puts it in the tab title; platforms that embed
   // TradingView's charts (nq.vision, prop firms) don't. There, read it from the chart's own last-price tag: the number
   // drawn on the price scale inside a box in the candle colour. Shared with lw.js's reader via data-bd-lwquote.
@@ -1571,6 +1661,10 @@
       origFillDesc.set.call(this, col); chLabel.set(this, col);
       const r = origFillPath.apply(this, a); origFillDesc.set.call(this, pF); return r;
     }
+    if (on && c && isAxis(c) && !isTop(c) && !a.length) { const b = pathBox.get(this); if (b) { lastScaleBox.ctx = this; lastScaleBox.cy = (b.y0 + b.y1) / 2; }
+      const tc = b && scaleTag(this, b.x1 - b.x0, b.y1 - b.y0);
+      if (tc) { lastTag.set(this, { col: tc, left: 2, ind: true }); const pF = this.fillStyle; origFillDesc.set.call(this, tc);
+        const r = origFillPath.apply(this, a); origFillDesc.set.call(this, pF); return r; } }
     if (on && c && isAxis(c)) lastTag.set(this, { col: this.fillStyle, left: 2 });
     // a filled shape on the chart that isn't a candle (a band between two lines, a box): an indicator zone
     if (on && c && isPane(c)) { const z = zoneFor(this, 1e4, 1e4); if (z) {
@@ -1623,6 +1717,9 @@
         return;
       }
     }
+    if (on && c && isAxis(c) && !isTop(c)) { const t = this.getTransform(); lastScaleBox.ctx = this; lastScaleBox.cy = (y + h / 2) * (t.d || 1) + t.f;
+      const tc = scaleTag(this, Math.abs(w * (t.a || 1)), Math.abs(h * (t.d || 1)));
+      if (tc) { lastTag.set(this, { col: tc, left: 2, ind: true }); const pF = this.fillStyle; origFillDesc.set.call(this, tc); origFill.call(this, x, y, w, h); origFillDesc.set.call(this, pF); return; } }
     if (on && c && w * (this.getTransform().a || 1) <= 40 && isPane(c)) noteFill(this.__bdFill);
     if (on && c && isPane(c)) { const k = rgbKey(String(this.fillStyle)), t = this.getTransform();
       if (k && (k.a === null || +k.a >= 0.6) && Math.abs(w * (t.a || 1)) < c.width * 0.6 && Math.abs(h * (t.d || 1)) < c.height * 0.5) noteSolidBox(this, x * (t.a || 1) + t.e, y * (t.d || 1) + t.f, (x + w) * (t.a || 1) + t.e, (y + h) * (t.d || 1) + t.f); }

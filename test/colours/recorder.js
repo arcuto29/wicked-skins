@@ -40,6 +40,8 @@
   const where = (c) => {
     if (!c || !c.isConnected) return "offscreen";
     if (c.closest && c.closest(".price-axis, .time-axis, [class*='price-axis'], [class*='time-axis']")) return "scale";
+    // Lightweight Charts: its scales are the narrow (price) and short (time) canvases of the chart's table
+    if (c.closest && c.closest("[data-bd-lwroot], .tv-lightweight-charts")) { const r = c.getBoundingClientRect(); if (r.width < 140 || r.height < 60) return "scale"; }
     return c.closest && c.closest(".chart-markup-table, .tv-lightweight-charts, [class*='chart']") ? "pane" : "other";
   };
   function rec(ctx, method, style, a) {
@@ -62,6 +64,7 @@
   const pts = new WeakMap();
   { const b = P.beginPath; P.beginPath = function () { if (R.on) pts.set(this, []); return b.apply(this, arguments); }; }
   for (const n of ["moveTo", "lineTo"]) { const o = P[n]; P[n] = function (x, y) { if (R.on) { const a = pts.get(this); if (a && a.length < 6) { const t = this.getTransform(); a.push(n[0] + Math.round(x * t.a + t.e) + "," + Math.round(y * t.d + t.f)); } } return o.apply(this, arguments); }; }
+  for (const n of ["rect", "roundRect"]) { const o = P[n]; if (!o) continue; P[n] = function (x, y, w, h) { if (R.on) { const a = pts.get(this); if (a && a.length < 6) { const t = this.getTransform(); a.push(n[0] + "(" + Math.round(x * t.a + t.e) + "," + Math.round(y * t.d + t.f) + " " + Math.round(w * t.a) + "x" + Math.round(h * t.d) + ")"); } } return o.apply(this, arguments); }; }
   const cid = new WeakMap(); let cn = 0; R.cid = (c) => { let v = cid.get(c); if (!v) { v = ++cn; cid.set(c, v); } return v; };
   R.pathOf = (ctx) => (pts.get(ctx) || []).join(" ");
   { const o = P.fillText; P.fillText = function (t, x, y) { try { if (R.on && R.detail && R.texts.length < 3000 && this.canvas && this.canvas.isConnected) { const m = this.getTransform();

@@ -82,7 +82,7 @@
   // (apps that listen for that call chart.resize), and shave 1px off the chart's container for two frames (charts that
   // auto-size themselves with a ResizeObserver redraw on that). Live price updates redraw the chart anyway.
   let repaintT = 0;
-  function repaint() {
+  function repaint(now) {   // now: Priism has just come on: no reason to wait (the wait only batches quick changes)
     clearTimeout(repaintT);
     repaintT = setTimeout(() => {
       if (!active) return;
@@ -107,7 +107,7 @@
           requestAnimationFrame(() => { try { target.dispatchEvent(new WheelEvent("wheel", { ...at, deltaY: -0.0001 })); } catch {} });
         } catch {}
       }
-    }, 150);
+    }, now ? 0 : 150);
   }
   window.__bdLwRepaint = repaint;
   // chart-line settings (Style tab), from the same attribute hook.js reads
@@ -157,9 +157,10 @@
     on = htmlEl().classList.contains("bd-on");
     const cs = htmlEl().getAttribute("data-ws-candles"); readFx(); const ls = JSON.stringify(lfx) + JSON.stringify(ltx);
     if (cs === candSig && ls === lfxSig && on === onWas) return;
+    const cameOn = on && onWas !== true;
     candSig = cs; lfxSig = ls; onWas = on; readCandles(); remapCacheMain.clear();
     try { window.__bdLite = !!(JSON.parse(htmlEl().getAttribute("data-ws-fx") || "{}").lite || JSON.parse(cs || "{}").lite); } catch {}
-    repaint();
+    repaint(cameOn);
   });
   (function watch() {
     const el = document.documentElement;
@@ -489,6 +490,8 @@
         const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p);
         lastBox.set(this, "xh:" + col); return;
       }
+      if (on && c && isAxis(c) && labelBox(this, w, h)) { const tc = tagColour(this.__bdLwOrig !== undefined ? this.__bdLwOrig : this.fillStyle);
+        if (tc) { noteTagRow(this, y, h); const p = this.fillStyle; fillDesc.set.call(this, tc); origFillRect.call(this, x, y, w, h); fillDesc.set.call(this, p); lastBox.set(this, "ind:" + tc); return; } }
       if (on && c && (isAxis(c) || isPaneC(c))) {
         noteBox(this, w, h); if (labelBox(this, w, h)) noteTagRow(this, y, h);
         if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) {
@@ -519,6 +522,8 @@
       if (on && c && !a.length) { const b = pbox.get(this); if (b) noteSolidHook(this, b.x, b.y, b.w, b.h); }
       if (on && c && !inLook && isAxis(c) && lfx && lfx.chOn && lfx.chLabels && greyish(this.fillStyle)) { const b = pbox.get(this);
         if (b && labelBox(this, b.w, b.h)) { const p = this.fillStyle, col = pickCol(lfx.chColor, String(p)); fillDesc.set.call(this, col); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); lastBox.set(this, "xh:" + col); return r; } }
+      if (on && c && !inLook && !a.length && isAxis(c)) { const b = pbox.get(this), tc = b && labelBox(this, b.w, b.h) ? tagColour(this.__bdLwOrig !== undefined ? this.__bdLwOrig : this.fillStyle) : null;
+        if (tc) { noteTagRow(this, b.y, b.h); const p = this.fillStyle; fillDesc.set.call(this, tc); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); lastBox.set(this, "ind:" + tc); return r; } }
       if (on && c && !inLook && (isAxis(c) || isPaneC(c))) { const b = pbox.get(this); if (b && labelBox(this, b.w, b.h)) { noteBox(this, b.w, b.h); noteTagRow(this, b.y, b.h);
         if (lfx && lfx.bracketOn && lfx.bracketFill && !greyish(this.fillStyle) && !isCandleCol(this.fillStyle)) { const p = this.fillStyle; fillDesc.set.call(this, lfx.bracketFill); const r = origFillP.apply(this, a); fillDesc.set.call(this, p); return r; } } }
       if (on && c && !a.length && !inLook && isPaneC(c)) { const b = pbox.get(this);
@@ -551,7 +556,9 @@
       if (on && lfx && lineHook && !a.length && lineHook(this)) return;
       // Line glow: indicator lines and drawings are long paths that aren't straight across the chart (grid, crosshair,
       // price lines are), in a colour that isn't grey and isn't a candle
+      lvlWait = false;
       const curve = on && !inLook && c && c.width > 200 && c.height > 120 && isChart(c) && lineIsCurve(this);
+      if (lvlWait) { lvlWait = false; return; }   // a hidden / see-through level: drawn when this paint is over (see settled)
       if (curve && window.__bdCandleLooks && window.__bdCandleLooks.noteSeen) window.__bdCandleLooks.noteSeen(strokeDesc.get.call(this), "line");   // "Each indicator" list
       const custom = lfx && lfx.indCustom && Object.keys(lfx.indCustom).length > 0;
       if (curve && lfx && (lfx.lineGlow > 0 || lfx.indMode !== "own" || custom)) {
@@ -559,6 +566,7 @@
         const cur = strokeDesc.get.call(this), L = window.__bdCandleLooks;
         const ind = (lfx.indMode !== "own" || custom) && L && L.indicator ? L.indicator(this, cur, { mode: lfx.indMode, color: lfx.indColor, up: candles && candles.upHex, down: candles && candles.downHex, accent: lfx.accent, custom: lfx.indCustom, grad: lfx.indGrad }) : null;
         if (ind && ind.hide) return;
+        if (ind && typeof ind.s === "string") noteLineCol(cur, ind.s);
         const glowAmt = ind && ind.glow !== undefined ? ind.glow : lfx.lineGlow;
         const pB = this.shadowBlur, pC = this.shadowColor, pW = this.lineWidth;
         if (ind) strokeDesc.set.call(this, ind.s);
@@ -667,22 +675,32 @@
     // colour for ~1 s and then have the chart redrawn: a flash of the original colour on every new level.)
     const levelFirst = new Map();   // colour -> true once seen as a level with no tag on its row
     let levelPend = null;
-    const settled = (ctx, col, k) => { const st = levelFirst.get(col); if (st === true) return true;
+    // Hidden in Each indicator, or see-through: drawing it now and putting it right at the end of the paint can't work (a
+    // hidden line can't be taken back off; your colour over a see-through line mixes with it). Those wait for the end of
+    // this paint and are drawn once, as they should be.
+    const lvlChanges = (col) => !!lfx && (lfx.indMode !== "own" || (lfx.indCustom && Object.keys(lfx.indCustom).length > 0) || lfx.lineGlow > 0);
+    let lvlWait = false, lvlReplay = null;   // lvlReplay "tagrow": a line drawn again that is an order / position line
+    const settled = (ctx, col, k) => { if (lvlReplay === "tagrow") return false; const st = levelFirst.get(col); if (st === true) return true;
       if (st === undefined) { if (levelFirst.size > 300) levelFirst.delete(levelFirst.keys().next().value); levelFirst.set(col, false); }
       if (!levelPend) { levelPend = []; queueMicrotask(settleLevels); }
-      if (levelPend.length < 40) { const t = ctx.getTransform(); levelPend.push({ ctx, col, y: k.hy, one: k.n === 1, x0: k.mx, x1: k.lx, lw: ctx.lineWidth * (Math.hypot(t.a, t.b) || 1), alpha: ctx.globalAlpha, cap: ctx.lineCap }); }
+      if (levelPend.length < 40) { const t = ctx.getTransform(), r = rgbKey(String(col)), e = r && lfx && lfx.indCustom && lfx.indCustom[r.key];
+        const al = (r && r.a !== null ? +r.a : 1) * ctx.globalAlpha, one = k.n === 1 && k.mx != null && k.lx != null;
+        const wait = one && (!!(e && e.h) || (al < 0.99 && lvlChanges(col)));
+        levelPend.push({ ctx, col, y: k.hy, one, wait, x0: k.mx, x1: k.lx, lw: ctx.lineWidth * (Math.hypot(t.a, t.b) || 1), alpha: ctx.globalAlpha, cap: ctx.lineCap });
+        if (wait) lvlWait = true; }
       return false; };
     function settleLevels() {
       const list = levelPend; levelPend = null; if (!list || !on) return;
       for (const e of list) {
-        if (onTagRow(e.y)) continue;                          // a tag on its row: an order / position line, left as it is
-        levelFirst.set(e.col, true);
-        const changes = lfx && (lfx.indMode !== "own" || (lfx.indCustom && Object.keys(lfx.indCustom).length > 0) || lfx.lineGlow > 0);
-        if (!changes || !e.one || e.x0 == null || e.x1 == null || Math.abs(e.x1 - e.x0) < 2) continue;
+        const tag = onTagRow(e.y);                            // a tag on its row: an order / position line, as it is
+        if (tag && !e.wait) continue;
+        if (!tag) levelFirst.set(e.col, true);
+        if (!tag && !e.wait && (!lvlChanges(e.col) || !e.one || e.x0 == null || e.x1 == null || Math.abs(e.x1 - e.x0) < 2)) continue;
         const g = e.ctx; g.save();
         try { g.setTransform(1, 0, 0, 1, 0, 0); strokeDesc.set.call(g, e.col); g.lineWidth = e.lw; g.setLineDash([]); g.globalAlpha = e.alpha; g.lineCap = e.cap;
+          lvlReplay = tag ? "tagrow" : null;
           proto.beginPath.call(g); proto.moveTo.call(g, e.x0, e.y); proto.lineTo.call(g, e.x1, e.y); proto.stroke.call(g);   // through the hooks: styled like any level
-        } catch {} finally { g.restore(); }
+        } catch {} finally { lvlReplay = null; g.restore(); }
       }
     }
     lineHook = styleLines;
@@ -691,6 +709,25 @@
     // On the price-scale canvas Lightweight Charts draws each tag as a box and then its text; plain tick numbers
     // have no box. We remember the box drawn just before a text to tell them apart.
     const lastBox = new WeakMap();   // ctx -> fill colour of the label box drawn just before
+    // Price-scale tags of your lines (an indicator's last value, a price line's label): drawn in the line's own colour.
+    // When the line has a colour of yours, its tag takes it too, with readable text (same rule as hook.js): Each
+    // indicator's solid colour, or the one the line was just drawn in. Never the price, never a line hidden in Each
+    // indicator (its value stays as it is). (An order line here is only known by its tag: one in exactly the colour of a restyled indicator line would
+    // have its tag restyled too.)
+    const lineCols = new Map();
+    function noteLineCol(orig, col) { const r = rgbKey(String(orig)); if (!r) return; const e = lineCols.get(r.key);
+      if (e && e.col === col) { e.t = performance.now(); return; } if (lineCols.size > 200) lineCols.delete(lineCols.keys().next().value); lineCols.set(r.key, { col, t: performance.now() }); }
+    function tagColour(orig) {
+      const r = rgbKey(String(orig)); if (!r || (r.a !== null && +r.a < 0.6) || isCandleCol(orig) || greyish(orig) || !lfx) return null;
+      const e = lfx.indCustom && lfx.indCustom[r.key]; let col = null;
+      if (e && e.h) return null;
+      // Each indicator's own colour for it: known before anything is drawn, so the tag is right in the very first paint (the
+      // scale can be drawn before the line). Otherwise the solid colour the line was just drawn in (all indicators' colour).
+      if (e && /^#[0-9a-f]{6}$/i.test(e.c || "")) col = e.c;
+      else { const l = lineCols.get(r.key); if (l && performance.now() - l.t < 10000) col = l.col; }
+      const k = col && rgbKey(col); if (!k || k.key === r.key) return null;
+      return r.a === null ? `rgb(${k.key})` : `rgba(${k.key},${r.a})`;
+    }
     const PNL_RE = /^(?:p\s*(?:&|n|\/)?\s*l\s*:?\s*)?([+\-\u2212])?\s*([$\u20ac\u00a3\u00a5])?\s*([+\-\u2212])?\s*(\d{1,3}(?:,\d{3})*|\d+)(\.\d{1,2})\s*(usd|usdt|usdc|eur|gbp|jpy|aud|cad|chf|nzd|pts|points)?$/i;
     // the chart pane is big; the price scale (narrow) and time scale (short) canvases sit in the same table
     const isPaneC = (c) => c && isChart(c) && c.width > 200 && c.height > 120;
@@ -767,8 +804,8 @@
       if (!isAxis(c)) return oText.call(this, t, x, y, ...rest);
       const box = lastBox.get(this); lastBox.delete(this);
       const pF = this.font, pS = this.fillStyle, pB = this.shadowBlur, pC = this.shadowColor;
-      if (box && box.startsWith("xh:")) {                // crosshair label we coloured: dark or light text, whichever reads
-        const r = rgbKey(box.slice(3)), L = r ? r.key.split(",").reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0) / 255 : 0;
+      if (box && (box.startsWith("xh:") || box.startsWith("ind:"))) {   // crosshair label / a line's tag we coloured: dark or light text, whichever reads
+        const r = rgbKey(box.slice(box.indexOf(":") + 1)), L = r ? r.key.split(",").reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0) / 255 : 0;
         fillDesc.set.call(this, L > 0.55 ? "#06110d" : "#ffffff");
       } else if (box && isCandleCol(box)) {                      // the last-price tag: remember the price (Live mood: day move)
         const n = parseFloat(String(t).replace(/[^\d.\-]/g, ""));

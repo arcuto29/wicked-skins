@@ -14,12 +14,13 @@
     return s[KEY];
   }
 
+  // (the main scripts load at document_start and content.js starts at DOMContentLoaded: see the top of content.js)
   async function registerOne(site) {
     const id = idFor(site.origin), matches = patternsFor(site);
     await chrome.scripting.unregisterContentScripts({ ids: [id + "_hook", id + "_main"] }).catch(() => {});
     await chrome.scripting.registerContentScripts([
       { id: id + "_hook", matches, js: ["src/candlelooks.js", "src/hook.js", "src/lw.js"], runAt: "document_start", world: "MAIN", allFrames: true, matchOriginAsFallback: true },
-      { id: id + "_main", matches, js: ["src/skins.js", "src/sounds.js", "src/pass.js", "src/content.js"], css: ["src/content.css"], runAt: "document_idle", allFrames: true, matchOriginAsFallback: true },
+      { id: id + "_main", matches, js: ["src/skins.js", "src/sounds.js", "src/pass.js", "src/content.js"], css: ["src/content.css"], runAt: "document_start", allFrames: true, matchOriginAsFallback: true },
     ]);
   }
 

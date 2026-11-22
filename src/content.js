@@ -1,4 +1,8 @@
-(function () {
+// Registered at document_start (manifest.json, sites.js) and started as soon as the page's HTML has been read
+// (DOMContentLoaded): the same point "document_idle" guarantees, without waiting for the browser's idle time. On
+// tradingview.com that came about half a second later, often after the chart's first paints in the platform's own
+// colours. (Already loaded: re-injected after an update, the desktop app: starts at once.)
+(function (main) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", main, { once: true }); else main(); })(function () {
   // One copy per extension instance per page. The background re-injects us after an update (old copies can't talk to
   // the panel any more); if this copy of the extension is already running here, don't start a second one.
   if (window.__bdContentAlive) return;
@@ -3399,12 +3403,24 @@
   let startFn = null, started = false;
   function whenChart(start) {
     startFn = start;
-    const go = () => { if (!claim()) return; sweep(); started = true; start(); setTimeout(announceFrame, 300); };
+    let iv = 0, seen = null, checking = false, done = false;
+    const stop = () => { done = true; clearInterval(iv); if (seen) { seen.disconnect(); seen = null; } };
+    const go = () => { if (done) return; stop(); if (!claim()) return; sweep(); started = true; start(); setTimeout(announceFrame, 300); };
     if (bigChart()) return go();
+    // The chart is noticed the moment its elements go into the page: the platform paints it on the next frame, and
+    // with your settings already read (see early below) it's in your look from that first paint. (Checked every 500 ms
+    // only, a chart opened in the platform's own colours for about half a second, a second in a chart frame.) Only
+    // until the chart is there; the checks below stay as they were for charts that show up much later.
+    try {
+      seen = new MutationObserver(() => { if (checking || done) return; checking = true;
+        queueMicrotask(() => { checking = false; if (!done && document.querySelector(CHART_SEL) && bigChart()) go(); }); });
+      seen.observe(document.documentElement, { childList: true, subtree: true });
+      setTimeout(() => { if (seen) { seen.disconnect(); seen = null; } }, 180000);
+    } catch { seen = null; }
     // charts render late and small widgets (mini charts) never qualify; check for a while
     // keep checking (login-gated / single-page apps can show the chart much later), slower after the first 3 minutes
-    let iv = setInterval(() => { if (bigChart()) { clearInterval(iv); go(); } }, 500);
-    setTimeout(() => { if (!bigChart()) { clearInterval(iv); iv = setInterval(() => { if (bigChart()) { clearInterval(iv); go(); } }, 2000); } }, 180000);
+    iv = setInterval(() => { if (bigChart()) go(); }, 500);
+    setTimeout(() => { if (!done && !bigChart()) { clearInterval(iv); iv = setInterval(() => { if (bigChart()) go(); }, 2000); } }, 180000);
   }
 
   // You changed something in THIS copy's panel: if another copy is drawing here, take the page back from it.
@@ -3453,10 +3469,23 @@
   setInterval(() => { passFor = ""; const was = plan(); refreshPass().then(() => { if (plan() !== was) apply(gate(["enabled"])); }); }, 3600e3);   // a pass runs out
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
     // when you last used this copy's panel is known BEFORE claiming the page, so after a reload the right copy wins
+    // Your settings (and pass) are read right away, while the page is still loading, so the chart is in your look from
+    // the moment it appears: they used to be read only once the chart was found, after its first paints. If anything
+    // changed in between, they're read again at that point, exactly as before.
+    let earlyR = null, changed = 0;
+    const earlyGen = changed;
+    chrome.storage.local.get(DEFAULTS, async (stored) => { const c = { ...DEFAULTS, ...stored }, id = (c.pass || "") + "|" + (c.deviceId || "");
+      let info = null; try { info = window.PriismPass ? await window.PriismPass.verify(c.pass, c.deviceId) : null; } catch {}
+      if (changed === earlyGen) earlyR = { c, id, info }; });
+    const startNow = () => { gate(); build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); };
     chrome.storage.local.get({ lastPick: 0 }, (s) => { myPick = +s.lastPick || 0;
-      whenChart(() => chrome.storage.local.get(DEFAULTS, async (stored) => { cfg = { ...DEFAULTS, ...stored }; await refreshPass(); gate(); build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); })); });
+      whenChart(() => {
+        if (earlyR && changed === earlyGen) { cfg = earlyR.c; passFor = earlyR.id; passInfo = earlyR.info; earlyR = null; return startNow(); }   // (what refreshPass would set)
+        chrome.storage.local.get(DEFAULTS, async (stored) => { cfg = { ...DEFAULTS, ...stored }; await refreshPass(); startNow(); });
+      }); });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
+      changed++;
       // today's total is shared between tabs (and reset from the panel); the journal is just stored data
       if (changes.dayPnl) { const nv = changes.dayPnl.newValue; day = nv && nv.date ? { ...freshDay(), ...nv } : freshDay(); renderGoal(); }
       const keys = Object.keys(changes).filter((k) => k !== "dayPnl" && k !== "journal" && k !== "lastPick");
@@ -3703,4 +3732,4 @@
       chrome.storage.onChanged.addListener(async (ch, area) => { if (area !== "local") return; let hit = false; for (const k of Object.keys(ch)) if (k in KEYS) { c[k] = ch[k].newValue; hit = true; } if (!hit) return; if (ch.pass || ch.invite || ch.deviceId) await plan(); apply(); });
     }
   })();
-})();
+});
