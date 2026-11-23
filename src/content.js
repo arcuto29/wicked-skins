@@ -872,16 +872,30 @@
       }
       if (content.tagName === "VIDEO") {
         content.playbackRate = Math.max(0.25, Math.min(4, cfg.speed * calmFactor()));
-        cfg.paused ? content.pause() : content.play().catch(() => {});
+        stillNow() ? content.pause() : content.play().catch(() => {});
       }
       if (content.tagName === "IFRAME") postLook(content);
     }
   }
+  // Your own video wallpapers hold still exactly when the built-in ones do (see startLoop): Pause, the tab in the
+  // background, Focus, one of TradingView's big windows open, trade focus (at the order ticket / in a trade). They
+  // kept playing before: a 4K video went on decoding while you clicked Buy.
+  // With Power saver, or when trading is slowed down at Auto quality's lowest level, they also hold still while you use
+  // the chart and play again ~0.4 s after, like the built-in ones.
+  const stillNow = () => !!(cfg.paused || document.hidden || (cfg.focus && cfg.enabled) || dlgOpen || holdOn
+    || ((cfg.powerSaver || heavyNow()) && performance.now() - inputAt < 400));
+  let stillWas = null;
+  function syncStill() {   // called when one of those changes
+    const st = stillNow(); if (st === stillWas) return; stillWas = st;
+    for (const v of views) { const c = v.content; if (!c) continue;
+      if (c.tagName === "VIDEO") { st ? c.pause() : c.play().catch(() => {}); } else if (c.tagName === "IFRAME") postLook(c); }
+  }
+  document.addEventListener("visibilitychange", syncStill);
 
   // Files stored in the extension's database play inside an extension iframe (player/player.html).
   function postLook(frame) {
     if (!frame || frame.tagName !== "IFRAME" || !frame.contentWindow) return;
-    frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed * calmFactor(), paused: cfg.paused } }, "*");
+    frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed * calmFactor(), paused: stillNow() } }, "*");
   }
 
   // ---------- built-in wallpapers drawn off TradingView's main thread ----------
@@ -1827,7 +1841,9 @@
       try { applyAtmo(); applyFrame(); applyBars(); applyPanels(); applySides(); applyUiStyle(); applyDialogs(); applyTicker(); applyLegend(); applyTradePanel(); } catch {} } };
   // input delay (a capture listener runs before any page handler: now minus the event's time) and long tasks, per 2 s
   { const lag = [], LT = { ms: 0 }; let winT = performance.now(), badRuns = 0, goodRuns = 0;
-    const note = (e) => { inputAt = performance.now(); if (cfg.enabled && lag.length < 400) lag.push(inputAt - e.timeStamp); };
+    let stillT = 0;
+    const note = (e) => { inputAt = performance.now(); if (cfg.enabled && lag.length < 400) lag.push(inputAt - e.timeStamp);
+      if (cfg.powerSaver || heavyNow()) { syncStill(); clearTimeout(stillT); stillT = setTimeout(syncStill, 450); } };   // (video wallpapers: see stillNow)
     for (const t of ["pointerdown", "pointermove", "keydown", "wheel"]) addEventListener(t, note, { capture: true, passive: true });
     try { new PerformanceObserver((l) => { for (const e of l.getEntries()) LT.ms += e.duration - 50; }).observe({ type: "longtask" }); } catch {}
     (function check() { setTimeout(check, 2000);
@@ -1880,6 +1896,7 @@
     if (next === holdOn) return;
     holdOn = next; document.documentElement.toggleAttribute("data-bd-hold", holdOn);
     if (!holdOn) try { atmoKick(); } catch {}
+    syncStill();
   }
   setInterval(syncHold, 250);
 
@@ -1892,7 +1909,7 @@
     const root = document.getElementById("overlap-manager-root");
     const open = !!root && [...root.querySelectorAll('[class^="dialog-"], [data-dialog-name]')].some((el) => {
       const r = el.getBoundingClientRect(); return r.width >= 300 && r.height >= 200; });
-    if (open !== dlgOpen) { dlgOpen = open; document.documentElement.toggleAttribute("data-bd-dlg", open); }
+    if (open !== dlgOpen) { dlgOpen = open; document.documentElement.toggleAttribute("data-bd-dlg", open); syncStill(); }
   }
   function watchDialogs() {
     const root = document.getElementById("overlap-manager-root");
@@ -1907,12 +1924,12 @@
   function startLoop() {
     running = true;
     watchDialogs(); if (!dlgObs) setTimeout(watchDialogs, 3000);
-    let last = performance.now();
+    let last = performance.now(), due = last;
     measureRefresh();
     const step = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(step);
-      if (document.hidden || window.__bdBackground || cfg.paused || (cfg.focus && cfg.enabled) || dlgOpen || holdOn) { last = now; hLast = 0; return; }   // holdOn: trade focus   // __bdBackground: a desktop-app tab you're not looking at
+      if (document.hidden || window.__bdBackground || cfg.paused || (cfg.focus && cfg.enabled) || dlgOpen || holdOn) { last = now; due = now; hLast = 0; return; }   // holdOn: trade focus   // __bdBackground: a desktop-app tab you're not looking at
       const watch = cfg.autoQuality && !cfg.powerSaver && (cfg.fps === "auto" || cfg.fps === "max");
       if (watch) trackHealth(now);
       // Target fps: user setting, power saver, or the current auto-quality cap (whichever is lowest).
@@ -1921,9 +1938,14 @@
       if (guard >= 1) target = Math.min(target, guard >= 2 ? 20 : 30);   // the safety floor (see liteNow)
       // Power saver, or trading slowed down at the lowest level: the wallpaper holds still while you use the chart
       // (clicks, drags, the crosshair) and moves again ~0.4 s after
-      if ((cfg.powerSaver || heavyNow()) && now - inputAt < 400) { last = now; return; }
+      if ((cfg.powerSaver || heavyNow()) && now - inputAt < 400) { last = now; due = now; return; }
       const gap = now - last;
-      if (gap < 1000 / target - 2) return;
+      // Paced on a running schedule: a frame may come up to half a refresh early, so over a second the rate is the one
+      // asked for on any display. (Skipping whole refreshes until the full interval had passed gave 48 fps instead of
+      // 60 on a 144 Hz screen, 37 on 75 Hz, 30 instead of 40 on 60 Hz.)
+      const iv = 1000 / target, per = 1000 / (refreshHz || 60);
+      if (now < due - per / 2) return;
+      due = now - due > iv ? now + iv : due + iv;   // (fell behind: start the schedule again from now)
       const dt = Math.min(0.1, gap / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
       last = now;
       for (const v of views) { if (v.skin) { v.clock += dt; v.skin.frame(v.clock, dt); } if (v.fx) { v.fxClock += dt; v.fx.frame(v.fxClock, dt); } }

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: smoother wallpapers
+- **Your video wallpapers hold still when the built-in ones do:** in a trade or at the order ticket (trade focus), while
+  one of TradingView's big windows is open, in Focus, in a background tab, and (with Power saver, or when trading is
+  slowed down at Auto quality's lowest level) while you pan and zoom. They kept playing before. Measured with a 4K
+  video on a slowed-down laptop setup: in a trade the chart went from 32 to 57 frames a second.
+- **Wallpapers run at the frame rate you chose on any screen:** "60" gave 48 on 144 Hz screens, 37 on 75 Hz.
+- **Still pictures** stop re-reading their colours every 3 s once nothing changes.
+- **Adding wallpapers:** a file the browser can't store (disk full) now says so, and the other files are still added
+  (the panel used to stay on "Checking files…"). Removing a video still being converted removes its original too.
+
 ## Unreleased: colours that stay put
 - **Bracket lines keep your line colour.** On a live chart the take-profit / stop-loss line went back to the platform's
   colour on most repaints (about once a second), and for a frame whenever it moved, the price scale was dragged or
