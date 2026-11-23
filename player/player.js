@@ -3,16 +3,50 @@
 (async function () {
   const q = new URLSearchParams(location.search);
   const id = q.get("id"), type = q.get("type");
-  let el, look = {}, fitter = null;
+  let el, look = {}, fitter = null, tries = 0;   // (tries: the latest attempt at playing with sound; older checks are ignored)
 
   function apply() {
     if (!el) return;
     if (fitter) fitter.update();   // Fit: Smart / Cover / Contain / Stretch (src/smartfit.js)
     if (el.tagName === "VIDEO") {
       el.playbackRate = Math.max(0.25, Math.min(4, look.speed || 1));
-      look.paused ? el.pause() : el.play().catch(() => {});
+      el.volume = Math.max(0, Math.min(1, +look.volume || 0));
+      if (look.paused) { tries++; el.pause(); lock.drop(); return; }
+      // its own sound only when the page says this is the one (Sound: On, the first chart with a video) and no other
+      // tab / window has taken it since (lock); otherwise silent
+      const loud = !!look.audio;
+      if (!loud) lock.drop();
+      // (a player that lost it to another tab tries again only when the page claims it for the window you're using,
+      // never just because the look was sent again)
+      if (!loud || (lock.lost() && !look.claim)) { el.muted = true; el.play().catch(() => {}); return; }
+      // turning the sound on: paused first, so Chrome says plainly whether sound is allowed (unmuting a video that's
+      // already playing is refused silently)
+      if (el.muted) { el.pause(); el.muted = false; }
+      // Chrome: no sound before you've clicked on the page (this frame may use the page's click: allow="autoplay *").
+      // It either refuses play() or quietly mutes the video again, so the result is checked: not playing with sound =
+      // play silently and ask the page. The sound is only taken from other tabs once it really plays here, so a tab
+      // that can't play it yet doesn't silence the one that can.
+      const n = ++tries;
+      const blocked = () => { if (n !== tries) return; el.muted = true; el.play().catch(() => {}); lock.drop(); parent.postMessage({ __wicked: "sound-blocked", id }, "*"); };
+      el.play().then(() => setTimeout(() => { if (n !== tries || !look.audio || look.paused) return;
+        if (el.muted || el.paused) return void blocked();
+        lock.take(); parent.postMessage({ __wicked: "sound-ok", id }, "*"); }, 250))
+        .catch((e) => { if (e && e.name === "AbortError") return; blocked(); });
     }
   }
+  // one wallpaper sound across every tab and window: the player that last took it plays it, the others go quiet.
+  // Players of the same page never take it from each other (the page itself gives the sound to one of them, and while
+  // a layout settles it can briefly have two copies of the same wallpaper)
+  const lock = (() => {
+    const me = Math.random().toString(36).slice(2); let bc = null, held = false, lostTo = false;
+    try { bc = new BroadcastChannel("priism-wall-sound"); bc.onmessage = (e) => { const d = e.data || {}; if (d.id === me || (d.page && d.page === look.page)) return;
+      if (d.t === "take") { lostTo = true; held = false; tries++; if (el && el.tagName === "VIDEO") el.muted = true; }
+      else if (d.t === "free" && lostTo) { lostTo = false; if (look.audio && !look.paused) apply(); } }; } catch {}
+    return { lost: () => lostTo,
+      take() { lostTo = false; if (!held && bc) { held = true; bc.postMessage({ t: "take", id: me, page: look.page }); } },
+      drop() { if (held && bc) { held = false; bc.postMessage({ t: "free", id: me, page: look.page }); } } };
+  })();
+  addEventListener("pagehide", () => lock.drop());   // this wallpaper closed (another wallpaper, Priism off, tab closed)
 
   addEventListener("message", (e) => {
     if (e.data && e.data.__wicked === "rec-start" && e.ports && e.ports[0]) return void recStart(e.data, e.ports[0]);
@@ -52,7 +86,7 @@
     if (!blob) throw new Error("missing");
     el = document.createElement(type === "video" ? "video" : "img");
     el.id = "m";
-    if (type === "video") Object.assign(el, { loop: true, muted: true, autoplay: true, playsInline: true });
+    if (type === "video") Object.assign(el, { loop: true, muted: true, autoplay: true, playsInline: true, disableRemotePlayback: true });   // (starts silent: see apply)
     el.src = URL.createObjectURL(blob);
     document.body.appendChild(el);
     fitter = window.PriismSmartFit ? window.PriismSmartFit.attach(document.body, el, () => look) : null;
