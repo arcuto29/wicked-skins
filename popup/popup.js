@@ -16,7 +16,7 @@ const LOOK_KEYS = [...CHART_KEYS, "atmoFx","atmoTrail","atmoAura","atmoColor","a
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
-  fps: "auto", fit: "cover", posX: 50, posY: 50, res: "standard",
+  fps: "auto", fit: "auto", posX: 50, posY: 50, res: "standard",
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   lensKey: "Alt+Shift+KeyZ", lensZoom: 2.5, lensSize: "m", zoneReact: "off", pnStyle: "flat", pnRound: false, pnWindows: true, tpOn: false, tpColors: "candles", tpBuy: "#2962ff", tpSell: "#f23645", tpShape: "rounded", tpStyle: "solid", tpPanel: "keep", react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft", musicParts: "gwfi", musicFeel: "punchy", musicSens: "normal",
@@ -2303,7 +2303,10 @@ function syncTune() {
   // Auto quality: meaningful on Smooth or Max (it eases off if your computer struggles). Eco/Balanced already cap things.
   $("autoQRow").hidden = cfg.powerSaver || (cfg.fps !== "auto" && cfg.fps !== "max");
   seg("autoQuality", [[true, "Auto"], [false, "Max"]], () => (cfg.autoQuality !== false), (v) => set({ autoQuality: v }));
-  seg("fit", [["cover", "Cover"], ["fit", "Contain"], ["stretch", "Stretch"]], () => cfg.fit, (v) => set({ fit: v }));
+  seg("fit", [["auto", "Smart"], ["cover", "Cover"], ["fit", "Contain"], ["stretch", "Stretch"]], () => cfg.fit, (v) => { set({ fit: v }); syncTune(); });
+  if ($("fitHint")) $("fitHint").textContent = cfg.fit === "auto"
+    ? "Smart: fills the chart when your picture is close to its shape. A phone wallpaper, a square or an ultrawide picture is shown whole and sharp, with the same picture softly blurred around it."
+    : cfg.fit === "cover" ? "Cover: fills the chart, cutting off what doesn't fit." : cfg.fit === "fit" ? "Contain: the whole picture, with empty space around it." : "Stretch: fills the chart, out of proportion.";
   seg("calm", [[false, "Off"], [true, "On"]], () => cfg.calm, (v) => set({ calm: v }));
   seg("motion", [[false, "On"], [true, "Paused"]], () => cfg.paused, (v) => set({ paused: v }));
   seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => { set({ layer: v }); syncTune(); });

@@ -47,6 +47,7 @@
         "src/sounds.js",
         "src/pass.js",
         "src/acct.js",
+        "src/smartfit.js",
         "src/content.js"
       ],
       "css": [
@@ -75,6 +76,7 @@
         "player/player.html",
         "player/player.js",
         "src/mediadb.js",
+        "src/smartfit.js",
         "src/fonts/*.woff2"
       ],
       "matches": [

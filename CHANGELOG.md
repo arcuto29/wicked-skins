@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: Smart fit for your wallpapers
+- **New default, Fit: Smart.** Your picture or video is placed for the charts themselves, not the whole page under
+  TradingView's toolbars and lists. Close to the charts' shape, it fills them like Cover. A phone wallpaper (9:16), a
+  square or an ultrawide picture is shown whole, sharp and in proportion, with the same picture softly blurred around it:
+  nothing stretched, no black bars, nothing important cut off. It follows window size, panels, fullscreen, zoom and
+  multi-chart layouts. Cover, Contain and Stretch are unchanged, next to Smart in the same Fit control.
+- **Your existing wallpapers look exactly as before:** if you already have uploads and never chose a Fit, you keep Cover.
+
 ## Unreleased: smoother wallpapers
 - **Your video wallpapers hold still when the built-in ones do:** in a trade or at the order ticket (trade focus), while
   one of TradingView's big windows is open, in Focus, in a background tab, and (with Power saver, or when trading is
