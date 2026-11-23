@@ -22,7 +22,7 @@ const DEFAULTS = {
   lensKey: "Alt+Shift+KeyZ", lensZoom: 2.5, lensSize: "m", zoneReact: "off", pnStyle: "flat", pnRound: false, pnWindows: true, tpOn: false, tpColors: "candles", tpBuy: "#2962ff", tpSell: "#f23645", tpShape: "rounded", tpStyle: "solid", tpPanel: "keep", react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft", musicParts: "gwfi", musicFeel: "punchy", musicSens: "normal",
   frameOn: false, framePattern: "carbon", frameMode: "accent", frameColor: "#7c6cff", frameColor2: "#ff4df0", frameW: 8, frameAlpha: 0.5, frameSize: 1, frameRound: true, frameEdge: true, frameMove: false,
   barPatOn: false, barPattern: "zebra", barMode: "rainbow", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.25, barSize: 1, barWhere: "tlrb",
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, tsxAcctLabel: "", tsxAcctStyle: "own", tsxAcctFont: "default", tsxAcctFill: "glass", tsxAcctGlow: "soft", tsxAcctBadge: "filled", privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", candleClosedLook: "", shiftSpeed: 10,
@@ -1246,7 +1246,7 @@ function renderMedia() {
       if (e.target.classList.contains("x")) {
         const media = cfg.media.filter((x) => x.id !== m.id);
         const wasActive = cfg.skin === "media" && cfg.mediaId === m.id;
-        if (m.file && window.WickedMediaDB) WickedMediaDB.del(m.id).catch(() => {});
+        if (m.file && window.WickedMediaDB) { WickedMediaDB.del(m.id).catch(() => {}); if (m.pending) WickedMediaDB.del(m.id + ":src").catch(() => {}); }   // (a video still to convert: its original too)
         const chartSkins = Object.fromEntries(Object.entries(cfg.chartSkins || {}).filter(([, v]) => v !== "media:" + m.id));
         set(wasActive ? { media, chartSkins, skin: "aurora", mediaId: null } : { media, chartSkins });
       } else if (!m.pending) return pickSource("media:" + m.id);
@@ -1310,6 +1310,8 @@ const readAsDataURL = (f, mime) => new Promise((res, rej) => {
 const hint = (t) => { $("mediaHint").textContent = t; };
 const saveMedia = (media, extra = {}) => { set({ media, ...extra }); if (extra.skin === "media") autoMatchPick(); };
 
+// why the browser wouldn't store a file, in plain words
+const storeMsg = (e) => /quota/i.test(String(e && (e.name || e.message))) ? "your disk or the browser's storage is full: free some space and try again" : String((e && e.message) || "the browser refused to store it");
 async function addFiles(files) {
   const problems = []; let added = 0, needConvert = 0, lastId = null;
   hint("Checking files…");
@@ -1331,13 +1333,14 @@ async function addFiles(files) {
     const url = URL.createObjectURL(f);
     const p = await probe(c.type, url);
     URL.revokeObjectURL(url);
+    // (saved file by file: one that can't be stored is reported and the rest are kept, nothing is left half-saved)
     if (p) {
-      await WickedMediaDB.put(id, f);
+      try { await WickedMediaDB.put(id, f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }
       let q = null; try { q = await window.PriismWallInfo.measure(f, c.type); } catch {}
       cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size, ...(q ? { w: q.w, h: q.h, oled: q.oled } : {}) }];
       lastId = id; added++;
     } else if (c.type === "video") {
-      await WickedMediaDB.put(id + ":src", f); // original kept until converted
+      try { await WickedMediaDB.put(id + ":src", f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }   // original kept until converted
       cfg.media = [...cfg.media, { id, name, type: "video", file: true, pending: true, origName: f.name, size: f.size }];
       needConvert++;
     } else problems.push(`${f.name}: this image's format can't be shown in the browser`);
@@ -1921,6 +1924,17 @@ function syncPrivHint() {
     : `Dollar amounts become dots; ${m === "points" ? "TradingView's tick values are shown in points (futures we know the tick size of; others stay in ticks)" : "tick and % values stay visible"}. Set TradingView to show ticks: Settings \u203A Trading \u203A P&L in Ticks.`;
 }
 if ($("privacyAcct")) $("privacyAcct").onchange = (e) => set({ privacyAcct: e.target.checked });
+// TopstepX account box nickname: the same rule as on the page (src/acct.js), so it can't pose as account details
+const ACCT_HINT_TXT = "On TopstepX, the account box at the top left: your nickname and style. The account type badge (Practice, Combine, Express Funded, Live Funded) always shows and comes from TopstepX, in its own colour. Visual only: nothing about your account changes. Custom needs Panels on.";
+function syncAcctNick(v) {
+  const problem = window.PriismAcct ? window.PriismAcct.nicknameProblem(v) : "";
+  $("tsxAcctHint").textContent = problem || ACCT_HINT_TXT; $("tsxAcctHint").style.color = problem ? "#ff8a8a" : "";
+  return !problem;
+}
+if ($("tsxAcctLabel")) {
+  $("tsxAcctLabel").value = cfg.tsxAcctLabel || ""; if (cfg.tsxAcctLabel) syncAcctNick(cfg.tsxAcctLabel);   // (a name saved under an older rule: say why it isn't shown)
+  $("tsxAcctLabel").oninput = (e) => { const v = e.target.value.replace(/\s+/g, " ").trim(); if (syncAcctNick(v)) set({ tsxAcctLabel: v }); };
+}
 if ($("privacyOrder")) $("privacyOrder").onchange = (e) => set({ privacyOrder: e.target.checked });
 if ($("privacyOn")) $("privacyOn").onchange = (e) => { set({ privacy: e.target.checked }); renderJournal(); };
 if ($("tradeClipOn")) $("tradeClipOn").onchange = (e) => { set({ tradeClipOn: e.target.checked }); syncExtras(); };
@@ -2239,9 +2253,16 @@ function syncPanels() {
   if ($("tsxLogo")) { seg("tsxLogo", [["own", "TopstepX's"], ["look", "Priism"], ["text", "Your name"]], () => cfg.tsxLogo || "own", (v) => { set({ tsxLogo: v }); syncPanels(); });
     $("tsxLogoTextRow").hidden = cfg.tsxLogo !== "text"; if (document.activeElement !== $("tsxLogoText")) $("tsxLogoText").value = cfg.tsxLogoText || "";
     const lc = cfg.tsxLogoColor || "look", isHex = /^#[0-9a-f]{6}$/i.test(lc);
-    $("tsxLogoColRow").hidden = !(cfg.tsxLogo === "look" || cfg.tsxLogo === "text");
+    const acctX = cfg.tsxAcctStyle === "custom";
+    $("tsxLogoColRow").hidden = !(cfg.tsxLogo === "look" || cfg.tsxLogo === "text" || acctX);
     seg("tsxLogoColor", [["look", "Your look"], ["rainbow", "Rainbow"], ["pick", "Colour"]], () => (isHex ? "pick" : lc), (v) => { set({ tsxLogoColor: v === "pick" ? ($("tsxLogoPick").value || "#7c6cff") : v }); syncPanels(); });
-    $("tsxLogoPick").hidden = !isHex; if (isHex) $("tsxLogoPick").value = lc; }
+    $("tsxLogoPick").hidden = !isHex; if (isHex) $("tsxLogoPick").value = lc;
+    seg("tsxAcctStyle", [["own", "TopstepX's"], ["custom", "Custom"]], () => (acctX ? "custom" : "own"), (v) => { set({ tsxAcctStyle: v }); syncPanels(); });
+    document.querySelectorAll(".tsx-acct-x").forEach((r) => { r.hidden = !acctX; });
+    seg("tsxAcctFont", [["default", "TopstepX"], ["display", "Display"], ["mono", "Mono"]], () => cfg.tsxAcctFont || "default", (v) => { set({ tsxAcctFont: v }); syncPanels(); });
+    seg("tsxAcctFill", [["glass", "Glass"], ["gradient", "Gradient"], ["solid", "Solid"]], () => cfg.tsxAcctFill || "glass", (v) => { set({ tsxAcctFill: v }); syncPanels(); });
+    seg("tsxAcctGlow", [["off", "Off"], ["soft", "Soft"], ["strong", "Strong"]], () => cfg.tsxAcctGlow || "soft", (v) => { set({ tsxAcctGlow: v }); syncPanels(); });
+    seg("tsxAcctBadge", [["filled", "Filled"], ["outline", "Outline"]], () => cfg.tsxAcctBadge || "filled", (v) => { set({ tsxAcctBadge: v }); syncPanels(); }); }
 }
 if ($("tsxLogoPick")) $("tsxLogoPick").oninput = (e) => set({ tsxLogoColor: e.target.value });
 if ($("tsxLogoText")) $("tsxLogoText").oninput = (e) => set({ tsxLogoText: e.target.value.slice(0, 24), tsxLogo: "text" });
@@ -2811,6 +2832,7 @@ async function siteBar() {
         }
       }
       if (window.TradingView || window.tvWidget) chart = true;
+      if (/(^|\.)tradovate\.com$/.test(location.hostname) && document.querySelector("canvas#c")) chart = true;   // Tradovate's WebGL charts
       return { chart, frames: [...frames] };
     } });
     found = res.result || found;

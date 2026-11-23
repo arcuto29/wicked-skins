@@ -190,6 +190,7 @@
     // ".chart-container" is a common class name, so only count it as TradingView's own chart when it holds one.
     let all = [...document.querySelectorAll(".chart-container")].filter((el) => el.querySelector(".chart-markup-table"));
     if (!all.length) all = [...document.querySelectorAll(LW_SEL)];
+    if (!all.length && TDV) all = [...document.querySelectorAll("[data-bd-tdvpane]")];   // Tradovate: where its WebGL charts are (see tdvPanes)
     return all
       .filter((el) => !all.some((o) => o !== el && o.contains(el)))
       .map((el) => ({ el, r: el.getBoundingClientRect() }))
@@ -198,7 +199,8 @@
   }
   const LW_SEL = "[data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight']";
   let charts = [];
-  const tiled = () => charts.length > 1 && (cfg.multi !== "span" || lwMulti());
+  // Tradovate: always one wallpaper per chart, under that chart only (its panels and lists stay as they are)
+  const tiled = () => (TDV && charts.length >= 1) || (charts.length > 1 && (cfg.multi !== "span" || lwMulti()));
   // the area covered by all charts together (watermark, P&L pill, over-chart clipping)
   function chartsBox() {
     if (!charts.length) {
@@ -215,6 +217,22 @@
   // the top page numbers every chart by position, so "Chart 2" means the same thing everywhere.
   // firstNum = the number of this frame's first chart (1 on a normal page).
   const IN_FRAME = window !== window.top;
+  // Tradovate draws its charts with WebGL into one canvas as big as the window (no chart elements to find). hook.js
+  // publishes where each chart's background is cleared (<html data-bd-tdv-panes>, CSS px) and makes those clears
+  // see-through while Priism is on; here an invisible box marks each of them, so the usual per-chart wallpaper tiles
+  // go exactly under the charts.
+  const TDV = !IN_FRAME && /(^|\.)tradovate\.com$/.test(location.hostname);
+  function tdvPanes() {
+    let list = []; try { list = JSON.parse(document.documentElement.getAttribute("data-bd-tdv-panes") || "[]"); } catch {}
+    const have = [...document.querySelectorAll("[data-bd-tdvpane]")];
+    list.forEach(([x, y, w, h], i) => { let el = have[i];
+      if (!el) { el = document.createElement("div"); el.setAttribute("data-bd-tdvpane", ""); el.setAttribute("aria-hidden", "true"); document.documentElement.appendChild(el); }
+      el.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:${w}px;height:${h}px;pointer-events:none;visibility:hidden`; });
+    have.slice(list.length).forEach((el) => el.remove());
+    try { if (layer) trackLayout(); } catch {}        // (before the layer exists: nothing to move yet)
+  }
+  if (TDV) { document.documentElement.classList.add("bd-tdv"); tdvPanes();
+    new MutationObserver(tdvPanes).observe(document.documentElement, { attributes: true, attributeFilter: ["data-bd-tdv-panes"] }); }
   let firstNum = 1;
   const chartFrames = new Map();   // (top page only) frame window -> { seen, count }
   function frameRects() {
@@ -854,16 +872,30 @@
       }
       if (content.tagName === "VIDEO") {
         content.playbackRate = Math.max(0.25, Math.min(4, cfg.speed * calmFactor()));
-        cfg.paused ? content.pause() : content.play().catch(() => {});
+        stillNow() ? content.pause() : content.play().catch(() => {});
       }
       if (content.tagName === "IFRAME") postLook(content);
     }
   }
+  // Your own video wallpapers hold still exactly when the built-in ones do (see startLoop): Pause, the tab in the
+  // background, Focus, one of TradingView's big windows open, trade focus (at the order ticket / in a trade). They
+  // kept playing before: a 4K video went on decoding while you clicked Buy.
+  // With Power saver, or when trading is slowed down at Auto quality's lowest level, they also hold still while you use
+  // the chart and play again ~0.4 s after, like the built-in ones.
+  const stillNow = () => !!(cfg.paused || document.hidden || (cfg.focus && cfg.enabled) || dlgOpen || holdOn
+    || ((cfg.powerSaver || heavyNow()) && performance.now() - inputAt < 400));
+  let stillWas = null;
+  function syncStill() {   // called when one of those changes
+    const st = stillNow(); if (st === stillWas) return; stillWas = st;
+    for (const v of views) { const c = v.content; if (!c) continue;
+      if (c.tagName === "VIDEO") { st ? c.pause() : c.play().catch(() => {}); } else if (c.tagName === "IFRAME") postLook(c); }
+  }
+  document.addEventListener("visibilitychange", syncStill);
 
   // Files stored in the extension's database play inside an extension iframe (player/player.html).
   function postLook(frame) {
     if (!frame || frame.tagName !== "IFRAME" || !frame.contentWindow) return;
-    frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed * calmFactor(), paused: cfg.paused } }, "*");
+    frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed * calmFactor(), paused: stillNow() } }, "*");
   }
 
   // ---------- built-in wallpapers drawn off TradingView's main thread ----------
@@ -1385,6 +1417,7 @@
   // chart's own container, directly under the chart (whose background lw.js clears). Single chart + "behind" mode only.
   let embeddedHost = null, lastRebuild = 0;
   function lwHost(list = charts) {
+    if (TDV) return null;
     if (document.querySelector(".chart-markup-table")) return null;          // TradingView's own charts: not a LW page
     if (list.length !== 1) return null;
     const el = list[0].el;
@@ -1395,6 +1428,7 @@
   // gets its wallpaper, under the chart. The page's own (solid) backgrounds would hide a layer behind the page.
   let embHosts = [];
   function lwHosts(list = charts) {
+    if (TDV) return null;
     if (document.querySelector(".chart-markup-table") || list.length < 2) return null;
     const hosts = list.map((c) => { const el = c.el;
       const h = el.classList.contains("tv-lightweight-charts") || (el.hasAttribute("data-bd-lwroot") && el.tagName === "TABLE") ? el.parentElement : el;
@@ -1807,7 +1841,9 @@
       try { applyAtmo(); applyFrame(); applyBars(); applyPanels(); applySides(); applyUiStyle(); applyDialogs(); applyTicker(); applyLegend(); applyTradePanel(); } catch {} } };
   // input delay (a capture listener runs before any page handler: now minus the event's time) and long tasks, per 2 s
   { const lag = [], LT = { ms: 0 }; let winT = performance.now(), badRuns = 0, goodRuns = 0;
-    const note = (e) => { inputAt = performance.now(); if (cfg.enabled && lag.length < 400) lag.push(inputAt - e.timeStamp); };
+    let stillT = 0;
+    const note = (e) => { inputAt = performance.now(); if (cfg.enabled && lag.length < 400) lag.push(inputAt - e.timeStamp);
+      if (cfg.powerSaver || heavyNow()) { syncStill(); clearTimeout(stillT); stillT = setTimeout(syncStill, 450); } };   // (video wallpapers: see stillNow)
     for (const t of ["pointerdown", "pointermove", "keydown", "wheel"]) addEventListener(t, note, { capture: true, passive: true });
     try { new PerformanceObserver((l) => { for (const e of l.getEntries()) LT.ms += e.duration - 50; }).observe({ type: "longtask" }); } catch {}
     (function check() { setTimeout(check, 2000);
@@ -1860,6 +1896,7 @@
     if (next === holdOn) return;
     holdOn = next; document.documentElement.toggleAttribute("data-bd-hold", holdOn);
     if (!holdOn) try { atmoKick(); } catch {}
+    syncStill();
   }
   setInterval(syncHold, 250);
 
@@ -1872,7 +1909,7 @@
     const root = document.getElementById("overlap-manager-root");
     const open = !!root && [...root.querySelectorAll('[class^="dialog-"], [data-dialog-name]')].some((el) => {
       const r = el.getBoundingClientRect(); return r.width >= 300 && r.height >= 200; });
-    if (open !== dlgOpen) { dlgOpen = open; document.documentElement.toggleAttribute("data-bd-dlg", open); }
+    if (open !== dlgOpen) { dlgOpen = open; document.documentElement.toggleAttribute("data-bd-dlg", open); syncStill(); }
   }
   function watchDialogs() {
     const root = document.getElementById("overlap-manager-root");
@@ -1887,12 +1924,12 @@
   function startLoop() {
     running = true;
     watchDialogs(); if (!dlgObs) setTimeout(watchDialogs, 3000);
-    let last = performance.now();
+    let last = performance.now(), due = last;
     measureRefresh();
     const step = (now) => {
       if (!running) return;
       raf = requestAnimationFrame(step);
-      if (document.hidden || window.__bdBackground || cfg.paused || (cfg.focus && cfg.enabled) || dlgOpen || holdOn) { last = now; hLast = 0; return; }   // holdOn: trade focus   // __bdBackground: a desktop-app tab you're not looking at
+      if (document.hidden || window.__bdBackground || cfg.paused || (cfg.focus && cfg.enabled) || dlgOpen || holdOn) { last = now; due = now; hLast = 0; return; }   // holdOn: trade focus   // __bdBackground: a desktop-app tab you're not looking at
       const watch = cfg.autoQuality && !cfg.powerSaver && (cfg.fps === "auto" || cfg.fps === "max");
       if (watch) trackHealth(now);
       // Target fps: user setting, power saver, or the current auto-quality cap (whichever is lowest).
@@ -1901,9 +1938,14 @@
       if (guard >= 1) target = Math.min(target, guard >= 2 ? 20 : 30);   // the safety floor (see liteNow)
       // Power saver, or trading slowed down at the lowest level: the wallpaper holds still while you use the chart
       // (clicks, drags, the crosshair) and moves again ~0.4 s after
-      if ((cfg.powerSaver || heavyNow()) && now - inputAt < 400) { last = now; return; }
+      if ((cfg.powerSaver || heavyNow()) && now - inputAt < 400) { last = now; due = now; return; }
       const gap = now - last;
-      if (gap < 1000 / target - 2) return;
+      // Paced on a running schedule: a frame may come up to half a refresh early, so over a second the rate is the one
+      // asked for on any display. (Skipping whole refreshes until the full interval had passed gave 48 fps instead of
+      // 60 on a 144 Hz screen, 37 on 75 Hz, 30 instead of 40 on 60 Hz.)
+      const iv = 1000 / target, per = 1000 / (refreshHz || 60);
+      if (now < due - per / 2) return;
+      due = now - due > iv ? now + iv : due + iv;   // (fell behind: start the schedule again from now)
       const dt = Math.min(0.1, gap / 1000) * cfg.speed * calmFactor() * (1 + Math.abs(mood) * cfg.reactStrength * 1.5);
       last = now;
       for (const v of views) { if (v.skin) { v.clock += dt; v.skin.frame(v.clock, dt); } if (v.fx) { v.fxClock += dt; v.fx.frame(v.fxClock, dt); } }
@@ -1963,6 +2005,8 @@
   if (!IN_FRAME && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
       if (!msg || typeof msg.ws !== "string") return;
+      // Tradovate: a chart-only capture can't include its WebGL chart, so the panel takes the whole page / screen there
+      if (TDV && (msg.ws === "snapshot" || msg.ws === "capinfo" || (msg.ws === "clip" && msg.mode !== "screen"))) return;
       if (msg.ws === "layout") reply({ count: chartCount() });
       if (msg.ws === "numbers") { showNumbers(+msg.n || 0); reply({ count: chartCount() }); }
       if (msg.ws === "symbol") { const q = parseTitle(); reply({ symbol: q ? q.sym : "" }); }
@@ -3400,7 +3444,7 @@
   // platform's embedded chart iframe). Other frames / pages of an enabled site are left untouched.
   // Advanced Charts (.chart-container) OR Lightweight Charts (.tv-lightweight-charts) — the wallpaper layer and
   // activation work for both; the candle recolour engine for each lives in hook.js / lw.js respectively.
-  const CHART_SEL = ".chart-markup-table, .chart-container, [data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight']";
+  const CHART_SEL = ".chart-markup-table, .chart-container, [data-bd-lwroot], .tv-lightweight-charts, [class*='lightweight'], [data-bd-tdvpane]";
   // a real chart: one at least 400 x 250, or several smaller ones that together fill that much (a 2- or 3-chart layout
   // on a small window). Mini charts (sparklines, a watchlist's tiny previews) are below 200 x 140 and don't count.
   const bigChart = () => { let area = 0;
@@ -3513,7 +3557,8 @@
   //    surfaces. Only colours, borders and corner radius: nothing moves, resizes or changes how it works.
   // One stylesheet, no observers; if TopstepX changes these parts, the rules simply stop matching.
   if (window === window.top && (/(^|\.)(topstepx|projectx)\.com$/.test(location.hostname) || document.documentElement.hasAttribute("data-tds-brand"))) (function topstepx() {
-    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look" };
+    const KEYS = { enabled: true, invite: null, pass: "", deviceId: "", panelMode: "off", panelColor: "#10131c", pnStyle: "flat", pnRound: false, uiAccent: "", wallMatch: null, candleUp: "#00ffa3", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look", privacy: false, privacyAcct: true, tsxAcctLabel: "",
+      tsxAcctStyle: "own", tsxAcctFont: "default", tsxAcctFill: "glass", tsxAcctGlow: "soft", tsxAcctBadge: "filled" };
     let c = { ...KEYS }, st = null, tries = 0, pro = false;
     const hex = (h) => /^#[0-9a-f]{6}$/i.test(h || "") ? h : null;
     const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), toHex = (a) => "#" + a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
@@ -3626,19 +3671,24 @@
     // colour, an accent edge and glow, the mark / letters filled with your wallpaper's colours, and a slow light sweep
     // (off with reduced motion). Drawn once as an SVG (crisp at any zoom), redrawn only when the look changes.
     let logoEl = null, logoDiv = null, logoSig = "";
-    function renderLogo() {
-      const H = document.documentElement, mode = c.tsxLogo === "look" || c.tsxLogo === "text" ? c.tsxLogo : "own";
-      const show = mode !== "own" && H.classList.contains("bd-tsx") && logoEl && logoEl.isConnected;
-      H.classList.toggle("bd-tsx-logo", !!show);
-      if (!show) { if (logoDiv) { logoDiv.remove(); logoDiv = null; logoSig = ""; } return; }
-      const r = logoEl.getBoundingClientRect(), W = Math.max(20, Math.round(r.width)), Hh = Math.max(16, Math.round(r.height));
-      // Logo colours: your look's (accent + wallpaper colours), a rainbow, or one colour you pick (in light-to-deep shades)
+    // Logo & account colours (one setting for both): your look's (accent + wallpaper colours), a rainbow, or one
+    // colour you pick (in light-to-deep shades)
+    function badgeColours() {
       const P = panel() || "#0b0d12", wall = (c.wallMatch && Array.isArray(c.wallMatch.colors) ? c.wallMatch.colors.map(hex).filter(Boolean) : []);
       const RAINBOW = ["#ff3b6b", "#ff9a3c", "#ffe14a", "#3dff9a", "#38d6ff", "#6f6bff", "#ff4ff0"];
       const pick = hex(c.tsxLogoColor), rainbow = c.tsxLogoColor === "rainbow";
       const A = rainbow ? "#9b6bff" : pick || accent();
       const stops = rainbow ? RAINBOW : pick ? [mix(pick, "#ffffff", 0.6), pick, mix(pick, "#000000", 0.35)]
         : [mix(A, "#ffffff", 0.55), A, wall.find((x) => x.toLowerCase() !== A.toLowerCase()) || mix(A, "#000000", 0.25)];
+      return { P, A, stops, rainbow };
+    }
+    function renderLogo() {
+      const H = document.documentElement, mode = c.tsxLogo === "look" || c.tsxLogo === "text" ? c.tsxLogo : "own";
+      const show = mode !== "own" && H.classList.contains("bd-tsx") && logoEl && logoEl.isConnected;
+      H.classList.toggle("bd-tsx-logo", !!show);
+      if (!show) { if (logoDiv) { logoDiv.remove(); logoDiv = null; logoSig = ""; } return; }
+      const r = logoEl.getBoundingClientRect(), W = Math.max(20, Math.round(r.width)), Hh = Math.max(16, Math.round(r.height));
+      const { P, A, stops, rainbow } = badgeColours();
       const name = mode === "text" ? String(c.tsxLogoText || "").trim().slice(0, 24) : "";
       const sig = [mode, name, W, Hh, A, P, stops.join(""), c.tsxLogoColor].join("|");
       if (!logoDiv) { logoDiv = document.createElement("div"); logoDiv.id = "bd-tsx-logo"; logoDiv.setAttribute("aria-hidden", "true"); document.documentElement.appendChild(logoDiv); }
@@ -3712,11 +3762,125 @@
     };
     const plan = async () => { const P = window.PriismPass; let info = null; try { info = P ? await P.verify(c.pass, c.deviceId) : null; } catch {}
       pro = P ? P.planOf(info, c.invite) === "pro" : !!(c.invite && c.invite.ok); };
+    // ---------- the account box (TopstepX's account picker, top left) ----------
+    // Visual only, local and reversible: nothing about the account is changed, read out or sent, and clicking the box
+    // still opens TopstepX's own account list. What it shows comes from TopstepX's own box (PriismAcct.read):
+    //  - the real account type, always (Practice, Combine, Express Funded, Live Funded…), in a fixed colour per type
+    //    that your colours can't change, so a practice account can never look live or funded
+    //  - its size and number as TopstepX shows them (the number masked in Streamer mode)
+    //  - your nickname, if you set one (PriismAcct.nickname: never numbers, money or account words)
+    // Account box › Custom (with Panels on) restyles it: font, fill (glass / gradient / solid), glow, badge style, in
+    // Logo & account colours. Streamer mode › Blur account panel masks the number, blurs the balances next to it and
+    // the numbers in its account list (readable under your mouse, so you can still pick one).
+    // If the type can't be read for certain, nothing is restyled; in Streamer mode the box is then blurred instead.
+    const ACCT_HINT = /\b(practice|combine|express|funded|live|xfa|lfa|eval|evaluation)\b|\(\s*(…|\.\.\.)\s*\d{2,}\s*\)/i;
+    const MONEY_RE = /[-+]?\$\s*[-+]?[\d,]+(\.\d+)?|^[-+]?[\d,]+\.\d{2}$/;
+    const AC = () => window.PriismAcct;
+    let acctT = 0, acctCss = null, acctBox = null;
+    const leaf = (el, re) => ![...el.children].some((k) => re.test(k.textContent || ""));
+    const topBar = () => document.querySelector('[data-testid="navbar-container"], [data-bd-tsx="top"]');
+    function findAcct() {     // the smallest box in the top bar with the account in it, or the picker it sits in
+      const top = topBar(); if (!top) return null;
+      if (acctBox && acctBox.isConnected && top.contains(acctBox)) return acctBox;
+      for (const el of top.querySelectorAll("*")) {
+        if (el.closest("#bd-tsx-logo, .bd-acct") || el.children.length > 3) continue;
+        const t = (el.textContent || "").trim(); if (!t || t.length > 80 || !ACCT_HINT.test(t) || !leaf(el, ACCT_HINT)) continue;
+        const box = el.closest('[data-bd-tsx="field"], [role="button"], [role="combobox"], button') || el;
+        if (top.contains(box)) { box.setAttribute("data-bd-tsx-acct", ""); return (acctBox = box); }
+      }
+      return null;
+    }
+    function markMoney() {    // Streamer mode: the balances in the top bar and the numbers in an open account list
+      const top = topBar();
+      if (top) for (const el of top.querySelectorAll("*")) { if (el.closest(".bd-acct, [data-bd-tsx-acct]") || el.children.length > 3 || el.hasAttribute("data-bd-tsx-money")) continue;
+        const t = (el.textContent || "").trim(); if (t && t.length <= 40 && MONEY_RE.test(t) && leaf(el, MONEY_RE)) el.setAttribute("data-bd-tsx-money", ""); }
+      for (const menu of document.querySelectorAll('[role="menu"], [role="listbox"], .MuiPopover-paper, .MuiMenu-paper, .MuiAutocomplete-popper'))
+        for (const el of menu.querySelectorAll("*")) { const t = (el.textContent || "").trim();
+          if (t && t.length <= 80 && /\d/.test(t) && (ACCT_HINT.test(t) || MONEY_RE.test(t)) && leaf(el, /\d/)) el.setAttribute("data-bd-tsx-acctitem", ""); }
+    }
+    const esc = (t) => String(t).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m]);
+    const EYE = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M3 3l18 18"/></svg>`;
+    function renderAcct() {
+      const H = document.documentElement, A0 = AC();
+      const custom = !!(A0 && c.enabled && pro && c.tsxAcctStyle === "custom" && H.classList.contains("bd-tsx"));
+      const priv = !!(c.enabled && pro && c.privacy && c.privacyAcct !== false);
+      H.classList.toggle("bd-tsx-priv", priv);
+      const box = (custom || priv) ? findAcct() : null;
+      // TopstepX's own text only (never our line inside the box, or it would read itself back)
+      const own = box ? [...box.childNodes].filter((n) => !(n.classList && n.classList.contains("bd-acct"))).map((n) => n.textContent).join("") : "";
+      const info = box && A0 ? A0.read(own) : null;
+      const show = !!(box && info);
+      H.classList.toggle("bd-tsx-acct-on", show); H.classList.toggle("bd-tsx-acct-blur", !!(box && priv && !info));
+      if (!show) { document.querySelectorAll(".bd-acct").forEach((e) => e.remove()); return; }
+      let ov = box.querySelector(":scope > .bd-acct");
+      if (!ov) { ov = document.createElement("span"); ov.className = "bd-acct"; ov.setAttribute("aria-hidden", "true"); box.appendChild(ov); }
+      const nick = A0.nickname(c.tsxAcctLabel), num = info.number ? (priv ? "\u2022\u2022\u2022\u2022" : "\u2026" + info.number) : "";
+      const html = `<b class="t">${esc(info.type)}</b>${info.size ? `<i class="s">${esc(info.size)}</i>` : ""}${nick ? `<em class="n">${esc(nick)}</em>` : ""}` +
+        (num || priv ? `<i class="u">${priv ? EYE : ""}${num ? `<span class="d">${num}</span>` : ""}</i>` : "");
+      const sig = [custom, priv, html, c.tsxAcctFont, c.tsxAcctFill, c.tsxAcctGlow, c.tsxAcctBadge, c.tsxLogoColor, c.panelMode, c.panelColor, c.uiAccent, JSON.stringify(c.wallMatch && c.wallMatch.colors), box.clientTop, box.clientLeft].join("|");
+      if (ov.dataset.sig === sig) return; ov.dataset.sig = sig; ov.innerHTML = html;
+      ov.classList.toggle("bd-acct-x", custom);
+      // the type badge: its own fixed colour (never yours), filled or outlined
+      const T = info.color, outline = custom && c.tsxAcctBadge === "outline";
+      let st = `--bd-acct-type:${T};--bd-acct-type-bg:${outline ? "transparent" : T};--bd-acct-type-fg:${outline ? T : "#0b0d12"};`;
+      if (custom) {
+        const { P, A, stops, rainbow } = badgeColours(), g = c.tsxAcctGlow === "strong" ? 1 : c.tsxAcctGlow === "off" ? 0 : 0.55;
+        const fill = c.tsxAcctFill === "solid" ? mix(P, A, 0.12) : c.tsxAcctFill === "gradient" ? `linear-gradient(100deg,${mix(P, stops[0], 0.28)},${mix(P, stops[stops.length - 1], 0.4)})` : rgba(mix(P, "#000000", 0.2), 0.62);
+        const font = c.tsxAcctFont === "mono" ? 'ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace' : c.tsxAcctFont === "display" ? 'ui-sans-serif,"Inter","Segoe UI",system-ui,sans-serif' : "inherit";
+        st += `--bd-acct-fill:${fill};--bd-acct-edge:${rgba(A, 0.25 + 0.35 * g)};--bd-acct-glow:${g ? `0 0 ${Math.round(6 + 14 * g)}px -2px ${rgba(A, 0.35 + 0.45 * g)}` : "none"};` +
+          `--bd-acct-name:${rainbow || c.tsxAcctFill === "gradient" ? `linear-gradient(90deg,${stops.join(",")})` : `linear-gradient(90deg,${mix(A, "#ffffff", 0.55)},${mix(A, "#ffffff", 0.3)})`};` +
+          `--bd-acct-tshadow:${g ? `0 0 ${Math.round(4 + 8 * g)}px ${rgba(A, 0.5 * g)}` : "none"};--bd-acct-font:${font};--bd-acct-weight:${c.tsxAcctFont === "display" ? 800 : 700};--bd-acct-track:${c.tsxAcctFont === "display" ? ".04em" : ".01em"};` +
+          `--bd-acct-blur:${c.tsxAcctFill === "glass" ? "blur(8px) saturate(1.2)" : "none"};`;
+      }
+      ov.style.cssText = st + `inset:-${box.clientTop}px -${box.clientLeft}px`;   // over the box's own border too
+      // the box keeps TopstepX's size, so when it's too narrow: drop the size, then the number, then use TopstepX's own
+      // short name for a long type (XFA, LFA); your nickname is shortened last (…). The type is never dropped.
+      ov.classList.remove("bd-acct-nosize", "bd-acct-nonum");
+      const tb = ov.querySelector(".t"), nk = ov.querySelector(".n"), fits = () => ov.scrollWidth <= ov.clientWidth + 1;
+      if (nk) nk.style.flex = "none";                      // measure with the nickname at its full width…
+      for (const step of ["bd-acct-nosize", "bd-acct-nonum", "short"]) {
+        if (fits()) break;
+        if (step === "short") { if (info.short !== info.type) tb.textContent = info.short; } else ov.classList.add(step);
+      }
+      if (nk) nk.style.flex = "";                          // …and shorten it (…) only if it still doesn't fit
+    }
+    function applyAcct() {
+      clearInterval(acctT); acctT = 0;
+      if (!acctCss) { acctCss = document.createElement("style"); acctCss.id = "bd-tsx-acct-css"; (document.head || document.documentElement).appendChild(acctCss); }
+      acctCss.textContent =
+        // the box's own text is hidden (still there, still clickable); our line sits on top of it, the same size
+        `html.bd-tsx-acct-on [data-bd-tsx-acct]{position:relative!important}` +
+        `html.bd-tsx-acct-on [data-bd-tsx-acct],html.bd-tsx-acct-on [data-bd-tsx-acct] *:not(.bd-acct):not(.bd-acct *){color:transparent!important;text-shadow:none!important}` +
+        `html.bd-tsx-acct-on [data-bd-tsx-acct] svg:not(.bd-acct svg) *{fill:transparent!important;stroke:transparent!important}` +
+        `.bd-acct{position:absolute;inset:0;z-index:1;display:flex;align-items:center;gap:6px;padding:0 8px;box-sizing:border-box;overflow:hidden;white-space:nowrap;pointer-events:none;` +
+          `border-radius:inherit;color:#e6e8ef;font:600 11.5px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.01em}` +
+        `.bd-acct .t{flex:none;padding:2px 6px;border-radius:999px;border:1px solid var(--bd-acct-type);background:var(--bd-acct-type-bg);color:var(--bd-acct-type-fg);` +
+          `font:800 9.5px/1.25 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.06em;text-transform:uppercase}` +
+        `.bd-acct .s{flex:none;font-style:normal;font-weight:700;color:#cfd3dd}` +
+        `.bd-acct .n{min-width:0;overflow:hidden;text-overflow:ellipsis;font-style:normal;font-weight:700}` +
+        `.bd-acct .u{flex:none;margin-left:auto;display:inline-flex;align-items:center;gap:3px;font-style:normal;color:#9aa0ad;font-variant-numeric:tabular-nums}` +
+        // (in Streamer mode the hidden eye stays, so viewers can tell the number is hidden)
+        `.bd-acct.bd-acct-nosize .s,.bd-acct.bd-acct-nonum .u .d,.bd-acct.bd-acct-nonum .u:not(:has(svg)){display:none}` +
+        // Custom: the box in your style
+        `.bd-acct.bd-acct-x{background:var(--bd-acct-fill);border:1px solid var(--bd-acct-edge);box-shadow:var(--bd-acct-glow);-webkit-backdrop-filter:var(--bd-acct-blur);backdrop-filter:var(--bd-acct-blur);` +
+          `font-family:var(--bd-acct-font);font-weight:var(--bd-acct-weight);letter-spacing:var(--bd-acct-track)}` +
+        `.bd-acct.bd-acct-x .n{background:var(--bd-acct-name);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(var(--bd-acct-tshadow))}` +
+        `.bd-acct.bd-acct-x .t{box-shadow:0 0 8px -2px var(--bd-acct-type)}` +
+        // Streamer mode: balances blurred; the account list's numbers blurred except the one under your mouse; a box
+        // whose type couldn't be read is blurred whole
+        `html.bd-tsx-priv [data-bd-tsx-money]{filter:blur(6px)!important}` +
+        `html.bd-tsx-priv [data-bd-tsx-acctitem]{filter:blur(5px)!important;transition:filter .12s}html.bd-tsx-priv [data-bd-tsx-acctitem]:hover{filter:none!important}` +
+        `html.bd-tsx-acct-blur [data-bd-tsx-acct]{filter:blur(6px)!important}`;
+      const tick = () => { renderAcct(); if (document.documentElement.classList.contains("bd-tsx-priv")) markMoney(); };
+      tick();
+      if (c.enabled && pro && (c.tsxAcctStyle === "custom" || (c.privacy && c.privacyAcct !== false)))
+        acctT = setInterval(() => { if (!document.hidden) tick(); }, 1000);   // TopstepX redraws its bar as numbers change
+    }
     // TopstepX builds its screen after loading: look for its panels a few times (cheap), then stop
     const look = () => { if (apply() && ++tries < 30) setTimeout(look, 2000); };
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get(KEYS, async (s) => { c = { ...KEYS, ...s }; await plan(); look(); });
-      chrome.storage.onChanged.addListener(async (ch, area) => { if (area !== "local") return; let hit = false; for (const k of Object.keys(ch)) if (k in KEYS) { c[k] = ch[k].newValue; hit = true; } if (!hit) return; if (ch.pass || ch.invite || ch.deviceId) await plan(); apply(); });
+      chrome.storage.local.get(KEYS, async (s) => { c = { ...KEYS, ...s }; await plan(); look(); applyAcct(); });
+      chrome.storage.onChanged.addListener(async (ch, area) => { if (area !== "local") return; let hit = false; for (const k of Object.keys(ch)) if (k in KEYS) { c[k] = ch[k].newValue; hit = true; } if (!hit) return; if (ch.pass || ch.invite || ch.deviceId) await plan(); apply(); applyAcct(); });
     }
   })();
 })();

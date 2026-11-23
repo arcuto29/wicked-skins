@@ -317,9 +317,16 @@
         <div class="row"><span>Panels</span><div class="seg" id="panelMode"></div><input type="color" id="panelColor" title="Panel colour" hidden /></div>
         <p class="hint">The watchlist, toolbars and side panels. Skin tints them with your wallpaper's colour.</p>
         <div class="row"><span>TopstepX logo</span><div class="seg" id="tsxLogo"></div></div>
-        <div class="row" id="tsxLogoColRow" hidden><span>Logo colours</span><div class="seg" id="tsxLogoColor"></div><input type="color" id="tsxLogoPick" title="Logo colour" value="#7c6cff" hidden /></div>
+        <div class="row" id="tsxLogoColRow" hidden><span>Logo &amp; account colours</span><div class="seg" id="tsxLogoColor"></div><input type="color" id="tsxLogoPick" title="Logo colour" value="#7c6cff" hidden /></div>
         <div class="row" id="tsxLogoTextRow" hidden><span>Your name</span><input type="text" id="tsxLogoText" class="field" maxlength="24" placeholder="Anything, e.g. PRIISM or your handle" /></div>
         <p class="hint">On TopstepX, the logo at the top left: TopstepX's own, the Priism mark or your own name, glowing with a light that circles it: in your look's colours, a rainbow, or a colour you pick. Needs Panels on.</p>
+        <div class="row"><span>TopstepX account box</span><div class="seg" id="tsxAcctStyle"></div></div>
+        <div class="row" id="tsxAcctRow"><span>Nickname</span><input type="text" id="tsxAcctLabel" class="field" maxlength="18" placeholder="Your name or handle" /></div>
+        <div class="row tsx-acct-x" hidden><span>Font</span><div class="seg" id="tsxAcctFont"></div></div>
+        <div class="row tsx-acct-x" hidden><span>Fill</span><div class="seg" id="tsxAcctFill"></div></div>
+        <div class="row tsx-acct-x" hidden><span>Glow</span><div class="seg" id="tsxAcctGlow"></div></div>
+        <div class="row tsx-acct-x" hidden><span>Type badge</span><div class="seg" id="tsxAcctBadge"></div></div>
+        <p class="hint" id="tsxAcctHint">On TopstepX, the account box at the top left: your nickname and style. The account type badge (Practice, Combine, Express Funded, Live Funded) always shows and comes from TopstepX, in its own colour. Visual only: nothing about your account changes. Custom needs Panels on.</p>
         <div class="row" data-tvonly><span>Panel style</span><div class="seg wrap" id="pnStyle"></div></div>
         <div class="row" data-tvonly><span>Corners</span><div class="seg" id="pnRound"></div></div>
         <div class="row" data-tvonly><span>Also on</span><div class="seg" id="pnWindows"></div></div>
@@ -462,7 +469,8 @@
         <p class="hint">Hides your money on screen and in clips while you stream or record. You choose what viewers see.</p>
         <div class="row"><span>P&amp;L on your trades</span><div class="seg" id="privacyPnl"></div></div>
         <p class="hint" id="privacyPnlHint"></p>
-        <div class="row"><span style="flex:1;white-space:nowrap">Blur account panel</span><label class="switch" title="Balance, positions and history at the bottom"><input type="checkbox" id="privacyAcct" /><span></span></label></div>
+        <div class="row"><span style="flex:1;white-space:nowrap">Blur account panel</span><label class="switch" title="Balance, positions and history at the bottom. On TopstepX: the account number and the balances at the top"><input type="checkbox" id="privacyAcct" /><span></span></label></div>
+        <p class="hint">On TopstepX: the account number is masked and the balances are blurred (the account type stays visible).</p>
         <div class="row"><span style="flex:1;white-space:nowrap">Blur order panel</span><label class="switch" title="The Buy / Sell panel on the right. Off = you can still see and use it"><input type="checkbox" id="privacyOrder" /><span></span></label></div>
         <div class="row"><span>Blurred panels under your mouse</span><div class="seg" id="privacyPeek"></div></div>
       </details>
@@ -624,6 +632,7 @@
   <script src="../src/workshop-config.js"></script>
   <script src="../src/invite.js"></script>
   <script src="../src/pass.js"></script>
+  <script src="../src/acct.js"></script>
   <script src="../src/workshop.js"></script>
   <script src="../src/sites.js"></script>
   <script src="../src/version.js"></script>

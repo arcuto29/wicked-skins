@@ -1,7 +1,7 @@
 /* Background service worker:
    - keeps per-site registrations (sites.js) in sync with the permissions you've granted
    - upgrades saved settings after any update (migrate.js) so they keep working */
-importScripts("sites.js", "migrate.js", "workshop-config.js", "invite.js");
+importScripts("sites.js", "migrate.js", "workshop-config.js", "pass.js", "invite.js");
 // Invite only: re-check the saved invite code now and then (at most once a day), so a revoked code locks this copy.
 const inviteCheck = () => { try { PriismInvite.recheck(false); } catch {} };
 inviteCheck(); setInterval(inviteCheck, 6 * 3600e3);
@@ -35,7 +35,7 @@ async function refreshOpenTabs() {
       if (probe.some((r) => r.result)) continue;
       await chrome.scripting.executeScript({ target, world: "MAIN", files: ["src/candlelooks.js", "src/hook.js", "src/lw.js"] });
       await chrome.scripting.insertCSS({ target, files: ["src/content.css"] });
-      await chrome.scripting.executeScript({ target, files: ["src/skins.js", "src/sounds.js", "src/pass.js", "src/content.js"] });
+      await chrome.scripting.executeScript({ target, files: ["src/skins.js", "src/sounds.js", "src/pass.js", "src/acct.js", "src/content.js"] });
     } catch {}   // a tab we can't reach (error page, permission removed) just keeps its old copy until refreshed
   }
 }

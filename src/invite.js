@@ -34,7 +34,10 @@
   // answers with a signed pass; until it's deployed, invites are checked the old way (no pass).
   async function ask(code, action) {
     const key = String(code || "").trim().slice(0, 64), dev = await deviceId();
-    const r = await post("/functions/v1/licence", { key, device: dev, app: app(), action: action || "check" });
+    // only once the licence function is deployed (src/pass.js LICENCE_LIVE): asking a function that isn't there fails
+    // Chrome's cross-origin check and shows an error in chrome://extensions on every check
+    const live = !!(root.PriismPass && root.PriismPass.LICENCE_LIVE);
+    const r = live ? await post("/functions/v1/licence", { key, device: dev, app: app(), action: action || "check" }) : { http: 404 };
     if (r && r.http === 200 && r.body && typeof r.body.status === "string") return r.body;
     if (r && r.http !== 404) return { status: "offline" };
     if (action === "release") return { status: "ok" };

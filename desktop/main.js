@@ -53,7 +53,7 @@ async function inject(wc) {
   await wc.insertCSS(read("content.css"));
   await wc.executeJavaScript(
     `window.__BD_CFG = ${JSON.stringify(cfg)}; window.__BD_CHANNEL = ${JSON.stringify(/-beta/i.test(app.getVersion()) ? "beta" : "stable")};\n` +
-    `if (window.__bdUpdate) { window.__bdUpdate(window.__BD_CFG); } else {\n${read("skins.js")}\n${read("sounds.js")}\n${read("pass.js")}\n${read("content.js")}\n}`
+    `if (window.__bdUpdate) { window.__bdUpdate(window.__BD_CFG); } else {\n${read("skins.js")}\n${read("sounds.js")}\n${read("pass.js")}\n${read("acct.js")}\n${read("content.js")}\n}`
   );
 }
 
