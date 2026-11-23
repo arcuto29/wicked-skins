@@ -1,0 +1,590 @@
+{
+ "setup: Priism is on the chart, the recorder under its hook": {
+  "pass": true,
+  "detail": null
+ },
+ "setup: 4 indicators, 5 drawings and a take-profit / stop-loss on the chart": {
+  "pass": true,
+  "detail": {
+   "px": 342.7,
+   "ids": {
+    "ma": "xKUAYD",
+    "bb": "obfmtk",
+    "rsi": "Osqrvc",
+    "macd": "sNvE51",
+    "trend": "gVgAHF",
+    "hline": "IdzA7U",
+    "rect": "oJGv8u",
+    "fib": "bg0xQl",
+    "text": "N6QLZz"
+   },
+   "nat": {
+    "ma": [
+     "#2196f3",
+     "#2962ff"
+    ],
+    "bb": [
+     "#ff6d00",
+     "#2196f3",
+     "#2196f3"
+    ],
+    "rsi": [
+     "#7e57c2",
+     "#2962ff"
+    ],
+    "macd": [
+     "#ff5252",
+     "#2196f3",
+     "#ff6d00"
+    ],
+    "trend": [
+     "#00bcd4"
+    ],
+    "hline": [
+     "#e91e63"
+    ],
+    "rect": [
+     "#ffeb3b"
+    ],
+    "text": [
+     "#4caf50"
+    ],
+    "fib": []
+   }
+  }
+ },
+ "blackwhite: Auto-match on, your candles stay yours (#3fa9f5 / #f5a623), take-profit / stop-loss and P&L stay your up / down": {
+  "pass": true,
+  "detail": {
+   "candleUp": "#3fa9f5",
+   "candleDown": "#f5a623",
+   "bracketProfit": "#3fa9f5",
+   "bracketLoss": "#f5a623",
+   "indMode": "wallpaper",
+   "bg": "dark"
+  }
+ },
+ "blackwhite: no indicator or drawing keeps its own (non up/down) colour on the chart": {
+  "pass": true,
+  "detail": {
+   "left": [],
+   "natives": [
+    "#2196f3",
+    "#2962ff",
+    "#ff6d00",
+    "#7e57c2",
+    "#00bcd4",
+    "#e91e63",
+    "#ffeb3b"
+   ]
+  }
+ },
+ "blackwhite (dark): every indicator / drawing colour stands out from it (contrast 3:1 or more; 5 measured)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#eeff6b",
+    "bb": "#eeff6b",
+    "rsi": "#787b86",
+    "trend": "#bfd1ed",
+    "rect": "#ff6b8b"
+   },
+   "contrast": {
+    "ma": 17,
+    "bb": 17,
+    "rsi": 4.4,
+    "trend": 12,
+    "rect": 6.9
+   }
+  }
+ },
+ "blackwhite: text on the chart (your label, the legend) in a readable tint (#e4e9f1)": {
+  "pass": true,
+  "detail": {
+   "txtColor": "#e4e9f1",
+   "lum": 0.91
+  }
+ },
+ "blackwhite: elements with different colours of their own stay told apart (closest pair rsi/rect: 136)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#eeff6b",
+    "bb": "#eeff6b",
+    "rsi": "#787b86",
+    "trend": "#bfd1ed",
+    "rect": "#ff6b8b"
+   },
+   "own": {
+    "ma": "#2196f3",
+    "bb": "#2196f3",
+    "rsi": "#787b86",
+    "trend": "#00bcd4",
+    "rect": "#ffeb3b"
+   }
+  }
+ },
+ "blackwhite: none of them looks like a candle (distance to your candle colours 115)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#eeff6b",
+    "bb": "#eeff6b",
+    "rsi": "#787b86",
+    "trend": "#bfd1ed",
+    "rect": "#ff6b8b"
+   }
+  }
+ },
+ "blackwhite: MACD's histogram still reads up / down (its own green / red, or your candle colours)": {
+  "pass": true,
+  "detail": {
+   "macd": [
+    "#eeff6b",
+    "#bfc0ed",
+    "#ff5252",
+    "#fccbcd"
+   ]
+  }
+ },
+ "blackwhite: Auto-match off puts every setting back as it was": {
+  "pass": true,
+  "detail": {
+   "keys": [],
+   "diff": {}
+  }
+ },
+ "blackwhite: ...and the indicators and drawings in their own colours again": {
+  "pass": true,
+  "detail": {
+   "missing": []
+  }
+ },
+ "colourful: Auto-match on, your candles stay yours (#3fa9f5 / #f5a623), take-profit / stop-loss and P&L stay your up / down": {
+  "pass": true,
+  "detail": {
+   "candleUp": "#3fa9f5",
+   "candleDown": "#f5a623",
+   "bracketProfit": "#3fa9f5",
+   "bracketLoss": "#f5a623",
+   "indMode": "wallpaper",
+   "bg": "dark"
+  }
+ },
+ "colourful: no indicator or drawing keeps its own (non up/down) colour on the chart": {
+  "pass": true,
+  "detail": {
+   "left": [],
+   "natives": [
+    "#2196f3",
+    "#2962ff",
+    "#ff6d00",
+    "#7e57c2",
+    "#00bcd4",
+    "#e91e63",
+    "#ffeb3b"
+   ]
+  }
+ },
+ "colourful (dark): every indicator / drawing colour stands out from it (contrast 3:1 or more; 5 measured)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#00fffa",
+    "bb": "#00fffa",
+    "rsi": "#787b86",
+    "trend": "#ff4db6",
+    "rect": "#9666ff"
+   },
+   "contrast": {
+    "ma": 14.8,
+    "bb": 14.8,
+    "rsi": 4.4,
+    "trend": 6.2,
+    "rect": 5
+   }
+  }
+ },
+ "colourful: text on the chart (your label, the legend) in a readable tint (#ff80cb)": {
+  "pass": true,
+  "detail": {
+   "txtColor": "#ff80cb",
+   "lum": 0.63
+  }
+ },
+ "colourful: elements with different colours of their own stay told apart (closest pair rsi/rect: 126)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#00fffa",
+    "bb": "#00fffa",
+    "rsi": "#787b86",
+    "trend": "#ff4db6",
+    "rect": "#9666ff"
+   },
+   "own": {
+    "ma": "#2196f3",
+    "bb": "#2196f3",
+    "rsi": "#787b86",
+    "trend": "#00bcd4",
+    "rect": "#ffeb3b"
+   }
+  }
+ },
+ "colourful: none of them looks like a candle (distance to your candle colours 107)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#00fffa",
+    "bb": "#00fffa",
+    "rsi": "#787b86",
+    "trend": "#ff4db6",
+    "rect": "#9666ff"
+   }
+  }
+ },
+ "colourful: MACD's histogram still reads up / down (its own green / red, or your candle colours)": {
+  "pass": true,
+  "detail": {
+   "macd": [
+    "#00fffa",
+    "#ff4d75",
+    "#ff5252",
+    "#fccbcd"
+   ]
+  }
+ },
+ "colourful: Auto-match off puts every setting back as it was": {
+  "pass": true,
+  "detail": {
+   "keys": [],
+   "diff": {}
+  }
+ },
+ "colourful: ...and the indicators and drawings in their own colours again": {
+  "pass": true,
+  "detail": {
+   "missing": []
+  }
+ },
+ "bright: Auto-match on, your candles stay yours (#3fa9f5 / #f5a623), take-profit / stop-loss and P&L stay your up / down": {
+  "pass": true,
+  "detail": {
+   "candleUp": "#3fa9f5",
+   "candleDown": "#f5a623",
+   "bracketProfit": "#3fa9f5",
+   "bracketLoss": "#f5a623",
+   "indMode": "wallpaper",
+   "bg": "light"
+  }
+ },
+ "bright: no indicator or drawing keeps its own (non up/down) colour on the chart": {
+  "pass": true,
+  "detail": {
+   "left": [],
+   "natives": [
+    "#2196f3",
+    "#2962ff",
+    "#ff6d00",
+    "#7e57c2",
+    "#00bcd4",
+    "#e91e63",
+    "#ffeb3b"
+   ]
+  }
+ },
+ "bright (light): every indicator / drawing colour stands out from it (contrast 3:1 or more; 5 measured)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#094fc3",
+    "bb": "#094fc3",
+    "rsi": "#787b86",
+    "trend": "#893b00",
+    "rect": "#f309d0"
+   },
+   "contrast": {
+    "ma": 6.3,
+    "bb": 6.3,
+    "rsi": 3.7,
+    "trend": 6.8,
+    "rect": 3.2
+   }
+  }
+ },
+ "bright: text on the chart (your label, the legend) in a readable tint (#61422b)": {
+  "pass": true,
+  "detail": {
+   "txtColor": "#61422b",
+   "lum": 0.28
+  }
+ },
+ "bright: elements with different colours of their own stay told apart (closest pair ma/rsi: 134)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#094fc3",
+    "bb": "#094fc3",
+    "rsi": "#787b86",
+    "trend": "#893b00",
+    "rect": "#f309d0"
+   },
+   "own": {
+    "ma": "#2196f3",
+    "bb": "#2196f3",
+    "rsi": "#787b86",
+    "trend": "#00bcd4",
+    "rect": "#ffeb3b"
+   }
+  }
+ },
+ "bright: none of them looks like a candle (distance to your candle colours 116)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#094fc3",
+    "bb": "#094fc3",
+    "rsi": "#787b86",
+    "trend": "#893b00",
+    "rect": "#f309d0"
+   }
+  }
+ },
+ "bright: MACD's histogram still reads up / down (its own green / red, or your candle colours)": {
+  "pass": true,
+  "detail": {
+   "macd": [
+    "#094fc3",
+    "#564400",
+    "#ff5252",
+    "#fccbcd"
+   ]
+  }
+ },
+ "bright: Auto-match off puts every setting back as it was": {
+  "pass": true,
+  "detail": {
+   "keys": [],
+   "diff": {}
+  }
+ },
+ "bright: ...and the indicators and drawings in their own colours again": {
+  "pass": true,
+  "detail": {
+   "missing": []
+  }
+ },
+ "dark: Auto-match on, your candles stay yours (#3fa9f5 / #f5a623), take-profit / stop-loss and P&L stay your up / down": {
+  "pass": true,
+  "detail": {
+   "candleUp": "#3fa9f5",
+   "candleDown": "#f5a623",
+   "bracketProfit": "#3fa9f5",
+   "bracketLoss": "#f5a623",
+   "indMode": "wallpaper",
+   "bg": "dark"
+  }
+ },
+ "dark: no indicator or drawing keeps its own (non up/down) colour on the chart": {
+  "pass": true,
+  "detail": {
+   "left": [],
+   "natives": [
+    "#2196f3",
+    "#2962ff",
+    "#ff6d00",
+    "#7e57c2",
+    "#00bcd4",
+    "#e91e63",
+    "#ffeb3b"
+   ]
+  }
+ },
+ "dark (dark): every indicator / drawing colour stands out from it (contrast 3:1 or more; 5 measured)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#ff7200",
+    "bb": "#ff7200",
+    "rsi": "#787b86",
+    "trend": "#33ff99",
+    "rect": "#7766ff"
+   },
+   "contrast": {
+    "ma": 6.8,
+    "bb": 6.8,
+    "rsi": 4.4,
+    "trend": 14.1,
+    "rect": 4.6
+   }
+  }
+ },
+ "dark: text on the chart (your label, the legend) in a readable tint (#a094ff)": {
+  "pass": true,
+  "detail": {
+   "txtColor": "#a094ff",
+   "lum": 0.62
+  }
+ },
+ "dark: elements with different colours of their own stay told apart (closest pair rsi/rect: 123)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#ff7200",
+    "bb": "#ff7200",
+    "rsi": "#787b86",
+    "trend": "#33ff99",
+    "rect": "#7766ff"
+   },
+   "own": {
+    "ma": "#2196f3",
+    "bb": "#2196f3",
+    "rsi": "#787b86",
+    "trend": "#00bcd4",
+    "rect": "#ffeb3b"
+   }
+  }
+ },
+ "dark: none of them looks like a candle (distance to your candle colours 63)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#ff7200",
+    "bb": "#ff7200",
+    "rsi": "#787b86",
+    "trend": "#33ff99",
+    "rect": "#7766ff"
+   }
+  }
+ },
+ "dark: MACD's histogram still reads up / down (its own green / red, or your candle colours)": {
+  "pass": true,
+  "detail": {
+   "macd": [
+    "#ff7200",
+    "#33ffe4",
+    "#ff5252",
+    "#fccbcd"
+   ]
+  }
+ },
+ "dark: Auto-match off puts every setting back as it was": {
+  "pass": true,
+  "detail": {
+   "keys": [],
+   "diff": {}
+  }
+ },
+ "dark: ...and the indicators and drawings in their own colours again": {
+  "pass": true,
+  "detail": {
+   "missing": []
+  }
+ },
+ "animated: Auto-match on, your candles stay yours (#3fa9f5 / #f5a623), take-profit / stop-loss and P&L stay your up / down": {
+  "pass": true,
+  "detail": {
+   "candleUp": "#3fa9f5",
+   "candleDown": "#f5a623",
+   "bracketProfit": "#3fa9f5",
+   "bracketLoss": "#f5a623",
+   "indMode": "wallpaper",
+   "bg": "dark"
+  }
+ },
+ "animated: no indicator or drawing keeps its own (non up/down) colour on the chart": {
+  "pass": true,
+  "detail": {
+   "left": [],
+   "natives": [
+    "#2196f3",
+    "#2962ff",
+    "#ff6d00",
+    "#7e57c2",
+    "#00bcd4",
+    "#e91e63",
+    "#ffeb3b"
+   ]
+  }
+ },
+ "animated (dark): every indicator / drawing colour stands out from it (contrast 3:1 or more; 4 measured)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#fd6b02",
+    "bb": "#fd6b02",
+    "rsi": "#787b86",
+    "rect": "#7467fe"
+   },
+   "contrast": {
+    "ma": 6.5,
+    "bb": 6.5,
+    "rsi": 4.4,
+    "rect": 4.5
+   }
+  }
+ },
+ "animated: text on the chart (your label, the legend) in a readable tint (#80f0ff)": {
+  "pass": true,
+  "detail": {
+   "txtColor": "#80f0ff",
+   "lum": 0.85
+  }
+ },
+ "animated: elements with different colours of their own stay told apart (closest pair rsi/rect: 122)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#fd6b02",
+    "bb": "#fd6b02",
+    "rsi": "#787b86",
+    "rect": "#7467fe"
+   },
+   "own": {
+    "ma": "#2196f3",
+    "bb": "#2196f3",
+    "rsi": "#787b86",
+    "rect": "#ffeb3b"
+   }
+  }
+ },
+ "animated: none of them looks like a candle (distance to your candle colours 68)": {
+  "pass": true,
+  "detail": {
+   "main": {
+    "ma": "#fd6b02",
+    "bb": "#fd6b02",
+    "rsi": "#787b86",
+    "rect": "#7467fe"
+   }
+  }
+ },
+ "animated: MACD's histogram still reads up / down (its own green / red, or your candle colours)": {
+  "pass": true,
+  "detail": {
+   "macd": [
+    "#fd6b02",
+    "#0d89ff",
+    "#ff5252",
+    "#fccbcd"
+   ]
+  }
+ },
+ "animated: Auto-match off puts every setting back as it was": {
+  "pass": true,
+  "detail": {
+   "keys": [],
+   "diff": {}
+  }
+ },
+ "animated: ...and the indicators and drawings in their own colours again": {
+  "pass": true,
+  "detail": {
+   "missing": []
+  }
+ },
+ "no page errors": {
+  "pass": true,
+  "detail": []
+ }
+}
