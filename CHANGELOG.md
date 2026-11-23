@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: no duplicate uploads
+- **A wallpaper is stored only once.** Picking a file you already have (even under another name), or the same file
+  twice in one go, no longer adds a second copy: the one you have goes on the chart, and the panel says
+  "Already in your uploads". Files are recognised by their content (size and a fingerprint of the start, middle and
+  end), so different files with the same name are still both added. Uploads from before this update are recognised too.
+- **Workshop:** "Use" on a wallpaper you already downloaded puts your copy on the chart without downloading it again,
+  and a Workshop wallpaper you'd already uploaded yourself isn't added twice. A converted video keeps its Workshop link.
+
 ## Unreleased: Smart fit for your wallpapers
 - **New default, Fit: Smart.** Your picture or video is placed for the charts themselves, not the whole page under
   TradingView's toolbars and lists. Close to the charts' shape, it fills them like Cover. A phone wallpaper (9:16), a
