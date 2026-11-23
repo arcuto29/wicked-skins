@@ -24,7 +24,7 @@ const DEFAULTS = {
   barPatOn: false, barPattern: "zebra", barMode: "rainbow", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.25, barSize: 1, barWhere: "tlrb",
   wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, tsxAcctLabel: "", tsxAcctStyle: "own", tsxAcctFont: "default", tsxAcctFill: "glass", tsxAcctGlow: "soft", tsxAcctBadge: "filled", privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
-  symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
+  symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false, matchBefore: null,
   candleLook: "solid", candleClosedLook: "", shiftSpeed: 10,
   candleWick: "same", candleWickUp: "#9aa4b8", candleWickDown: "#9aa4b8", candleBorder: "none", candleBorderUp: "#ffffff", candleBorderDown: "#ffffff", candleBorderW: 1, candleHollow: "none", candleWickW: 0, candleBodyW: 1, candleFxCore: "off", candleFxEdge: "off", candleFxAmt: 0.65, atmoFx: "off", atmoTrail: false, atmoAura: false, atmoColor: "candle", atmoCustom: "#7df9ff", atmoOpacity: 0.15, atmoLen: 4, atmoFade: 450, zoneFx: [], smartDim: "off", vignetteAt: "screen", skinOpts: {}, myCandles: [], chartColors: "auto", chartStyle: {}, zoneShape: "square", zoneBorder: "line", zoneStyle: "flat",
   indMode: "own", indColor: "", indCustom: {}, markMode: "own", markColor: "#ffd166", drawOn: false, zoneFill: 0.12, zoneDim: false, indGrad: [], wallMatch: null, txtMode: "own", txtColor: "", txtOutline: 0, txtSize: 0,
@@ -75,7 +75,15 @@ function routeChartStyle(obj) {
   const all = { ...(cfg.chartStyle || {}) }; all[styleChart] = { ...(all[styleChart] || {}), ...mine };
   rest.chartStyle = all; return rest;
 }
-const set = (obj) => { obj = routeChartStyle(obj); Object.assign(cfg, obj); chrome.storage.local.set({ ...obj, lastPick: Date.now() }); };
+// profit / loss colours that were your candle colours follow them when you change the candles (they mean up / down)
+function followCandles(obj) {
+  for (const [ck, ks] of [["candleUp", ["bracketProfit", "pnlUp"]], ["candleDown", ["bracketLoss", "pnlDown"]]]) {
+    if (!(ck in obj) || obj[ck] === cfg[ck]) continue;
+    for (const k of ks) if (!(k in obj) && cfg[k] && cfg[k] === cfg[ck]) obj[k] = obj[ck];
+  }
+  return obj;
+}
+const set = (obj) => { obj = followCandles(routeChartStyle(obj)); Object.assign(cfg, obj); chrome.storage.local.set({ ...obj, lastPick: Date.now() }); };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -777,6 +785,10 @@ async function matchEverything(auto) {
   const lumHex = (x) => [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16) / 255).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
   const lift = (x) => { if (bright || !/^#[0-9a-f]{6}$/i.test(x || "")) return x; let f = 0, y = x; while (lumHex(y) < 0.42 && f < 0.7) { f += 0.05; y = mixHex(x, "#ffffff", f); } return y; };
   pal = { ...pal, up: lift(pal.up), down: lift(pal.down) };
+  // Your candle colours are the theme's foundation: kept as they are when you chose them, and everything else is
+  // matched to them. Only when you hadn't (candles off, or colours a previous match set) do they come from the wallpaper.
+  const ownCandles = !!cfg.candleOn && cfg.candlePreset !== "match" && /^#[0-9a-f]{6}$/i.test(cfg.candleUp || "") && /^#[0-9a-f]{6}$/i.test(cfg.candleDown || "");
+  const up = ownCandles ? cfg.candleUp : pal.up, down = ownCandles ? cfg.candleDown : pal.down;
   // text (price scale, legend, ticker) must read: on a dark / black wallpaper never darker than a light grey, on a
   // bright one never lighter than a deep tone. A black wallpaper's "colour" is near black, so it's lifted a long way.
   const toLum = (x, min, max) => { let y = x, f = 0; if (min) while (lumHex(y) < min && f < 1) { f += 0.04; y = mixHex(x, "#ffffff", Math.min(1, f)); }
@@ -787,36 +799,56 @@ async function matchEverything(auto) {
   if (run !== matchRun || pick !== String(cfg.skin) + "|" + String(cfg.mediaId || "")) return;
   const name = cfg.skin === "media" ? "your wallpaper" : (WickedSkins[cfg.skin] || {}).name || "your wallpaper";
   const colors = (Array.isArray(pal.colors) && pal.colors.length >= 2 ? pal.colors : [pal.up, pal.down, accent]).slice(0, 5);
-  applyWithUndo((() => { const all = {
+  const changes = (() => { const all = {
     enabled: true,
-    candleOn: true, candleUp: pal.up, candleDown: pal.down, candlePreset: "custom", lineGlow: Math.max(+cfg.lineGlow || 0, 0.25),
+    ...(ownCandles ? {} : { candleOn: true, candleUp: up, candleDown: down, candlePreset: "match" }), lineGlow: Math.max(+cfg.lineGlow || 0, 0.25),
     chOn: true, chColor: accent, chLabels: true, gridOn: true, gridColor: accent, gridAlpha: 0.18, gridStyle: cfg.gridOn ? cfg.gridStyle : "dotted",
     plOn: true, plColor: "candle", scaleText: light, scaleGlow: Math.max(+cfg.scaleGlow || 0, 0.2),
     sbOn: true, sbColor: soft,                                     // session breaks
     tkOn: true, tkColor: light, tkGlow: !bright,
-    bracketOn: true, bracketProfit: pal.up, bracketLoss: pal.down, bracketQty: soft, bracketLineColor: accent,
-    pnlUp: pal.up, pnlDown: pal.down,
+    // profit / loss stay your up / down colours (their meaning never changes)
+    bracketOn: true, bracketProfit: up, bracketLoss: down, bracketQty: soft, bracketLineColor: accent,
+    pnlUp: up, pnlDown: down,
     panelMode: "skin", dlgMode: "glass", uiAccent: soft,
     // indicators, their zones and your drawings take the wallpaper's own colours (each one its own; the same reading as
     // the candles), zones soft so the price reads through them; the legend and indicator text stay readable
     markMode: "wallpaper", indMode: "wallpaper", wallMatch: { src: String(cfg.skin) + "|" + String(cfg.mediaId || ""), colors }, zoneFill: Math.min(+cfg.zoneFill || 0.12, 0.14),
     drawOn: true, lgOn: true, lgColor: light, lgVals: "own", txtMode: "custom", txtColor: light,   // legend names in a light (or, on bright wallpapers, deep) tint of the wallpaper
-    // everything means everything: indicators you'd given their own colour (Each indicator) take the wallpaper's too
-    // (hidden ones stay hidden, and their shapes, borders, styles and widths stay), and the chart frame and interface
-    // skin, if they're on, take the wallpaper's accent
-    indCustom: Object.fromEntries(Object.entries(cfg.indCustom || {}).map(([k, e]) => { const { c, g, ...rest } = e || {}; return [k, rest]; }).filter(([, e]) => Object.values(e).some((v) => v))),
+    // colours you gave an indicator or drawing yourself (Each indicator) stay yours; the chart frame and interface skin,
+    // if they're on, take the wallpaper's accent
     ...(cfg.frameOn ? { frameMode: "accent" } : {}), ...(cfg.barPatOn ? { barMode: "accent" } : {}),
     ...(cfg.scaleBg === "color" ? { scaleBgColor: bright ? mixHex(accent, "#ffffff", 0.8) : mixHex(accent, "#000000", 0.8) } : {}),
   };
   // styling chart 2, 3...: only that chart's own settings (the page-wide panels, ticker and legend stay as they are)
-  return styleChart > 1 ? Object.fromEntries(Object.entries(all).filter(([k]) => PER_CHART_KEYS.has(k))) : all; })(), grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : auto ? `Auto-matched everything to ${name}.` : `Everything now matches ${name}.`);
+  return styleChart > 1 ? Object.fromEntries(Object.entries(all).filter(([k]) => PER_CHART_KEYS.has(k))) : all; })();
+  if (auto && styleChart === 1) rememberBeforeMatch(changes);
+  applyWithUndo(changes, grey ? `${name} is a grey wallpaper, so everything now has a matching silver look.` : auto ? `Auto-matched everything to ${name}.` : `Everything now matches ${name}.`);
 }
 if ($("matchAll")) $("matchAll").onclick = () => matchEverything();
 // Auto-match: every wallpaper you pick (built-in, your own upload or from the Workshop) runs Match everything on its
 // own. One-tap looks keep their own designed colours.
 function autoMatchPick() { if (cfg.matchOnPick && !noAutoMatch) matchEverything(true); }
+// Auto-match is non-destructive: what it changes is remembered as it was before the first match (matchBefore.was) and
+// as Auto-match set it (matchBefore.set). Turning Auto-match off puts back every setting that still has the value
+// Auto-match gave it; a setting you changed yourself in the meantime stays as you made it.
+const sameVal = (a, b) => JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b);
+function rememberBeforeMatch(changes) {
+  const mb = cfg.matchBefore && cfg.matchBefore.was ? cfg.matchBefore : { was: {}, set: {} }, was = { ...mb.was }, setv = { ...mb.set };
+  for (const [k, v] of Object.entries(changes)) { if (k === "enabled") continue;
+    if (!(k in was)) was[k] = cfg[k] === undefined ? null : cfg[k];
+    setv[k] = v === undefined ? null : v; }
+  set({ matchBefore: { was, set: setv } });
+}
+function restoreBeforeMatch() {
+  const mb = cfg.matchBefore; if (!mb || !mb.was) return set({ matchBefore: null });
+  const back = {};
+  for (const [k, v] of Object.entries(mb.was)) if (sameVal(cfg[k], mb.set[k])) back[k] = v === null ? (k in DEFAULTS ? DEFAULTS[k] : null) : v;
+  set({ ...back, matchBefore: null }); refreshAll();
+}
 function syncMatchOnPick() {
-  const pick = (v) => { set({ matchOnPick: v }); syncMatchOnPick(); if (v) matchEverything(true); };
+  const pick = (v) => { set({ matchOnPick: v });
+    if (!v) restoreBeforeMatch();
+    syncMatchOnPick(); if (v) matchEverything(true); };
   for (const id of ["matchOnPick"]) if ($(id)) seg(id, [[false, "Off"], [true, "On"]], () => !!cfg.matchOnPick, pick);
   let view = ""; try { view = skinView; } catch {}                // (skinView is declared further down)
   if ($("matchPickRow")) $("matchPickRow").hidden = view === "looks";

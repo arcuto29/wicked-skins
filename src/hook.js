@@ -186,7 +186,7 @@
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
       fx.indMode, fx.indColor, fx.markMode, fx.markColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.zoneShape, fx.zoneBorder, fx.zoneStyle, fx.zoneReact, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
-    if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(fx.wallColors);
+    if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(fx.wallColors, fx.bg);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
   }
@@ -1787,13 +1787,13 @@
     if (!q) return fn.apply(this, a);
     const L = window.__bdCandleLooks;
     if (q.full) {                                          // a fully styled chart: swap the whole style while it draws
-      const pc = candles, pf = fx; candles = q.cand; fx = q.fx; if (L && L.setWallColors) L.setWallColors(fx.wallColors);
-      try { return fn.apply(this, a); } finally { candles = pc; fx = pf; if (L && L.setWallColors) L.setWallColors(fx.wallColors); }
+      const pc = candles, pf = fx; candles = q.cand; fx = q.fx; if (L && L.setWallColors) L.setWallColors(fx.wallColors, fx.bg);
+      try { return fn.apply(this, a); } finally { candles = pc; fx = pf; if (L && L.setWallColors) L.setWallColors(fx.wallColors, fx.bg); }
     }
     const pc = candles, pa = fx.accent, pt = fx.txtColor;
     candles = q.cand; if (q.accent) fx.accent = q.accent; if (q.text && fx.txtMode === "custom") fx.txtColor = q.text; if (L && L.setWallColors && q.colors.length >= 2) L.setWallColors(q.colors);
     try { return fn.apply(this, a); }
-    finally { candles = pc; fx.accent = pa; fx.txtColor = pt; if (L && L.setWallColors && q.colors.length >= 2) L.setWallColors(fx.wallColors); }
+    finally { candles = pc; fx.accent = pa; fx.txtColor = pt; if (L && L.setWallColors && q.colors.length >= 2) L.setWallColors(fx.wallColors, fx.bg); }
   };
   for (const name of ["fillRect", "strokeRect", "fill", "stroke", "fillText", "strokeText"]) if (typeof proto[name] === "function") proto[name] = withChart(proto[name]);
   for (const prop of ["fillStyle", "strokeStyle"]) {
