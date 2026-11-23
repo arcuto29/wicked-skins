@@ -1,4 +1,6 @@
-# Publishes site/ (home page, Workshop, Privacy, Terms) to GitHub Pages on every push to main.
+# Publishes site/ (home page, Workshop, Privacy, Terms) on every push to main.
+# This code repo is private, so the website lives in the PUBLIC repo arcuto29/wicked-skins: this pushes the built
+# site to its gh-pages branch, and that repo's GitHub Pages serves it at https://arcuto29.github.io/wicked-skins/.
 name: Website
 on:
   push:
@@ -7,19 +9,23 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-  pages: write
-  id-token: write
 concurrency: { group: pages, cancel-in-progress: true }
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: { name: github-pages, url: "${{ steps.deploy.outputs.page_url }}" }
     steps:
+      - name: Needs the PUBLIC_REPO_TOKEN secret
+        env: { T: "${{ secrets.PUBLIC_REPO_TOKEN }}" }
+        run: '[ -n "$T" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (see RELEASING.md). The website is published to the public arcuto29/wicked-skins repo."; exit 1; }'
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
       # share-link previews (look.html) draw with the extension's own wallpaper + candle code
-      - run: mkdir -p site/lib && cp src/skins.js src/candlelooks.js site/lib/
-      - uses: actions/upload-pages-artifact@v3
-        with: { path: site }
-      - id: deploy
-        uses: actions/deploy-pages@v4
+      - run: mkdir -p site/lib && cp src/skins.js src/candlelooks.js site/lib/ && touch site/.nojekyll
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          external_repository: arcuto29/wicked-skins
+          publish_branch: gh-pages
+          publish_dir: ./site
+          force_orphan: true          # the public repo only ever holds the current site, no history
+          user_name: arcuto29
+          user_email: arcuto29@users.noreply.github.com
