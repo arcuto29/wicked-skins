@@ -8,3 +8,5 @@ evidence/colours: colour flicker fix (fix/colour-flicker at 4f8a2d6): recordings
 
 priism-colours-and-wallpapers-test.zip: PR #180 (23621ed) merged locally with main 8eccdee (which has #181). Test build only.
 priism-main-test.zip: main at 8eccdee (has #181, not #180), for comparison.
+
+evidence/smart-fit: Smart fit (feat/smart-fit), tradingview.com and a 2-chart Lightweight Charts page, before (main) / after. Test output only.
