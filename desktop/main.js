@@ -24,7 +24,9 @@ const AUTH_URL = /(accounts|signin|sign-in|login|log-in|oauth|authori[sz]e|\/aut
 let cfg = {};
 let tvWin, settingsWin;
 
-const load = () => { try { cfg = JSON.parse(fs.readFileSync(settingsFile(), "utf8")); } catch { cfg = {}; } };
+const load = () => { try { cfg = JSON.parse(fs.readFileSync(settingsFile(), "utf8")); } catch { cfg = {}; }
+  // Fit's default became Smart: wallpapers you already had, with Fit never changed, keep exactly how they looked (Cover)
+  if (cfg.fit === undefined && Array.isArray(cfg.media) && cfg.media.length) { cfg.fit = "cover"; try { save(); } catch {} } };
 const save = () => fs.writeFileSync(settingsFile(), JSON.stringify(cfg));
 const read = (f) => fs.readFileSync(path.join(SRC, f), "utf8");
 
@@ -39,7 +41,7 @@ async function inject(wc) {
   await wc.insertCSS(read("content.css"));
   await wc.executeJavaScript(
     `window.__BD_CFG = ${JSON.stringify(cfg)};\n` +
-    `if (window.__bdUpdate) { window.__bdUpdate(window.__BD_CFG); } else {\n${read("skins.js")}\n${read("sounds.js")}\n${read("pass.js")}\n${read("acct.js")}\n${read("content.js")}\n}`
+    `if (window.__bdUpdate) { window.__bdUpdate(window.__BD_CFG); } else {\n${read("skins.js")}\n${read("sounds.js")}\n${read("pass.js")}\n${read("acct.js")}\n${read("smartfit.js")}\n${read("content.js")}\n}`
   );
 }
 
