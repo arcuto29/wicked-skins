@@ -1,5 +1,11 @@
 Test builds only. Not a release.
 
+## priism-main-latest.zip (main at efb49df)
+Everything merged so far: auto-updates (#179), no duplicate uploads (#183), wallpaper sound (#184), Auto-match for
+indicators and drawings (#185). Not in it yet: the uploads fix (#186) and beta licensing (#177).
+Same permanent test id as priism-keep-uploads-test.zip, so both see the same wallpapers and settings.
+
+
 ## priism-keep-uploads-test.zip (PR #186)
 Main plus the uploads fix. It has Priism's fixed test id (clnbopeffinekcpboohdadbmilhaelab), so it keeps its uploads
 and settings in any folder, and every later keyed test build sees the same ones. Your other copies keep their own.
