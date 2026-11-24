@@ -1,6 +1,21 @@
 # Changelog
 
-## Unreleased: your uploads are never lost
+## Unreleased
+
+### Priism Pro (Whop licence keys)
+- **Plans.** Priism Pro is unlocked with a licence key from Whop, entered in the same box as invite codes. Invite codes
+  keep working and count as Pro. Settings › **Plan** shows your plan, its renewal date, **Manage billing**, and
+  **Sign out on this device**, which frees the device so the key can go on another one. A key works on up to 3 devices.
+- **Free** (ready, switched off until launch): 6 wallpapers and candle colours, with the Priism watermark. Pro
+  features show a PRO tag and explain instead of doing nothing. Your Pro settings stay saved and come back with Pro.
+- **Safer unlock.** The licence check answers with a signed pass for this device, which lasts 14 days and is renewed
+  daily. Editing saved settings can't unlock Pro. Nothing about your charts or trading is sent.
+- Setup and launch steps: LICENCES.md.
+
+## 0.1.87 (2026-11-24)
+Your wallpapers, looks and settings now stay with you through every update, and video wallpapers can play their sound.
+
+### Your uploads are never lost
 - **Wallpapers no longer drop off My uploads.** With two Priism pages open (the popup, and the tab that converts
   videos), the one with the older list could write it back and drop wallpapers the other had just added. Every change
   to the list is now merged with what's stored, and an upload only ever goes when you remove it. Removing asks first.
@@ -17,7 +32,7 @@
   saved (disk full) now says so instead of being lost at the next restart. Uploads are kept under what the settings
   file can safely hold.
 
-## Unreleased: sound for video wallpapers
+### Sound for video wallpapers
 - **Your video wallpaper can play its own sound.** Off by default; turn it on in Skins › Motion › Sound (the row only
   shows while a video is your wallpaper), with its own Volume (0-100%, separate from your computer's volume).
   Your choice is kept through updates and is not part of saved looks, so applying a look never turns sound on.
@@ -30,7 +45,7 @@
 - **Converted videos keep their sound** (Vorbis, 128 kbit/s); if the sound can't be converted, the picture still is.
 - **Fixed:** video wallpapers kept playing when you turned Focus on (they now hold still, like the built-in ones).
 
-## Unreleased: no duplicate uploads
+### No duplicate uploads
 - **A wallpaper is stored only once.** Picking a file you already have (even under another name), or the same file
   twice in one go, no longer adds a second copy: the one you have goes on the chart, and the panel says
   "Already in your uploads". Files are recognised by their content (size and a fingerprint of the start, middle and
@@ -38,7 +53,7 @@
 - **Workshop:** "Use" on a wallpaper you already downloaded puts your copy on the chart without downloading it again,
   and a Workshop wallpaper you'd already uploaded yourself isn't added twice. A converted video keeps its Workshop link.
 
-## Unreleased: Auto-match colours indicators and drawings around your candles
+### Auto-match colours indicators and drawings around your candles
 - **Your candle colours are the foundation.** Auto-match (and Match everything) keeps the candle colours you chose and
   builds the theme from the wallpaper's colours plus tones of your candles. Only if you hadn't chosen candles do they
   come from the wallpaper. Take-profit / stop-loss and P&L stay your up / down colours.
@@ -49,7 +64,7 @@
 - **Turning Auto-match off puts everything back** the way it was before it matched, except settings you changed
   yourself in the meantime.
 
-## Unreleased: Smart fit for your wallpapers
+### Smart fit for your wallpapers
 - **New default, Fit: Smart.** Your picture or video is placed for the charts themselves, not the whole page under
   TradingView's toolbars and lists. Close to the charts' shape, it fills them like Cover. A phone wallpaper (9:16), a
   square or an ultrawide picture is shown whole, sharp and in proportion, with the same picture softly blurred around it:
@@ -57,7 +72,7 @@
   multi-chart layouts. Cover, Contain and Stretch are unchanged, next to Smart in the same Fit control.
 - **Your existing wallpapers look exactly as before:** if you already have uploads and never chose a Fit, you keep Cover.
 
-## Unreleased: smoother wallpapers
+### Smoother wallpapers
 - **Your video wallpapers hold still when the built-in ones do:** in a trade or at the order ticket (trade focus), while
   one of TradingView's big windows is open, in Focus, in a background tab, and (with Power saver, or when trading is
   slowed down at Auto quality's lowest level) while you pan and zoom. They kept playing before. Measured with a 4K
@@ -67,7 +82,7 @@
 - **Adding wallpapers:** a file the browser can't store (disk full) now says so, and the other files are still added
   (the panel used to stay on "Checking files…"). Removing a video still being converted removes its original too.
 
-## Unreleased: colours that stay put
+### Colours that stay put
 - **Bracket lines keep your line colour.** On a live chart the take-profit / stop-loss line went back to the platform's
   colour on most repaints (about once a second), and for a frame whenever it moved, the price scale was dragged or
   the chart zoomed. It now has your colour in every frame, on TradingView and on platforms built on TradingView's
@@ -81,7 +96,9 @@
   250 ms, so a chart that drew at once (e.g. on a reload) showed its first frames in the platform's colours.
 - Nothing else is drawn differently: only when your colour is applied changed. No new settings.
 
-## Unreleased: marker colours
+## 0.1.86 (2026-11-04)
+
+### Marker colours
 - **New: Markers** (Chart › Lines, zones & labels, under Indicators): the small shapes on a chart, in any colour. That covers an indicator's signal arrows, triangles, circles and labels, your trade arrows, and the markers an app like nq.vision puts on candles.
   - Choose Own, Colour (any colour, exactly), Candles (buy / up markers in your up colour, the rest your down colour), Rainbow, Gradient (the same gradient colours as Indicators) or Wallpaper.
   - Glow follows the existing Glow slider.
@@ -89,20 +106,6 @@
   - Each marker colour shows up in Each indicator, where you can give it its own colour or hide it.
   - Match everything covers markers too.
   - Only the colour changes: where a marker sits, its shape and its text stay as the platform draws them. Candles and zones are untouched.
-
-## Unreleased
-
-### Priism Pro (Whop licence keys)
-- **Plans.** Priism Pro is unlocked with a licence key from Whop, entered in the same box as invite codes. Invite codes
-  keep working and count as Pro. Settings › **Plan** shows your plan, its renewal date, **Manage billing**, and
-  **Sign out on this device**, which frees the device so the key can go on another one. A key works on up to 3 devices.
-- **Free** (ready, switched off until launch): 6 wallpapers and candle colours, with the Priism watermark. Pro
-  features show a PRO tag and explain instead of doing nothing. Your Pro settings stay saved and come back with Pro.
-- **Safer unlock.** The licence check answers with a signed pass for this device, which lasts 14 days and is renewed
-  daily. Editing saved settings can't unlock Pro. Nothing about your charts or trading is sent.
-- Setup and launch steps: LICENCES.md.
-
-## 0.1.86 (2026-11-04)
 
 ### Trading comes first
 Priism never touches orders, account data or the network, so it can't change how fast an order reaches your broker.
