@@ -437,6 +437,40 @@ body.lw-page [data-tvonly] { display: none !important; }
 .pu-go:focus-visible { box-shadow: 0 0 0 3px rgba(25,211,255,.35), 0 8px 26px rgba(46,242,176,.25); }
 .pu-foot { position: relative; margin-top: 12px; color: #666b7b; font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .02em; }
 @media (prefers-reduced-motion: reduce) { .pu-rays path, .pu-spark, .pu-eyebrow i, .pu-go::after { animation: none; } .pu-spark { display: none; } .pu-veil, .pu-card { transition: none; } }
+/* docked: download / ready / error / manual sit in the corner, never blocking the panel (or taking the keyboard) */
+.pu-veil.pu-dock { inset: auto 14px 14px auto; display: block; padding: 0; background: none; backdrop-filter: none; pointer-events: none; }
+.pu-dock .pu-card { pointer-events: auto; width: min(340px, calc(100vw - 28px)); padding: 12px 16px 12px; border-radius: 18px; text-align: left; transform: translateY(14px) scale(.98); transition: transform .35s cubic-bezier(.2,.9,.25,1), opacity .25s ease; box-shadow: 0 24px 60px -18px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.06); }
+.pu-dock.in .pu-card { transform: none; }
+.pu-dock .pu-scene.sm { position: absolute; right: -8px; top: -4px; width: 120px; height: 60px; margin: 0; opacity: .85; }
+.pu-dock .pu-ver { justify-content: flex-start; margin: 8px 0 4px; gap: 9px; }
+.pu-dock .pu-new { font-size: 26px; }
+.pu-dock .pu-lead { margin: 0 0 10px; max-width: none; font-size: 12.5px; }
+.pu-dock .pu-list { margin-bottom: 10px; padding: 6px 10px; }
+.pu-dock.pu-downloading .pu-list, .pu-dock.pu-available .pu-list, .pu-dock.pu-error .pu-list, .pu-dock.pu-manual .pu-list { display: none; }   /* compact: the notes come with "ready" (and "updated") */   /* compact while it downloads: the notes come with "ready" */
+.pu-dock .pu-btns { justify-content: flex-end; }
+.pu-dock .pu-btns button, .pu-dock .pu-btns a { padding: 9px 16px; font-size: 12.5px; }
+.pu-dock .pu-foot { margin-top: 8px; text-align: right; }
+.pu-btns a.pu-go { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; border-radius: 99px; font: 700 13.5px system-ui, sans-serif; padding: 11px 20px; }
+.pu-beta { margin-left: 4px; padding: 1px 7px; border-radius: 99px; background: linear-gradient(100deg, #8f7bff, #19d3ff); color: #071016; font: 800 10px system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+/* the real download: a spectrum bar that fills with the actual percentage */
+.pu-prog { position: relative; margin: 2px 0 12px; }
+.pu-bar { position: relative; height: 8px; border-radius: 99px; overflow: hidden; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
+.pu-bar i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 99px; background: linear-gradient(90deg, #ff5f7a, #ffa04d, #ffe066, #2ef2b0, #19d3ff, #8f7bff); background-size: 340px 100%; transition: width .45s cubic-bezier(.3,.8,.3,1); box-shadow: 0 0 12px rgba(46,242,176,.45); }
+.pu-bar i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%); transform: translateX(-100%); animation: pu-flow 1.6s linear infinite; }
+@keyframes pu-flow { to { transform: translateX(100%); } }
+.pu-prog.wait .pu-bar i { width: 30% !important; animation: pu-seek 1.4s ease-in-out infinite alternate; }   /* not started yet: no number is shown */
+@keyframes pu-seek { from { left: 0; } to { left: 70%; } }
+.pu-pct { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; color: #8d93a5; font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.pu-pct b { color: #eef0f6; font: 700 13px system-ui, sans-serif; }
+.pu-prog.wait .pu-pct b, .pu-prog.wait .pu-pct span { display: none; }
+.pu-steps { position: relative; margin: 0 0 10px; padding: 8px 12px 8px 28px; border-radius: 12px; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.06); color: #d6dae4; font-size: 12.5px; line-height: 1.45; text-align: left; }
+.pu-steps li + li { margin-top: 4px; }
+/* paused (error): amber instead of green, no shine on the button */
+.pu-error .pu-eyebrow { border-color: rgba(255,196,80,.3); background: rgba(255,196,80,.08); color: #ffd27a; }
+.pu-error .pu-eyebrow i { background: #ffc450; animation: none; }
+.pu-error .pu-rays path { opacity: .25; animation: none; }
+.pu-error .pu-go::after { animation: none; }
+@media (prefers-reduced-motion: reduce) { .pu-bar i::after, .pu-prog.wait .pu-bar i { animation: none; } .pu-bar i, .pu-dock .pu-card { transition: none; } }
 .card.wslook .oncount.review { background: rgba(255,196,80,.9); color: #1a1205; }
 .card.look .acts .pub { border-color: rgba(46,242,176,.45); color: #bff8e5; }
 /* Each indicator */
@@ -631,3 +665,10 @@ details.grp.fxmix > summary { text-shadow: 0 0 10px rgba(25,211,255,.45); }
 #planName { font-weight: 700; }
 .ig-close { position: absolute; top: 10px; right: 12px; background: none; border: 0; color: inherit; font-size: 20px; cursor: pointer; opacity: .7; }
 .ig-card { position: relative; }
+
+/* Backup & restore: what happened, in plain words (and the result stays until you Keep or Undo) */
+.bk-msg { margin: 8px 0 2px; padding: 9px 11px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07); font-size: 12.5px; line-height: 1.5; color: #d6dae4; }
+.bk-msg.ok { border-color: rgba(46,242,176,.28); background: rgba(46,242,176,.06); }
+.bk-msg.bad { border-color: rgba(255,120,120,.32); background: rgba(255,90,90,.06); }
+.bk-msg .hint { display: inline; margin: 0; }
+.bk-msg .warn { color: #ffd27a; } .bk-msg .okc { color: #6ff5c6; }

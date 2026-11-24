@@ -24,10 +24,24 @@ const AUTH_URL = /(accounts|signin|sign-in|login|log-in|oauth|authori[sz]e|\/aut
 let cfg = {};
 let tvWin, settingsWin;
 
-const load = () => { try { cfg = JSON.parse(fs.readFileSync(settingsFile(), "utf8")); } catch { cfg = {}; }
+// Settings are written atomically (a temp file, then renamed over the old one) and the previous good copy is kept
+// as settings.json.bak, so a crash, power cut or installer closing the app mid-write can never leave you with
+// empty settings: a damaged file falls back to the last good copy.
+const load = () => {
+  for (const f of [settingsFile(), settingsFile() + ".bak"]) {
+    try { const v = JSON.parse(fs.readFileSync(f, "utf8")); if (v && typeof v === "object") { cfg = v; break; } } catch {}
+  }
+  if (!cfg || typeof cfg !== "object") cfg = {};
   // Fit's default became Smart: wallpapers you already had, with Fit never changed, keep exactly how they looked (Cover)
-  if (cfg.fit === undefined && Array.isArray(cfg.media) && cfg.media.length) { cfg.fit = "cover"; try { save(); } catch {} } };
-const save = () => fs.writeFileSync(settingsFile(), JSON.stringify(cfg));
+  if (cfg.fit === undefined && Array.isArray(cfg.media) && cfg.media.length) { cfg.fit = "cover"; try { save(); } catch {} }
+};
+let bakDone = false;   // the .bak is the copy from before this run's first change (wallpapers can make it big)
+const save = () => {
+  const f = settingsFile(), tmp = f + ".tmp", data = JSON.stringify(cfg);
+  fs.writeFileSync(tmp, data);
+  if (!bakDone) { try { if (fs.existsSync(f)) fs.copyFileSync(f, f + ".bak"); bakDone = true; } catch {} }
+  fs.renameSync(tmp, f);
+};
 const read = (f) => fs.readFileSync(path.join(SRC, f), "utf8");
 
 // hook.js must run before TradingView's own scripts (it wraps the canvas API), so the TV window's
@@ -40,7 +54,7 @@ async function inject(wc) {
   if (!wc || wc.isDestroyed()) return;
   await wc.insertCSS(read("content.css"));
   await wc.executeJavaScript(
-    `window.__BD_CFG = ${JSON.stringify(cfg)};\n` +
+    `window.__BD_CFG = ${JSON.stringify(cfg)}; window.__BD_CHANNEL = ${JSON.stringify(/-beta/i.test(app.getVersion()) ? "beta" : "stable")};\n` +
     `if (window.__bdUpdate) { window.__bdUpdate(window.__BD_CFG); } else {\n${read("skins.js")}\n${read("sounds.js")}\n${read("pass.js")}\n${read("acct.js")}\n${read("smartfit.js")}\n${read("content.js")}\n}`
   );
 }
@@ -212,6 +226,13 @@ ipcMain.handle("tv:action", async (_e, kind) => {
 });
 
 ipcMain.handle("store:get", (_e, defaults) => ({ ...defaults, ...cfg }));
+// removing keys (settings migrations, restoring a backup): only Priism's own settings file, never anything else
+ipcMain.handle("store:remove", (_e, keys) => {
+  const ks = (Array.isArray(keys) ? keys : [keys]).filter((k) => typeof k === "string");
+  if (!ks.length) return;
+  for (const k of ks) delete cfg[k];
+  save();
+});
 ipcMain.handle("store:set", (_e, obj) => {
   Object.assign(cfg, obj);
   save();
@@ -221,48 +242,79 @@ ipcMain.handle("store:set", (_e, obj) => {
 });
 
 // ---------- auto-updates (installed builds only) ----------
-// Releases are published to GitHub by .github/workflows/release.yml; electron-updater finds them there,
-// downloads in the background and installs on the next restart.
-// When one is ready, the panel shows the "Update ready" card (popup/update-card.js, shared with the extension).
-// It never pops up over the chart: if the panel is closed, the card waits for it, and the update installs anyway
-// when you quit. "Restart & update" reopens your chart tabs afterwards if they were open.
-let updater = null, pendingUpdate = null;
+// Releases are published to GitHub by .github/workflows/release.yml (only after the owner approves them);
+// electron-updater finds them there, downloads in the background, checks the file's SHA-512 against the release's
+// metadata, and installs when you choose "Restart & update" or the next time you close Priism. Never by itself
+// while you're using it.
+// The panel's update card (popup/update-card.js, shared with the extension) shows the real state, as it happens:
+//   checking -> available (version) -> downloading (percent, bytes, speed) -> ready  |  current  |  error (why)
+// The last state is also kept in userData/update-state.json, so it's still right after a restart, and support can
+// read what happened. A failed check or download is tried again by itself (30 minutes later, then every 6 hours);
+// nothing is installed unless it downloaded completely and matched.
+// Beta: an installed beta build (version like 0.1.87-beta.1) follows beta releases (GitHub pre-releases) and the
+// stable ones after them; a stable build only ever gets stable releases.
+let updater = null, retryT = 0;
+let upd = { state: "idle", version: null, current: app.getVersion(), percent: 0, transferred: 0, total: 0, speed: 0, error: null, at: 0 };
 const resumeFile = () => path.join(app.getPath("userData"), "resume-chart.json");
+const stateFile = () => path.join(app.getPath("userData"), "update-state.json");
+function setUpd(p) {
+  upd = { ...upd, ...p, current: app.getVersion(), at: Date.now() };
+  if (p.state && p.state !== "downloading") { try { fs.writeFileSync(stateFile(), JSON.stringify(upd)); } catch {} }   // (progress isn't written to disk: it changes many times a second)
+  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send("upd:state", upd);
+}
+// a plain reason for a failed check / download
+function updError(e) {
+  const m = String((e && (e.message || e)) || ""), code = (e && e.code) || "";
+  if (/ERR_INTERNET_DISCONNECTED|ERR_NETWORK_CHANGED|ERR_NETWORK_IO_SUSPENDED|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ERR_CONNECTION|ERR_EMPTY_RESPONSE|ERR_ADDRESS_UNREACHABLE|ERR_NAME_NOT_RESOLVED|ERR_TIMED_OUT|net::ERR_PROXY|socket hang up/i.test(m + code))
+    return { kind: "offline", message: "No connection to the update server. Priism tries again by itself." };
+  if (/sha512 checksum mismatch|ERR_CHECKSUM|checksum/i.test(m + code))
+    return { kind: "damaged", message: "The download didn't match the release, so it wasn't installed. Priism downloads it again by itself." };
+  if (/\b404\b|HttpError: 404|ERR_UPDATER_CHANNEL_FILE_NOT_FOUND|Cannot find .* in the latest release/i.test(m + code))
+    return { kind: "missing", message: "The update file isn't on the server. Priism tries again later; nothing was changed." };
+  if (/ENOSPC|no space/i.test(m)) return { kind: "disk", message: "Not enough free disk space to download the update." };
+  return { kind: "other", message: "The update couldn't be downloaded. Priism tries again later; nothing was changed.", detail: m.slice(0, 300) };
+}
+const retryLater = (ms) => { clearTimeout(retryT); retryT = setTimeout(() => check().catch(() => {}), ms); };
+async function check() {
+  if (!updater || upd.state === "downloading" || upd.state === "ready") return upd;
+  try { await updater.checkForUpdates(); } catch (e) { setUpd({ state: "error", error: updError(e) }); retryLater(30 * 60000); }
+  return upd;
+}
 ipcMain.on("app:version", (e) => { e.returnValue = app.getVersion(); });
-ipcMain.handle("upd:pending", () => pendingUpdate);
+ipcMain.handle("upd:state", () => upd);
+ipcMain.handle("upd:check", () => check());
+ipcMain.handle("upd:pending", () => (upd.state === "ready" ? { version: upd.version } : null));   // (older panels)
 ipcMain.handle("upd:install", () => {
-  if (!updater || !pendingUpdate) return false;
+  if (!updater || upd.state !== "ready") return false;       // only once a complete, verified download is waiting
   try { fs.writeFileSync(resumeFile(), JSON.stringify({ chart: tvOpen(), at: Date.now() })); } catch {}
-  saveDesk(); flushCookies();
+  saveDesk(); flushCookies(); save();
+  setUpd({ state: "installing" });
   setTimeout(() => updater.quitAndInstall(true, true), 500);     // let the tab list save first; silent install, relaunch
   return true;
 });
 function setupUpdates() {
+  try { const s = JSON.parse(fs.readFileSync(stateFile(), "utf8")); if (s && s.state === "error") upd = { ...upd, state: "error", error: s.error, at: s.at }; } catch {}
   if (!app.isPackaged) return;
   try { ({ autoUpdater: updater } = require("electron-updater")); } catch { return; }
-  updater.autoDownload = true;
-  updater.autoInstallOnAppQuit = true;
-  updater.on("update-downloaded", (info) => {
-    pendingUpdate = { version: info.version };
-    if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send("upd:ready", pendingUpdate);
-  });
-  updater.on("error", () => {}); // offline etc.: try again next time
-  updater.checkForUpdates().catch(() => {});
-  setInterval(() => updater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
+  // macOS only installs updates into signed apps (Apple's rule). Until Priism is signed there, a Mac gets an honest
+  // "download it" card instead of a download that could never install.
+  const macUnsigned = process.platform === "darwin";
+  updater.autoDownload = !macUnsigned;
+  updater.autoInstallOnAppQuit = !macUnsigned;  // "Not now": it installs when you close Priism
+  updater.on("checking-for-update", () => setUpd({ state: "checking", error: null }));
+  updater.on("update-available", (i) => setUpd({ state: macUnsigned ? "manual" : "available", version: i.version, percent: 0, transferred: 0, total: 0, error: null }));
+  updater.on("update-not-available", () => setUpd({ state: "current", version: null, error: null }));
+  updater.on("download-progress", (p) => setUpd({ state: "downloading", percent: Math.max(0, Math.min(100, p.percent || 0)), transferred: p.transferred || 0, total: p.total || 0, speed: p.bytesPerSecond || 0 }));
+  updater.on("update-downloaded", (i) => setUpd({ state: "ready", version: i.version, percent: 100, error: null }));
+  updater.on("error", (e) => { if (upd.state === "ready") return; setUpd({ state: "error", error: updError(e) }); retryLater(30 * 60000); });
+  check();
+  setInterval(() => check(), 6 * 60 * 60 * 1000);
 }
 async function checkNow() {
   if (!updater) return dialog.showMessageBox({ message: "Updates are checked automatically in the installed app." });
-  if (pendingUpdate) {                                   // already downloaded: show the card
-    openSettings();
-    const send = () => settingsWin && !settingsWin.isDestroyed() && settingsWin.webContents.send("upd:ready", pendingUpdate);
-    return settingsWin.webContents.isLoading() ? settingsWin.webContents.once("did-finish-load", send) : send();
-  }
-  try {
-    const r = await updater.checkForUpdates();
-    const latest = r && r.updateInfo && r.updateInfo.version;
-    if (!latest || latest === app.getVersion()) dialog.showMessageBox({ message: `You're on the latest version (${app.getVersion()}).` });
-    else dialog.showMessageBox({ message: `Downloading ${latest}…`, detail: "The panel tells you when it's ready to install." });
-  } catch { dialog.showMessageBox({ message: "Couldn't check for updates right now." }); }
+  openSettings();                                          // the panel's update card shows what happens, live
+  if (upd.state !== "ready" && upd.state !== "downloading") await check();
+  if (upd.state === "current") dialog.showMessageBox({ message: `You're on the latest version (${app.getVersion()}).` });
 }
 
 app.whenReady().then(() => {

@@ -51,7 +51,8 @@
     },
     "nsis": {
       "oneClick": true,
-      "perMachine": false
+      "perMachine": false,
+      "artifactName": "Priism-Skins-Setup-${version}.${ext}"
     },
     "mac": {
       "target": [
@@ -63,12 +64,14 @@
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Priism Skins records your voice into clips when you turn on Sound: Voice.",
         "NSAudioCaptureUsageDescription": "Priism Skins can include your computer's sound in clips."
-      }
+      },
+      "artifactName": "Priism-Skins-${version}-${arch}-mac.${ext}"
     },
     "linux": {
       "target": "AppImage",
       "icon": "../icons/icon-512.png",
-      "category": "Finance"
+      "category": "Finance",
+      "artifactName": "Priism-Skins-${version}.${ext}"
     },
     "publish": [
       {

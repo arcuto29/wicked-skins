@@ -4,10 +4,16 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.os.Bundle
 import android.view.ViewGroup
+import android.content.Intent
+import android.net.Uri
 import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import java.io.File
+import java.io.FileOutputStream
 import android.widget.FrameLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
@@ -25,6 +31,14 @@ class MainActivity : Activity() {
     private lateinit var chart: WebView
     private var settings: WebView? = null
     private lateinit var store: Store
+    // Backup & restore (Settings): a backup is written to a temporary file in pieces, then saved where you choose
+    // with Android's own "Save to" screen (so it survives an uninstall); "Restore from a backup" uses its file picker.
+    private var backupTmp: File? = null
+    private var backupOut: FileOutputStream? = null
+    private var pickCallback: ValueCallback<Array<Uri>>? = null
+    private val REQ_SAVE = 41
+    private val REQ_PICK = 42
+    private fun versionName(): String = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "" } catch (e: Exception) { "" }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,6 +88,7 @@ class MainActivity : Activity() {
             append("(function(){")
             append("var s=document.createElement('style');s.textContent=`").append(css).append("`;document.documentElement.appendChild(s);")
             append("window.__BD_CFG=").append(cfg).append(";")
+            append("window.__BD_CHANNEL=").append(if (versionName().contains("-beta")) "\"beta\"" else "\"stable\"").append(";")
             append("if(window.__bdUpdate){window.__bdUpdate(window.__BD_CFG);}else{")
             append(asset("shared/src/skins.js")).append("\n")
             append(asset("shared/src/sounds.js")).append("\n")
@@ -99,6 +114,15 @@ class MainActivity : Activity() {
         wv.settings.javaScriptEnabled = true
         wv.settings.domStorageEnabled = true
         wv.addJavascriptInterface(Bridge(), "PriismNative")
+        // "Restore from a backup": Android's file picker for the panel's <input type="file">
+        wv.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(view: WebView, cb: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
+                pickCallback?.onReceiveValue(null)
+                pickCallback = cb
+                val i = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                return try { startActivityForResult(i, REQ_PICK); true } catch (e: Exception) { pickCallback = null; false }
+            }
+        }
         // popup.html expects window.chrome.storage; the shim (priism-android.js) provides it from PriismNative.
         wv.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String?) {
@@ -150,8 +174,51 @@ class MainActivity : Activity() {
     private fun asset(path: String): String =
         assets.open(path).bufferedReader().use { it.readText() }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_PICK) {
+            val uri = if (resultCode == RESULT_OK) data?.data else null
+            pickCallback?.onReceiveValue(if (uri != null) arrayOf(uri) else null)
+            pickCallback = null
+        } else if (requestCode == REQ_SAVE) {
+            val uri = if (resultCode == RESULT_OK) data?.data else null
+            var ok = false
+            var where = ""
+            try {
+                val tmp = backupTmp
+                if (uri != null && tmp != null) {
+                    contentResolver.openOutputStream(uri)?.use { out -> tmp.inputStream().use { it.copyTo(out) } }
+                    ok = true
+                    where = uri.lastPathSegment?.substringAfterLast(':') ?: ""
+                }
+            } catch (e: Exception) { ok = false }
+            backupTmp?.delete(); backupTmp = null
+            val w = org.json.JSONObject.quote(where)
+            settings?.evaluateJavascript("window.__priismSaved && window.__priismSaved($ok, $w)", null)
+        }
+    }
+
     /** JS bridge shared by both WebViews. */
     inner class Bridge {
+        @JavascriptInterface fun version(): String = versionName()
+        @JavascriptInterface fun remove(keys: String) { store.remove(keys) }
+        // backup file, in pieces (base64): begin, chunk..., end (then "Save to")
+        @JavascriptInterface fun saveBegin(name: String) {
+            backupOut?.close()
+            backupTmp?.delete()
+            val safe = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            backupTmp = File(cacheDir, safe)
+            backupOut = FileOutputStream(backupTmp!!)
+        }
+        @JavascriptInterface fun saveChunk(b64: String) { backupOut?.write(android.util.Base64.decode(b64, android.util.Base64.DEFAULT)) }
+        @JavascriptInterface fun saveEnd() {
+            backupOut?.close(); backupOut = null
+            val name = backupTmp?.name ?: "priism-backup.priism"
+            runOnUiThread {
+                val i = Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream").putExtra(Intent.EXTRA_TITLE, name)
+                try { startActivityForResult(i, REQ_SAVE) } catch (e: Exception) { settings?.evaluateJavascript("window.__priismSaved && window.__priismSaved(false, '')", null) }
+            }
+        }
         @JavascriptInterface fun get(): String = store.json()
         @JavascriptInterface fun set(obj: String) {
             store.merge(obj)

@@ -583,6 +583,14 @@
         <div class="row plan-btns"><button id="planGet" class="primary" type="button">Get Priism Pro</button><button id="planKey" type="button">Enter a key</button>
           <button id="planManage" type="button" hidden>Manage billing</button><button id="planOut" class="link" type="button" hidden>Sign out on this device</button></div>
       </details>
+      <details class="grp" data-grp="backup" id="bkBox">
+        <summary>Backup &amp; restore</summary>
+        <p class="hint">One file with everything you made: your settings, saved looks and candle styles, and your uploaded wallpapers themselves. Use it to move to another computer or a new install, or before reinstalling. Your licence and this device's keys are never in it.</p>
+        <div class="row plan-btns"><button id="bkSave" class="primary" type="button">Save a backup</button><label class="btn">Restore from a backup<input type="file" id="bkFile" accept=".priism" hidden /></label></div>
+        <div id="bkMsg" class="bk-msg" hidden></div>
+        <div class="row plan-btns" id="bkConfirm" hidden><button id="bkRestoreBtn" class="primary" type="button">Restore</button><button id="bkCancel" type="button">Cancel</button></div>
+        <div class="row plan-btns" id="bkResult" hidden><button id="bkKeep" class="primary" type="button">Keep</button><button id="bkUndo" type="button">Undo restore</button></div>
+      </details>
 
 
 
@@ -631,6 +639,8 @@
   <script src="../src/acct.js"></script>
   <script src="../src/workshop.js"></script>
   <script src="../src/sites.js"></script>
+  <script src="../src/version.js"></script>
+  <script src="../src/backup.js"></script>
   <script src="../src/migrate.js"></script>
   <script src="../src/mediadb.js"></script>
   <script src="../src/skins.js"></script>

@@ -3483,7 +3483,12 @@
     if (dupReported || !EXT) return; dupReported = true;
     try { chrome.storage.local.set({ dupSeen: Date.now() }); } catch {}
   }
+  // A copy that can't draw here (no plan: a beta copy that isn't activated, a copy with no code yet) never takes the
+  // page from one that can; if it loses its plan while drawing, it hands the page back. (It used to claim the page
+  // anyway, and a newer, locked copy left the chart with nothing drawn.)
+  const canDraw = () => { try { return plan() !== "none"; } catch { return true; } };
   function claim() {
+    if (!canDraw()) return false;
     const cur = readOwner();
     const alive = cur && Date.now() - cur.ts < 6000;
     if (alive && cur.token !== ME.token && (cur.id !== ME.id || cur.ver !== ME.ver)) {
@@ -3499,11 +3504,12 @@
   // After the extension updates or reloads, this copy's connection to the extension is gone (the panel can't reach
   // it any more) and the background worker injects a fresh copy into the tab — so a dead copy hands over to it.
   const ctxDead = () => !!EXT && !(chrome.runtime && chrome.runtime.id);
-  const shouldYield = () => { const cur = readOwner();
+  const shouldYield = () => { if (!canDraw()) return true; const cur = readOwner();
     return !!cur && cur.token !== ME.token && Date.now() - cur.ts < 6000 &&
       (cur.id !== ME.id ? outranks(cur, { pick: myPick, ver: ME.ver }) : verCmp(cur.ver, ME.ver) > 0 || ctxDead()); };
   function yieldPage() {
     standDown = true; teardown(); if (wmEl) { wmEl.remove(); wmEl = null; }
+    { const cur = readOwner(); if (cur && cur.token === ME.token) document.documentElement.removeAttribute("data-bd-owner"); }   // free the page at once
     if (timerEl) { timerEl.remove(); timerEl = null; } clearInterval(timerIv); timerIv = 0;
     if (goalEl) { goalEl.remove(); goalEl = null; }
     if (guardEl) { guardEl.remove(); guardEl = null; }
@@ -3515,7 +3521,12 @@
   }
   new MutationObserver(() => { if (!owner || standDown) return; if (shouldYield()) return yieldPage(); sweep(); }).observe(document.documentElement, { childList: true });
   setInterval(() => {
-    if (!owner || standDown) return;
+    if (!owner || standDown) {
+      // waiting: the page is free (no copy drawing, or it stopped) and this copy can draw: take it
+      const cur = readOwner();
+      if (startFn && canDraw() && (!cur || Date.now() - cur.ts > 6000) && bigChart()) retake();
+      return;
+    }
     if (shouldYield()) return yieldPage();                                       // a newer / live copy took over
     writeOwner();                                                                // heartbeat
   }, 2000);
@@ -3587,9 +3598,14 @@
   }
   setInterval(() => { passFor = ""; const was = plan(); refreshPass().then(() => { if (plan() !== was) apply(gate(["enabled"])); }); }, 3600e3);   // a pass runs out
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-    // when you last used this copy's panel is known BEFORE claiming the page, so after a reload the right copy wins
-    chrome.storage.local.get({ lastPick: 0 }, (s) => { myPick = +s.lastPick || 0;
-      whenChart(() => chrome.storage.local.get(DEFAULTS, async (stored) => { cfg = { ...DEFAULTS, ...stored }; await refreshPass(); gate(); build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); })); });
+    // Your settings, your plan and when you last used this copy's panel are all known BEFORE claiming the page: so
+    // after a reload the right copy wins, and a copy that can't draw (no plan) never takes it (canDraw).
+    // (Changes made while waiting for the chart arrive through onChanged below, as before.)
+    chrome.storage.local.get({ ...DEFAULTS, lastPick: 0 }, async (stored) => {
+      myPick = +stored.lastPick || 0; delete stored.lastPick;
+      cfg = { ...DEFAULTS, ...stored }; await refreshPass(); gate();
+      whenChart(() => { gate(); build(); pushCandles(); pushFx(); renderWatermark(); applyFocus(); renderTimer(); applyPrivacy(); });
+    });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       // today's total is shared between tabs (and reset from the panel); the journal is just stored data
