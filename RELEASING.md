@@ -51,6 +51,30 @@ Pull requests run `ci.yml` (checks, build, desktop smoke test) and `updates.yml`
 - backup / restore between two Chrome installs;
 - the update card in every state.
 
+## Where your users' things are kept (and why updates never lose them)
+| Install | Kept in | Survives updates because |
+|---|---|---|
+| Chrome Web Store | the extension's own storage + its file database (`wicked-media`), under the store's extension id | Chrome keeps an extension's data when it updates it (same id) |
+| Loaded unpacked (zip) | the same, under the **unpacked copy's id** | from 0.1.88 on the zip has a fixed key (`keys/unpacked.json`): the same id in **any** folder |
+| Desktop app | `settings.json` in the app's folder (`%APPDATA%/Priism Skins`, `~/Library/Application Support/Priism Skins`, `~/.config/Priism Skins`), written safely with a `.bak` | the installer never touches that folder; settings left under the old name "Wicked Skins" are copied over on first start (`desktop/userdata.js`) |
+| Android | the app's own storage | every release is signed with the same key (from 0.1.87 on) |
+
+Only removing Priism (uninstall, or Remove in `chrome://extensions`) deletes them. That's Chrome's and the operating
+system's rule, so **Settings › Backup & restore › Save a backup** is the way to move to a new install.
+
+**Unpacked ids.** Chrome gives an unpacked copy without a key an id made from its **folder path**, and keeps its data
+under that id. Unzipping an update into a new folder therefore made a new, empty copy (the old copy's data is still
+there, under the old id, until that copy is removed). The build now makes two zips:
+- `priism-skins-X.zip`: to load unpacked. From `keyedFrom` (0.1.88) on it has the fixed key, so updates can go in any folder.
+- `priism-skins-X-store.zip`: for the Chrome Web Store, with no key (the store refuses one). The release workflow uploads
+  this one, and refuses a store zip that has a key.
+
+Adding a key to an existing install changes its id once. So 0.1.87 still ships without a key, and its update card
+tells unpacked users, for 0.1.88: save a backup, load the new folder, Restore, and remove the old copy once it says
+Verified. From then on, updates keep everything wherever they're unzipped. Test builds use `node
+scripts/build-extension.js --keyed`, so testers keep their uploads between test builds too. The key's private half isn't
+needed (the id comes from the public half) and isn't in the repo.
+
 ## Two repos: private code, public releases
 - **`arcuto29/priism-app` (private):** all the code, tests and history. Tags, CI and builds run here.
 - **`arcuto29/wicked-skins` (public):** only the GitHub Releases (downloads + the desktop app's auto-update files) and

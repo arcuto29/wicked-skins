@@ -22,6 +22,7 @@ jobs:
       - run: node test/updates/version.test.mjs
       - run: node test/updates/migrate.test.mjs
       - run: node test/updates/backup.test.mjs
+      - run: node test/persist/desktop-userdata.test.mjs   # desktop: settings left under the app's old name come along
       - name: The release checker catches the 0.1.86 bug in the real published metadata
         run: |
           mkdir r && cd r
@@ -40,6 +41,8 @@ jobs:
       - run: npm install --no-save playwright@1.64.1 && npx playwright install --with-deps chromium
       - run: node test/updates/card.visual.js
       - run: node test/updates/extension.e2e.js
+      - name: Uploads survive updates (a real v0.1.86 install updated, files byte for byte, videos play with sound)
+        run: node test/persist/upgrade.e2e.js
       - name: Stable and beta side by side on the real TradingView chart
         run: node test/updates/channels.e2e.js
       - uses: actions/upload-artifact@v4

@@ -23,5 +23,6 @@
     put: (id, blob) => tx("readwrite", (s) => s.put(blob, id)),
     get: (id) => tx("readonly", (s) => s.get(id)),
     del: (id) => tx("readwrite", (s) => s.delete(id)),
+    keys: () => tx("readonly", (s) => s.getAllKeys()),   // every stored file (to find ones nothing lists any more)
   };
 })();

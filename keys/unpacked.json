@@ -1,0 +1,8 @@
+{
+ "_": "Public keys that give Priism's unpacked copies (the zips you load in chrome://extensions) the same extension id in any folder, so their uploads and settings stay when you update into a new folder. Public halves only: the id comes from these alone. Never put a key in the Chrome Web Store zip (the store refuses it). keyedFrom: the first version whose unpacked zip carries the key (see RELEASING.md: the move from an older unpacked copy).",
+ "keyedFrom": "0.1.88",
+ "stable": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs/Q8iMvFxen+pNlV3HjcqaRaKGKOGHmfeKPM29xZfJE1eOCoMq3uWGlxFfPssoh2p09NnzbBYnHMqkC3jL4mF6BOpiY1umTRgBEtpqridp3s3pPtwC08DQoW+wTCFKcjC4m3qlkMThtImmQXYKdSvZW4iy+gHCaOZR5/+WS+KoCHTvb8xlsKV1otQkClUzDDpcP3PtIYG7bz7D4XDwG0OeORrU1FmFvFA2B9UAbfQ/3J3+mbxT6oWpDG/GwF4CcaXBae6S5krJxsBDsooYtBkr46EivN9e4rKwFtskSYsBsacvF5oUA4zqECyEkWN2MKGOvT4/an7PCuHA2e8h3PyQIDAQAB",
+ "stableId": "clnbopeffinekcpboohdadbmilhaelab",
+ "beta": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5sBgqvLe0H5joFV6CQgXXUctNL5l7cj4Ots/40cEeeGz2vf0otFRPgQ4+ROnzzNxyCdnbW94gP13zZC8O6tK3OdItClscLiHRtnFfNd0bEUI6ukzbx6bZhwv2nuhKqLuqbzNv2Rr25/4iq4z3UvGX7MAMsskklzl3NEBICpma8tHtTUiBQDNt+hZztnev40456iJ30i9PcgYYJAU7yf2kGmLHLnY/pg9lbxlRwCv7qIOmHOZ8wvjeygKGpby4a9BYUU8y5CV7myiAhiZCasrPAuhGLF2VuSXprX13yVMFS+XWbYc9bHG1K6o1QHR5+gbrV2aVwXZ5PaIhBRy3rh1PQIDAQAB",
+ "betaId": "fchkpnmabjolaaodlknfmjgijghdpfhf"
+}

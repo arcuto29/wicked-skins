@@ -25,6 +25,7 @@
     },
     "files": [
       "main.js",
+      "userdata.js",
       "preload.js",
       "tv-preload.js",
       "tabs.html",

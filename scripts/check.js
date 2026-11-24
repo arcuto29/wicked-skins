@@ -67,5 +67,16 @@ for (const f of fs.readdirSync(path.join(ROOT, "src"))) if (f.endsWith(".js")) {
   }
 }
 
+// fixed ids for unpacked copies (uploads survive updates in a new folder): the keys give exactly the ids written next
+// to them, the panel waits for the same first version, and the repo's own manifest never has a key (the store refuses
+// it; the build adds it to the unpacked zip only)
+{ const K = JSON.parse(fs.readFileSync(path.join(ROOT, "keys", "unpacked.json"), "utf8"));
+  const idOf = (b64) => [...require("crypto").createHash("sha256").update(Buffer.from(b64, "base64")).digest("hex").slice(0, 32)].map((c) => String.fromCharCode(97 + parseInt(c, 16))).join("");
+  if (idOf(K.stable) !== K.stableId || idOf(K.beta) !== K.betaId) { bad++; console.error("✗ keys/unpacked.json: a key doesn't give the id next to it"); }
+  if (K.stableId === K.betaId) { bad++; console.error("✗ keys/unpacked.json: stable and beta must have different ids (they never share settings)"); }
+  const m = /const KEYED_FROM = "([\d.]+)"/.exec(fs.readFileSync(path.join(ROOT, "popup", "popup.js"), "utf8"));
+  if (!m || m[1] !== K.keyedFrom) { bad++; console.error(`✗ popup.js KEYED_FROM (${m && m[1]}) must equal keys/unpacked.json keyedFrom (${K.keyedFrom})`); }
+  if ("key" in root) { bad++; console.error("✗ manifest.json must not have a key (the build adds it to the unpacked zip only)"); } }
+
 if (bad) { console.error(`\n${bad} problem(s).`); process.exit(1); }
 console.log(`✓ ${js.length} JS files parse · manifest OK · version ${root.version} everywhere (${V ? V.channel : "?"})`);
