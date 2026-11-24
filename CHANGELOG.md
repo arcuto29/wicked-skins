@@ -8,8 +8,11 @@
   closing halfway through adding files), Priism finds the file and puts it back in My uploads. Your chosen wallpaper
   stays as it is.
 - **Files are listed the moment they're saved**, not after the whole batch.
-- **Unpacked copies keep their uploads wherever you unzip an update** (from 0.1.88: a fixed id). For that one update,
-  the update card walks you through bringing everything along with a backup.
+- **A new Priism copy brings your things along by itself.** Install the Chrome Web Store version next to an unzipped
+  copy (or the other way round), or 0.1.88 next to an older unzipped copy. The new one takes your wallpapers (the
+  files themselves, checked byte for byte), looks, candle styles and settings. You don't need a backup. From 0.1.88,
+  unzipped copies keep everything wherever you unzip an update (a fixed id).
+- **A file only counts as added once it's really stored**, at its full size.
 - **Desktop app:** settings and uploads from before the rename ("Wicked Skins") are brought over. A setting that can't be
   saved (disk full) now says so instead of being lost at the next restart. Uploads are kept under what the settings
   file can safely hold.

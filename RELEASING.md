@@ -69,9 +69,22 @@ there, under the old id, until that copy is removed). The build now makes two zi
 - `priism-skins-X-store.zip`: for the Chrome Web Store, with no key (the store refuses one). The release workflow uploads
   this one, and refuses a store zip that has a key.
 
-Adding a key to an existing install changes its id once. So 0.1.87 still ships without a key, and its update card
-tells unpacked users, for 0.1.88: save a backup, load the new folder, Restore, and remove the old copy once it says
-Verified. From then on, updates keep everything wherever they're unzipped. Test builds use `node
+Adding a key to an existing install changes its id once. So 0.1.87 still ships without a key. For 0.1.88, its update
+card tells unpacked users to unzip into a **new** folder and Load unpacked next to the old copy. The new copy then
+takes everything from the old one **by itself** (`src/handover.js`), and both panels say when it's done. No backup is
+needed.
+
+**Moving between copies by itself (`src/handover.js`).** The known ids are the store copy, the unpacked copy with the
+fixed key, and the beta twin; stable and beta never mix.
+- A copy with things says hello to those ids every 15 minutes (`chrome.alarms`).
+- An empty copy at one of those ids pulls everything over Chrome's extension-to-extension messaging: settings, looks,
+  candle styles and every wallpaper file. Each file is checked by size and CRC-32 before it's listed.
+- A cut-off move resumes. Nothing is deleted on either side.
+- A copy only gives its data to those ids. It takes from others only while it's empty.
+- A licence code that comes along only counts after the server confirms it.
+- The same move works between a store copy and an unpacked copy, either way.
+
+Test builds use `node
 scripts/build-extension.js --keyed`, so testers keep their uploads between test builds too. The key's private half isn't
 needed (the id comes from the public half) and isn't in the repo.
 

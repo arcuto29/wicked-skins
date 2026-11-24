@@ -43,6 +43,8 @@ jobs:
       - run: node test/updates/extension.e2e.js
       - name: Uploads survive updates (a real v0.1.86 install updated, files byte for byte, videos play with sound)
         run: node test/persist/upgrade.e2e.js
+      - name: Moving to a new copy by itself (no backup; files byte for byte; a made-up licence isn't accepted)
+        run: node test/persist/handover.e2e.js
       - name: Stable and beta side by side on the real TradingView chart
         run: node test/updates/channels.e2e.js
       - uses: actions/upload-artifact@v4

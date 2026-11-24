@@ -206,7 +206,7 @@ async function playInPlayer(ctx, id, m) {
   const B = stage(path.join(TMP, "b", "Priism"), { version: "0.1.88" });
   ({ ctx, id } = await launch(prof3, B)); p = await panel(ctx, id);
   { const s = await store(p, "media"), h = await p.$eval("#mediaHint", (e) => e.textContent);
-    ok("(without the key, another folder is another copy: a new id, empty, and it says where your uploads may be)", id !== idA && (s.media || []).length === 0 && /Restore it here/.test(h), { idA, idB: id, h }); }
+    ok("(without the key, another folder is another copy: a new id, empty, and it says where your uploads may be)", id !== idA && (s.media || []).length === 0 && /come over by themselves/.test(h), { idA, idB: id, h }); }
   await ctx.close();
 
   const n = Object.values(R).filter(Boolean).length;
