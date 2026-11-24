@@ -1344,21 +1344,49 @@ const saveMedia = (media, extra = {}) => { set({ media, ...extra }); if (extra.s
 
 // why the browser wouldn't store a file, in plain words
 const storeMsg = (e) => /quota/i.test(String(e && (e.name || e.message))) ? "your disk or the browser's storage is full: free some space and try again" : String((e && e.message) || "the browser refused to store it");
+// The same file added twice (picked again, dropped twice in one go, or a Workshop wallpaper you'd already uploaded) is
+// stored only once: the copy you already have is put on the chart instead. A file is recognised by its content, not
+// its name: its size plus a SHA-256 of its start, middle and end (1 MB each, so a 2 GB video is quick to check).
+async function fingerprint(blob) {
+  try {
+    const MB = 1 << 20, n = blob.size, mid = Math.floor(n / 2);
+    const parts = n <= 3 * MB ? [blob] : [blob.slice(0, MB), blob.slice(mid - MB / 2, mid + MB / 2), blob.slice(n - MB)];
+    const h = new Uint8Array(await crypto.subtle.digest("SHA-256", await new Blob(parts).arrayBuffer()));
+    return n + ":" + [...h.slice(0, 16)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch { return null; }
+}
+// uploads added before this check have no fingerprint yet: worked out once from the stored file (a converted video
+// isn't the file you picked any more, so it can't be matched)
+async function fingerprintOld() {
+  let changed = false;
+  for (const m of cfg.media) {
+    if (m.fp || m.converted) continue;
+    let b = null;
+    try { b = m.file ? await WickedMediaDB.get(m.pending ? m.id + ":src" : m.id) : m.src ? await (await fetch(m.src)).blob() : null; } catch {}
+    const fp = b && await fingerprint(b);
+    if (fp) { m.fp = fp; changed = true; }
+  }
+  if (changed) set({ media: cfg.media });
+}
 async function addFiles(files) {
-  const problems = []; let added = 0, needConvert = 0, lastId = null;
+  const problems = [], dupes = []; let added = 0, needConvert = 0, lastId = null;
   hint("Checking files…");
+  await fingerprintOld();
   for (const f of files) {
     const c = classify(f);
     if (c.err) { problems.push(`${f.name}: ${c.err}`); continue; }
     if (f.size > MAX_FILE_MB * 1024 * 1024) { problems.push(`${f.name}: over ${MAX_FILE_MB >= 1024 ? MAX_FILE_MB / 1024 + " GB" : MAX_FILE_MB + " MB"}`); continue; }
     const name = f.name;
     const id = uid();
+    const fp = await fingerprint(f);
+    const same = fp && cfg.media.find((m) => m.fp === fp);
+    if (same) { dupes.push(f.name); if (!same.pending) lastId = same.id; continue; }
 
     if (!EXT_MODE) { // desktop app fallback
       const src = await readAsDataURL(f, c.mime);
       const p = await probe(c.type, src);
       if (!p) { problems.push(`${f.name}: can't play in the desktop app yet (try MP4 H.264 or WebM)`); continue; }
-      cfg.media = [...cfg.media, { id, name, type: c.type, src }]; lastId = id; added++;
+      cfg.media = [...cfg.media, { id, name, type: c.type, src, ...(fp ? { fp } : {}) }]; lastId = id; added++;
       continue;
     }
 
@@ -1369,11 +1397,11 @@ async function addFiles(files) {
     if (p) {
       try { await WickedMediaDB.put(id, f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }
       let q = null; try { q = await window.PriismWallInfo.measure(f, c.type); } catch {}
-      cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size, ...(q ? { w: q.w, h: q.h, oled: q.oled } : {}) }];
+      cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size, ...(fp ? { fp } : {}), ...(q ? { w: q.w, h: q.h, oled: q.oled } : {}) }];
       lastId = id; added++;
     } else if (c.type === "video") {
       try { await WickedMediaDB.put(id + ":src", f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }   // original kept until converted
-      cfg.media = [...cfg.media, { id, name, type: "video", file: true, pending: true, origName: f.name, size: f.size }];
+      cfg.media = [...cfg.media, { id, name, type: "video", file: true, pending: true, origName: f.name, size: f.size, ...(fp ? { fp } : {}) }];
       needConvert++;
     } else problems.push(`${f.name}: this image's format can't be shown in the browser`);
   }
@@ -1381,6 +1409,7 @@ async function addFiles(files) {
   renderMedia(); renderSkins();
   const parts = [];
   if (added) parts.push(`Added ${added} file${added > 1 ? "s" : ""}.`);
+  if (dupes.length) parts.push(`Already in your uploads, not added again: ${dupes.join(", ")}.`);
   if (needConvert) parts.push(`${needConvert} video${needConvert > 1 ? "s" : ""} need converting…`);
   if (problems.length) parts.push("Skipped " + problems.join(" · "));
   hint(parts.join(" ") || "Files stay on your computer.");
@@ -1436,7 +1465,8 @@ async function convertPending() {
         await WickedMediaDB.put(m.id, blob);
         await WickedMediaDB.del(m.id + ":src");
         delete converting[m.id];
-        cfg.media = cfg.media.map((x) => (x.id === m.id ? { id: x.id, name: x.name, type: "video", file: true, thumb: p.thumb, size: blob.size, converted: true } : x));
+        cfg.media = cfg.media.map((x) => (x.id === m.id ? { id: x.id, name: x.name, type: "video", file: true, thumb: p.thumb, size: blob.size, converted: true,
+          ...(x.fp ? { fp: x.fp } : {}), ...(x.wsId ? { wsId: x.wsId } : {}) } : x));   // (fp: the file you picked, so picking it again is still recognised)
         saveMedia(cfg.media, { skin: "media", mediaId: m.id });
         hint(`Converted ${m.origName}. It's on your chart now.`);
       } catch (e) {
@@ -1564,7 +1594,9 @@ async function useLookWall(wallId, fallbackSkin) {
     const before = new Set((cfg.media || []).map((m) => m.id));
     noAutoMatch = true;
     try { await addFiles([new File([blob], `${w.title}.${ext || (w.kind === "video" ? "webm" : "png")}`, { type: blob.type })]); } finally { noAutoMatch = false; }
-    const added = (cfg.media || []).find((m) => !before.has(m.id));
+    // (newly added, or the same file you already had: tagged either way, so it isn't downloaded again next time)
+    const fp = await fingerprint(blob);
+    const added = (cfg.media || []).find((m) => !before.has(m.id)) || (fp && (cfg.media || []).find((m) => m.fp === fp && !m.wsId));
     if (added) set({ media: cfg.media.map((m) => (m.id === added.id ? { ...m, wsId: wallId } : m)) });
     toast(`\u201c${w.title}\u201d is on your chart and in My uploads.`);
   } catch (e) { set({ skin: fallbackSkin && WickedSkins[fallbackSkin] ? fallbackSkin : "aurora" }); syncSkinView(); toast("Couldn't get the look's wallpaper (" + e.message + "), so it uses a built-in one."); }
@@ -1603,11 +1635,17 @@ function wsRender() {
 }
 // "Use": download into your Uploads and put it on the chart. No account needed.
 async function wsUse(it) {
+  // already downloaded: the copy in your Uploads is used (no second download, no second copy)
+  const have = it.id && (cfg.media || []).find((m) => m.wsId === it.id && !m.pending);
+  if (have) { pickSource("media:" + have.id); toast(`“${it.title}” is on your chart (already in My uploads).`); return; }
   toast(`Downloading “${it.title}”…`);
   try {
     const blob = await W().fetchFile(it);
     const ext = (blob.type.split("/")[1] || "").replace("jpeg", "jpg");
+    const before = new Set((cfg.media || []).map((m) => m.id)), fp = await fingerprint(blob);
     await addFiles([new File([blob], `${it.title}.${ext || (it.kind === "video" ? "webm" : "png")}`, { type: blob.type })]);
+    const got = (cfg.media || []).find((m) => !before.has(m.id)) || (fp && (cfg.media || []).find((m) => m.fp === fp && !m.wsId));
+    if (got && it.id) set({ media: cfg.media.map((m) => (m.id === got.id ? { ...m, wsId: it.id } : m)) });
     toast(`“${it.title}” is on your chart and in My uploads (Skins tab).`);
   } catch (e) { toast("Couldn't use it: " + e.message); }
 }
