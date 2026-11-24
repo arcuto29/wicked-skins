@@ -1,0 +1,618 @@
+{
+ "light: setup: the library draws its logo where Priism looks (ring, disc, \"TV\" mark)": {
+  "pass": true,
+  "detail": {
+   "ring": "#ebebeb",
+   "disc": "#ffffff",
+   "mark": "#0f0f0f",
+   "rawDisc": "#ffffff",
+   "glow": false
+  }
+ },
+ "light: TradingView's (the default): the logo exactly as TradingView draws it": {
+  "pass": true,
+  "detail": {
+   "ring": "#ebebeb",
+   "disc": "#ffffff",
+   "mark": "#0f0f0f",
+   "rawDisc": "#ffffff",
+   "glow": false
+  }
+ },
+ "light look: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": false
+  }
+ },
+ "light look: the \"TV\" mark reads on its disc (contrast 9.6:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#ffb9ef",
+   "disc": "#3e1839"
+  }
+ },
+ "light look: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": false
+  }
+ },
+ "light look: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": false
+  }
+ },
+ "light look: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "light glass: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffffff",
+   "disc": "#0e1018",
+   "mark": "#f2f4f8",
+   "rawDisc": "rgba(14, 16, 24, 0.62)",
+   "glow": false
+  }
+ },
+ "light glass: the \"TV\" mark reads on its disc (contrast 17.2:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#f2f4f8",
+   "disc": "rgba(14, 16, 24, 0.62)"
+  }
+ },
+ "light glass: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffffff",
+   "disc": "#0e1018",
+   "mark": "#f2f4f8",
+   "rawDisc": "rgba(14, 16, 24, 0.62)",
+   "glow": false
+  }
+ },
+ "light glass: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "light color-blue: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#2f7bff",
+   "disc": "#102141",
+   "mark": "#accaff",
+   "rawDisc": "#102141",
+   "glow": false
+  }
+ },
+ "light color-blue: the \"TV\" mark reads on its disc (contrast 9.6:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#accaff",
+   "disc": "#102141"
+  }
+ },
+ "light color-blue: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#2f7bff",
+   "disc": "#102141",
+   "mark": "#accaff",
+   "rawDisc": "#102141",
+   "glow": false
+  }
+ },
+ "light color-blue: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#2f7bff",
+   "disc": "#102141",
+   "mark": "#accaff",
+   "rawDisc": "#102141",
+   "glow": false
+  }
+ },
+ "light color-blue: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "light color-yellow: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffe14a",
+   "disc": "#3e381a",
+   "mark": "#fff3b7",
+   "rawDisc": "#3e381a",
+   "glow": false
+  }
+ },
+ "light color-yellow: the \"TV\" mark reads on its disc (contrast 10.5:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#fff3b7",
+   "disc": "#3e381a"
+  }
+ },
+ "light color-yellow: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffe14a",
+   "disc": "#3e381a",
+   "mark": "#fff3b7",
+   "rawDisc": "#3e381a",
+   "glow": false
+  }
+ },
+ "light color-yellow: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffe14a",
+   "disc": "#3e381a",
+   "mark": "#fff3b7",
+   "rawDisc": "#3e381a",
+   "glow": false
+  }
+ },
+ "light color-yellow: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "light color-grey: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#7a7a7a",
+   "disc": "#202124",
+   "mark": "#cacaca",
+   "rawDisc": "#202124",
+   "glow": false
+  }
+ },
+ "light color-grey: the \"TV\" mark reads on its disc (contrast 9.8:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#cacaca",
+   "disc": "#202124"
+  }
+ },
+ "light color-grey: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#7a7a7a",
+   "disc": "#202124",
+   "mark": "#cacaca",
+   "rawDisc": "#202124",
+   "glow": false
+  }
+ },
+ "light color-grey: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#7a7a7a",
+   "disc": "#202124",
+   "mark": "#cacaca",
+   "rawDisc": "#202124",
+   "glow": false
+  }
+ },
+ "light color-grey: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "light look-glow: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": true
+  }
+ },
+ "light look-glow: the \"TV\" mark reads on its disc (contrast 9.6:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#ffb9ef",
+   "disc": "#3e1839"
+  }
+ },
+ "light look-glow: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": true
+  }
+ },
+ "light look-glow: glows": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": true
+  }
+ },
+ "light look-glow: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "dark: setup: the library draws its logo where Priism looks (ring, disc, \"TV\" mark)": {
+  "pass": true,
+  "detail": {
+   "ring": "#4a4a4a",
+   "disc": "#0f0f0f",
+   "mark": "#ffffff",
+   "rawDisc": "#0f0f0f",
+   "glow": false
+  }
+ },
+ "dark: TradingView's (the default): the logo exactly as TradingView draws it": {
+  "pass": true,
+  "detail": {
+   "ring": "#4a4a4a",
+   "disc": "#0f0f0f",
+   "mark": "#ffffff",
+   "rawDisc": "#0f0f0f",
+   "glow": false
+  }
+ },
+ "dark look: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": false
+  }
+ },
+ "dark look: the \"TV\" mark reads on its disc (contrast 9.6:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#ffb9ef",
+   "disc": "#3e1839"
+  }
+ },
+ "dark look: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": false
+  }
+ },
+ "dark look: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": false
+  }
+ },
+ "dark look: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "dark glass: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffffff",
+   "disc": "#0e1018",
+   "mark": "#f2f4f8",
+   "rawDisc": "rgba(14, 16, 24, 0.62)",
+   "glow": false
+  }
+ },
+ "dark glass: the \"TV\" mark reads on its disc (contrast 17.2:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#f2f4f8",
+   "disc": "rgba(14, 16, 24, 0.62)"
+  }
+ },
+ "dark glass: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffffff",
+   "disc": "#0e1018",
+   "mark": "#f2f4f8",
+   "rawDisc": "rgba(14, 16, 24, 0.62)",
+   "glow": false
+  }
+ },
+ "dark glass: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "dark color-blue: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#2f7bff",
+   "disc": "#102141",
+   "mark": "#accaff",
+   "rawDisc": "#102141",
+   "glow": false
+  }
+ },
+ "dark color-blue: the \"TV\" mark reads on its disc (contrast 9.6:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#accaff",
+   "disc": "#102141"
+  }
+ },
+ "dark color-blue: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#2f7bff",
+   "disc": "#102141",
+   "mark": "#accaff",
+   "rawDisc": "#102141",
+   "glow": false
+  }
+ },
+ "dark color-blue: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#2f7bff",
+   "disc": "#102141",
+   "mark": "#accaff",
+   "rawDisc": "#102141",
+   "glow": false
+  }
+ },
+ "dark color-blue: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "dark color-yellow: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffe14a",
+   "disc": "#3e381a",
+   "mark": "#fff3b7",
+   "rawDisc": "#3e381a",
+   "glow": false
+  }
+ },
+ "dark color-yellow: the \"TV\" mark reads on its disc (contrast 10.5:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#fff3b7",
+   "disc": "#3e381a"
+  }
+ },
+ "dark color-yellow: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffe14a",
+   "disc": "#3e381a",
+   "mark": "#fff3b7",
+   "rawDisc": "#3e381a",
+   "glow": false
+  }
+ },
+ "dark color-yellow: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#ffe14a",
+   "disc": "#3e381a",
+   "mark": "#fff3b7",
+   "rawDisc": "#3e381a",
+   "glow": false
+  }
+ },
+ "dark color-yellow: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "dark color-grey: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#7a7a7a",
+   "disc": "#202124",
+   "mark": "#cacaca",
+   "rawDisc": "#202124",
+   "glow": false
+  }
+ },
+ "dark color-grey: the \"TV\" mark reads on its disc (contrast 9.8:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#cacaca",
+   "disc": "#202124"
+  }
+ },
+ "dark color-grey: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#7a7a7a",
+   "disc": "#202124",
+   "mark": "#cacaca",
+   "rawDisc": "#202124",
+   "glow": false
+  }
+ },
+ "dark color-grey: no glow unless asked": {
+  "pass": true,
+  "detail": {
+   "ring": "#7a7a7a",
+   "disc": "#202124",
+   "mark": "#cacaca",
+   "rawDisc": "#202124",
+   "glow": false
+  }
+ },
+ "dark color-grey: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "dark look-glow: restyled (not TradingView's colours any more), still all three parts in the same place": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": true
+  }
+ },
+ "dark look-glow: the \"TV\" mark reads on its disc (contrast 9.6:1, at least 4.5)": {
+  "pass": true,
+  "detail": {
+   "mark": "#ffb9ef",
+   "disc": "#3e1839"
+  }
+ },
+ "dark look-glow: in that colour's family (the ring is the colour itself)": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": true
+  }
+ },
+ "dark look-glow: glows": {
+  "pass": true,
+  "detail": {
+   "ring": "#ff4fd8",
+   "disc": "#3e1839",
+   "mark": "#ffb9ef",
+   "rawDisc": "#3e1839",
+   "glow": true
+  }
+ },
+ "dark look-glow: nothing else on the chart changed (the same fill colours everywhere else)": {
+  "pass": true,
+  "detail": null
+ },
+ "back to TradingView's: TradingView's own colours again": {
+  "pass": true,
+  "detail": {
+   "ring": "#4a4a4a",
+   "disc": "#0f0f0f",
+   "mark": "#ffffff",
+   "rawDisc": "#0f0f0f",
+   "glow": false
+  }
+ },
+ "no page errors (charting library)": {
+  "pass": true,
+  "detail": []
+ },
+ "Lightweight Charts: its TradingView logo is there, in its own colours": {
+  "pass": true,
+  "detail": {
+   "fill": "#D1D4DC",
+   "stroke": "#131722",
+   "filter": "none",
+   "visible": true,
+   "box": [
+    10,
+    763,
+    35,
+    19
+   ]
+  }
+ },
+ "Lightweight Charts look: recoloured, same place and size, still visible, mark readable (9.6:1)": {
+  "pass": true,
+  "detail": {
+   "fill": "#3e1839",
+   "stroke": "#ffb9ef",
+   "filter": "drop-shadow(rgb(255, 79, 216) 0px 0px 8px)",
+   "visible": true,
+   "box": [
+    10,
+    763,
+    35,
+    19
+   ]
+  }
+ },
+ "Lightweight Charts glass: recoloured, same place and size, still visible, mark readable (17.2:1)": {
+  "pass": true,
+  "detail": {
+   "fill": "rgba(14,16,24,0.62)",
+   "stroke": "#f2f4f8",
+   "filter": "none",
+   "visible": true,
+   "box": [
+    10,
+    763,
+    35,
+    19
+   ]
+  }
+ },
+ "Lightweight Charts color-yellow: recoloured, same place and size, still visible, mark readable (10.5:1)": {
+  "pass": true,
+  "detail": {
+   "fill": "#3e381a",
+   "stroke": "#fff3b7",
+   "filter": "none",
+   "visible": true,
+   "box": [
+    10,
+    763,
+    35,
+    19
+   ]
+  }
+ },
+ "Lightweight Charts: back to its own colours": {
+  "pass": true,
+  "detail": {
+   "fill": "#D1D4DC",
+   "stroke": "#131722",
+   "filter": "none",
+   "visible": true,
+   "box": [
+    10,
+    763,
+    35,
+    19
+   ]
+  }
+ },
+ "panel: one TradingView logo row (Bars & panels); colour picker and glow only when they apply; each saves; part of saved looks": {
+  "pass": true,
+  "detail": {
+   "one": true,
+   "glowHidden": true,
+   "pickShown": true,
+   "glowShown": true,
+   "st": {
+    "tvLogo": "color",
+    "tvLogoColor": "#ffe14a",
+    "tvLogoGlow": 1
+   },
+   "inLooks": true
+  }
+ }
+}
