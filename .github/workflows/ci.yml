@@ -45,6 +45,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: node test/colours/hook.unit.js
       - run: node test/colours/hook.unit.js --dpr 2
+      - run: node test/match/palette.test.js   # Auto-match: indicator / drawing colours readable, told apart, up / down kept
 
   workshop-rules:
     # The Workshop's database rules (supabase/schema.sql) against a real Postgres

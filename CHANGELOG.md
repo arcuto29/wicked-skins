@@ -21,6 +21,17 @@
 - **Workshop:** "Use" on a wallpaper you already downloaded puts your copy on the chart without downloading it again,
   and a Workshop wallpaper you'd already uploaded yourself isn't added twice. A converted video keeps its Workshop link.
 
+## Unreleased: Auto-match colours indicators and drawings around your candles
+- **Your candle colours are the foundation.** Auto-match (and Match everything) keeps the candle colours you chose and
+  builds the theme from the wallpaper's colours plus tones of your candles. Only if you hadn't chosen candles do they
+  come from the wallpaper. Take-profit / stop-loss and P&L stay your up / down colours.
+- **Indicators and drawings** (lines, moving averages, bands, levels, zones, Fibonacci, trend lines, rectangles,
+  horizontal lines) each get a theme colour that stands out from the wallpaper (lighter on dark ones, deeper on bright
+  ones), differs from the others and from your candles, and is never a made-up clear green or red. Green / red
+  indicator colours (up / down) take your up / down candle colours. Colours you set yourself per indicator stay yours.
+- **Turning Auto-match off puts everything back** the way it was before it matched, except settings you changed
+  yourself in the meantime.
+
 ## Unreleased: Smart fit for your wallpapers
 - **New default, Fit: Smart.** Your picture or video is placed for the charts themselves, not the whole page under
   TradingView's toolbars and lists. Close to the charts' shape, it fills them like Cover. A phone wallpaper (9:16), a

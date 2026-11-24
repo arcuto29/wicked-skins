@@ -533,11 +533,59 @@
   // the same hue and saturation, lifted so its brightest channel is full (a deep shade's glow that still shows)
   const bright = (hex) => { if (!isHex(hex)) return hex; const c = rgbOf(hex), m = Math.max(...c); return m >= 200 || !m ? hex : toHex(c.map((v) => Math.round((v * 255) / m))); };
   // the wallpaper's own colours (set by hook.js / lw.js from what the page measured), for "Wallpaper"
-  let wallCols = [];
-  function setWallColors(a) { wallCols = Array.isArray(a) ? a.filter(isHex).slice(0, 5) : []; }
+  let wallCols = [], wallBg = "dark";
+  // bg: how the wallpaper reads behind the chart ("dark" / "light"), for the contrast of the Wallpaper colours
+  function setWallColors(a, bg) { wallCols = Array.isArray(a) ? a.filter(isHex).slice(0, 5) : []; if (bg === "dark" || bg === "light") wallBg = bg; }
+  // ---------- Wallpaper (Match everything): the chart's indicators and drawings as one theme ----------
+  // From the wallpaper's own colours AND your candle colours, made readable on that wallpaper and told apart:
+  //  - each colour is lifted (dark wallpaper) or deepened (bright one) until it stands out from the wallpaper;
+  //  - colours too close to one already in the set, or to your candles (an indicator mustn't look like a candle), are
+  //    left out, so every line, level and zone has a colour of its own;
+  //  - past the wallpaper's colours come tones of your candle colours (their hue, shifted), so the set belongs to them.
+  // Worked out once per wallpaper / candles / brightness (memo), never per paint.
+  const lumC = (c) => (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  // by lightness, keeping the colour's own hue and saturation (a pale colour gets some colour): mixing with black / white
+  // turned pastels into the same muddy grey on a bright wallpaper. Greys stay grey.
+  const toHsl = (c) => { const [r, g, b] = c.map((v) => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    if (!d) return [0, 0, l]; const sa = d / (1 - Math.abs(2 * l - 1)); let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return [(h * 60 + 360) % 360, sa, l]; };
+  const fromHsl = (h, sa, l) => { const c = (1 - Math.abs(2 * l - 1)) * sa, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2;
+    const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]; return [r, g, b].map((v) => (v + m) * 255); };
+  function readable(hex, bg) {
+    const light = bg === "light", [h, sa0] = toHsl(rgbOf(hex)), sa = sa0 < 0.12 ? sa0 : Math.max(sa0, light ? 0.65 : 0.55);
+    let l = toHsl(rgbOf(hex))[2], c = fromHsl(h, sa, l), n = 0;
+    while ((light ? lumC(c) > 0.3 : lumC(c) < 0.45) && n++ < 40) { l = light ? Math.max(0.05, l - 0.025) : Math.min(0.95, l + 0.025); c = fromHsl(h, sa, l); }
+    return toHex(c);
+  }
+  const signalHue = (hex) => { const [hh, ss] = toHsl(rgbOf(hex)); return ss > 0.35 && (hh <= 10 || hh >= 350 || (hh >= 100 && hh <= 150)); };
+  function matchPalette(wall, up, down, bg) {
+    const cand = [up, down].filter(isHex).map(rgbOf), out = [];
+    const tryAdd = (hex) => { if (!isHex(hex)) return; const h = readable(hex, bg), c = rgbOf(h);
+      if (out.length >= 8 || out.some((x) => dist(rgbOf(x), c) < (bg === "light" ? 55 : 70)) || cand.some((x) => dist(x, c) < 60)) return; out.push(h); };
+    for (const w of wall) tryAdd(w);
+    // tones of your candle colours (and of the wallpaper's), turned round the colour wheel, to complete the set
+    const seeds = [...[up, down].filter(isHex), ...wall];
+    // (never a made-up clear green or red: on a chart those read as up / down; a green or red wallpaper keeps its own)
+    for (const deg of [40, -40, 80, -80, 140, 180, -140]) for (const sd of seeds) { const t = shade(sd, deg); if (!signalHue(t)) tryAdd(t); }
+    if (out.length < 2) return null;
+    return out;
+  }
+  // A colour that means up / down (green / red: a MACD histogram, Supertrend, buy / sell arrows) keeps its meaning: it
+  // takes your up / down candle colour instead of a theme colour ("keep": Priism's candle colours are off, so it keeps
+  // its own colour). null = not one of those.
+  function signalOf(orig, up, down) {
+    const k = keyOf(String(orig)); if (!k) return null;
+    const [r, g, b] = k.k.split(",").map((v) => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+    const sat = mx === mn ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1)); if (sat < 0.45 || l < 0.18 || l > 0.82) return null;
+    const d = mx - mn; let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h = (h * 60 + 360) % 360;
+    const side = h >= 85 && h <= 185 ? "up" : h <= 12 || h >= 345 ? "down" : null;
+    if (!side) return null;
+    return isHex(up) && isHex(down) ? (side === "up" ? up : down) : "keep";
+  }
   function indPalette(o) {
     // Wallpaper: each indicator / zone takes one of the wallpaper's real colours; past those, shades in between
     if (o.mode === "wallpaper" && wallCols.length >= 2) {
+      const m = matchPalette(wallCols, o.up, o.down, wallBg); if (m) return m;
       const out = [...wallCols];
       for (let i = 0; i < wallCols.length && out.length < 10; i++) out.push(shade(wallCols[i], 24));
       return out;
@@ -696,10 +744,15 @@
   // edge: a zone's outline, kept crisp (never softened like the fill)
   function indicatorAll(ctx, orig, o, force, alpha, edge) {
     if (!o || ((!o.mode || o.mode === "own") && !force)) return null;
-    const kk = keyOf(String(orig)), i = slotOf(kk ? kk.k : String(orig));
     const al = alpha === undefined || alpha >= 0.99 ? 1 : edge ? +alpha : zoneAlpha(alpha, o);
     // force: "rainbow" | "gradient" = this indicator's own choice (Each indicator), else the all-indicators mode
     const kind = force === "rainbow" || force === "gradient" ? force : o.mode;
+    if (kind === "wallpaper") {   // up / down colours keep their meaning, in your candle colours (readable)
+      const sg = signalOf(orig, o.up, o.down);   // (before taking a slot: the theme colours are for the others)
+      if (sg === "keep") return null;
+      if (sg) { const c = memo("sig|" + sg + wallBg, () => readable(sg, wallBg)); return { s: withAlpha(c, al), g: c }; }
+    }
+    const kk = keyOf(String(orig)), i = slotOf(kk ? kk.k : String(orig));
     if (kind === "rainbow" || kind === "gradient") {   // left to right across the chart
       const rb = kind === "rainbow", G = gradOf(o, i), off = (i * 67) % 360;
       const t = ctx.getTransform(), a = t.a || 1, w = ctx.canvas.width, key = kind + "|" + w + "|" + t.e + "|" + a + "|" + (rb ? off : G.join("")) + "|" + al.toFixed(2);
@@ -711,10 +764,15 @@
         m.set(key, gr); }
       return { s: gr, g: rb ? hsl(off + 180) : G[1] };
     }
-    const P = memo("ind|" + o.mode + o.color + o.up + o.down + o.accent + (o.mode === "wallpaper" ? wallCols.join("") : ""), () => indPalette(o));
+    const P = memo("ind|" + o.mode + o.color + o.up + o.down + o.accent + (o.mode === "wallpaper" ? wallCols.join("") + wallBg : ""), () => indPalette(o));
     // the glow: the line's own hue at full brightness. Custom's deeper shades (half your colour, half black) would
     // otherwise glow dark on a dark chart and all but vanish; the line itself keeps its shade.
-    return P ? { s: withAlpha(P[i % P.length], al), g: o.mode === "custom" ? bright(P[i % P.length]) : P[i % P.length] } : null;
+    if (!P) return null;
+    // Wallpaper: more colours on the chart than in the set (a Fibonacci alone has a dozen): the next round of colours
+    // are the set's own, turned a little round the colour wheel and made readable again, so they still differ
+    const pc = kind === "wallpaper" && i >= P.length ? memo("wrap|" + P[i % P.length] + "|" + Math.floor(i / P.length) + wallBg, () => { const base = P[i % P.length], r = Math.floor(i / P.length) % 5, steps = [[0], [22, -22], [-22, 22], [44, -44], [-44, 44]][r];
+      for (const d of steps) { const t = readable(shade(base, d), wallBg); if (!signalHue(t) || signalHue(base)) return t; } return base; }) : P[i % P.length];
+    return { s: withAlpha(pc, al), g: o.mode === "custom" ? bright(pc) : pc };
   }
 
   // ---------- chart text (Style > Chart text): text indicators draw ON the chart (labels, levels, values, prints) ----------

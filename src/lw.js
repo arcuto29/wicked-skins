@@ -147,8 +147,9 @@
         zoneReact: ["glow", "strong", "edge", "spotlight", "shimmer"].includes(f.zoneReact) ? f.zoneReact : "off",
         zoneShape: ["square", "rounded", "pill", "oval"].includes(f.zoneShape) ? f.zoneShape : "square", zoneBorder: ["line", "dashed", "double", "glow", "none"].includes(f.zoneBorder) ? f.zoneBorder : "line", zoneStyle: ["flat", "fade", "shine", "glass", "hollow"].includes(f.zoneStyle) ? f.zoneStyle : "flat",
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
+        bg: f.bg === "light" ? "light" : "dark",   // how the wallpaper reads (Wallpaper colours: their contrast)
         accent: hex(f.accent), wallColors: Array.isArray(f.wallColors) ? f.wallColors.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 5) : [] } : null;
-      if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(lfx ? lfx.wallColors : []);
+      if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(lfx ? lfx.wallColors : [], lfx && lfx.bg);
     } catch { lfx = null; ltx = null; }
   }
   let lfxSig = "null", candSig = null, onWas = null;
@@ -822,7 +823,7 @@
       // a chart styled on its own (Style each chart): its candles + chart styling, parsed exactly like the main ones
       const parseOwn = (q) => { const sf = lfx, st = ltx, sc = candles; readFx(q.fx); readCandles(q.cand || null);
         const r = { l: +q.l || 0, t: +q.t || 0, r: +q.r || 0, b: +q.b || 0, full: true, lfx, ltx, cand: candles, colors: [] };
-        lfx = sf; ltx = st; candles = sc; if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(lfx ? lfx.wallColors : []); return r; };
+        lfx = sf; ltx = st; candles = sc; if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(lfx ? lfx.wallColors : [], lfx && lfx.bg); return r; };
       chartCols = Array.isArray(a) && a.length > 1 ? a.slice(0, 16).map((q, i) => i && q && typeof q.fx === "string" ? parseOwn(q) : (i && q && hx(q.up) && hx(q.down)
         ? { l: +q.l || 0, t: +q.t || 0, r: +q.r || 0, b: +q.b || 0, up: hx(q.up), down: hx(q.down), accent: hx(q.accent), text: hx(q.text), colors: Array.isArray(q.colors) ? q.colors.map(hx).filter(Boolean).slice(0, 5) : [] }
         : i ? null : { l: +(q && q.l) || 0, t: +(q && q.t) || 0, r: +(q && q.r) || 0, b: +(q && q.b) || 0, main: true })) : null;
@@ -840,11 +841,11 @@
     const withChart = (fn) => function (...a) {
       const q = chartCols ? chartFor(this.canvas) : null;
       if (!q) return fn.apply(this, a);
-      if (q.full) { const pc = candles, pf = lfx, pt = ltx, L = window.__bdCandleLooks; candles = q.cand; lfx = q.lfx; ltx = q.ltx; if (L && L.setWallColors) L.setWallColors(lfx ? lfx.wallColors : []);
-        try { return fn.apply(this, a); } finally { candles = pc; lfx = pf; ltx = pt; if (L && L.setWallColors) L.setWallColors(lfx ? lfx.wallColors : []); } }
+      if (q.full) { const pc = candles, pf = lfx, pt = ltx, L = window.__bdCandleLooks; candles = q.cand; lfx = q.lfx; ltx = q.ltx; if (L && L.setWallColors) L.setWallColors(lfx ? lfx.wallColors : [], lfx && lfx.bg);
+        try { return fn.apply(this, a); } finally { candles = pc; lfx = pf; ltx = pt; if (L && L.setWallColors) L.setWallColors(lfx ? lfx.wallColors : [], lfx && lfx.bg); } }
       const pc = candles, pa = lfx && lfx.accent, pt = ltx && ltx.color, L = window.__bdCandleLooks, wc = q.colors.length >= 2 && L && L.setWallColors;
-      candles = q.cand; if (lfx && q.accent) lfx.accent = q.accent; if (ltx && q.text && ltx.mode === "custom") ltx.color = q.text; if (wc) L.setWallColors(q.colors);
-      try { return fn.apply(this, a); } finally { candles = pc; if (lfx) lfx.accent = pa; if (ltx) ltx.color = pt; if (wc) L.setWallColors(lfx ? lfx.wallColors : []); }
+      candles = q.cand; if (lfx && q.accent) lfx.accent = q.accent; if (ltx && q.text && ltx.mode === "custom") ltx.color = q.text; if (wc) L.setWallColors(q.colors, lfx && lfx.bg);
+      try { return fn.apply(this, a); } finally { candles = pc; if (lfx) lfx.accent = pa; if (ltx) ltx.color = pt; if (wc) L.setWallColors(lfx ? lfx.wallColors : [], lfx && lfx.bg); }
     };
     for (const name of ["fillRect", "strokeRect", "fill", "stroke", "fillText", "strokeText"]) if (typeof proto[name] === "function") proto[name] = withChart(proto[name]);
     for (const prop of ["fillStyle", "strokeStyle"]) { const d = Object.getOwnPropertyDescriptor(proto, prop); if (d && d.set) Object.defineProperty(proto, prop, { configurable: true, enumerable: d.enumerable, get: d.get, set: withChart(d.set) }); }
