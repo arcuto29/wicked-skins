@@ -10,6 +10,9 @@ WickedMigrate.run();                                   // every worker start: ch
 chrome.runtime.onInstalled.addListener((d) => {
   WickedMigrate.run();
   if (d.reason === "update") chrome.storage.local.remove("updateReady");
+  // Fit's default became Smart. Anyone updating who already has wallpapers of their own and never chose a Fit keeps
+  // exactly what they had (Cover). New installs, and anyone without uploads yet, get Smart.
+  if (d.reason === "update") chrome.storage.local.get(["fit", "media"], (s) => { if (s.fit === undefined && Array.isArray(s.media) && s.media.length) chrome.storage.local.set({ fit: "cover" }); });
   WickedSites.sync().then(() => { if (d.reason === "install" || d.reason === "update") refreshOpenTabs(); });
   // First install (e.g. from the Chrome Web Store): open a TradingView chart, where a welcome card explains how to
   // pin Priism Skins and pick a look. The chart is already skinned, so you see what it does straight away.
@@ -35,7 +38,7 @@ async function refreshOpenTabs() {
       if (probe.some((r) => r.result)) continue;
       await chrome.scripting.executeScript({ target, world: "MAIN", files: ["src/candlelooks.js", "src/hook.js", "src/lw.js"] });
       await chrome.scripting.insertCSS({ target, files: ["src/content.css"] });
-      await chrome.scripting.executeScript({ target, files: ["src/skins.js", "src/sounds.js", "src/pass.js", "src/content.js"] });
+      await chrome.scripting.executeScript({ target, files: ["src/skins.js", "src/sounds.js", "src/pass.js", "src/acct.js", "src/smartfit.js", "src/content.js"] });
     } catch {}   // a tab we can't reach (error page, permission removed) just keeps its old copy until refreshed
   }
 }

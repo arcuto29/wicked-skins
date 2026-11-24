@@ -212,3 +212,14 @@ footer { background: linear-gradient(180deg, transparent, rgba(46,242,176,.04));
 .ws-card .info small.credit:hover { -webkit-line-clamp: unset; }
 @media (prefers-reduced-motion: reduce) { .ws-card, .ws-card .media img, .ws-card .media video { transition: none; } .ws-card:hover, .ws-card:hover .media img { transform: none; } }
 .ws-card .info .ws-dl svg { position: static; inset: auto; margin: 0; display: block; transform: none; width: 15px; height: 15px; }
+
+/* Workshop › Usage (admins) */
+.usage-bars { display: grid; gap: 10px; margin: 10px 0; }
+.ubar { position: relative; padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.ubar-t { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; } .ubar-t span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.ubar > i { display: block; height: 6px; margin-top: 8px; border-radius: 3px; background: #34d399; }
+.ubar.warn > i { background: #f5b041; } .ubar.bad > i { background: #fb7185; }
+.ubar small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+.usage-more { margin: 8px 0 4px; } .usage-more summary { cursor: pointer; color: var(--a2); font-size: 13px; }
+.usage-lim { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 10px 0; }
+.usage-lim label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); } .usage-lim .field { margin: 0; }

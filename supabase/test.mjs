@@ -11,7 +11,7 @@ await db.exec(`
   create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
-  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid, metadata jsonb, created_at timestamptz default now());
   alter table storage.objects enable row level security;
   create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
   grant usage on schema public, auth, storage to anon, authenticated;
@@ -41,7 +41,10 @@ const as = async (uid, sql, params) => {
   try { return await db.query(sql, params); } finally { await db.exec("reset role"); }
 };
 const tryAs = async (...a) => { try { await as(...a); return "ok"; } catch (e) { return "denied: " + e.message.slice(0, 60); } };
-const up = (uid, title) => as(uid, `insert into public.wallpapers (title, kind, file_path, size_bytes, status, likes) values ($1, 'video', $2, 1000, 'approved', 999) returning id, status, owner, likes`, [title, `${uid}/x.webm`]);
+// a file in Storage (as Supabase records it: its real size in metadata), uploaded by that user
+const put = (uid, name, size = 1000) => as(uid, `insert into storage.objects (bucket_id, name, metadata) values ('workshop', $1, $2)`, [name, JSON.stringify({ size, mimetype: "video/webm" })]);
+let nFile = 0;
+const up = async (uid, title) => { const f = `${uid}/x${++nFile}.webm`; await put(uid, f); return as(uid, `insert into public.wallpapers (title, kind, file_path, size_bytes, status, likes) values ($1, 'video', $2, 1000, 'approved', 999) returning id, status, owner, likes`, [title, f]); };
 const w1 = (await up(U1, "User wallpaper")).rows[0];
 ok("user upload -> pending, can't self-approve or fake likes", w1.status === "pending" && w1.likes === 0 && w1.owner === U1, JSON.stringify(w1));
 const wa = (await up(ADMIN, "Admin wallpaper")).rows[0];
@@ -108,9 +111,10 @@ ok("3 reports hide a look until re-review", (await as(null, "select count(*)::in
   ok("an admin's update stays live", sa === "approved" && (await as(null, "select title from public.looks where id = $1", [la.id])).rows[0].title === "Admin look 2"); }
 ok("owner can delete own look", (await as(U1, "delete from public.looks where id = $1 returning id", [l1.id])).rows.length === 1);
 // ---------- wallpaper labels (quality + OLED) ----------
-{ const w = (await as(U1, "insert into public.wallpapers (title, kind, file_path, size_bytes, width, height, oled) values ('dark', 'image', 'u/x.png', 10, 3840, 2160, true) returning id, width, oled")).rows[0];
+{ await put(U1, `${U1}/dark.png`, 10); await put(U1, `${U1}/y.png`, 10);
+  const w = (await as(U1, `insert into public.wallpapers (title, kind, file_path, size_bytes, width, height, oled) values ('dark', 'image', '${U1}/dark.png', 10, 3840, 2160, true) returning id, width, oled`)).rows[0];
   ok("a shared wallpaper keeps its size and OLED label", w.width === 3840 && w.oled === true);
-  ok("silly sizes are refused", (await tryAs(U1, "insert into public.wallpapers (title, kind, file_path, size_bytes, width, height) values ('x', 'image', 'u/y.png', 10, 0, 99999)")) !== "ok");
+  ok("silly sizes are refused", (await tryAs(U1, `insert into public.wallpapers (title, kind, file_path, size_bytes, width, height) values ('x', 'image', '${U1}/y.png', 10, 0, 99999)`)) !== "ok");
   ok("non-admins can't relabel", (await tryAs(U2, "select public.label_wallpaper($1, 640, 360, false)", [w.id])).startsWith("denied"));
   await as(ADMIN, "select public.label_wallpaper($1, 1920, 1080, false)", [w.id]);
   const r = (await as(ADMIN, "select width, oled from public.wallpapers where id = $1", [w.id])).rows[0];
@@ -121,7 +125,7 @@ ok("owner can delete own look", (await as(U1, "delete from public.looks where id
   ok("service upload for the owner: approved, owner kept, credit stored", w.status === "approved" && w.owner === OWNER && w.credit === "NASA, ESA, CSA, and STScI");
   let bad = "ok"; try { await db.query("insert into public.wallpapers (owner, title, kind, file_path, size_bytes) values ($1, 'x', 'image', 'o/x.jpg', 10)", [U1]); } catch { bad = "refused"; }
   ok("service uploads for a non-admin are refused", bad === "refused");
-  ok("signed-in users still can't choose another owner", (await as(U1, "insert into public.wallpapers (owner, title, kind, file_path, size_bytes) values ($1, 'y', 'image', 'u/y.jpg', 10) returning owner", [OWNER])).rows[0].owner === U1); }
+  ok("signed-in users still can't choose another owner", (await as(U1, `insert into public.wallpapers (owner, title, kind, file_path, size_bytes) values ($1, 'y', 'image', '${U1}/y.png', 10) returning owner`, [OWNER])).rows[0].owner === U1); }
 // ---------- invites ----------
 await db.exec("grant update on public.invites to authenticated");
 ok("non-admin can't make invites", (await tryAs(U1, "insert into public.invites (code) values ('PRIISM-AAAA-BBBB')")).startsWith("denied"));
@@ -165,6 +169,55 @@ ok("the owner reads them, with contact and version", br && br.message === "Candl
 ok("nobody can write one directly (only through report_bug)", (await tryAs(U1, "insert into public.bug_reports (device, message) values ('x-00000001', 'hey')")) !== "ok" && (await tryAs(null, "insert into public.bug_reports (device, message) values ('x-00000001', 'hey')")) !== "ok");
 await as(ADMIN, "update public.bug_reports set done = true where message = 'report 0'");
 ok("the owner marks one done and deletes one", (await as(ADMIN, "select count(*)::int n from public.bug_reports where done")).rows[0].n === 1 && (await tryAs(ADMIN, "delete from public.bug_reports where message = 'report 1'")).startsWith("ok"));
+// ---------- free-tier limits: upload quotas, the real size, the total cap, the usage monitor ----------
+await db.exec("grant update on public.app_limits to anon, authenticated");   // Supabase grants it by default; RLS decides
+const U5 = "00000000-0000-0000-0000-000000000005", U6 = "00000000-0000-0000-0000-000000000006";
+for (const [id, e] of [[U5, "e@x.com"], [U6, "f@x.com"]]) await db.query("insert into auth.users (id, email) values ($1, $2)", [id, e]);
+const MB = 1048576;
+const share1 = (uid, kind, file, claimed = 1000, thumb = null) => as(uid, `insert into public.wallpapers (title, kind, file_path, thumb_path, size_bytes) values ('t', $1, $2, $3, $4) returning size_bytes`, [kind, file, thumb, claimed]);
+ok("limits are readable by anyone (the site shows them)", (await as(null, "select max_uploads_per_user n from public.app_limits")).rows[0].n === 15);
+ok("only admins change the limits", (await as(U5, "update public.app_limits set max_uploads_per_user = 999 returning id")).rows.length === 0
+  && (await as(ADMIN, "update public.app_limits set max_uploads_per_user = 3, max_bytes_per_user = $1, max_image_bytes = $2, max_video_bytes = $2 returning id", [10 * MB, 5 * MB])).rows.length === 1);
+ok("nobody can add or remove the limits row", (await tryAs(ADMIN, "insert into public.app_limits (id) values (2)")) !== "ok" && (await tryAs(ADMIN, "delete from public.app_limits")) !== "ok");
+// the recorded size is the stored file's, never what the browser says
+await put(U5, `${U5}/a.png`, 2 * MB);
+ok("the size recorded is the stored file's (a fake small size is replaced)", Number((await share1(U5, "image", `${U5}/a.png`, 10)).rows[0].size_bytes) === 2 * MB);
+ok("sharing a file that was never uploaded is refused", (await tryAs(U5, "insert into public.wallpapers (title, kind, file_path, size_bytes) values ('t', 'image', $1, 10)", [`${U5}/nope.png`])).includes("upload the file first"));
+await put(U6, `${U6}/theirs.png`, MB);
+ok("sharing someone else's file as your own is refused", (await tryAs(U5, "insert into public.wallpapers (title, kind, file_path, size_bytes) values ('t', 'image', $1, 10)", [`${U6}/theirs.png`])).includes("own folder"));
+await put(U5, `${U5}/big.png`, 6 * MB);
+ok("an image over the image limit is refused, with the limit", (await tryAs(U5, "insert into public.wallpapers (title, kind, file_path, size_bytes) values ('t', 'image', $1, 10)", [`${U5}/big.png`])).includes("up to 5 MB"));
+await db.query("delete from storage.objects where name = $1", [`${U5}/big.png`]);   // (removed through the Storage API, as the site does)
+await put(U5, `${U5}/b.png`, MB); await share1(U5, "image", `${U5}/b.png`); await put(U5, `${U5}/c.png`, MB); await share1(U5, "image", `${U5}/c.png`);
+await put(U5, `${U5}/d.png`, MB);
+ok("the per-user upload count is enforced (3 here), with how to make room", (await tryAs(U5, "insert into public.wallpapers (title, kind, file_path, size_bytes) values ('t', 'image', $1, 10)", [`${U5}/d.png`])).includes("up to 3 wallpapers"));
+const mine = (await as(U5, "select public.my_workshop_usage() u")).rows[0].u;
+ok("you see your own usage and limits", mine.uploads === 3 && mine.max_uploads === 3 && Number(mine.bytes) === 5 * MB && Number(mine.max_bytes) === 10 * MB && mine.unlimited === false, JSON.stringify(mine));
+// storage itself stops a user who is at their byte limit (also uploads that never became a wallpaper)
+await as(ADMIN, "update public.app_limits set max_uploads_per_user = 50, max_bytes_per_user = $1", [6 * MB]);
+await put(U5, `${U5}/e.png`, MB);   // now at 6 MB
+ok("Storage refuses more files once you're at your byte limit", (await tryAs(U5, `insert into storage.objects (bucket_id, name, metadata) values ('workshop', '${U5}/f.png', '{"size": 10}')`)).startsWith("denied"));
+ok("...but other users can still upload", (await tryAs(U6, `insert into storage.objects (bucket_id, name, metadata) values ('workshop', '${U6}/ok.png', '{"size": 10}')`)) === "ok");
+ok("admins aren't limited", (await tryAs(ADMIN, `insert into storage.objects (bucket_id, name, metadata) values ('workshop', '${ADMIN}/huge.mp4', '{"size": 52000000}')`)) === "ok"
+  && (await as(ADMIN, "select public.my_workshop_usage() u")).rows[0].u.unlimited === true);
+// the whole Workshop has a cap below the plan's storage quota: once it's reached, uploads stop (for non-admins)
+await as(ADMIN, "update public.app_limits set max_bytes_per_user = $1, max_total_bytes = $2", [100 * MB, 50 * MB]);
+ok("once the Workshop is at its total cap, uploads stop for everyone but admins", (await tryAs(U6, `insert into storage.objects (bucket_id, name, metadata) values ('workshop', '${U6}/more.png', '{"size": 10}')`)).startsWith("denied"));
+await as(ADMIN, "update public.app_limits set max_total_bytes = $1", [900 * MB]);
+// the usage monitor (admins only)
+await db.exec("update public.wallpapers set status = 'approved'");
+const wid = (await as(U5, "select id from public.wallpapers where owner = $1 limit 1", [U5])).rows[0].id;
+for (let i = 0; i < 3; i++) await as(null, "select public.count_use($1)", [wid]);
+await db.exec(`insert into storage.objects (bucket_id, name, metadata, created_at) values ('workshop', '${U6}/stale.png', '{"size": 4096}', now() - interval '2 days')`);
+const use = (await as(ADMIN, "select public.workshop_usage() u")).rows[0].u;
+ok("monitor: storage, database, downloads this month (3 of the 2 MB file + the earlier 1000-byte one)", Number(use.workshop_bytes) > 0 && Number(use.db_bytes) > 0 && use.month_downloads === 4 && Number(use.month_bytes) === 3 * 2 * MB + 1000 && use.limits.free_storage_bytes === 1073741824, JSON.stringify({ w: use.workshop_bytes, d: use.month_downloads, b: use.month_bytes }));
+ok("monitor: top uploaders and files left by unfinished uploads (older than a day)", use.top.length >= 2 && use.top[0].bytes >= use.top[1].bytes && use.orphans.some((o) => o.path === `${U6}/stale.png` && o.bytes === 4096) && !use.orphans.some((o) => o.path === `${U5}/a.png`), JSON.stringify(use.orphans.map((o) => o.path)));
+ok("monitor: admins only", (await tryAs(U5, "select public.workshop_usage()")).startsWith("denied") && (await tryAs(null, "select public.workshop_usage()")).startsWith("denied"));
+ok("the internal helpers can't be called directly", (await tryAs(U5, "select public.workshop_folder_usage($1)", [U6])).startsWith("denied") && (await tryAs(U5, "select public.workshop_check_upload('image', 'x', null, 1)")).startsWith("denied"));
+ok("downloads per day aren't readable directly", (await as(U5, "select count(*)::int n from public.usage_daily")).rows[0].n === 0);
+await as(ADMIN, "update public.app_limits set max_uploads_per_user = 15, max_bytes_per_user = $1, max_image_bytes = $2, max_video_bytes = $3", [60 * MB, 20 * MB, 30 * MB]);
+await db.exec(fs.readFileSync(new URL("./schema.sql", import.meta.url), "utf8"));
+ok("re-running the schema keeps the limits you set", (await db.query("select max_uploads_per_user n from public.app_limits")).rows[0].n === 15);
 // ---------- beta access tied to accounts ----------
 // Supabase grants execute on new functions by default and schema.sql revokes it again; the blanket grant above undid
 // that here, so put the schema's revoke back for the internal helper.

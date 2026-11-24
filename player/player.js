@@ -3,12 +3,11 @@
 (async function () {
   const q = new URLSearchParams(location.search);
   const id = q.get("id"), type = q.get("type");
-  let el, look = {};
+  let el, look = {}, fitter = null;
 
   function apply() {
     if (!el) return;
-    el.style.objectFit = { cover: "cover", fit: "contain", stretch: "fill" }[look.fit] || "cover";
-    el.style.objectPosition = `${look.posX ?? 50}% ${look.posY ?? 50}%`;
+    if (fitter) fitter.update();   // Fit: Smart / Cover / Contain / Stretch (src/smartfit.js)
     if (el.tagName === "VIDEO") {
       el.playbackRate = Math.max(0.25, Math.min(4, look.speed || 1));
       look.paused ? el.pause() : el.play().catch(() => {});
@@ -56,6 +55,7 @@
     if (type === "video") Object.assign(el, { loop: true, muted: true, autoplay: true, playsInline: true });
     el.src = URL.createObjectURL(blob);
     document.body.appendChild(el);
+    fitter = window.PriismSmartFit ? window.PriismSmartFit.attach(document.body, el, () => look) : null;
     apply();
     parent.postMessage({ __wicked: "player-ready", id }, "*");
     // brightness report for the page's auto-contrast (we're same-origin with our own blob, so we can read pixels)
@@ -63,9 +63,11 @@
     const g = c.getContext("2d", { willReadFrequently: true });
     // the video frame lives on the graphics card; shrink it off the main thread (createImageBitmap) before reading,
     // so measuring never stalls the page
-    let busy = false;
-    setInterval(async () => {
-      if (busy || document.hidden) return; busy = true;
+    let busy = false, lastGrid = "", same = 0;
+    // a still picture never changes: once two samples in a row are the same, stop (animated GIF / WebP / APNG differ,
+    // so they keep being sampled; a paused video isn't sampled at all)
+    const iv = setInterval(async () => {
+      if (busy || document.hidden || (el.tagName === "VIDEO" && el.paused)) return; busy = true;
       try {
         let src = el, bmp = null;
         if (typeof createImageBitmap === "function") { try { bmp = await createImageBitmap(el, { resizeWidth: 32, resizeHeight: 18, resizeQuality: "low" }); src = bmp; } catch { src = el; } }
@@ -77,6 +79,7 @@
           if ((i / 4) % 32 >= 27) prof[Math.floor(i / 4 / 32)] += l / 5;
         }
         const mean = sum / n;
+        if (el.tagName === "IMG") { const k = grid.join(","); if (k === lastGrid) { if (++same >= 1) clearInterval(iv); return; } lastGrid = k; same = 0; }
         // grid = 32x18 brightness map; rgb = same pixels (r,g,b,a bytes) so the page can derive an Auto-match palette.
         parent.postMessage({ __wicked: "lum", mean, std: Math.sqrt(Math.max(0, sq / n - mean * mean)), prof, grid, rgb: Array.from(d) }, "*");
       } catch {} finally { busy = false; }

@@ -1,0 +1,25 @@
+# One-off helper: copy a release (with all its downloads) from this private code repo to the public
+# arcuto29/wicked-skins repo. Used once when the code repo went private, so the website's download buttons and the
+# desktop app's auto-update have the current version straight away. Actions → Mirror a release → Run workflow.
+name: Mirror a release
+on:
+  workflow_dispatch:
+    inputs:
+      tag: { description: "Tag to copy, e.g. v0.1.58", required: true }
+permissions:
+  contents: read
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the release from this repo
+        env: { GH_TOKEN: "${{ github.token }}", TAG: "${{ inputs.tag }}" }
+        run: |
+          mkdir out && gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir out
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > notes.md
+          ls -l out
+      - name: Publish it in the public repo
+        env: { GH_TOKEN: "${{ secrets.PUBLIC_REPO_TOKEN }}", TAG: "${{ inputs.tag }}" }
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret first (see RELEASING.md)."; exit 1; }
+          gh release create "$TAG" out/* --repo arcuto29/wicked-skins --title "Priism Skins $TAG" --notes-file notes.md --latest

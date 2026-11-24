@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased: no duplicate uploads
+- **A wallpaper is stored only once.** Picking a file you already have (even under another name), or the same file
+  twice in one go, no longer adds a second copy: the one you have goes on the chart, and the panel says
+  "Already in your uploads". Files are recognised by their content (size and a fingerprint of the start, middle and
+  end), so different files with the same name are still both added. Uploads from before this update are recognised too.
+- **Workshop:** "Use" on a wallpaper you already downloaded puts your copy on the chart without downloading it again,
+  and a Workshop wallpaper you'd already uploaded yourself isn't added twice. A converted video keeps its Workshop link.
+
+## Unreleased: Smart fit for your wallpapers
+- **New default, Fit: Smart.** Your picture or video is placed for the charts themselves, not the whole page under
+  TradingView's toolbars and lists. Close to the charts' shape, it fills them like Cover. A phone wallpaper (9:16), a
+  square or an ultrawide picture is shown whole, sharp and in proportion, with the same picture softly blurred around it:
+  nothing stretched, no black bars, nothing important cut off. It follows window size, panels, fullscreen, zoom and
+  multi-chart layouts. Cover, Contain and Stretch are unchanged, next to Smart in the same Fit control.
+- **Your existing wallpapers look exactly as before:** if you already have uploads and never chose a Fit, you keep Cover.
+
+## Unreleased: smoother wallpapers
+- **Your video wallpapers hold still when the built-in ones do:** in a trade or at the order ticket (trade focus), while
+  one of TradingView's big windows is open, in Focus, in a background tab, and (with Power saver, or when trading is
+  slowed down at Auto quality's lowest level) while you pan and zoom. They kept playing before. Measured with a 4K
+  video on a slowed-down laptop setup: in a trade the chart went from 32 to 57 frames a second.
+- **Wallpapers run at the frame rate you chose on any screen:** "60" gave 48 on 144 Hz screens, 37 on 75 Hz.
+- **Still pictures** stop re-reading their colours every 3 s once nothing changes.
+- **Adding wallpapers:** a file the browser can't store (disk full) now says so, and the other files are still added
+  (the panel used to stay on "Checking files…"). Removing a video still being converted removes its original too.
+
+## Unreleased: colours that stay put
+- **Bracket lines keep your line colour.** On a live chart the take-profit / stop-loss line went back to the platform's
+  colour on most repaints (about once a second), and for a frame whenever it moved, the price scale was dragged or
+  the chart zoomed. It now has your colour in every frame, on TradingView and on platforms built on TradingView's
+  charting library (TopstepX). Profit and loss labels keep their own colours.
+- **Drawings keep their Each indicator colour** when they come back (switching back to their symbol or timeframe) or are
+  new: they were drawn in their own colour for up to 3 s first.
+- **Indicator level lines** (one straight line, like prints or session levels) take your colour in their very first frame
+  instead of after about a second, on TradingView and on Lightweight Charts (nq.vision). They no longer go back to their
+  own colour while the price scale is dragged or a price tag passes over them.
+- **Lightweight Charts (nq.vision): a new chart is styled from its first frame.** Priism looked for the chart every
+  250 ms, so a chart that drew at once (e.g. on a reload) showed its first frames in the platform's colours.
+- Nothing else is drawn differently: only when your colour is applied changed. No new settings.
+
 ## Unreleased: marker colours
 - **New: Markers** (Chart › Lines, zones & labels, under Indicators): the small shapes on a chart, in any colour. That covers an indicator's signal arrows, triangles, circles and labels, your trade arrows, and the markers an app like nq.vision puts on candles.
   - Choose Own, Colour (any colour, exactly), Candles (buy / up markers in your up colour, the rest your down colour), Rainbow, Gradient (the same gradient colours as Indicators) or Wallpaper.

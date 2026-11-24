@@ -16,13 +16,13 @@ const LOOK_KEYS = [...CHART_KEYS, "atmoFx","atmoTrail","atmoAura","atmoColor","a
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
   opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
-  fps: "auto", fit: "cover", posX: 50, posY: 50, res: "standard",
+  fps: "auto", fit: "auto", posX: 50, posY: 50, res: "standard",
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
   lensKey: "Alt+Shift+KeyZ", lensZoom: 2.5, lensSize: "m", zoneReact: "off", pnStyle: "flat", pnRound: false, pnWindows: true, tpOn: false, tpColors: "candles", tpBuy: "#2962ff", tpSell: "#f23645", tpShape: "rounded", tpStyle: "solid", tpPanel: "keep", react: "off", reactStrength: 0.6, moodLook: "glow", moodRange: 1, moodPulse: "soft", musicParts: "gwfi", musicFeel: "punchy", musicSens: "normal",
   frameOn: false, framePattern: "carbon", frameMode: "accent", frameColor: "#7c6cff", frameColor2: "#ff4df0", frameW: 8, frameAlpha: 0.5, frameSize: 1, frameRound: true, frameEdge: true, frameMove: false,
   barPatOn: false, barPattern: "zebra", barMode: "rainbow", barColor: "#7c6cff", barColor2: "#ff4df0", barAlpha: 0.25, barSize: 1, barWhere: "tlrb",
-  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
+  wmOn: false, wmPos: "br", wmText: "", wmStyle: "corner", wmOpacity: 0.85, wmDrift: false, clipEdit: true, clipQuality: "balanced", clipAudio: "none", clipLen: 10, privacy: false, privacyPeek: false, privacyKey: "Alt+Shift+KeyP", privacyAcct: true, tsxAcctLabel: "", tsxAcctStyle: "own", tsxAcctFont: "default", tsxAcctFill: "glass", tsxAcctGlow: "soft", tsxAcctBadge: "filled", privacyOrder: false, privacyPnl: "hide", bracketQty: "", goalSound: "off", sessionSound: "off", tkOn: false, tkColor: "", tkSize: 1, tkFont: "default", tkGlow: false, tkOnly: false, lgOn: false, lgColor: "", lgVals: "own", lgBack: "none", tradeClipOn: false, tradeClipLen: 30, toggleKey: "Alt+Shift+KeyW", focusKey: "Alt+Shift+KeyF", recordKey: "Alt+Shift+KeyV", snapKey: "Alt+Shift+KeyS", focus: false, focusHides: "wallpaper", timerOn: false, timerMarket: "auto", timerPos: "bc", timerShow: "full", timerFormat: "in", timerClosed: "show", timerStyle: "pill", sides: "off", leftBar: "off", panelMode: "off", panelColor: "#10131c", tsxLogo: "own", tsxLogoText: "", tsxLogoColor: "look", dlgMode: "off", dlgColor: "#12151f", dlgAlpha: 0.78, uiFont: "default", uiSize: 0, uiAccent: "", vignette: 0, calm: false,
   sessionOn: false, sessionSkins: { asia: "galaxy", london: "rain", ny: "cybergrid", off: "ocean" },
   symbolOn: false, symbolSkins: {}, autoQuality: true, autoMatch: false, matchOnPick: false,
   candleLook: "solid", candleClosedLook: "", shiftSpeed: 10,
@@ -1246,7 +1246,7 @@ function renderMedia() {
       if (e.target.classList.contains("x")) {
         const media = cfg.media.filter((x) => x.id !== m.id);
         const wasActive = cfg.skin === "media" && cfg.mediaId === m.id;
-        if (m.file && window.WickedMediaDB) WickedMediaDB.del(m.id).catch(() => {});
+        if (m.file && window.WickedMediaDB) { WickedMediaDB.del(m.id).catch(() => {}); if (m.pending) WickedMediaDB.del(m.id + ":src").catch(() => {}); }   // (a video still to convert: its original too)
         const chartSkins = Object.fromEntries(Object.entries(cfg.chartSkins || {}).filter(([, v]) => v !== "media:" + m.id));
         set(wasActive ? { media, chartSkins, skin: "aurora", mediaId: null } : { media, chartSkins });
       } else if (!m.pending) return pickSource("media:" + m.id);
@@ -1310,35 +1310,66 @@ const readAsDataURL = (f, mime) => new Promise((res, rej) => {
 const hint = (t) => { $("mediaHint").textContent = t; };
 const saveMedia = (media, extra = {}) => { set({ media, ...extra }); if (extra.skin === "media") autoMatchPick(); };
 
+// why the browser wouldn't store a file, in plain words
+const storeMsg = (e) => /quota/i.test(String(e && (e.name || e.message))) ? "your disk or the browser's storage is full: free some space and try again" : String((e && e.message) || "the browser refused to store it");
+// The same file added twice (picked again, dropped twice in one go, or a Workshop wallpaper you'd already uploaded) is
+// stored only once: the copy you already have is put on the chart instead. A file is recognised by its content, not
+// its name: its size plus a SHA-256 of its start, middle and end (1 MB each, so a 2 GB video is quick to check).
+async function fingerprint(blob) {
+  try {
+    const MB = 1 << 20, n = blob.size, mid = Math.floor(n / 2);
+    const parts = n <= 3 * MB ? [blob] : [blob.slice(0, MB), blob.slice(mid - MB / 2, mid + MB / 2), blob.slice(n - MB)];
+    const h = new Uint8Array(await crypto.subtle.digest("SHA-256", await new Blob(parts).arrayBuffer()));
+    return n + ":" + [...h.slice(0, 16)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch { return null; }
+}
+// uploads added before this check have no fingerprint yet: worked out once from the stored file (a converted video
+// isn't the file you picked any more, so it can't be matched)
+async function fingerprintOld() {
+  let changed = false;
+  for (const m of cfg.media) {
+    if (m.fp || m.converted) continue;
+    let b = null;
+    try { b = m.file ? await WickedMediaDB.get(m.pending ? m.id + ":src" : m.id) : m.src ? await (await fetch(m.src)).blob() : null; } catch {}
+    const fp = b && await fingerprint(b);
+    if (fp) { m.fp = fp; changed = true; }
+  }
+  if (changed) set({ media: cfg.media });
+}
 async function addFiles(files) {
-  const problems = []; let added = 0, needConvert = 0, lastId = null;
+  const problems = [], dupes = []; let added = 0, needConvert = 0, lastId = null;
   hint("Checking files…");
+  await fingerprintOld();
   for (const f of files) {
     const c = classify(f);
     if (c.err) { problems.push(`${f.name}: ${c.err}`); continue; }
     if (f.size > MAX_FILE_MB * 1024 * 1024) { problems.push(`${f.name}: over ${MAX_FILE_MB >= 1024 ? MAX_FILE_MB / 1024 + " GB" : MAX_FILE_MB + " MB"}`); continue; }
     const name = f.name;
     const id = uid();
+    const fp = await fingerprint(f);
+    const same = fp && cfg.media.find((m) => m.fp === fp);
+    if (same) { dupes.push(f.name); if (!same.pending) lastId = same.id; continue; }
 
     if (!EXT_MODE) { // desktop app fallback
       const src = await readAsDataURL(f, c.mime);
       const p = await probe(c.type, src);
       if (!p) { problems.push(`${f.name}: can't play in the desktop app yet (try MP4 H.264 or WebM)`); continue; }
-      cfg.media = [...cfg.media, { id, name, type: c.type, src }]; lastId = id; added++;
+      cfg.media = [...cfg.media, { id, name, type: c.type, src, ...(fp ? { fp } : {}) }]; lastId = id; added++;
       continue;
     }
 
     const url = URL.createObjectURL(f);
     const p = await probe(c.type, url);
     URL.revokeObjectURL(url);
+    // (saved file by file: one that can't be stored is reported and the rest are kept, nothing is left half-saved)
     if (p) {
-      await WickedMediaDB.put(id, f);
+      try { await WickedMediaDB.put(id, f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }
       let q = null; try { q = await window.PriismWallInfo.measure(f, c.type); } catch {}
-      cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size, ...(q ? { w: q.w, h: q.h, oled: q.oled } : {}) }];
+      cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size, ...(fp ? { fp } : {}), ...(q ? { w: q.w, h: q.h, oled: q.oled } : {}) }];
       lastId = id; added++;
     } else if (c.type === "video") {
-      await WickedMediaDB.put(id + ":src", f); // original kept until converted
-      cfg.media = [...cfg.media, { id, name, type: "video", file: true, pending: true, origName: f.name, size: f.size }];
+      try { await WickedMediaDB.put(id + ":src", f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }   // original kept until converted
+      cfg.media = [...cfg.media, { id, name, type: "video", file: true, pending: true, origName: f.name, size: f.size, ...(fp ? { fp } : {}) }];
       needConvert++;
     } else problems.push(`${f.name}: this image's format can't be shown in the browser`);
   }
@@ -1346,6 +1377,7 @@ async function addFiles(files) {
   renderMedia(); renderSkins();
   const parts = [];
   if (added) parts.push(`Added ${added} file${added > 1 ? "s" : ""}.`);
+  if (dupes.length) parts.push(`Already in your uploads, not added again: ${dupes.join(", ")}.`);
   if (needConvert) parts.push(`${needConvert} video${needConvert > 1 ? "s" : ""} need converting…`);
   if (problems.length) parts.push("Skipped " + problems.join(" · "));
   hint(parts.join(" ") || "Files stay on your computer.");
@@ -1401,7 +1433,8 @@ async function convertPending() {
         await WickedMediaDB.put(m.id, blob);
         await WickedMediaDB.del(m.id + ":src");
         delete converting[m.id];
-        cfg.media = cfg.media.map((x) => (x.id === m.id ? { id: x.id, name: x.name, type: "video", file: true, thumb: p.thumb, size: blob.size, converted: true } : x));
+        cfg.media = cfg.media.map((x) => (x.id === m.id ? { id: x.id, name: x.name, type: "video", file: true, thumb: p.thumb, size: blob.size, converted: true,
+          ...(x.fp ? { fp: x.fp } : {}), ...(x.wsId ? { wsId: x.wsId } : {}) } : x));   // (fp: the file you picked, so picking it again is still recognised)
         saveMedia(cfg.media, { skin: "media", mediaId: m.id });
         hint(`Converted ${m.origName}. It's on your chart now.`);
       } catch (e) {
@@ -1529,7 +1562,9 @@ async function useLookWall(wallId, fallbackSkin) {
     const before = new Set((cfg.media || []).map((m) => m.id));
     noAutoMatch = true;
     try { await addFiles([new File([blob], `${w.title}.${ext || (w.kind === "video" ? "webm" : "png")}`, { type: blob.type })]); } finally { noAutoMatch = false; }
-    const added = (cfg.media || []).find((m) => !before.has(m.id));
+    // (newly added, or the same file you already had: tagged either way, so it isn't downloaded again next time)
+    const fp = await fingerprint(blob);
+    const added = (cfg.media || []).find((m) => !before.has(m.id)) || (fp && (cfg.media || []).find((m) => m.fp === fp && !m.wsId));
     if (added) set({ media: cfg.media.map((m) => (m.id === added.id ? { ...m, wsId: wallId } : m)) });
     toast(`\u201c${w.title}\u201d is on your chart and in My uploads.`);
   } catch (e) { set({ skin: fallbackSkin && WickedSkins[fallbackSkin] ? fallbackSkin : "aurora" }); syncSkinView(); toast("Couldn't get the look's wallpaper (" + e.message + "), so it uses a built-in one."); }
@@ -1568,11 +1603,17 @@ function wsRender() {
 }
 // "Use": download into your Uploads and put it on the chart. No account needed.
 async function wsUse(it) {
+  // already downloaded: the copy in your Uploads is used (no second download, no second copy)
+  const have = it.id && (cfg.media || []).find((m) => m.wsId === it.id && !m.pending);
+  if (have) { pickSource("media:" + have.id); toast(`“${it.title}” is on your chart (already in My uploads).`); return; }
   toast(`Downloading “${it.title}”…`);
   try {
     const blob = await W().fetchFile(it);
     const ext = (blob.type.split("/")[1] || "").replace("jpeg", "jpg");
+    const before = new Set((cfg.media || []).map((m) => m.id)), fp = await fingerprint(blob);
     await addFiles([new File([blob], `${it.title}.${ext || (it.kind === "video" ? "webm" : "png")}`, { type: blob.type })]);
+    const got = (cfg.media || []).find((m) => !before.has(m.id)) || (fp && (cfg.media || []).find((m) => m.fp === fp && !m.wsId));
+    if (got && it.id) set({ media: cfg.media.map((m) => (m.id === got.id ? { ...m, wsId: it.id } : m)) });
     toast(`“${it.title}” is on your chart and in My uploads (Skins tab).`);
   } catch (e) { toast("Couldn't use it: " + e.message); }
 }
@@ -1921,6 +1962,17 @@ function syncPrivHint() {
     : `Dollar amounts become dots; ${m === "points" ? "TradingView's tick values are shown in points (futures we know the tick size of; others stay in ticks)" : "tick and % values stay visible"}. Set TradingView to show ticks: Settings \u203A Trading \u203A P&L in Ticks.`;
 }
 if ($("privacyAcct")) $("privacyAcct").onchange = (e) => set({ privacyAcct: e.target.checked });
+// TopstepX account box nickname: the same rule as on the page (src/acct.js), so it can't pose as account details
+const ACCT_HINT_TXT = "On TopstepX, the account box at the top left: your nickname and style. The account type badge (Practice, Combine, Express Funded, Live Funded) always shows and comes from TopstepX, in its own colour. Visual only: nothing about your account changes. Custom needs Panels on.";
+function syncAcctNick(v) {
+  const problem = window.PriismAcct ? window.PriismAcct.nicknameProblem(v) : "";
+  $("tsxAcctHint").textContent = problem || ACCT_HINT_TXT; $("tsxAcctHint").style.color = problem ? "#ff8a8a" : "";
+  return !problem;
+}
+if ($("tsxAcctLabel")) {
+  $("tsxAcctLabel").value = cfg.tsxAcctLabel || ""; if (cfg.tsxAcctLabel) syncAcctNick(cfg.tsxAcctLabel);   // (a name saved under an older rule: say why it isn't shown)
+  $("tsxAcctLabel").oninput = (e) => { const v = e.target.value.replace(/\s+/g, " ").trim(); if (syncAcctNick(v)) set({ tsxAcctLabel: v }); };
+}
 if ($("privacyOrder")) $("privacyOrder").onchange = (e) => set({ privacyOrder: e.target.checked });
 if ($("privacyOn")) $("privacyOn").onchange = (e) => { set({ privacy: e.target.checked }); renderJournal(); };
 if ($("tradeClipOn")) $("tradeClipOn").onchange = (e) => { set({ tradeClipOn: e.target.checked }); syncExtras(); };
@@ -2239,9 +2291,16 @@ function syncPanels() {
   if ($("tsxLogo")) { seg("tsxLogo", [["own", "TopstepX's"], ["look", "Priism"], ["text", "Your name"]], () => cfg.tsxLogo || "own", (v) => { set({ tsxLogo: v }); syncPanels(); });
     $("tsxLogoTextRow").hidden = cfg.tsxLogo !== "text"; if (document.activeElement !== $("tsxLogoText")) $("tsxLogoText").value = cfg.tsxLogoText || "";
     const lc = cfg.tsxLogoColor || "look", isHex = /^#[0-9a-f]{6}$/i.test(lc);
-    $("tsxLogoColRow").hidden = !(cfg.tsxLogo === "look" || cfg.tsxLogo === "text");
+    const acctX = cfg.tsxAcctStyle === "custom";
+    $("tsxLogoColRow").hidden = !(cfg.tsxLogo === "look" || cfg.tsxLogo === "text" || acctX);
     seg("tsxLogoColor", [["look", "Your look"], ["rainbow", "Rainbow"], ["pick", "Colour"]], () => (isHex ? "pick" : lc), (v) => { set({ tsxLogoColor: v === "pick" ? ($("tsxLogoPick").value || "#7c6cff") : v }); syncPanels(); });
-    $("tsxLogoPick").hidden = !isHex; if (isHex) $("tsxLogoPick").value = lc; }
+    $("tsxLogoPick").hidden = !isHex; if (isHex) $("tsxLogoPick").value = lc;
+    seg("tsxAcctStyle", [["own", "TopstepX's"], ["custom", "Custom"]], () => (acctX ? "custom" : "own"), (v) => { set({ tsxAcctStyle: v }); syncPanels(); });
+    document.querySelectorAll(".tsx-acct-x").forEach((r) => { r.hidden = !acctX; });
+    seg("tsxAcctFont", [["default", "TopstepX"], ["display", "Display"], ["mono", "Mono"]], () => cfg.tsxAcctFont || "default", (v) => { set({ tsxAcctFont: v }); syncPanels(); });
+    seg("tsxAcctFill", [["glass", "Glass"], ["gradient", "Gradient"], ["solid", "Solid"]], () => cfg.tsxAcctFill || "glass", (v) => { set({ tsxAcctFill: v }); syncPanels(); });
+    seg("tsxAcctGlow", [["off", "Off"], ["soft", "Soft"], ["strong", "Strong"]], () => cfg.tsxAcctGlow || "soft", (v) => { set({ tsxAcctGlow: v }); syncPanels(); });
+    seg("tsxAcctBadge", [["filled", "Filled"], ["outline", "Outline"]], () => cfg.tsxAcctBadge || "filled", (v) => { set({ tsxAcctBadge: v }); syncPanels(); }); }
 }
 if ($("tsxLogoPick")) $("tsxLogoPick").oninput = (e) => set({ tsxLogoColor: e.target.value });
 if ($("tsxLogoText")) $("tsxLogoText").oninput = (e) => set({ tsxLogoText: e.target.value.slice(0, 24), tsxLogo: "text" });
@@ -2282,7 +2341,10 @@ function syncTune() {
   // Auto quality: meaningful on Smooth or Max (it eases off if your computer struggles). Eco/Balanced already cap things.
   $("autoQRow").hidden = cfg.powerSaver || (cfg.fps !== "auto" && cfg.fps !== "max");
   seg("autoQuality", [[true, "Auto"], [false, "Max"]], () => (cfg.autoQuality !== false), (v) => set({ autoQuality: v }));
-  seg("fit", [["cover", "Cover"], ["fit", "Contain"], ["stretch", "Stretch"]], () => cfg.fit, (v) => set({ fit: v }));
+  seg("fit", [["auto", "Smart"], ["cover", "Cover"], ["fit", "Contain"], ["stretch", "Stretch"]], () => cfg.fit, (v) => { set({ fit: v }); syncTune(); });
+  if ($("fitHint")) $("fitHint").textContent = cfg.fit === "auto"
+    ? "Smart: fills the chart when your picture is close to its shape. A phone wallpaper, a square or an ultrawide picture is shown whole and sharp, with the same picture softly blurred around it."
+    : cfg.fit === "cover" ? "Cover: fills the chart, cutting off what doesn't fit." : cfg.fit === "fit" ? "Contain: the whole picture, with empty space around it." : "Stretch: fills the chart, out of proportion.";
   seg("calm", [[false, "Off"], [true, "On"]], () => cfg.calm, (v) => set({ calm: v }));
   seg("motion", [[false, "On"], [true, "Paused"]], () => cfg.paused, (v) => set({ paused: v }));
   seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => { set({ layer: v }); syncTune(); });
@@ -2811,6 +2873,7 @@ async function siteBar() {
         }
       }
       if (window.TradingView || window.tvWidget) chart = true;
+      if (/(^|\.)tradovate\.com$/.test(location.hostname) && document.querySelector("canvas#c")) chart = true;   // Tradovate's WebGL charts
       return { chart, frames: [...frames] };
     } });
     found = res.result || found;

@@ -400,3 +400,7 @@ html.bd-lite.bd-shift .chart-markup-table.pane canvas:first-of-type, html.bd-lit
 /* Trade focus (content.js syncHold): while you're at the order ticket or in a position, the endless loops hold still */
 html[data-bd-hold] #bd-layer .bd-frame::before, html[data-bd-hold] .bd-emb .bd-frame::before, html[data-bd-hold] #bd-barpat.bd-aurora > div,
 html[data-bd-hold].bd-shift .chart-markup-table.pane canvas:first-of-type, html[data-bd-hold] #bd-pnl.bd-pnl-rainbow { animation-play-state: paused !important; }
+
+/* Tradovate: its WebGL canvas sits in #content; with the chart backgrounds see-through, the wallpaper tiles behind
+   (one per chart) show. #content's own black would hide them. The rest of its screen keeps its colours. */
+html.bd-on.bd-tdv:not(.bd-over-mode) #content { background: transparent !important; }
