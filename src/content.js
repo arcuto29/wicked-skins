@@ -11,7 +11,7 @@
     loadouts: [],
     // Tune
     opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
-    fps: "auto", fit: "cover", posX: 50, posY: 50,
+    fps: "auto", fit: "auto", posX: 50, posY: 50,   // fit: auto (Smart) | cover | fit (Contain) | stretch: src/smartfit.js
     res: "standard",       // wallpaper sharpness: standard (light) | sharp (your screen's size) | ultra (every pixel, up to 4K)
     powerSaver: false, paused: false, bw: false,
     layer: "behind",       // "behind" | "over"
@@ -866,9 +866,10 @@
       v.vg.__css = vgCss(v); v.vg.style.background = v.vg.__css;
       const content = v.content;
       content.style.filter = f.join(" ");
-      if (content.tagName !== "CANVAS") {
-        content.style.objectFit = { cover: "cover", fit: "contain", stretch: "fill" }[cfg.fit] || "cover";
-        content.style.objectPosition = `${cfg.posX}% ${cfg.posY}%`;
+      if (content.tagName === "IMG" || content.tagName === "VIDEO") {   // shown right in the page: fitted here (an IFRAME: by its player)
+        if (!v.fitter && window.PriismSmartFit && content.parentNode) v.fitter = window.PriismSmartFit.attach(content.parentNode, content, () => ({ fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, area: v.area }));
+        if (v.fitter) v.fitter.update();
+        else { content.style.objectFit = { cover: "cover", fit: "contain", stretch: "fill" }[cfg.fit] || "cover"; content.style.objectPosition = `${cfg.posX}% ${cfg.posY}%`; }
       }
       if (content.tagName === "VIDEO") {
         content.playbackRate = Math.max(0.25, Math.min(4, cfg.speed * calmFactor()));
@@ -895,7 +896,8 @@
   // Files stored in the extension's database play inside an extension iframe (player/player.html).
   function postLook(frame) {
     if (!frame || frame.tagName !== "IFRAME" || !frame.contentWindow) return;
-    frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, speed: cfg.speed * calmFactor(), paused: stillNow() } }, "*");
+    const fv = views.find((x) => x.content === frame);
+    frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, area: fv ? fv.area : null, speed: cfg.speed * calmFactor(), paused: stillNow() } }, "*");
   }
 
   // ---------- built-in wallpapers drawn off TradingView's main thread ----------
@@ -1502,7 +1504,7 @@
     try { applyAtmo(); } catch {}
     resetQuality(); lastMatch = "";
     if (views.some((v) => v.skin || v.fx)) startLoop();
-    applyLook(); syncMusic();
+    applyLook(); syncMusic(); fitViews();
     renderPnl();
   }
 
@@ -1734,10 +1736,34 @@
     // number of tiles changed (chart added/removed, or 1 <-> many): rebuild; otherwise just move them
     if (before !== charts.length) setTimeout(announceFrame, 0);
     if (wasTiled !== tiled() || (tiled() && before !== charts.length)) build();
-    else { placeViews(); updateReact(0); }
+    else { placeViews(); updateReact(0); fitViews(); }
     setTimeout(measureBackdrop, 200);
   }
   setInterval(trackLayout, 600);
+  // Fit: Smart places your picture for the charts, not the whole page behind TradingView's toolbars and lists: each
+  // wallpaper is told where the charts are in it (CSS px), when that changes (layout, panels, window, fullscreen, zoom)
+  function areaFor(v) {
+    if (!v.tile || !charts.length) return null;
+    const t = v.tile.getBoundingClientRect(); if (!t.width || !t.height) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const c of charts) { const r0 = c.el.getBoundingClientRect(), r = { left: r0.left, top: r0.top, right: r0.right, bottom: r0.bottom };
+      // the plotting area: without the price scale on the right and the time scale under it (where there are)
+      try { for (const ax of c.el.querySelectorAll(".price-axis")) { const q = ax.getBoundingClientRect(); if (q.width > 10 && q.left > r.left + (r.right - r.left) / 2) r.right = Math.min(r.right, q.left); }
+        const ta = c.el.querySelector(".time-axis"); if (ta) { const q = ta.getBoundingClientRect(); if (q.height > 8 && q.top > r.top + (r.bottom - r.top) / 2) r.bottom = Math.min(r.bottom, q.top); } } catch {}
+      const a = Math.max(r.left, t.left), b = Math.max(r.top, t.top), cc = Math.min(r.right, t.right), d = Math.min(r.bottom, t.bottom);
+      if (cc - a < 40 || d - b < 40) continue; x0 = Math.min(x0, a); y0 = Math.min(y0, b); x1 = Math.max(x1, cc); y1 = Math.max(y1, d); }
+    if (!isFinite(x0)) return null;
+    return { x: Math.round(x0 - t.left), y: Math.round(y0 - t.top), w: Math.round(x1 - x0), h: Math.round(y1 - y0) };
+  }
+  function fitViews() {
+    if ((cfg.fit || "auto") !== "auto") return;   // (Cover / Contain / Stretch: the whole wallpaper, as before)
+    for (const v of views) {
+      if (!v.content || v.content.tagName === "CANVAS") continue;
+      const a = areaFor(v), sig = a ? `${a.x},${a.y},${a.w},${a.h}` : "";
+      if (sig === v.areaSig) continue; v.areaSig = sig; v.area = a;
+      if (v.content.tagName === "IFRAME") postLook(v.content); else if (v.fitter) v.fitter.update();
+    }
+  }
   addEventListener("resize", () => setTimeout(trackLayout, 50));
   // Charts that change size without the window changing (dragging the divider between charts in a multi-chart
   // layout, opening a side panel): follow them on the very next frame. Checking every 0.6 s left a wallpaper behind
@@ -1976,7 +2002,7 @@
   function teardown() {
     if (chartRO) chartRO.disconnect();
     releaseStack();
-    for (const v of views) { if (v.skin && v.skin.remove) try { v.skin.remove(); } catch {} if (v.fx && v.fx.remove) try { v.fx.remove(); } catch {} }
+    for (const v of views) { if (v.skin && v.skin.remove) try { v.skin.remove(); } catch {} if (v.fx && v.fx.remove) try { v.fx.remove(); } catch {} if (v.fitter) { v.fitter.destroy(); v.fitter = null; } }
     running = false;
     cancelAnimationFrame(raf);
     if (layer) {
@@ -2383,6 +2409,7 @@
     if (keys.some((k) => k.startsWith("atmo") || ATMO_KEYS.has(k))) applyAtmo();
     if (keys.includes("fps")) { resetQuality(); views.forEach(sizeCanvas); publishQ(); }
     if (keys.includes("res")) views.forEach(sizeCanvas);
+    if (keys.includes("fit")) { for (const v of views) v.areaSig = null; fitViews(); }
     if (keys.includes("enabled") && !cfg.enabled) lensOn(false);
     if (keys.includes("react")) for (const v of views) setFx(v, v.src);   // effects that swell with music run next to it
     if (keys.includes("autoMatch")) { lastMatch = ""; setTimeout(measureBackdrop, 50); }   // re-derive the palette now
@@ -2418,8 +2445,11 @@
   function drawFit(g, el, dx, dy, dw, dh) {
     const nw = el.videoWidth || el.naturalWidth || el.width, nh = el.videoHeight || el.naturalHeight || el.height;
     if (!nw || !nh || cfg.fit === "stretch" || el.tagName === "CANVAS") return g.drawImage(el, dx, dy, dw, dh);
-    const k = cfg.fit === "fit" ? Math.min(dw / nw, dh / nh) : Math.max(dw / nw, dh / nh), w = nw * k, h = nh * k;
-    g.drawImage(el, dx + (dw - w) * (Math.max(0, Math.min(100, +cfg.posX)) / 100), dy + (dh - h) * (Math.max(0, Math.min(100, +cfg.posY)) / 100), w, h);
+    const F = window.PriismSmartFit, fit = cfg.fit || "auto";
+    if (!F) { const k = fit === "fit" ? Math.min(dw / nw, dh / nh) : Math.max(dw / nw, dh / nh); return g.drawImage(el, dx + (dw - nw * k) / 2, dy + (dh - nh * k) / 2, nw * k, nh * k); }
+    const b = F.box(nw, nh, dw, dh, fit, cfg.posX, cfg.posY);
+    if (b.extend) F.drawSurround(g, el, nw, nh, dx, dy, dw, dh);   // as on screen (Smart showing it whole)
+    g.save(); g.beginPath(); g.rect(dx, dy, dw, dh); g.clip(); g.drawImage(el, dx + b.x, dy + b.y, b.w, b.h); g.restore();
   }
   function wallFilter(dpr) {
     const f = [];

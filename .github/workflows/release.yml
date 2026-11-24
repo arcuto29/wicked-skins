@@ -27,6 +27,9 @@ jobs:
       channel: ${{ steps.v.outputs.channel }}
       prerelease: ${{ steps.v.outputs.prerelease }}
     steps:
+      - name: Releases go to the public repo (needs the PUBLIC_REPO_TOKEN secret)
+        env: { T: "${{ secrets.PUBLIC_REPO_TOKEN }}" }
+        run: '[ -n "$T" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (see RELEASING.md). Releases are published to the public arcuto29/wicked-skins repo."; exit 1; }'
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
@@ -161,8 +164,12 @@ jobs:
       VERSION: ${{ needs.prepare.outputs.version }}
       CHANNEL: ${{ needs.prepare.outputs.channel }}
       PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
-      GH_TOKEN: ${{ github.token }}
+      # releases (downloads + the desktop apps' update files) live in the public repo; this code repo is private
+      PUBLIC_REPO: arcuto29/wicked-skins
+      GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
     steps:
+      - name: Releases go to the public repo (needs the PUBLIC_REPO_TOKEN secret)
+        run: '[ -n "$GH_TOKEN" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (RELEASING.md). Nothing was published."; exit 1; }'
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
@@ -198,6 +205,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         id: rel
         with:
+          repository: arcuto29/wicked-skins
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
           name: Priism Skins ${{ github.ref_name }}
           body_path: notes.md
           draft: true
@@ -207,10 +216,10 @@ jobs:
       - name: Every file is on the release, then make it public
         run: |
           ID="${{ steps.rel.outputs.id }}"
-          HAVE=$(gh api "repos/${GITHUB_REPOSITORY}/releases/$ID/assets?per_page=100" --jq '.[].name' | sort)
+          HAVE=$(gh api "repos/${PUBLIC_REPO}/releases/$ID/assets?per_page=100" --jq '.[].name' | sort)
           WANT=$(ls out | sort)
           [ "$HAVE" = "$WANT" ] || { echo "::error::Release files differ from the build:"; diff <(echo "$WANT") <(echo "$HAVE"); exit 1; }
-          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/$ID" -F draft=false -F prerelease="$PRERELEASE" > /dev/null
+          gh api -X PATCH "repos/${PUBLIC_REPO}/releases/$ID" -F draft=false -F prerelease="$PRERELEASE" > /dev/null
           echo "Published $(echo "$HAVE" | wc -l) files."
       - name: Chrome Web Store
         env:

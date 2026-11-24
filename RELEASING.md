@@ -51,6 +51,16 @@ Pull requests run `ci.yml` (checks, build, desktop smoke test) and `updates.yml`
 - backup / restore between two Chrome installs;
 - the update card in every state.
 
+## Two repos: private code, public releases
+- **`arcuto29/priism-app` (private):** all the code, tests and history. Tags, CI and builds run here.
+- **`arcuto29/wicked-skins` (public):** only the GitHub Releases (downloads + the desktop app's auto-update files) and
+  the website (`gh-pages` branch → https://arcuto29.github.io/wicked-skins/). Never push code here.
+
+The workflows publish to the public repo with the **`PUBLIC_REPO_TOKEN`** secret (in `priism-app` → Settings →
+Secrets and variables → Actions). It's a fine-grained personal access token limited to **only** `arcuto29/wicked-skins`,
+with **Contents: Read and write**. When it expires, make a new one and replace the secret; releases and the website
+fail with "Add the PUBLIC_REPO_TOKEN secret" until then.
+
 ## One-time setup (owner)
 ### 1. The approval gate (required: without it nothing publishes)
 GitHub → repo **Settings → Environments → New environment** → name it `release`:

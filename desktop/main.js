@@ -29,9 +29,11 @@ let tvWin, settingsWin;
 // empty settings: a damaged file falls back to the last good copy.
 const load = () => {
   for (const f of [settingsFile(), settingsFile() + ".bak"]) {
-    try { const v = JSON.parse(fs.readFileSync(f, "utf8")); if (v && typeof v === "object") { cfg = v; return; } } catch {}
+    try { const v = JSON.parse(fs.readFileSync(f, "utf8")); if (v && typeof v === "object") { cfg = v; break; } } catch {}
   }
-  cfg = {};
+  if (!cfg || typeof cfg !== "object") cfg = {};
+  // Fit's default became Smart: wallpapers you already had, with Fit never changed, keep exactly how they looked (Cover)
+  if (cfg.fit === undefined && Array.isArray(cfg.media) && cfg.media.length) { cfg.fit = "cover"; try { save(); } catch {} }
 };
 let bakDone = false;   // the .bak is the copy from before this run's first change (wallpapers can make it big)
 const save = () => {
@@ -53,7 +55,7 @@ async function inject(wc) {
   await wc.insertCSS(read("content.css"));
   await wc.executeJavaScript(
     `window.__BD_CFG = ${JSON.stringify(cfg)}; window.__BD_CHANNEL = ${JSON.stringify(/-beta/i.test(app.getVersion()) ? "beta" : "stable")};\n` +
-    `if (window.__bdUpdate) { window.__bdUpdate(window.__BD_CFG); } else {\n${read("skins.js")}\n${read("sounds.js")}\n${read("pass.js")}\n${read("acct.js")}\n${read("content.js")}\n}`
+    `if (window.__bdUpdate) { window.__bdUpdate(window.__BD_CFG); } else {\n${read("skins.js")}\n${read("sounds.js")}\n${read("pass.js")}\n${read("acct.js")}\n${read("smartfit.js")}\n${read("content.js")}\n}`
   );
 }
 

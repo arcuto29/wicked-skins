@@ -3,12 +3,11 @@
 (async function () {
   const q = new URLSearchParams(location.search);
   const id = q.get("id"), type = q.get("type");
-  let el, look = {};
+  let el, look = {}, fitter = null;
 
   function apply() {
     if (!el) return;
-    el.style.objectFit = { cover: "cover", fit: "contain", stretch: "fill" }[look.fit] || "cover";
-    el.style.objectPosition = `${look.posX ?? 50}% ${look.posY ?? 50}%`;
+    if (fitter) fitter.update();   // Fit: Smart / Cover / Contain / Stretch (src/smartfit.js)
     if (el.tagName === "VIDEO") {
       el.playbackRate = Math.max(0.25, Math.min(4, look.speed || 1));
       look.paused ? el.pause() : el.play().catch(() => {});
@@ -56,6 +55,7 @@
     if (type === "video") Object.assign(el, { loop: true, muted: true, autoplay: true, playsInline: true });
     el.src = URL.createObjectURL(blob);
     document.body.appendChild(el);
+    fitter = window.PriismSmartFit ? window.PriismSmartFit.attach(document.body, el, () => look) : null;
     apply();
     parent.postMessage({ __wicked: "player-ready", id }, "*");
     // brightness report for the page's auto-contrast (we're same-origin with our own blob, so we can read pixels)
