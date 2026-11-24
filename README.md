@@ -1,5 +1,11 @@
 Test builds only. Not a release.
 
+## priism-keep-uploads-test.zip (PR #186)
+Main plus the uploads fix. It has Priism's fixed test id (clnbopeffinekcpboohdadbmilhaelab), so it keeps its uploads
+and settings in any folder, and every later keyed test build sees the same ones. Your other copies keep their own.
+To bring your wallpapers over: in your current copy, Settings > Backup & restore > Save a backup; in this one, Restore.
+
+
 ## priism-all-open-prs-test.zip
 Main plus every open PR merged together: #177 beta licensing, #179 auto-updates, #184 wallpaper sound, #185 Auto-match
 for indicators and drawings (#183 no duplicate uploads is already in main). Load unpacked in Chrome
