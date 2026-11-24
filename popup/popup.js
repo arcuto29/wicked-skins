@@ -15,7 +15,7 @@ const CHART_KEYS = ["pnStyle","pnRound","pnWindows","tpOn","tpColors","tpBuy","t
 const LOOK_KEYS = [...CHART_KEYS, "atmoFx","atmoTrail","atmoAura","atmoColor","atmoCustom","atmoOpacity","atmoLen","atmoFade","zoneFx","smartDim","vignetteAt","opacity","overOpacity","dim","blur","vividness","tint","speed","fps","res","fit","posX","posY","powerSaver","paused","bw","layer","candleOn","candleUp","candleDown","candleGlow","candlePreset","candleLook","candleClosedLook","shiftSpeed","candleWick","candleWickUp","candleWickDown","candleBorder","candleBorderUp","candleBorderDown","candleBorderW","candleHollow","candleWickW","candleBodyW","candleFxCore","candleFxEdge","candleFxAmt","lineGlow","scaleText","scaleGlow","scaleBold","scaleBg","scaleBgColor","scaleLabels","scaleSize","scaleFont","react","reactStrength","moodLook","moodRange","moodPulse","musicParts","musicFeel","musicSens","vignette","calm","sessionOn","sessionSkins","multi","chartSkins","chartColors","chartStyle","bracketOn","bracketSize","bracketBack","bracketFill","bracketText","bracketProfit","bracketLoss","bracketBorderColor","bracketBorderW","bracketLineColor","bracketLineW","bracketQty","pnlShow","pnlStyle","pnlPos","pnlSize","pnlBack","pnlUp","pnlDown","wallOpts"];
 const DEFAULTS = {
   enabled: true, skin: "aurora", mediaId: null, media: [], loadouts: [],
-  opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
+  opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1, wallAudio: false, wallVolume: 0.6,
   fps: "auto", fit: "auto", posX: 50, posY: 50, res: "standard",
   powerSaver: false, paused: false, bw: false, layer: "behind",
   candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
@@ -1414,15 +1414,25 @@ async function convertPending() {
       try {
         const src = await WickedMediaDB.get(m.id + ":src");
         if (!src) throw new Error("original file missing");
-        const ff = await getFFmpeg();
+        let ff = await getFFmpeg();
         const onProg = ({ progress }) => { converting[m.id] = Math.max(0, Math.min(1, progress || 0)); renderMedia(); };
         ff.on("progress", onProg);
         const inName = "in." + ((m.origName.split(".").pop() || "bin").toLowerCase());
         await ff.writeFile(inName, new Uint8Array(await src.arrayBuffer()));
-        // Wallpaper-friendly: no audio, max 1920px wide (3840 = 4K with Ultra sharpness), 30 fps, fast VP8 WebM, first 3 minutes.
+        // Wallpaper-friendly: max 1920px wide (3840 = 4K with Ultra sharpness), 30 fps, fast VP8 WebM, first 3 minutes.
+        // Its own sound is kept (Vorbis, 128 kbit/s: plays only if you turn Sound on); a video without sound simply has
+        // none. If the sound can't be converted, the picture is converted without it rather than not at all.
+        // (Vorbis, not Opus: the bundled ffmpeg.wasm crashes encoding Opus, "memory access out of bounds")
         const big = cfg.res === "ultra";
-        const code = await ff.exec(["-i", inName, "-t", "180", "-an", "-vf", `scale='min(${big ? 3840 : 1920},iw)':-2,fps=30`,
-          "-c:v", "libvpx", "-b:v", big ? "14M" : "4M", "-deadline", "realtime", "-cpu-used", "8", "-pix_fmt", "yuv420p", "out.webm"]);
+        const args = (audio) => ["-i", inName, "-t", "180", ...(audio ? ["-c:a", "libvorbis", "-b:a", "128k", "-ac", "2"] : ["-an"]), "-vf", `scale='min(${big ? 3840 : 1920},iw)':-2,fps=30`,
+          "-c:v", "libvpx", "-b:v", big ? "14M" : "4M", "-deadline", "realtime", "-cpu-used", "8", "-pix_fmt", "yuv420p", "out.webm"];
+        let code; try { code = await ff.exec(args(true)); } catch { code = -1; }
+        if (code !== 0) {
+          // a crash leaves ffmpeg unusable: a fresh one for the try without sound
+          try { await ff.deleteFile("out.webm"); } catch { ff.off("progress", onProg); try { ff.terminate(); } catch {} ffmpegP = null;
+            ff = await getFFmpeg(); ff.on("progress", onProg); await ff.writeFile(inName, new Uint8Array(await src.arrayBuffer())); }
+          code = await ff.exec(args(false));
+        }
         ff.off("progress", onProg);
         if (code !== 0) throw new Error("ffmpeg could not read this video");
         const data = await ff.readFile("out.webm");
@@ -2308,6 +2318,21 @@ if ($("dlgColor")) $("dlgColor").oninput = (e) => set({ dlgColor: e.target.value
 if ($("dlgAlpha")) $("dlgAlpha").oninput = (e) => { set({ dlgAlpha: +e.target.value }); $("dlgAlphaOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 if ($("panelColor")) $("panelColor").oninput = (e) => set({ panelColor: e.target.value, panelMode: "color" });
 
+// Sound (Motion group): only while a video of yours is the wallpaper (or one chart's, in a mixed layout)
+function videoWallpaper() {
+  const vid = (id) => !!(cfg.media || []).find((m) => m.id === id && m.type === "video");
+  if (cfg.skin === "media" && vid(cfg.mediaId)) return true;
+  return cfg.multi === "mix" && Object.values(cfg.chartSkins || {}).some((s) => typeof s === "string" && s.startsWith("media:") && vid(s.slice(6)));
+}
+function syncWallSound() {
+  const show = videoWallpaper(), on = !!cfg.wallAudio;
+  $("wallSoundRow").hidden = !show; $("wallSoundHint").hidden = !show; $("wallVolRow").hidden = !show || !on;
+  if (!show) return;
+  seg("wallSound", [[false, "Off"], [true, "On"]], () => !!cfg.wallAudio, (v) => { set({ wallAudio: v }); syncWallSound(); });
+  const inp = $("wallVol"), out = $("wallVolOut"), pct = (v) => Math.round(v * 100) + "%";
+  inp.value = cfg.wallVolume ?? 0.6; out.textContent = pct(+inp.value);
+  inp.oninput = () => { set({ wallVolume: +inp.value }); out.textContent = pct(+inp.value); };
+}
 function syncTune() {
   try { syncWallOpts(); wallPrev = null; setTimeout(drawWallPrev, 30); } catch {}
   $("sliders").innerHTML = "";
@@ -2347,6 +2372,7 @@ function syncTune() {
     : cfg.fit === "cover" ? "Cover: fills the chart, cutting off what doesn't fit." : cfg.fit === "fit" ? "Contain: the whole picture, with empty space around it." : "Stretch: fills the chart, out of proportion.";
   seg("calm", [[false, "Off"], [true, "On"]], () => cfg.calm, (v) => set({ calm: v }));
   seg("motion", [[false, "On"], [true, "Paused"]], () => cfg.paused, (v) => set({ paused: v }));
+  syncWallSound();
   seg("layer", [["behind", "Under chart"], ["over", "On top"]], () => cfg.layer, (v) => { set({ layer: v }); syncTune(); });
   syncClarity();
   // Sides only makes sense under the chart (On top already floats over everything).

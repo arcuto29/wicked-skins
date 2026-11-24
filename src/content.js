@@ -11,6 +11,8 @@
     loadouts: [],
     // Tune
     opacity: 1, overOpacity: 0.35, dim: 0.3, blur: 0, vividness: 1, tint: 0, speed: 1,
+    wallAudio: false,      // your video wallpaper's own sound (off: videos never make a sound unless you turn it on)
+    wallVolume: 0.6,       // its volume, 0-1 (the computer's own volume is separate)
     fps: "auto", fit: "auto", posX: 50, posY: 50,   // fit: auto (Smart) | cover | fit (Contain) | stretch: src/smartfit.js
     res: "standard",       // wallpaper sharpness: standard (light) | sharp (your screen's size) | ultra (every pixel, up to 4K)
     powerSaver: false, paused: false, bw: false,
@@ -873,7 +875,7 @@
       }
       if (content.tagName === "VIDEO") {
         content.playbackRate = Math.max(0.25, Math.min(4, cfg.speed * calmFactor()));
-        stillNow() ? content.pause() : content.play().catch(() => {});
+        playVideo(v);
       }
       if (content.tagName === "IFRAME") postLook(content);
     }
@@ -889,15 +891,73 @@
   function syncStill() {   // called when one of those changes
     const st = stillNow(); if (st === stillWas) return; stillWas = st;
     for (const v of views) { const c = v.content; if (!c) continue;
-      if (c.tagName === "VIDEO") { st ? c.pause() : c.play().catch(() => {}); } else if (c.tagName === "IFRAME") postLook(c); }
+      if (c.tagName === "VIDEO") playVideo(v); else if (c.tagName === "IFRAME") postLook(c); }
+    soundLock.sync();
   }
+  // ---------- your video wallpaper's own sound (Sound: On) ----------
+  // Off by default. Only one video ever plays its sound: in a layout of several charts, the first chart showing a video
+  // (the others stay silent); across tabs and windows, the one you used last (soundLock). The sound stops whenever the
+  // video holds still (see stillNow: Pause, Focus, trade focus, a TradingView window open, a background tab), and with
+  // the wallpaper itself (another wallpaper, Priism off). Pitch stays natural at other speeds (the browser keeps it).
+  const isVideoView = (v) => !!v.content && (v.content.tagName === "VIDEO" || (v.content.tagName === "IFRAME" && /[?&]type=video\b/.test(v.content.src || "")));
+  const soundView = () => (cfg.wallAudio && cfg.enabled ? views.find(isVideoView) || null : null);
+  const vol = () => Math.max(0, Math.min(1, +cfg.wallVolume || 0));
+  // a direct <video> (desktop app, older uploads): play / hold, with its sound only if it's the one
+  function playVideo(v) {
+    const c = v.content; if (stillNow()) { c.pause(); return; }
+    const loud = v === soundView() && soundLock.mine(); c.volume = vol();
+    if (!loud) { c.muted = true; c.play().catch(() => {}); return; }
+    if (c.muted) { c.pause(); c.muted = false; }   // (so Chrome says plainly whether sound is allowed: see player.js)
+    const blocked = () => { c.muted = true; c.play().catch(() => {}); soundBlocked(); };   // (checked the same way as in player.js)
+    c.play().then(() => setTimeout(() => { if (v !== soundView() || !soundLock.mine() || stillNow()) return;
+      if (c.muted || c.paused) blocked(); else { soundLock.take(); soundOk(); } }, 250))
+      .catch((e) => { if (e && e.name === "AbortError") return; blocked(); });
+  }
+  // Chrome only lets a page play sound after you've clicked or typed on it. If it says no, the video keeps playing
+  // silently and a small card offers sound; any click on the page turns it on as well.
+  let soundAsk = null, soundRetry = false;
+  function soundBlocked() {
+    if (!soundRetry) { soundRetry = true; for (const ev of ["pointerdown", "keydown"]) addEventListener(ev, soundAgain, { capture: true, once: true, passive: true }); }
+    if (soundAsk || !cfg.wallAudio) return;
+    const card = document.createElement("div"); card.id = "bd-soundask"; soundAsk = card;
+    card.className = "bd-ui-card"; card.style.cssText = "top:70px";
+    const txt = document.createElement("span"); txt.textContent = "Priism Skins \u00B7 your wallpaper has sound";
+    const go = document.createElement("button"), no = document.createElement("button");
+    go.textContent = "Turn sound on"; no.textContent = "Not now"; go.className = "bd-ui-btn pri"; no.className = "bd-ui-btn";
+    card.append(txt, go, no); document.documentElement.appendChild(card);
+    go.onclick = () => soundAgain();
+    no.onclick = () => { card.remove(); soundAsk = null; };
+  }
+  function soundOk() { soundRetry = false; if (soundAsk) { soundAsk.remove(); soundAsk = null; } }   // it plays: no card
+  function soundAgain() {
+    soundRetry = false; if (soundAsk) { soundAsk.remove(); soundAsk = null; }
+    soundLock.claim(); for (const v of views) { if (v.content.tagName === "VIDEO") playVideo(v); else if (v.content.tagName === "IFRAME") postLook(v.content, true); }
+  }
+  // one sound across tabs / windows, for videos played right in the page (the desktop app, older uploads): the copy that
+  // last started (or got your attention) takes it; the others go quiet. (Uploads in the extension play in its player
+  // frames, which share the sound among themselves: player.js. A channel of its own, so the two never mix.)
+  const soundLock = (() => {
+    const me = Math.random().toString(36).slice(2); let bc = null, lost = false, held = false;
+    try { bc = new BroadcastChannel("priism-wall-sound-page"); bc.onmessage = (e) => { const d = e.data || {};
+      if (d.t === "take" && d.id !== me) { if (!lost) { lost = true; held = false; refresh(); } }
+      else if (d.t === "free" && d.id !== me && lost) { lost = false; refresh(); } }; } catch {}
+    const wants = () => { const v = soundView(); return !!v && v.content.tagName === "VIDEO" && !stillNow(); };
+    const refresh = () => { for (const v of views) if (v.content.tagName === "VIDEO") playVideo(v); };
+    const direct = () => views.some((v) => v.content && v.content.tagName === "VIDEO");
+    function take() { lost = false; if (!held && bc && direct()) { held = true; bc.postMessage({ t: "take", id: me }); } }
+    // (taken only once its sound really plays here: playVideo; a tab that can't play it yet leaves the others alone)
+    return { mine: () => !lost, take, claim() { lost = false; }, drop() { if (held && bc) { held = false; bc.postMessage({ t: "free", id: me }); } }, sync() { if (!wants() && held) { held = false; if (bc) bc.postMessage({ t: "free", id: me }); } } };
+  })();
+  addEventListener("focus", () => { if (soundView()) soundAgain(); });   // the window you're using gets the sound
+  addEventListener("pagehide", () => soundLock.drop());   // closing / leaving this tab: another one can have the sound
   document.addEventListener("visibilitychange", syncStill);
 
   // Files stored in the extension's database play inside an extension iframe (player/player.html).
-  function postLook(frame) {
+  const PAGE_ID = Math.random().toString(36).slice(2);   // (players of this page: see player.js, its sound lock)
+  function postLook(frame, claim) {
     if (!frame || frame.tagName !== "IFRAME" || !frame.contentWindow) return;
-    const fv = views.find((x) => x.content === frame);
-    frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, area: fv ? fv.area : null, speed: cfg.speed * calmFactor(), paused: stillNow() } }, "*");
+    const fv = views.find((x) => x.content === frame), sv = soundView(), loud = !!sv && sv.content === frame;
+    frame.contentWindow.postMessage({ __wicked: "look", look: { fit: cfg.fit, posX: cfg.posX, posY: cfg.posY, area: fv ? fv.area : null, speed: cfg.speed * calmFactor(), paused: stillNow(), audio: loud, volume: vol(), claim: !!claim && loud, page: PAGE_ID } }, "*");
   }
 
   // ---------- built-in wallpapers drawn off TradingView's main thread ----------
@@ -1012,7 +1072,7 @@
     if (m && m.file && typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getURL) {
       el = document.createElement("iframe");
       el.className = "bd-player";
-      el.setAttribute("allow", "autoplay");
+      el.setAttribute("allow", "autoplay *");   // (*: the frame's address is a per-session one, so "autoplay" alone never matched it and the page's click didn't count for its sound)
       el.src = chrome.runtime.getURL(`player/player.html?id=${encodeURIComponent(m.id)}&type=${m.type}`);
       el.addEventListener("load", () => postLook(el));
     } else if (m && m.src) {
@@ -2249,6 +2309,7 @@
   }
   setInterval(measureBackdrop, 3000);
   addEventListener("message", (e) => {
+    if (e.data && (e.data.__wicked === "sound-blocked" || e.data.__wicked === "sound-ok") && views.some((x) => x.content.tagName === "IFRAME" && e.source === x.content.contentWindow)) return e.data.__wicked === "sound-ok" ? soundOk() : soundBlocked();
     if (!e.data || e.data.__wicked !== "lum") return;
     const v = views.find((x) => x.content.tagName === "IFRAME" && e.source === x.content.contentWindow);
     if (!v) return;
@@ -2387,7 +2448,7 @@
 
   function apply(keys) {
     if (standDown || (EXT && !owner)) return;
-    if (keys.some((k) => k === "focus" || k === "focusHides" || k === "enabled")) applyFocus();
+    if (keys.some((k) => k === "focus" || k === "focusHides" || k === "enabled")) { applyFocus(); syncStill(); }   // (video wallpapers and their sound hold still in Focus: stillNow)
     if (keys.some((k) => k.startsWith("timer") || k === "enabled" || k === "candleUp")) renderTimer();
     if (keys.some((k) => k.startsWith("privacy") || k === "enabled")) { applyPrivacy(); try { renderGoal(); } catch {} }
     if (keys.some((k) => k.startsWith("tradeClip") || k === "enabled") && !(cfg.enabled && cfg.tradeClipOn)) tcStop();

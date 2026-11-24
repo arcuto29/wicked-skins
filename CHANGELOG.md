@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: sound for video wallpapers
+- **Your video wallpaper can play its own sound.** Off by default; turn it on in Skins › Motion › Sound (the row only
+  shows while a video is your wallpaper), with its own Volume (0-100%, separate from your computer's volume).
+  Your choice is kept through updates and is not part of saved looks, so applying a look never turns sound on.
+- **One sound only:** in a multi-chart layout only the first chart with the video plays it; across tabs and windows,
+  the tab you clicked last has it (a new tab takes it once you click on it; closing it gives it back).
+- **It stops when the video stops:** Pause, Focus, trade focus, a TradingView window open, a hidden tab, Power saver
+  while you pan, another wallpaper, Priism off.
+- **Chrome's sound rule:** a page you haven't clicked yet may not play sound. The video then plays silently and a small
+  "Turn sound on" card appears; one click (on the card or anywhere on the chart) turns it on.
+- **Converted videos keep their sound** (Vorbis, 128 kbit/s); if the sound can't be converted, the picture still is.
+- **Fixed:** video wallpapers kept playing when you turned Focus on (they now hold still, like the built-in ones).
+
 ## Unreleased: no duplicate uploads
 - **A wallpaper is stored only once.** Picking a file you already have (even under another name), or the same file
   twice in one go, no longer adds a second copy: the one you have goes on the chart, and the panel says
