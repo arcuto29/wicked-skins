@@ -12,8 +12,8 @@ android {
         minSdk 24
         targetSdk 34
         // set by scripts/release.js (scripts/versions.js): every release is higher than the last
-        versionCode 108699
-        versionName "0.1.86"
+        versionCode 108799
+        versionName "0.1.87"
     }
 
     // Load the keystore from gradle.properties if present; otherwise debug-sign so the build still runs.
