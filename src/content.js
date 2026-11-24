@@ -16,6 +16,7 @@
     fps: "auto", fit: "auto", posX: 50, posY: 50,   // fit: auto (Smart) | cover | fit (Contain) | stretch: src/smartfit.js
     res: "standard",       // wallpaper sharpness: standard (light) | sharp (your screen's size) | ultra (every pixel, up to 4K)
     powerSaver: false, paused: false, bw: false,
+    tvLogo: "own", tvLogoColor: "", tvLogoGlow: 0,   // the TradingView logo on the chart: own | look | glass | color (restyled, never hidden)
     layer: "behind",       // "behind" | "over"
     // Candles
     candleOn: false, candleUp: "#00ffa3", candleDown: "#ff2e97", candleGlow: 0, candlePreset: "neon",
@@ -2139,7 +2140,7 @@
   const FX_KEYS = ["lineGlow", "markMode", "markColor", "scaleText", "scaleGlow", "scaleBold", "scaleBg", "scaleBgColor", "scaleLabels", "scaleSize", "scaleFont",
     "bracketOn", "bracketSize", "bracketBack", "bracketFill", "bracketText", "bracketProfit", "bracketLoss",
     "bracketBorderColor", "bracketBorderW", "bracketLineColor", "bracketLineW", "bracketDebug", "privacy", "privacyPnl", "bracketQty",
-    "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "zoneShape", "zoneBorder", "zoneStyle", "zoneReact", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle"];
+    "indMode", "indColor", "indCustom", "drawOn", "zoneFill", "zoneDim", "zoneShape", "zoneBorder", "zoneStyle", "zoneReact", "indGrad", "txtMode", "txtColor", "txtOutline", "txtSize", "gridOn", "gridColor", "gridAlpha", "gridW", "gridStyle", "chOn", "chColor", "chW", "chStyle", "chGlow", "chGlowColor", "chLabels", "plOn", "plColor", "plW", "plStyle", "sbOn", "sbColor", "sbW", "sbStyle", "axOn", "axColor", "axW", "axStyle", "tvLogo", "tvLogoColor", "tvLogoGlow", "uiAccent"];
   // ---------- auto contrast: how bright / busy is the wallpaper behind the chart? ----------
   let backdrop = { bg: null, busy: false, prof: [], profs: [] };
   const GW = 32, GH = 18;                      // brightness grid of each wallpaper
@@ -2362,6 +2363,26 @@
       const n = parseInt(cfg.scaleBgColor.slice(1), 16); tint = `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},0.72)`;
     }
     h.style.setProperty("--bd-scale-tint", tint);
+    tvLogoCss();
+  }
+  // Lightweight Charts' TradingView logo (nq.vision and others): a link whose colours are two CSS variables. The same
+  // styles as on TradingView's charts (hook.js draws those): recoloured, glowing if you like, never hidden or moved.
+  let tvLogoSt = null;
+  function tvLogoCss() {
+    const m = cfg.enabled ? cfg.tvLogo : "own";
+    if (m !== "look" && m !== "glass" && m !== "color") { if (tvLogoSt) tvLogoSt.textContent = ""; return; }
+    const hx = (h) => /^#[0-9a-f]{6}$/i.test(h || "") ? h : null, A = (m === "color" && hx(cfg.tvLogoColor)) || hx(cfg.uiAccent) || skinAccent() || hx(cfg.candleUp) || "#7c6cff";
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), to = (a) => "#" + a.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+    const mix = (a, b, f) => to(rgb(a).map((v, i) => v + (rgb(b)[i] - v) * f));
+    const lum = (h) => rgb(h).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+    const con = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+    let fill, stroke;
+    if (m === "glass") { fill = "rgba(14,16,24,0.62)"; stroke = "#f2f4f8"; }
+    else { fill = mix(A, "#07080c", 0.78); stroke = mix(A, "#ffffff", 0.6); if (con(stroke, fill) < 4.5) stroke = con("#ffffff", fill) >= con("#0b0d12", fill) ? "#ffffff" : "#0b0d12"; }
+    const g = Math.max(0, Math.min(1, +cfg.tvLogoGlow || 0));
+    if (!tvLogoSt) { tvLogoSt = document.createElement("style"); tvLogoSt.id = "bd-tvlogo"; (document.head || document.documentElement).appendChild(tvLogoSt); }
+    tvLogoSt.textContent = `a#tv-attr-logo,a#tv-attr-logo[data-dark]{--fill:${fill}!important;--stroke:${stroke}!important;opacity:1!important;visibility:visible!important;` +
+      `filter:${g ? `drop-shadow(0 0 ${(2 + g * 6).toFixed(1)}px ${A})` : "none"}!important}`;
   }
 
   // Keys that need a rebuild vs. ones we can apply live.

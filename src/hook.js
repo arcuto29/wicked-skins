@@ -107,6 +107,7 @@
     sbOn: false, sbColor: "", sbW: 0, sbStyle: "dashed",          // session breaks (vertical lines between sessions)
     axOn: false, axColor: "", axW: 0, axStyle: "solid",           // the border lines of the price / time scales
     accent: "",
+    tvLogo: "own", tvLogoColor: "", tvLogoGlow: 0, uiAccent: "",   // the TradingView logo on the chart: restyled, never hidden
     bg: null, busy: false, prof: [], profs: [] };
   let fx = { ...FX0 };
   const colOpt = (v) => (v === "candle" || /^#[0-9a-f]{6}$/i.test(v || "") ? v : "");
@@ -168,6 +169,8 @@
         indGrad: Array.isArray(f.indGrad) ? f.indGrad.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 3) : [],
         txtMode: ["readable", "custom", "candle"].includes(f.txtMode) ? f.txtMode : "own", txtColor: /^#[0-9a-f]{6}$/i.test(f.txtColor || "") ? f.txtColor : "", txtOutline: Math.max(0, Math.min(2, +f.txtOutline || 0)), txtSize: Math.max(0, Math.min(2, +f.txtSize || 0)),
         accent: /^#[0-9a-f]{6}$/i.test(f.accent || "") ? f.accent : "",
+        tvLogo: ["look", "glass", "color"].includes(f.tvLogo) ? f.tvLogo : "own", tvLogoColor: /^#[0-9a-f]{6}$/i.test(f.tvLogoColor || "") ? f.tvLogoColor : "",
+        tvLogoGlow: Math.max(0, Math.min(1, +f.tvLogoGlow || 0)), uiAccent: /^#[0-9a-f]{6}$/i.test(f.uiAccent || "") ? f.uiAccent : "",
         wallColors: Array.isArray(f.wallColors) ? f.wallColors.filter((x) => /^#[0-9a-f]{6}$/i.test(x)).slice(0, 5) : [],
         bg: f.bg === "dark" || f.bg === "light" ? f.bg : null,   // measured brightness of the wallpaper (content.js)
         busy: !!f.busy,                                           // wallpaper has lots of contrast behind the scale
@@ -185,7 +188,7 @@
     const sig = JSON.stringify([fx.lineGlow, fx.scaleText, fx.scaleGlow, fx.scaleBold, fx.scaleBg, fx.scaleBgColor, fx.scaleLabels, fx.scaleSize, fx.scaleFont, fx.scaleFamily, fx.fontTick, fx.lite,
       fx.bracketOn, fx.bracketSize, fx.bracketBack, fx.bracketFill, fx.bracketText, fx.bracketProfit, fx.bracketLoss,
       fx.bracketBorderColor, fx.bracketBorderW, fx.bracketLineColor, fx.bracketLineW, fx.privacy, fx.privacyPnl, fx.tickSize, fx.bracketQty,
-      fx.indMode, fx.indColor, fx.markMode, fx.markColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.zoneShape, fx.zoneBorder, fx.zoneStyle, fx.zoneReact, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent]);
+      fx.indMode, fx.indColor, fx.markMode, fx.markColor, JSON.stringify(fx.indCustom), fx.wallColors.join(""), fx.zoneFill, fx.zoneDim, fx.zoneShape, fx.zoneBorder, fx.zoneStyle, fx.zoneReact, fx.indGrad.join(""), fx.drawOn, fx.txtMode, fx.txtColor, fx.txtOutline, fx.txtSize, fx.gridOn, fx.gridColor, fx.gridAlpha, fx.gridW, fx.gridStyle, fx.chOn, fx.chColor, fx.chW, fx.chStyle, fx.chGlow, fx.chGlowColor, fx.chLabels, fx.plOn, fx.plColor, fx.plW, fx.plStyle, fx.sbOn, fx.sbColor, fx.sbW, fx.sbStyle, fx.axOn, fx.axColor, fx.axW, fx.axStyle, fx.accent, fx.tvLogo, fx.tvLogoColor, fx.tvLogoGlow, fx.uiAccent]);
     if (window.__bdCandleLooks && window.__bdCandleLooks.setWallColors) window.__bdCandleLooks.setWallColors(fx.wallColors, fx.bg);
     const userChanged = sig !== fxSig; fxSig = sig;
     return userChanged;
@@ -1539,9 +1542,55 @@
     const now = performance.now();
     if (isFinite(n) && n > 0 && (n !== quoteVal || now - quoteAt > 1000)) { quoteAt = now; quoteVal = n; htmlEl().setAttribute("data-bd-lwquote", JSON.stringify({ p: n, ts: Date.now() })); }
   }
+  // ---------- the TradingView logo on the chart (TradingView's charting library: TopstepX and other platforms) ----------
+  // TradingView's terms ask for its attribution to stay clearly visible (also in streams), so it's only ever restyled:
+  // the same round logo, in the same place and size, in your look's colours, a colour you pick or frosted glass, with
+  // an optional glow; the "TV" mark always contrasts with its disc. The library draws it on the chart's own canvas as
+  // three fills at a fixed spot in device pixels (measured at 1x and 2x, light and dark): a ring and a disc at
+  // (13, bottom - 45), then the mark, a Path2D, at (18, bottom - 38). Only those, and only in grey (its own colours).
+  const tvl = { hex: (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), to: (a) => "#" + a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("") };
+  tvl.mix = (a, b, f) => { const x = tvl.hex(a), y = tvl.hex(b); return tvl.to(x.map((v, i) => v + (y[i] - v) * f)); };
+  tvl.lum = (h) => tvl.hex(h).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+  tvl.contrast = (a, b) => { const x = tvl.lum(a), y = tvl.lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  tvl.grey = (v) => { const k = rgbKey(String(v)); if (!k) return false; const [r, g, b] = k.key.split(",").map(Number); return Math.max(r, g, b) - Math.min(r, g, b) <= 8 && (k.a === null || +k.a >= 0.9); };
+  // which part of the logo this fill is, or null
+  function tvLogoPart(ctx, a) {
+    const c = ctx.canvas; if (!c || c.getAttribute("data-name") !== "pane-canvas") return null;
+    const t = ctx.getTransform(); if (t.a !== 1 || t.d !== 1 || t.b !== 0 || t.c !== 0) return null;
+    const up = c.height - t.f, col = ctx.__bdFill !== undefined ? ctx.__bdFill : origFillDesc.get.call(ctx);
+    if (!tvl.grey(col)) return null;
+    if (!a.length && t.e >= 10 && t.e <= 16 && up >= 42 && up <= 48) return { part: "round" };
+    if (a[0] instanceof Path2D && t.e >= 15 && t.e <= 21 && up >= 35 && up <= 41) return { part: "mark" };
+    return null;
+  }
+  // the logo's colours for the current style: { ring, disc, mark, glow }
+  function tvLogoColours() {
+    // Your look: your Accent if you set one, else your wallpaper's (like the TopstepX logo)
+    const A = fx.tvLogo === "color" && fx.tvLogoColor ? fx.tvLogoColor : fx.uiAccent || fx.accent || (candles && candles.upHex) || "#7c6cff";
+    let disc, ring, mark;
+    if (fx.tvLogo === "glass") { disc = "rgba(14,16,24,0.62)"; ring = "rgba(255,255,255,0.22)"; mark = "#f2f4f8"; }
+    else { const d = tvl.mix(A, "#07080c", 0.78); disc = d; ring = A; mark = tvl.mix(A, "#ffffff", 0.6);
+      // the mark always reads on its disc (4.5:1 or more), whatever colour you picked
+      if (tvl.contrast(mark, d) < 4.5) mark = tvl.contrast("#ffffff", d) >= tvl.contrast("#0b0d12", d) ? "#ffffff" : "#0b0d12"; }
+    return { ring, disc, mark, glow: fx.tvLogoGlow > 0 ? A : "" };
+  }
+  const tvRound = new WeakMap();   // canvas -> fills of the ring / disc seen in this frame (the first is the ring)
+  function tvLogoFill(ctx, a, part) {
+    const C = tvLogoColours(), c = ctx.canvas;
+    let col;
+    if (part.part === "mark") col = C.mark;
+    else { const now = performance.now(), r = tvRound.get(c); const second = r && now - r.t < 50 && r.n === 1;
+      tvRound.set(c, { t: now, n: second ? 2 : 1 }); col = second ? C.disc : C.ring; }
+    const pF = ctx.fillStyle, pSB = ctx.shadowBlur, pSC = ctx.shadowColor;
+    origFillDesc.set.call(ctx, col);
+    // (the glow is the ring's: on the blocky "TV" mark it would blur into a box)
+    if (C.glow && part.part !== "mark" && col === C.ring) { ctx.shadowColor = C.glow; ctx.shadowBlur = 2 + fx.tvLogoGlow * 12; }
+    try { return origFillPath.apply(ctx, a); } finally { origFillDesc.set.call(ctx, pF); ctx.shadowBlur = pSB; ctx.shadowColor = pSC; }
+  }
   proto.fill = function (...a) {
     const c = this.canvas;
     if (c && !c.isConnected) noteHiddenOther(this);
+    if (on && fx.tvLogo !== "own" && c) { const part = tvLogoPart(this, a); if (part) return tvLogoFill(this, a, part); }
     // a solid rounded tag on the chart (order / position labels): note its row, so its level line is never an indicator's
     if (on && c && a.length === 0 && isPane(c)) { const b = pathBox.get(this);
       if (b) { const dpr = (typeof devicePixelRatio === "number" && devicePixelRatio) || 1, w = (b.x1 - b.x0) / dpr, h = (b.y1 - b.y0) / dpr, k = rgbKey(String(this.fillStyle));

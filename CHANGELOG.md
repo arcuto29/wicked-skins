@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased: the TradingView logo in your style
+- **New: TradingView logo** (Style › Bars & panels). The round TradingView logo on the chart, on TopstepX and other
+  platforms built on TradingView's charts and on nq.vision, in your look's colours (your Accent, or your wallpaper's),
+  frosted glass or a colour you pick, with an optional glow.
+- **It always stays, in the same place and size, and the "TV" mark always reads on it.** TradingView asks for its logo
+  to stay visible on its charts, also in streams. Off by default (TradingView's own).
+
 ## Unreleased
 
 ### Priism Pro (Whop licence keys)
