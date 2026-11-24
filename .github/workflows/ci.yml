@@ -57,6 +57,18 @@ jobs:
       - run: node supabase/test.mjs
       - run: node supabase/licence.test.mjs
 
+  uploads:
+    # Your uploads are stored once: the same file picked again, renamed, or twice in one go is not added a second time
+    # (the real panel with the extension loaded, test/uploads/dedupe.e2e.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm install --no-save playwright@1.64.1
+      - run: npx playwright install --with-deps chromium
+      - run: node test/uploads/dedupe.e2e.js
+
   wallpaper-sound:
     # Video wallpaper sound with Chrome's real autoplay rule: off by default, the "Turn sound on" card, volume, one
     # sound across charts and tabs, Pause / Focus / trade focus / Power saver, conversion keeps it (test/audio)
