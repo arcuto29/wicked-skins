@@ -479,6 +479,8 @@ begin
   select * into inv from public.invites where code = c;
   if not found then return 'invalid'; end if;
   if inv.revoked then return 'revoked'; end if;
+  if inv.expires_at is not null and inv.expires_at < now() then return 'expired'; end if;
+  if inv.requires_account then return 'account'; end if;     -- a beta code: added to an account on the website, not here
   update public.invite_devices set last_seen = now() where code = c and device = p_device;
   if found then return 'ok'; end if;
   select count(*) into n from public.invite_devices where code = c;
@@ -489,6 +491,213 @@ end;
 $$;
 revoke execute on function public.redeem_invite(text, text, text) from public;
 grant execute on function public.redeem_invite(text, text, text) to anon, authenticated;
+
+-- ---------- beta access tied to accounts ----------
+-- A beta code (requires_account) is added to ONE person's account on the website (claim_invite) and ends on
+-- expires_at. Their copy of Priism is then linked to that account with a short link code the website shows
+-- (create_link_code: 10 minutes, once). The copy keeps a random device secret that only the server can check (stored
+-- as a SHA-256 hash, never readable). An account has up to max_devices copies (1 for the beta); a new copy replaces
+-- the old one at most once every 7 days, and the owner can reset any account. Older codes without requires_account
+-- keep working per device, as before. Nothing about anyone's charts is involved.
+alter table public.invites add column if not exists expires_at timestamptz;
+alter table public.invites add column if not exists requires_account boolean not null default false;
+alter table public.invites add column if not exists claimed_by uuid references auth.users (id) on delete set null;
+alter table public.invites add column if not exists claimed_at timestamptz;
+alter table public.invites alter column max_devices set default 1;
+create index if not exists invites_claimed_by on public.invites (claimed_by);
+
+create table if not exists public.account_devices (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  device text not null check (device ~ '^[A-Za-z0-9-]{8,64}$'),
+  app text check (char_length(app) <= 20),
+  secret_hash text not null check (secret_hash ~ '^[0-9a-f]{64}$'),
+  linked_at timestamptz not null default now(),
+  last_seen timestamptz not null default now(),
+  active boolean not null default true,
+  primary key (user_id, device)
+);
+create index if not exists account_devices_device on public.account_devices (device);
+alter table public.account_devices enable row level security;   -- no policies: only through the functions below
+
+create table if not exists public.account_moves (user_id uuid primary key references auth.users (id) on delete cascade, last_move timestamptz);
+alter table public.account_moves enable row level security;
+
+create table if not exists public.link_codes (
+  code text primary key check (code ~ '^[A-Z2-9]{4}-[A-Z2-9]{4}$'),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  expires_at timestamptz not null default now() + interval '10 minutes',
+  used boolean not null default false
+);
+alter table public.link_codes enable row level security;
+
+-- what an account may use now: status ok | none | expired | revoked, until (null = no end), max_devices
+create or replace function public.account_access(p_uid uuid, out status text, out until timestamptz, out max_devices integer)
+language plpgsql stable security definer set search_path = ''
+as $$
+declare n integer; has_open boolean; mx timestamptz; md integer;
+begin
+  if p_uid is null then status := 'none'; return; end if;
+  if public.is_admin(p_uid) then status := 'ok'; until := null; max_devices := 5; return; end if;
+  select count(*), coalesce(bool_or(i.expires_at is null), false), max(i.expires_at), max(i.max_devices) into n, has_open, mx, md
+  from public.invites i where i.claimed_by = p_uid and not i.revoked and (i.expires_at is null or i.expires_at > now());
+  if n > 0 then status := 'ok'; until := case when has_open then null else mx end; max_devices := md; return; end if;
+  max_devices := 0;
+  if exists (select 1 from public.invites i where i.claimed_by = p_uid and not i.revoked) then
+    status := 'expired'; select max(i.expires_at) into until from public.invites i where i.claimed_by = p_uid and not i.revoked; return; end if;
+  status := case when exists (select 1 from public.invites i where i.claimed_by = p_uid) then 'revoked' else 'none' end;
+end;
+$$;
+revoke execute on function public.account_access(uuid) from public, anon, authenticated;
+
+-- add a code to your account (website, signed in): ok | invalid | revoked | expired | taken (someone else's)
+create or replace function public.claim_invite(p_code text)
+returns text language plpgsql security definer set search_path = ''
+as $$
+declare inv public.invites; c text := upper(trim(coalesce(p_code, '')));
+begin
+  if (select auth.uid()) is null then return 'invalid'; end if;
+  select * into inv from public.invites where code = c for update;
+  if not found then return 'invalid'; end if;
+  if inv.revoked then return 'revoked'; end if;
+  if inv.expires_at is not null and inv.expires_at < now() then return 'expired'; end if;
+  if inv.claimed_by is null then update public.invites set claimed_by = (select auth.uid()), claimed_at = now() where code = c; return 'ok'; end if;
+  return case when inv.claimed_by = (select auth.uid()) then 'ok' else 'taken' end;
+end;
+$$;
+revoke execute on function public.claim_invite(text) from public, anon;
+grant execute on function public.claim_invite(text) to authenticated;
+
+-- a one-time link code for connecting a copy of Priism to your account (shown on the website, good for 10 minutes)
+create or replace function public.create_link_code()
+returns text language plpgsql volatile security definer set search_path = ''
+as $$
+declare A constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; b bytea; c text; i integer;
+begin
+  if (select auth.uid()) is null then raise exception 'access: sign in first'; end if;
+  if (public.account_access((select auth.uid()))).status <> 'ok' then raise exception 'access: this account has no active beta access'; end if;
+  delete from public.link_codes where user_id = (select auth.uid()) or expires_at < now();
+  loop
+    b := decode(replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''), 'hex'); c := '';
+    for i in 0..7 loop c := c || substr(A, (get_byte(b, i) % 32) + 1, 1); if i = 3 then c := c || '-'; end if; end loop;
+    exit when not exists (select 1 from public.link_codes where code = c);
+  end loop;
+  insert into public.link_codes (code, user_id) values (c, (select auth.uid()));
+  return c;
+end;
+$$;
+revoke execute on function public.create_link_code() from public, anon;
+grant execute on function public.create_link_code() to authenticated;
+
+-- a copy of Priism enters a link code: it joins that account (status ok, until) or gets why not
+-- (invalid | none | expired | revoked | full with next = when a move is allowed again)
+create or replace function public.link_device(p_link text, p_device text, p_secret text, p_app text default null)
+returns jsonb language plpgsql volatile security definer set search_path = ''
+as $$
+declare lc public.link_codes; acc record; n integer; lm timestamptz; h text;
+begin
+  if p_device is null or p_device !~ '^[A-Za-z0-9-]{8,64}$' or p_secret is null or p_secret !~ '^[A-Za-z0-9_-]{32,128}$' then return jsonb_build_object('status', 'invalid'); end if;
+  select * into lc from public.link_codes where code = upper(trim(coalesce(p_link, ''))) for update;
+  if not found or lc.used or lc.expires_at < now() then return jsonb_build_object('status', 'invalid'); end if;
+  select * into acc from public.account_access(lc.user_id);
+  if acc.status <> 'ok' then return jsonb_build_object('status', acc.status); end if;
+  -- copies used on this account in the last 7 days (still linked, or replaced / removed recently), other than this one
+  select count(*) into n from public.account_devices d where d.user_id = lc.user_id and d.device <> p_device and (d.active or d.last_seen > now() - interval '7 days');
+  if n >= acc.max_devices and not exists (select 1 from public.account_devices d where d.user_id = lc.user_id and d.device = p_device and d.active) then
+    select m.last_move into lm from public.account_moves m where m.user_id = lc.user_id;
+    if lm is not null and lm > now() - interval '7 days' then return jsonb_build_object('status', 'full', 'next', lm + interval '7 days'); end if;
+    update public.account_devices set active = false where user_id = lc.user_id and device <> p_device;   -- the old copy stops at its next check
+    insert into public.account_moves (user_id, last_move) values (lc.user_id, now()) on conflict (user_id) do update set last_move = now();
+  end if;
+  h := encode(sha256(convert_to(p_secret, 'UTF8')), 'hex');
+  update public.account_devices set active = false where device = p_device and user_id <> lc.user_id;   -- one account per copy
+  insert into public.account_devices (user_id, device, app, secret_hash) values (lc.user_id, p_device, left(p_app, 20), h)
+  on conflict (user_id, device) do update set secret_hash = excluded.secret_hash, active = true, last_seen = now(), app = excluded.app;
+  update public.link_codes set used = true where code = lc.code;
+  return jsonb_build_object('status', 'ok', 'until', acc.until);
+end;
+$$;
+revoke execute on function public.link_device(text, text, text, text) from public;
+grant execute on function public.link_device(text, text, text, text) to anon, authenticated;
+
+-- a linked copy checks in (daily): ok | expired | revoked | none | moved (another copy took its place) | invalid
+create or replace function public.device_check(p_device text, p_secret text)
+returns jsonb language plpgsql volatile security definer set search_path = ''
+as $$
+declare d public.account_devices; acc record;
+begin
+  if p_device is null or p_secret is null then return jsonb_build_object('status', 'invalid'); end if;
+  select * into d from public.account_devices where device = p_device and secret_hash = encode(sha256(convert_to(p_secret, 'UTF8')), 'hex')
+    order by active desc, last_seen desc limit 1;
+  if not found then return jsonb_build_object('status', 'invalid'); end if;
+  if not d.active then return jsonb_build_object('status', 'moved'); end if;
+  update public.account_devices set last_seen = now() where user_id = d.user_id and device = d.device;
+  select * into acc from public.account_access(d.user_id);
+  return jsonb_build_object('status', acc.status, 'until', acc.until);
+end;
+$$;
+revoke execute on function public.device_check(text, text) from public;
+grant execute on function public.device_check(text, text) to anon, authenticated;
+
+-- "Sign out on this device": the copy leaves its account (the 7-day rule still counts it, so it can't be passed around)
+create or replace function public.unlink_device(p_device text, p_secret text)
+returns text language plpgsql volatile security definer set search_path = ''
+as $$
+begin
+  update public.account_devices set active = false, last_seen = now()
+  where device = p_device and secret_hash = encode(sha256(convert_to(coalesce(p_secret, ''), 'UTF8')), 'hex');
+  return 'ok';
+end;
+$$;
+revoke execute on function public.unlink_device(text, text) from public;
+grant execute on function public.unlink_device(text, text) to anon, authenticated;
+
+-- your access, codes and linked copies (website › Account)
+create or replace function public.my_access()
+returns jsonb language plpgsql stable security definer set search_path = ''
+as $$
+declare acc record; me uuid := (select auth.uid()); lm timestamptz;
+begin
+  if me is null then raise exception 'sign in first'; end if;
+  select * into acc from public.account_access(me);
+  select m.last_move into lm from public.account_moves m where m.user_id = me;
+  return jsonb_build_object('status', acc.status, 'until', acc.until, 'max_devices', acc.max_devices,
+    'next_move', case when lm is not null and lm > now() - interval '7 days' then lm + interval '7 days' end,
+    'codes', (select coalesce(jsonb_agg(jsonb_build_object('code', i.code, 'expires_at', i.expires_at, 'revoked', i.revoked) order by i.claimed_at), '[]'::jsonb) from public.invites i where i.claimed_by = me),
+    'devices', (select coalesce(jsonb_agg(jsonb_build_object('device', right(d.device, 6), 'app', d.app, 'linked_at', d.linked_at, 'last_seen', d.last_seen, 'active', d.active) order by d.linked_at desc), '[]'::jsonb)
+                from public.account_devices d where d.user_id = me));
+end;
+$$;
+revoke execute on function public.my_access() from public, anon;
+grant execute on function public.my_access() to authenticated;
+
+-- the owner: who has which code, their copies, and a reset (all copies removed, the 7-day rule cleared)
+create or replace function public.admin_accounts()
+returns jsonb language plpgsql stable security definer set search_path = ''
+as $$
+begin
+  if not public.is_admin((select auth.uid())) then raise exception 'admins only'; end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object('code', i.code, 'user_id', i.claimed_by, 'email', u.email, 'claimed_at', i.claimed_at,
+      'devices', (select count(*) from public.account_devices d where d.user_id = i.claimed_by and d.active),
+      'last_seen', (select max(d.last_seen) from public.account_devices d where d.user_id = i.claimed_by),
+      'next_move', (select case when m.last_move > now() - interval '7 days' then m.last_move + interval '7 days' end from public.account_moves m where m.user_id = i.claimed_by))), '[]'::jsonb)
+    from public.invites i join auth.users u on u.id = i.claimed_by);
+end;
+$$;
+revoke execute on function public.admin_accounts() from public, anon;
+grant execute on function public.admin_accounts() to authenticated;
+create or replace function public.admin_reset_account(p_user uuid)
+returns text language plpgsql volatile security definer set search_path = ''
+as $$
+begin
+  if not public.is_admin((select auth.uid())) then raise exception 'admins only'; end if;
+  delete from public.account_devices where user_id = p_user;
+  delete from public.account_moves where user_id = p_user;
+  delete from public.link_codes where user_id = p_user;
+  return 'ok';
+end;
+$$;
+revoke execute on function public.admin_reset_account(uuid) from public, anon;
+grant execute on function public.admin_reset_account(uuid) to authenticated;
 
 -- ---------- bug reports ----------
 -- Sent from the Priism panel (Settings › Report a bug). Only the owner / admins can read them (website › Workshop ›
@@ -522,7 +731,8 @@ as $$
 declare msg text := trim(coalesce(p_message, '')); n int;
 begin
   if p_device is null or p_device !~ '^[A-Za-z0-9-]{8,64}$' then return 'invalid'; end if;
-  if not exists (select 1 from public.invite_devices d join public.invites i on i.code = d.code where d.device = p_device and not i.revoked) then return 'invalid'; end if;
+  if not exists (select 1 from public.invite_devices d join public.invites i on i.code = d.code where d.device = p_device and not i.revoked)
+     and not exists (select 1 from public.account_devices a where a.device = p_device and a.active and (public.account_access(a.user_id)).status = 'ok') then return 'invalid'; end if;
   if char_length(msg) < 3 or char_length(msg) > 2000 then return 'invalid'; end if;
   select count(*) into n from public.bug_reports where device = p_device and created_at > now() - interval '1 hour';
   if n >= 5 then return 'slow'; end if;

@@ -64,6 +64,16 @@
       </div>
     </section>
 
+    <section id="account" hidden>
+      <h2 style="font-size:22px;margin:34px 0 6px">Beta access</h2>
+      <p class="hint">Got a beta code? Add it to your account here, then link your copy of Priism: press <b>Get a link code</b> and type it in the Priism panel within 10 minutes. The beta works on one device at a time; you can move it to another device once every 7 days.</p>
+      <div class="inv-new"><input id="betaCode" class="field" maxlength="40" placeholder="Beta code" autocomplete="off" spellcheck="false"><button id="betaClaim" class="btn" type="button">Add to my account</button></div>
+      <p class="hint" id="betaMsg"></p>
+      <div id="betaStatus" class="mine-list"></div>
+      <div id="betaLinkRow" hidden><div class="inv-new"><button id="betaLink" class="btn primary" type="button">Get a link code</button><b id="betaLinkCode" class="inv-code" style="font-size:22px;letter-spacing:2px"></b></div></div>
+      <p class="hint" id="betaLinkMsg"></p>
+    </section>
+
     <section id="myShares" hidden>
       <h2 style="font-size:22px;margin:34px 0 6px">Your shares</h2>
       <p class="hint" id="mySharesHint">Everything you've shared, and whether it's live yet. Delete anything any time.</p>
@@ -81,10 +91,13 @@
       <div class="inv-new">
         <input id="invNote" class="field" maxlength="80" placeholder="Who is it for? (only you see this)">
         <label class="inv-dev" id="invCountL" hidden>Codes <input id="invCount" class="field" type="number" min="2" max="100" value="10"></label>
-        <label class="inv-dev">Devices <input id="invMax" class="field" type="number" min="1" max="10000" value="2"></label>
+        <label class="inv-dev">Devices <input id="invMax" class="field" type="number" min="1" max="10000" value="1"></label>
+        <label class="inv-dev"><input id="invBeta" type="checkbox" checked> Beta: needs an account</label>
+        <label class="inv-dev">Ends after <input id="invDays" class="field" type="number" min="0" max="365" value="21"> days</label>
         <button id="invMake" class="btn primary" type="button">Make a code</button>
       </div>
       <p class="hint" id="invKindHint">One code for one person, on up to this many of their devices.</p>
+      <p class="hint">Beta codes are added to one person's account on this page (Beta access), and work on their linked device until the end date. 0 days = no end. Codes without "needs an account" work on any device that types them, like before.</p>
       <p class="hint" id="invMsg"></p>
       <div id="invBatch" class="inv-batch" hidden><textarea id="invBatchText" class="field" rows="6" readonly></textarea><button id="invBatchCopy" class="btn" type="button">Copy all</button></div>
       <p class="hint"><button id="labelOld" class="btn" type="button">Label older wallpapers</button> Measures quality (4K, 1080p…) and OLED for wallpapers shared before labels existed.</p>
@@ -353,17 +366,24 @@
     async function renderInvites() {
       const box = $("invites"); if (!profile || !profile.is_admin) { box.hidden = true; return; }
       box.hidden = false; const list = $("invList");
-      const [iv, dv] = await Promise.all([sb.from("invites").select("code,note,max_devices,revoked,created_at").order("created_at", { ascending: false }).range(0, 199),
-        sb.from("invite_devices").select("code,device,app,first_seen,last_seen").order("last_seen", { ascending: false }).range(0, 999)]);
+      const [iv, dv, ac] = await Promise.all([sb.from("invites").select("code,note,max_devices,revoked,created_at,expires_at,requires_account,claimed_by").order("created_at", { ascending: false }).range(0, 199),
+        sb.from("invite_devices").select("code,device,app,first_seen,last_seen").order("last_seen", { ascending: false }).range(0, 999), sb.rpc("admin_accounts")]);
+      const accts = Object.fromEntries(((ac && ac.data) || []).map((a) => [a.code, a]));
       if (iv.error) { list.innerHTML = /invites|schema cache/i.test(iv.error.message) ? "<p class='hint'>Invites aren't set up on the server yet: re-run supabase/schema.sql in Supabase (SQL Editor).</p>" : "<p class='hint'>Couldn't load invites: " + esc(iv.error.message) + "</p>"; return; }
       const devs = dv.data || [], ago = (t) => { const d = (Date.now() - new Date(t)) / 864e5; return d < 1 ? "today" : Math.round(d) + "d ago"; };
       list.innerHTML = iv.data.length ? "" : "<p class='hint'>No codes yet. Make one above.</p>";
       for (const v of iv.data) {
         const mine = devs.filter((d) => d.code === v.code), row = document.createElement("div"); row.className = "mine-row inv-row";
-        row.innerHTML = `<div class="mine-t"><b class="inv-code">${esc(v.code)}</b> ${v.revoked ? '<span class="st rej">Off</span>' : mine.length >= v.max_devices ? '<span class="st rev">Full</span>' : '<span class="st live">Active</span>'}
-            <small>${esc(v.note || "no note")} · ${mine.length}/${v.max_devices} device${v.max_devices === 1 ? "" : "s"}${mine.length ? " · last used " + ago(mine[0].last_seen) : ""}</small>
+        const ended = v.expires_at && new Date(v.expires_at) < new Date(), a = accts[v.code], day = (t) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        const used = v.requires_account ? (a ? `${esc(a.email || "?")} · ${a.devices} linked device${a.devices === 1 ? "" : "s"}${a.last_seen ? " · seen " + ago(a.last_seen) : ""}${a.next_move ? " · can move " + day(a.next_move) : ""}` : "not claimed yet")
+          : `${mine.length}/${v.max_devices} device${v.max_devices === 1 ? "" : "s"}${mine.length ? " · last used " + ago(mine[0].last_seen) : ""}`;
+        row.innerHTML = `<div class="mine-t"><b class="inv-code">${esc(v.code)}</b> ${v.revoked ? '<span class="st rej">Off</span>' : ended ? '<span class="st rej">Ended</span>' : !v.requires_account && mine.length >= v.max_devices ? '<span class="st rev">Full</span>' : '<span class="st live">Active</span>'}${v.requires_account ? ' <span class="st">Beta</span>' : ""}
+            <small>${esc(v.note || "no note")} · ${used}${v.expires_at ? " · " + (ended ? "ended " : "ends ") + day(v.expires_at) : ""}</small>
             <small>${mine.map((d) => `${esc(d.app || "?")} (${ago(d.last_seen)}) <a href="#" data-free="${esc(d.device)}">free</a>`).join(" · ")}</small></div>
-          <button class="btn" data-a="copy" type="button">Copy</button><button class="btn" data-a="toggle" type="button">${v.revoked ? "Turn on" : "Turn off"}</button><button class="btn" data-a="del" type="button">Delete</button>`;
+          <button class="btn" data-a="copy" type="button">Copy</button>${v.expires_at ? '<button class="btn" data-a="ext" type="button">+7 days</button>' : ""}${a ? '<button class="btn" data-a="reset" type="button">Reset devices</button>' : ""}<button class="btn" data-a="toggle" type="button">${v.revoked ? "Turn on" : "Turn off"}</button><button class="btn" data-a="del" type="button">Delete</button>`;
+        const ext = row.querySelector('[data-a="ext"]'), rst = row.querySelector('[data-a="reset"]');
+        if (ext) ext.onclick = async () => { const from = Math.max(Date.now(), +new Date(v.expires_at)); const r = await sb.from("invites").update({ expires_at: new Date(from + 7 * 864e5).toISOString() }).eq("code", v.code); if (r.error) return alert(r.error.message); renderInvites(); };
+        if (rst) rst.onclick = async () => { if (!confirm(`Unlink every device on ${a.email || "this account"}? They can link a new one straight away.`)) return; const r = await sb.rpc("admin_reset_account", { p_user: a.user_id }); if (r.error) return alert(r.error.message); renderInvites(); };
         row.querySelector('[data-a="copy"]').onclick = async (e) => { try { await navigator.clipboard.writeText(v.code); e.target.textContent = "Copied"; } catch { prompt("Copy the code:", v.code); } };
         row.querySelector('[data-a="toggle"]').onclick = async () => { const r = await sb.from("invites").update({ revoked: !v.revoked }).eq("code", v.code); if (r.error) return alert(r.error.message); renderInvites(); };
         row.querySelector('[data-a="del"]').onclick = async () => { if (!confirm(`Delete ${v.code}? Devices using it lock within a day.`)) return; const r = await sb.from("invites").delete().eq("code", v.code); if (r.error) return alert(r.error.message); renderInvites(); };
@@ -375,12 +395,12 @@
     // what to make: one code for one person, several personal codes at once, or ONE code a whole group shares
     // (a Discord, say: you set how many devices it lets in, and can turn it off any time)
     let invKind = "one";
-    const KIND = { one: { dev: 2, btn: "Make a code", hint: "One code for one person, on up to this many of their devices." },
+    const KIND = { one: { dev: 1, btn: "Make a code", hint: "One code for one person, on up to this many of their devices." },
       many: { dev: 2, btn: "Make the codes", hint: "A list of personal codes, one per person. Copy them all and hand them out." },
       group: { dev: 100, btn: "Make a group code", hint: "One code you can post for a whole group. It lets in up to this many devices; turn it off any time." } };
     document.querySelectorAll("#invKind [data-k]").forEach((b) => (b.onclick = () => {
       invKind = b.dataset.k; document.querySelectorAll("#invKind [data-k]").forEach((x) => x.classList.toggle("on", x === b));
-      $("invCountL").hidden = invKind !== "many"; $("invMax").value = KIND[invKind].dev; $("invMake").textContent = KIND[invKind].btn; $("invKindHint").textContent = KIND[invKind].hint;
+      $("invCountL").hidden = invKind !== "many"; $("invMax").value = KIND[invKind].dev; $("invBeta").checked = invKind !== "group"; $("invMake").textContent = KIND[invKind].btn; $("invKindHint").textContent = KIND[invKind].hint;
       $("invBatch").hidden = true;
     }));
     $("invBatchCopy").onclick = async (e) => { try { await navigator.clipboard.writeText($("invBatchText").value); e.target.textContent = "Copied"; } catch { $("invBatchText").select(); } };
@@ -398,9 +418,11 @@
       const n = invKind === "many" ? Math.max(2, Math.min(100, Math.round(+$("invCount").value || 10))) : 1;
       const codes = []; while (codes.length < n) { const c = newCode(); if (!codes.includes(c)) codes.push(c); }
       $("invMake").disabled = true;
-      const r = await sb.from("invites").insert(codes.map((code, i) => ({ code, note: note ? (n > 1 ? `${note} #${i + 1}` : note) : (invKind === "group" ? "group" : null), max_devices: max })));
+      const days = Math.max(0, Math.min(365, Math.round(+$("invDays").value || 0))), beta = $("invBeta").checked;
+      const extra = { ...(beta ? { requires_account: true } : {}), ...(days ? { expires_at: new Date(Date.now() + days * 864e5).toISOString() } : {}) };
+      const r = await sb.from("invites").insert(codes.map((code, i) => ({ code, note: note ? (n > 1 ? `${note} #${i + 1}` : note) : (invKind === "group" ? "group" : null), max_devices: max, ...extra })));
       $("invMake").disabled = false;
-      if (r.error) return say("invMsg", "Couldn't make " + (n > 1 ? "the codes" : "a code") + ": " + (/check constraint/i.test(r.error.message) ? "devices must be 1 to 10000 (re-run supabase/schema.sql if it stops at 50)." : r.error.message));
+      if (r.error) return say("invMsg", "Couldn't make " + (n > 1 ? "the codes" : "a code") + ": " + (/expires_at|requires_account/i.test(r.error.message) ? "re-run supabase/schema.sql first (it adds beta codes)." : /check constraint/i.test(r.error.message) ? "devices must be 1 to 10000 (re-run supabase/schema.sql if it stops at 50)." : r.error.message));
       if (n > 1) { $("invBatchText").value = codes.join("\n"); $("invBatch").hidden = false; $("invBatchCopy").textContent = "Copy all"; say("invMsg", `Made ${n} codes. Copy them all below.`); }
       else say("invMsg", invKind === "group" ? `Made ${codes[0]} for up to ${max} devices. Post it for your group.` : `Made ${codes[0]}. Copy it and send it to them.`);
       $("invNote").value = ""; renderInvites();
@@ -430,6 +452,36 @@
       }
     }
 
+    // ---------- beta access (signed in) ----------
+    const BETA_SAY = { ok: "Added. Now link your copy of Priism below.", invalid: "That code isn't right. Check it and try again.", revoked: "That code has been turned off.",
+      expired: "That code has ended.", taken: "That code is already on someone else's account." };
+    async function renderBeta() {
+      const box = $("account"); box.hidden = !user; if (!user) return;
+      const r = await sb.rpc("my_access");
+      if (r.error) { $("betaStatus").innerHTML = /my_access|function/i.test(r.error.message) ? "" : "<p class='hint'>Couldn't load your access: " + esc(r.error.message) + "</p>"; $("betaLinkRow").hidden = true; return; }
+      if (!r.data) { $("betaStatus").innerHTML = ""; $("betaLinkRow").hidden = true; return; }   // (not set up on the server yet)
+      const a = r.data, day = (t) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      const line = a.status === "ok" ? (a.until ? `Active until ${day(a.until)}` : "Active") : a.status === "expired" ? `Ended${a.until ? " on " + day(a.until) : ""}. Thanks for testing!` : a.status === "revoked" ? "Turned off" : "No beta code on this account yet";
+      const devs = (a.devices || []).map((d) => `<small>${esc(d.app || "Priism")} ··${esc(d.device)} · linked ${day(d.linked_at)} · seen ${day(d.last_seen)}${d.active ? "" : " · unlinked"}</small>`).join("");
+      $("betaStatus").innerHTML = `<div class="mine-row"><div class="mine-t"><b>${esc(line)}</b>${devs || (a.status === "ok" ? "<small>No device linked yet.</small>" : "")}${a.next_move ? `<small>You can move to another device from ${day(a.next_move)}.</small>` : ""}</div></div>`;
+      $("betaLinkRow").hidden = a.status !== "ok";
+    }
+    $("betaClaim").onclick = async () => {
+      const c = $("betaCode").value.trim(); if (!c) return say("betaMsg", "Enter your beta code.");
+      $("betaClaim").disabled = true; const r = await sb.rpc("claim_invite", { p_code: c }); $("betaClaim").disabled = false;
+      say("betaMsg", r.error ? "Couldn't add it: " + r.error.message : BETA_SAY[r.data] || r.data); if (r.data === "ok") $("betaCode").value = ""; renderBeta();
+    };
+    let linkTimer = 0;
+    $("betaLink").onclick = async () => {
+      const r = await sb.rpc("create_link_code"); clearInterval(linkTimer);
+      if (r.error) { $("betaLinkCode").textContent = ""; return say("betaLinkMsg", r.error.message.replace(/^access: /, "")); }
+      $("betaLinkCode").textContent = r.data; const end = Date.now() + 10 * 60e3;
+      const tick = () => { const left = Math.max(0, Math.round((end - Date.now()) / 1000));
+        say("betaLinkMsg", left ? `Type this in the Priism panel (the box that asks for a code) within ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}. It works once. Linking a new device moves your beta off the old one.` : "That code has run out. Get a new one.");
+        if (!left) { clearInterval(linkTimer); $("betaLinkCode").textContent = ""; } };
+      tick(); linkTimer = setInterval(tick, 1000);
+    };
+
     // ---------- account ----------
     let user = null, profile = null;
     async function refresh() {
@@ -446,10 +498,10 @@
       $("myShares").hidden = !user;
       if (user) { $("signout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); await refresh(); say("shareMsg", ""); }; renderMine(); }
       say("ownerNote", user && profile && profile.is_admin ? "You're the owner: what you share goes live straight away." : user ? "Shares are checked before everyone can see them (usually within a day). You'll see yours under Your shares." : "");
-      renderReview(); renderInvites(); renderBugs(); renderUsage();
+      renderReview(); renderInvites(); renderBugs(); renderBeta(); renderUsage();
     }
     sb.auth.onAuthStateChange(() => refresh());
-    refresh().then(() => { if (location.hash === "#mine" && user) $("myShares").scrollIntoView(); });
+    refresh().then(() => { if (location.hash === "#mine" && user) $("myShares").scrollIntoView(); if (location.hash === "#account") (user ? $("account") : $("submit")).scrollIntoView(); });
 
     const creds = () => ({ email: $("email").value.trim(), password: $("pass").value });
     $("signin").onclick = async () => { const c = creds(); if (!c.email || !c.password) return say("authMsg", "Enter your email and password.");
