@@ -328,6 +328,8 @@ app.whenReady().then(() => {
       }).catch(() => cb({}));
     }, { useSystemPicker: true });
   } catch {}
+  // settings left in the folder of the app's old name (Wicked Skins): copied over once (desktop/userdata.js)
+  try { const from = require("./userdata").recoverOldSettings(app.getPath("appData"), app.getPath("userData")); if (from) console.log("settings recovered from", from); } catch (e) { console.error("settings recovery:", e && e.message); }
   load();
   // Allow user-chosen wallpapers (data:/blob:) regardless of the site's media CSP.
   session.defaultSession.webRequest.onHeadersReceived({ urls: ["https://*.tradingview.com/*"] }, (d, cb) => {

@@ -64,7 +64,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const keys = await dbKeys();
   ok("the browser's storage holds one copy of each (no orphan files)", Array.isArray(keys) && keys.length === 4, keys);
   // 6. delete one, add it again: allowed (it's no longer there)
-  await set({ media: s.media.filter((m) => m.name !== "b.png") }); await pop.reload(); await sleep(1000);
+  // (with the panel's own Remove button, which asks first and deletes the file too)
+  await pop.reload(); await sleep(1000);
+  pop.once("dialog", (d) => d.accept());
+  await pop.evaluate(() => { const c = [...document.querySelectorAll("#mediaCards .card")].find((x) => /b\.png/.test(x.textContent)); c.querySelector(".x").click(); }); await sleep(800);
   await pick([file("b.png", "B")]);
   s = await get();
   ok("a file you deleted can be added again", s.media.length === 4 && s.media.some((m) => m.name === "b.png"), s.media.map((m) => m.name));

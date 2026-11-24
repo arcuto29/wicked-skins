@@ -59,7 +59,9 @@ const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
   const card = () => pa.evaluate((seenSrc) => { const seen = eval(seenSrc), v = document.querySelector(".pu-veil"); return v ? { cls: v.className, text: v.innerText, href: (v.querySelector("a.pu-go") || {}).href || "", seen: seen(v) } : null; }, seen.toString());
   await pa.waitForTimeout(600);   // (past its slide-in)
   let c = await card();
-  ok("unpacked copy + newer release: an 'Update available' card with the steps to do it by hand", c && /pu-manual/.test(c.cls) && /Update available/i.test(c.text) && /this copy.s folder/i.test(c.text) && /Reload/.test(c.text), c && c.text.slice(0, 200));
+  ok("unpacked copy + newer release: an 'Update available' card with the steps to do it by hand", c && /pu-manual/.test(c.cls) && /Update available/i.test(c.text)
+    // (9.9.9 is past keys/unpacked.json keyedFrom: the one-time move to the fixed id; your things move over by themselves, no backup)
+    && /NEW folder/.test(c.text) && /Load unpacked/.test(c.text) && /by themselves/.test(c.text) && !/backup/i.test(c.text), c && c.text.slice(0, 400));
   ok("...its button is the release's real zip", c && c.href.endsWith("/v9.9.9/priism-skins-9.9.9.zip"), c && c.href);
   ok("...and it never claims to download or install by itself", c && !/Restart|Downloading|ready/i.test(c.text));
   ok("...it sits in the corner, it doesn't cover the panel, and it's actually on screen in the popup", c && /pu-dock/.test(c.cls) && c.seen);

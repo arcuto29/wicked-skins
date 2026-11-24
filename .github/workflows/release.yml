@@ -230,7 +230,9 @@ jobs:
           STABLE_ID: ${{ secrets.CWS_EXTENSION_ID }}
           BETA_ID: ${{ secrets.CWS_BETA_EXTENSION_ID }}
         run: |
-          if [ "$CHANNEL" = "beta" ]; then EXTENSION_ID="$BETA_ID"; ZIP=$(ls out/priism-skins-beta-*.zip); else EXTENSION_ID="$STABLE_ID"; ZIP=$(ls out/priism-skins-[0-9]*.zip); fi
+          if [ "$CHANNEL" = "beta" ]; then EXTENSION_ID="$BETA_ID"; ZIP=$(ls out/priism-skins-beta-*-store.zip); else EXTENSION_ID="$STABLE_ID"; ZIP=$(ls out/priism-skins-[0-9]*-store.zip); fi
+          # (the -store zip: no fixed key, which the store refuses; the other zip is for loading unpacked)
+          if unzip -p "$ZIP" manifest.json | grep -q '"key"'; then echo "::error::$ZIP has a key in its manifest: the store refuses it."; exit 1; fi
           export EXTENSION_ID
           if [ -z "$EXTENSION_ID" ] || [ -z "$REFRESH_TOKEN" ] || [ -z "$CLIENT_ID" ]; then
             echo "::notice::No Chrome Web Store listing connected for the $CHANNEL channel: upload $ZIP in the dashboard (RELEASING.md)."; exit 0; fi

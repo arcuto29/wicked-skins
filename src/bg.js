@@ -1,7 +1,7 @@
 /* Background service worker:
    - keeps per-site registrations (sites.js) in sync with the permissions you've granted
    - upgrades saved settings after any update (migrate.js) so they keep working */
-importScripts("sites.js", "migrate.js", "workshop-config.js", "pass.js", "invite.js");
+importScripts("sites.js", "migrate.js", "workshop-config.js", "pass.js", "invite.js", "mediadb.js", "backup.js", "handover.js");   // handover: moving to a new copy by itself
 // Invite only: re-check the saved invite code now and then (at most once a day), so a revoked code locks this copy.
 const inviteCheck = () => { try { PriismInvite.recheck(false); } catch {} };
 inviteCheck(); setInterval(inviteCheck, 6 * 3600e3);

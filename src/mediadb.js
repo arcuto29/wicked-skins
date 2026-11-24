@@ -19,9 +19,10 @@
       t.onerror = t.onabort = () => rej(t.error || new Error("the browser refused to store it (storage full or unavailable)"));
     });
   };
-  window.WickedMediaDB = {
+  (typeof self !== "undefined" ? self : window).WickedMediaDB = {   // (pages, and the background worker: automatic moves, src/handover.js)
     put: (id, blob) => tx("readwrite", (s) => s.put(blob, id)),
     get: (id) => tx("readonly", (s) => s.get(id)),
     del: (id) => tx("readwrite", (s) => s.delete(id)),
+    keys: () => tx("readonly", (s) => s.getAllKeys()),   // every stored file (to find ones nothing lists any more)
   };
 })();

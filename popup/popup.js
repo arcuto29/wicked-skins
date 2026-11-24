@@ -83,7 +83,32 @@ function followCandles(obj) {
   }
   return obj;
 }
-const set = (obj) => { obj = followCandles(routeChartStyle(obj)); Object.assign(cfg, obj); chrome.storage.local.set({ ...obj, lastPick: Date.now() }); };
+// Your uploads list is never overwritten by an older copy of itself. Two panel pages can be open at once (this
+// popup, and the tab that converts videos), each with the list as it was when it opened; writing that back used to
+// drop wallpapers the other page had just added (their files stayed stored, but nothing listed them). So every write
+// of the list is merged with what's really stored: entries are only ever removed on purpose (forgetMedia). All
+// writes go out in order, one after the other, so a later setting can never be overtaken by an earlier one.
+const mediaGone = new Set();
+const forgetMedia = (id) => mediaGone.add(id);
+let writeQ = Promise.resolve();
+function mergeMedia(mine, stored) {
+  const have = new Set(mine.map((m) => m && m.id));
+  return [...mine.filter((m) => m && !mediaGone.has(m.id)), ...(Array.isArray(stored) ? stored : []).filter((m) => m && !have.has(m.id) && !mediaGone.has(m.id))];
+}
+// a write that didn't make it (disk full, the desktop app's settings file couldn't be written): said plainly, once a
+// minute at most, instead of silently losing it at the next restart
+let saveFailedAt = 0;
+function saveFailed(e) { if (Date.now() - saveFailedAt < 60000) return; saveFailedAt = Date.now();
+  try { toast(`Couldn't save your settings (${String((e && e.message) || e).slice(0, 120)}). What was saved before is kept; free some disk space, or remove a large upload, and try again.`); } catch {} }
+const set = (obj) => { obj = followCandles(routeChartStyle(obj)); Object.assign(cfg, obj); const out = { ...obj, lastPick: Date.now() };
+  writeQ = writeQ.then(() => new Promise((done) => {
+    const fail = (e) => { done(); saveFailed(e); };
+    const write = () => { try { const r = chrome.storage.local.set(out, () => { const le = chrome.runtime && chrome.runtime.lastError; le ? fail(le) : done(); }); if (r && r.then) r.then(() => done(), fail); } catch (e) { fail(e); } };
+    if (!("media" in out) || !Array.isArray(out.media)) return write();
+    chrome.storage.local.get({ media: [] }, (st) => { out.media = mergeMedia(out.media, st && st.media);
+      if (out.media.length !== cfg.media.length) { cfg.media = out.media; setTimeout(() => { try { renderMedia(); } catch {} }, 0); }
+      write(); });
+  })); };
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -727,6 +752,17 @@ async function renderEachInd() {
   });
 }
 try { chrome.storage.onChanged.addListener((ch, area) => { if (area === "local" && ch.indSeen) renderEachInd(); }); } catch {}
+// another panel page (or this one) changed your uploads: this page's list follows, so it never works from an old one
+try { chrome.storage.onChanged.addListener((ch, area) => {
+  if (area !== "local" || !ch.media || !Array.isArray(ch.media.newValue)) return;
+  const nv = ch.media.newValue, ov = Array.isArray(ch.media.oldValue) ? ch.media.oldValue : [], ids = (l) => new Set(l.map((m) => m && m.id));
+  const inNew = ids(nv), inOld = ids(ov);
+  // (entries this page added that haven't been written yet are kept; ones removed elsewhere go)
+  const unsaved = cfg.media.filter((m) => !inNew.has(m.id) && !inOld.has(m.id));
+  const before = cfg.media.map((m) => m.id).join();
+  cfg.media = mergeMedia(nv, unsaved);
+  if (cfg.media.map((m) => m.id).join() !== before) { try { renderMedia(); renderSkins(); } catch {} }
+}); } catch {}
 $("scaleGlow").oninput = (e) => { set({ scaleGlow: +e.target.value }); $("scaleGlowOut").textContent = Math.round(+e.target.value * 100) + "%"; };
 $("scaleText").oninput = (e) => set({ scaleText: e.target.value });
 $("scaleBgColor").oninput = (e) => set({ scaleBgColor: e.target.value });
@@ -1236,6 +1272,9 @@ function deskCard() {
   DESK.onState((s) => renderDesk(!!(s && s.open)));
 }
 const IS_TAB = new URLSearchParams(location.search).has("page");
+// the first version whose unpacked zip has a fixed id (keys/unpacked.json; scripts/check.js keeps the two the same)
+const KEYED_FROM = "0.1.88";
+const DESK_MEDIA_CHARS = 350e6;   // desktop app: all uploads together, as text in its settings file (one file's safe size)
 const MAX_FILE_MB = EXT_MODE ? 2048 : MAX_MB;
 const converting = {}; // id -> progress 0..1
 
@@ -1276,6 +1315,9 @@ function renderMedia() {
     card.insertAdjacentHTML("beforeend", `${badge}${wallTags(m.w, m.h, m.oled)}<div class="label"><span>${esc(m.name)}</span><button class="x" title="Remove">${ICON_X}</button></div>`);
     card.onclick = (e) => {
       if (e.target.classList.contains("x")) {
+        // (removing deletes the file from this computer: asked first, so a stray click never loses a wallpaper)
+        if (!confirm(`Remove \u201c${m.name}\u201d from your uploads? Its file is deleted from this computer.`)) return;
+        forgetMedia(m.id);
         const media = cfg.media.filter((x) => x.id !== m.id);
         const wasActive = cfg.skin === "media" && cfg.mediaId === m.id;
         if (m.file && window.WickedMediaDB) { WickedMediaDB.del(m.id).catch(() => {}); if (m.pending) WickedMediaDB.del(m.id + ":src").catch(() => {}); }   // (a video still to convert: its original too)
@@ -1368,6 +1410,11 @@ async function fingerprintOld() {
   }
   if (changed) set({ media: cfg.media });
 }
+// a file only counts as added once it's really in the database at its full size (never "Added" for one that isn't)
+async function storedOk(key, size) { const b = await WickedMediaDB.get(key); if (!b || b.size !== size) throw new Error("it didn't store completely: your disk or the browser's storage may be full"); }
+// ask the browser to treat Priism's storage as permanent (it already is for an extension with unlimitedStorage; this
+// makes it explicit where it isn't, e.g. the desktop app's panel)
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(() => {}); } catch {}
 async function addFiles(files) {
   const problems = [], dupes = []; let added = 0, needConvert = 0, lastId = null;
   hint("Checking files…");
@@ -1383,10 +1430,13 @@ async function addFiles(files) {
     if (same) { dupes.push(f.name); if (!same.pending) lastId = same.id; continue; }
 
     if (!EXT_MODE) { // desktop app fallback
+      // (stored inside the settings file: kept well under what one file can hold, so saving can never fail)
+      const inFile = cfg.media.reduce((n, m) => n + (m.src ? m.src.length : 0), 0);
+      if (inFile + f.size * 1.37 > DESK_MEDIA_CHARS) { problems.push(`${f.name}: the desktop app holds about ${Math.round(DESK_MEDIA_CHARS / 1.37 / 1048576)} MB of uploads in total; remove one to make room`); continue; }
       const src = await readAsDataURL(f, c.mime);
       const p = await probe(c.type, src);
       if (!p) { problems.push(`${f.name}: can't play in the desktop app yet (try MP4 H.264 or WebM)`); continue; }
-      cfg.media = [...cfg.media, { id, name, type: c.type, src, ...(fp ? { fp } : {}) }]; lastId = id; added++;
+      cfg.media = [...cfg.media, { id, name, type: c.type, src, ...(fp ? { fp } : {}) }]; lastId = id; added++; set({ media: cfg.media });
       continue;
     }
 
@@ -1395,14 +1445,15 @@ async function addFiles(files) {
     URL.revokeObjectURL(url);
     // (saved file by file: one that can't be stored is reported and the rest are kept, nothing is left half-saved)
     if (p) {
-      try { await WickedMediaDB.put(id, f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }
+      try { await WickedMediaDB.put(id, f); await storedOk(id, f.size); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); WickedMediaDB.del(id).catch(() => {}); continue; }
       let q = null; try { q = await window.PriismWallInfo.measure(f, c.type); } catch {}
       cfg.media = [...cfg.media, { id, name, type: c.type, file: true, thumb: p.thumb, size: f.size, ...(fp ? { fp } : {}), ...(q ? { w: q.w, h: q.h, oled: q.oled } : {}) }];
       lastId = id; added++;
+      set({ media: cfg.media });   // (listed straight away: the popup can close before the whole batch is done)
     } else if (c.type === "video") {
-      try { await WickedMediaDB.put(id + ":src", f); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); continue; }   // original kept until converted
+      try { await WickedMediaDB.put(id + ":src", f); await storedOk(id + ":src", f.size); } catch (e) { problems.push(`${f.name}: couldn't be saved (${storeMsg(e)})`); WickedMediaDB.del(id + ":src").catch(() => {}); continue; }   // original kept until converted
       cfg.media = [...cfg.media, { id, name, type: "video", file: true, pending: true, origName: f.name, size: f.size, ...(fp ? { fp } : {}) }];
-      needConvert++;
+      needConvert++; set({ media: cfg.media });
     } else problems.push(`${f.name}: this image's format can't be shown in the browser`);
   }
   saveMedia(cfg.media, lastId ? { skin: "media", mediaId: lastId } : {});
@@ -1416,6 +1467,59 @@ async function addFiles(files) {
   if (needConvert) {
     if (IS_TAB) convertPending();
     else chrome.tabs.create({ url: chrome.runtime.getURL("popup/popup.html?page=media") }); // keep converting even if the popup closes
+  }
+}
+
+// ---------- recovery: wallpapers whose file is stored but that your list lost ----------
+// Every file you upload is kept in this browser's own database (WickedMediaDB) under the wallpaper's id; the list
+// in settings says which ones you have. If the list ever lost an entry (an older panel page writing over it, the popup
+// closing halfway through adding files), the file is still there: it's put back in My uploads, never deleted.
+// (A video's original kept for converting is "<id>:src": put back as a video still to convert.)
+let recovering = false;
+async function recoverUploads() {
+  if (recovering || !EXT_MODE || !window.WickedMediaDB || !WickedMediaDB.keys) return 0;
+  recovering = true;
+  try {
+    // (not while files are arriving from your other copy: src/handover.js lists them itself once they're all here)
+    const { handover: hv } = await new Promise((r) => chrome.storage.local.get({ handover: null }, r));
+    if (hv && !hv.done && !hv.error && Date.now() - (hv.started || 0) < 3600e3) return 0;
+    const keys = (await WickedMediaDB.keys()).map(String).filter((k) => !k.startsWith("hv:")), have = new Set(keys);
+    const listed = new Set(); for (const m of cfg.media) { listed.add(m.id); listed.add(m.id + ":src"); }
+    const back = []; let n = 0;
+    for (const k of keys) {
+      if (listed.has(k)) continue;
+      const isSrc = k.endsWith(":src"), id = isSrc ? k.slice(0, -4) : k;
+      if (isSrc && have.has(id)) continue;                 // a conversion that finished: the video itself is what counts
+      if (cfg.media.some((m) => m.id === id) || back.some((m) => m.id === id)) continue;
+      const blob = await WickedMediaDB.get(k).catch(() => null); if (!blob || !blob.size) continue;
+      const kind = /^video\//.test(blob.type) ? "video" : /^image\//.test(blob.type) ? "image" : null;
+      n++;
+      const name = `Recovered ${kind || "wallpaper"} ${n}`;
+      if (isSrc) { back.push({ id, name, type: "video", file: true, pending: true, origName: name + "." + ((blob.type.split("/")[1] || "mp4").replace("quicktime", "mov")), size: blob.size, recovered: true }); continue; }
+      // (what it is, if the browser didn't say: tried as a video, then as a picture)
+      let type = kind, p = null; const url = URL.createObjectURL(blob);
+      try { for (const t of kind ? [kind] : ["video", "image"]) { p = await probe(t, url); if (p) { type = t; break; } } } finally { URL.revokeObjectURL(url); }
+      back.push({ id, name, type: type || "image", file: true, size: blob.size, recovered: true, ...(p && p.thumb ? { thumb: p.thumb } : {}) });
+    }
+    if (!back.length) return 0;
+    set({ media: [...cfg.media, ...back] }); renderMedia(); renderSkins();
+    hint(`Found ${back.length} wallpaper${back.length > 1 ? "s" : ""} whose file was still on this computer but missing from your list: back in My uploads.`);
+    if (back.some((m) => m.pending) && IS_TAB) convertPending();
+    return back.length;
+  } catch { return 0; } finally { recovering = false; }
+}
+
+// what the automatic move between your Priism copies did (src/handover.js), said once in each copy's panel
+async function handoverNote() {
+  const s = await new Promise((r) => chrome.storage.local.get({ handover: null, handoverTo: null, handoverSeen: 0 }, r));
+  const h = s.handover, to = s.handoverTo && Object.values(s.handoverTo).sort((a, b) => b.at - a.at)[0];
+  if (h && h.done && h.at > (s.handoverSeen || 0)) {
+    toast(`Everything came over from your other Priism copy: ${h.wallpapers} wallpaper${h.wallpapers === 1 ? "" : "s"}, ${h.looks} saved look${h.looks === 1 ? "" : "s"} and your settings${h.licence === "ok" ? ", and your licence" : ""}. You can remove the other copy in chrome://extensions.`);
+    chrome.storage.local.set({ handoverSeen: Date.now() });
+  } else if (h && !h.done && !h.error && Date.now() - (h.started || 0) < 3600e3) hint(`Bringing your things over from your other Priism copy${h.of ? `: ${h.files || 0} of ${h.of} files` : ""}\u2026`);
+  else if (to && to.at > (s.handoverSeen || 0)) {
+    toast(`Your wallpapers, looks and settings are now also in your new Priism copy. This copy can be removed whenever you like.`);
+    chrome.storage.local.set({ handoverSeen: Date.now() });
   }
 }
 
@@ -1476,13 +1580,14 @@ async function convertPending() {
         await WickedMediaDB.del(m.id + ":src");
         delete converting[m.id];
         cfg.media = cfg.media.map((x) => (x.id === m.id ? { id: x.id, name: x.name, type: "video", file: true, thumb: p.thumb, size: blob.size, converted: true,
-          ...(x.fp ? { fp: x.fp } : {}), ...(x.wsId ? { wsId: x.wsId } : {}) } : x));   // (fp: the file you picked, so picking it again is still recognised)
-        saveMedia(cfg.media, { skin: "media", mediaId: m.id });
-        hint(`Converted ${m.origName}. It's on your chart now.`);
+          ...(x.fp ? { fp: x.fp } : {}), ...(x.wsId ? { wsId: x.wsId } : {}), ...(x.recovered ? { recovered: true } : {}) } : x));   // (fp: the file you picked, so picking it again is still recognised)
+        // (a recovered video goes back in My uploads only: your wallpaper stays the one you chose)
+        if (m.recovered) { saveMedia(cfg.media); hint(`Converted ${m.name}: it's in My uploads.`); }
+        else { saveMedia(cfg.media, { skin: "media", mediaId: m.id }); hint(`Converted ${m.origName}. It's on your chart now.`); }
       } catch (e) {
         delete converting[m.id];
         await WickedMediaDB.del(m.id + ":src").catch(() => {});
-        cfg.media = cfg.media.filter((x) => x.id !== m.id);
+        forgetMedia(m.id); cfg.media = cfg.media.filter((x) => x.id !== m.id);
         saveMedia(cfg.media);
         hint(`Couldn't convert ${m.origName}: ${e.message || e}.`);
       }
@@ -3088,9 +3193,22 @@ async function updates() {
   if (!r || !newer(r.version, me) || C.isOpen() || snoozed("zip", r.version, 24)) return;
   const zip = r.assets.find((x) => (ME.channel === "beta" ? /^priism-skins-beta-[\d.]+\.zip$/i : /^priism-skins-[\d.]+\.zip$/i).test(x.name));
   const store = ME.channel === "beta" ? BETA_STORE_URL : STORE_URL;
+  // Chrome keeps an unpacked copy's uploads and settings under its id. Without a fixed key the id comes from the
+  // folder, so a new folder = a new, empty copy. From KEYED_FROM on the zip has a fixed key (keys/unpacked.json):
+  // the same id in any folder. Moving to it is a new id once, so this one time your things come along by backup.
+  const keyedNow = !!(chrome.runtime.getManifest && chrome.runtime.getManifest().key), keyedNext = PV.newer(r.version, KEYED_FROM) || r.version === KEYED_FROM;
+  const name = zip ? zip.name : "the new zip";
+  const steps = keyedNow
+    ? [`Download ${name} and unzip it (over this copy's folder or into a new one: both keep everything).`, "In chrome://extensions, press Reload on Priism (or Load unpacked and pick the new folder)."]
+    : keyedNext
+      ? [`Download ${name} and unzip it into a NEW folder (not over this one).`,
+        "In chrome://extensions choose Load unpacked and pick that folder. Keep this copy for now: your wallpapers, looks and settings move over to the new one by themselves.",
+        "When the new copy says everything came over, remove this one. From then on, updates keep everything wherever you unzip them."]
+      : [`Download ${name}.`, "Unzip it over THIS copy's folder (replace the files). A new folder would start empty.", "Press Reload on Priism in chrome://extensions."];
   C.show({ mode: "manual", from: me, to: r.version,
-    lead: "This copy was loaded unpacked, so Chrome can't update it by itself. Two minutes, and everything stays:",
-    steps: [`Download ${zip ? zip.name : "the new zip"}.`, "Unzip it over this copy's folder (replace the files).", "Press Reload on Priism in chrome://extensions."],
+    lead: keyedNext && !keyedNow ? "This update gives Priism a permanent id, so later updates keep everything wherever you unzip them. This once, install it next to this copy:"
+      : "This copy was loaded unpacked, so Chrome can't update it by itself. Two minutes, and everything stays:",
+    steps,
     foot: store ? `Or use the ${ME.channel === "beta" ? "beta listing" : "Chrome Web Store"} copy: it updates itself (back up first).` : "Your looks, wallpapers and settings stay.",
     primary: "Download " + PV.label(r.version), href: zip ? zip.url : r.url, onLater: () => snooze("zip", r.version) });
 }
@@ -3375,6 +3493,10 @@ chrome.storage.local.get(DEFAULTS, (stored) => {
   deskCard(); if (DESK && !IS_TAB) { setupDesk(); renderSkins(); renderQuick(); }
   detectCharts();
   updates(); deskUpdates();
+  // (files still stored that your list lost: put back. A copy with no uploads at all says where they might be.)
+  handoverNote();
+  setTimeout(async () => { const n = await recoverUploads();
+    if (!n && EXT_MODE && !cfg.media.length && $("mediaHint")) hint("No uploads in this copy yet. If your wallpapers are in another Priism copy in this browser, keep both switched on: they come over by themselves within a few minutes. (Another computer, or a copy you removed: Settings \u203A Backup & restore.)"); }, 600);
   const q = new URLSearchParams(location.search);
   if (q.get("page")) {
     document.body.classList.add("page");
