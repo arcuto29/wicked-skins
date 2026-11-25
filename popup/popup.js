@@ -3449,6 +3449,7 @@ function planWhy(r, saved) {
     case "moved": return "Your beta moved to another device. To use it here, get a link code on the website (Account). You can move once every 7 days.";
     case "full": return r.next ? `Your account is already used on another device. You can move it to this one from ${niceDate(r.next)}, or ask the Priism team to reset it.`
       : "That code or key is already used on its maximum number of devices. With a Pro key, sign out on one of them first (Settings \u203a Plan).";
+    case "limited": return "Too many wrong tries. Wait about 10 minutes, then try again.";
     case "offline": return "Couldn't reach the server. Check your internet and try again.";
   }
   return "Enter your Priism Pro licence key, an invite code, or a beta link code from the website.";

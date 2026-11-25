@@ -8,7 +8,7 @@ const R = {}; const ok = (k, v, d) => { R[k] = v; console.log((v ? "PASS " : "FA
 await db.exec(`
   create role anon nologin; create role authenticated nologin;
   create schema auth; create schema storage;
-  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}');
+  create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}', email_confirmed_at timestamptz default now());
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
   create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid, metadata jsonb, created_at timestamptz default now());
@@ -35,8 +35,10 @@ await db.exec(fs.readFileSync(new URL("./schema.sql", import.meta.url), "utf8"))
 ok("re-running the schema keeps the owner admin", (await db.query("select is_admin from public.profiles where id = $1", [OWNER])).rows[0].is_admin === true);
 ok("...and takes admin away from accounts that aren't owners", (await db.query("select count(*)::int n from public.profiles where is_admin")).rows[0].n === 1);
 await db.exec(`update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com')`);
+let KEEP_LIMITS = false, HEADERS = "";   // rate-limit tests: keep the wrong-guess counts, and set the request headers the database sees
 const as = async (uid, sql, params) => {
-  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid || ""}', false);`);
+  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid || ""}', false); select set_config('request.headers', '${HEADERS}', false);`);
+  if (!KEEP_LIMITS) await db.exec("delete from public.licence_limits");   // (other tests make many wrong guesses on purpose)
   await db.exec(`set role ${uid ? "authenticated" : "anon"}`);
   try { return await db.query(sql, params); } finally { await db.exec("reset role"); }
 };
@@ -222,6 +224,7 @@ ok("re-running the schema keeps the limits you set", (await db.query("select max
 // Supabase grants execute on new functions by default and schema.sql revokes it again; the blanket grant above undid
 // that here, so put the schema's revoke back for the internal helper.
 await db.exec("revoke execute on function public.account_access(uuid) from anon, authenticated");
+for (const f of ["licence_set_rate_key(text)", "licence_source()", "licence_miss(text, boolean)", "beta_spots_used()"]) await db.exec(`revoke execute on function public.${f} from anon, authenticated`);
 // (tests above may re-run schema.sql, which keeps only the owner as admin: make the test admin an admin again)
 await db.exec(`update public.profiles set is_admin = true where id = (select id from auth.users where email = 'you@example.com')`);
 const raw = (sql, p) => db.query(sql, p);   // as the database owner: used only to move the clock for a test
@@ -291,5 +294,106 @@ await claim(B2, "BETA-0003-AAAA"); await link(await mk(B2), "pc-00000005", S2);
 ok("a copy linked to a new account leaves the old one", (await chk("pc-00000005", S2)).status === "ok"
   && (await raw("select count(*)::int n from public.account_devices where device = 'pc-00000005' and active")).rows[0].n === 1);
 ok("admins: access with no code", (await as(ADMIN, "select public.my_access() r")).rows[0].r.status === "ok");
+
+// ---------- rate limiting (guessing codes) ----------
+// Wrong guesses are counted by the caller's address (and, on the website, the account), never by device id, plus a global
+// cap. The database sees the address in the request headers; tests set them the way PostgREST would.
+const HDR = (ip, extra = {}) => JSON.stringify({ "cf-connecting-ip": ip, ...extra }).replace(/'/g, "''");
+const redH = async (ip, code, dev) => { HEADERS = HDR(ip); return (await as(null, "select public.redeem_invite($1, $2) r", [code, dev])).rows[0].r; };
+KEEP_LIMITS = true; await db.exec("delete from public.licence_limits");
+{
+  let last = "";
+  for (let i = 1; i <= 10; i++) last = await redH("203.0.113.5", "GUESS-0000-" + String(i).padStart(4, "0"), "fresh-dev-" + String(i).padStart(4, "0"));   // a NEW device id every time
+  ok("wrong guesses are invalid up to the limit, even with a new device id each time", last === "invalid");
+  ok("the 11th guess from that address is refused (new device ids don't help)", (await redH("203.0.113.5", "GUESS-0000-9999", "fresh-dev-9999")) === "limited");
+  ok("...and so is a CORRECT code from that address, until the window passes", (await redH("203.0.113.5", "PRIISM-GOOD-0001", "fresh-dev-8888")) === "limited");
+  await as(ADMIN, "insert into public.invites (code, max_devices) values ('PRIISM-GOOD-0001', 3) on conflict do nothing");
+  ok("another address is not affected", (await redH("203.0.113.9", "PRIISM-GOOD-0001", "fresh-dev-7777")) === "ok");
+  ok("successes aren't counted: many right answers never limit", await (async () => { for (let i = 0; i < 15; i++) if ((await redH("203.0.113.9", "PRIISM-GOOD-0001", "fresh-dev-7777")) !== "ok") return false; return true; })());
+  ok("a revoked code isn't a wrong guess", await (async () => { await as(ADMIN, "insert into public.invites (code, revoked) values ('PRIISM-GONE-0001', true) on conflict do nothing");
+    for (let i = 0; i < 15; i++) if ((await redH("203.0.113.20", "PRIISM-GONE-0001", "fresh-dev-6666")) !== "revoked") return false; return true; })());
+  HEADERS = JSON.stringify({ "x-forwarded-for": "198.51.100.200, 10.0.0.1" });
+  for (let i = 0; i < 10; i++) await as(null, "select public.redeem_invite($1, 'xff-dev-0001')", ["XFF-0000-" + String(i).padStart(4, "0")]);
+  HEADERS = JSON.stringify({ "x-forwarded-for": "198.51.100.200, 10.0.0.2" });
+  ok("without Cloudflare's header the first forwarded address is used (another proxy hop doesn't dodge it)", (await as(null, "select public.redeem_invite('PRIISM-GOOD-0001', 'xff-dev-0002') r")).rows[0].r === "limited");
+  // the headers a caller adds himself can't pick his own bucket
+  for (let i = 0; i < 10; i++) await redH("203.0.113.30", "GUESS-1111-" + String(i).padStart(4, "0"), "fresh-dev-5555");
+  HEADERS = HDR("203.0.113.30", { "x-priism-client": "198.51.100.77", "x-priism-proof": "p".repeat(30) });
+  ok("a made-up 'client address' without the shared key is ignored", (await as(null, "select public.redeem_invite('PRIISM-GOOD-0001', 'fresh-dev-4444') r")).rows[0].r === "limited");
+  // the licence function, with the shared key
+  const KEY = "k-" + "r".repeat(30); await db.query("select public.licence_set_rate_key($1)", [KEY]);
+  ok("a short shared key is refused", (await db.query("select public.licence_set_rate_key('short')").then(() => "ok", () => "denied")) === "denied");
+  ok("only the hash of the shared key is stored", (await raw("select value from public.licence_settings where key = 'rate_key_hash'")).rows[0].value.length === 64);
+  const fn = async (ip, sql, params) => { HEADERS = HDR("192.0.2.1", { "x-priism-client": ip, "x-priism-proof": KEY }); return (await as(null, sql, params)).rows[0].r; };
+  for (let i = 0; i < 12; i++) await fn("198.51.100.1", "select public.redeem_invite($1, 'fn-dev-0001') r", ["NOPE-FN-" + String(i).padStart(4, "0")]);
+  ok("through the function, the database doesn't count its own misses (the function counts after trying Whop too)", await fn("198.51.100.1", "select public.licence_limited() r") === false);
+  for (let i = 0; i < 10; i++) await fn("198.51.100.1", "select public.licence_note_miss() r");
+  ok("...the function reports a miss, and that visitor is then limited", await fn("198.51.100.1", "select public.licence_limited() r") === true);
+  ok("...another visitor behind the same function is not", await fn("198.51.100.2", "select public.licence_limited() r") === false);
+  ok("...and the limit applies to the database checks too", await fn("198.51.100.1", "select public.redeem_invite('PRIISM-GOOD-0001', 'fn-dev-0002') r") === "limited");
+  ok("nobody can count misses or read the settings directly", (await tryAs(null, "select public.licence_miss()")).startsWith("denied") && (await tryAs(U1, "select public.licence_source()")).startsWith("denied")
+    && (await tryAs(U1, "select public.licence_set_rate_key('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx')")).startsWith("denied") && (await as(U1, "select count(*)::int n from public.licence_settings")).rows[0].n === 0);
+}
+{ // link codes and device secrets are rate limited the same way
+  HEADERS = HDR("203.0.113.40"); let last = "";
+  for (let i = 0; i < 10; i++) last = (await as(null, "select public.link_device($1, $2, $3) r", ["ABCD-23" + (20 + i), "pc-9000000" + i, "z".repeat(40)])).rows[0].r.status;
+  ok("wrong link codes: invalid, then limited", last === "invalid" && (await as(null, "select public.link_device('ABCD-2399', 'pc-90000099', $1) r", ["z".repeat(40)])).rows[0].r.status === "limited");
+  HEADERS = HDR("203.0.113.41");
+  for (let i = 0; i < 10; i++) await as(null, "select public.device_check($1, $2) r", ["pc-9100000" + i, "y".repeat(40)]);
+  ok("wrong device secrets: limited too", (await as(null, "select public.device_check('pc-91000099', $1) r", ["y".repeat(40)])).rows[0].r.status === "limited");
+}
+{ // adding a beta code on the website: by account, whatever the address
+  const G = "00000000-0000-0000-0000-0000000000c0"; await raw("insert into auth.users (id, email) values ($1, 'guesser@x.com')", [G]);
+  let last = ""; for (let i = 0; i < 10; i++) { HEADERS = HDR("198.18.0." + (i + 1)); last = (await as(G, "select public.claim_invite($1) r", ["NOPE-" + i + "000-0000"])).rows[0].r; }
+  HEADERS = HDR("198.18.0.99");
+  ok("wrong beta codes on one account: invalid, then limited, even from a new address each time", last === "invalid" && (await as(G, "select public.claim_invite('NOPE-9999-0000') r")).rows[0].r === "limited");
+}
+{ // everyone together
+  await raw("delete from public.licence_limits"); await raw("insert into public.licence_limits (bucket, win, n) values ('all', date_trunc('hour', now()), 500)");
+  ok("the global cap holds against any number of addresses", (await redH("100.64.0.1", "PRIISM-GOOD-0001", "fresh-dev-3333")) === "limited" && (await redH("100.64.9.9", "PRIISM-GOOD-0001", "fresh-dev-3334")) === "limited");
+  await raw("delete from public.licence_limits"); HEADERS = "";
+  ok("it clears when the hour is over", (await redH("100.64.0.1", "PRIISM-GOOD-0001", "fresh-dev-3333")) === "ok");
+  await raw("insert into public.licence_limits (bucket, win, n) values ('ip:d:9.9.9.9', now() - interval '3 days', 99)"); await redH("100.64.0.1", "MISS-0000-0000", "fresh-dev-3335");
+  ok("old counts are cleaned up", (await raw("select count(*)::int n from public.licence_limits where win < now() - interval '1 day'")).rows[0].n === 0);
+}
+KEEP_LIMITS = false; HEADERS = "";
+
+// ---------- beta spots (start with 15) ----------
+{
+  ok("the default is 15 beta testers", (await raw("select max_beta_testers from public.app_limits where id = 1")).rows[0].max_beta_testers === 15);
+  const used = (await as(ADMIN, "select public.beta_spots() r")).rows[0].r;
+  ok("the owner sees spots used and the limit", used.max === 15 && Number.isInteger(used.used), JSON.stringify(used));
+  ok("only the owner can see or change the limit", (await tryAs(U1, "select public.beta_spots()")).startsWith("denied") && (await as(U1, "update public.app_limits set max_beta_testers = 99 where id = 1 returning id")).rows.length === 0);
+  await as(ADMIN, "update public.app_limits set max_beta_testers = $1 where id = 1", [used.used + 2]);
+  const T = [1, 2, 3, 4].map((n) => `00000000-0000-0000-0000-0000000000d${n}`);
+  for (const [i, id] of T.entries()) { await raw("insert into auth.users (id, email) values ($1, $2)", [id, `spot${i}@x.com`]);
+    await as(ADMIN, "insert into public.invites (code, requires_account, expires_at) values ($1, true, now() + interval '21 days')", ["SPOT-000" + i + "-AAAA"]); }
+  ok("spots fill up", (await claim(T[0], "SPOT-0000-AAAA")) === "ok" && (await claim(T[1], "SPOT-0001-AAAA")) === "ok");
+  ok("the next tester is told the beta is full ('closed'), and nothing is claimed", (await claim(T[2], "SPOT-0002-AAAA")) === "closed" && (await raw("select claimed_by from public.invites where code = 'SPOT-0002-AAAA'")).rows[0].claimed_by === null);
+  ok("someone who already has a spot isn't turned away", (await claim(T[0], "SPOT-0000-AAAA")) === "ok");
+  await as(ADMIN, "update public.invites set revoked = true where code = 'SPOT-0000-AAAA'");
+  ok("turning one off frees the spot", (await claim(T[2], "SPOT-0002-AAAA")) === "ok");
+  await raw("update public.invites set expires_at = now() - interval '1 minute' where code = 'SPOT-0001-AAAA'");
+  ok("an ended beta frees its spot too", (await claim(T[3], "SPOT-0003-AAAA")) === "ok");
+  await as(ADMIN, "insert into public.invites (code, requires_account, expires_at) values ('SPOT-OWNER-AAAA', true, now() + interval '21 days')");
+  ok("the owner's own account never needs a spot", (await claim(ADMIN, "SPOT-OWNER-AAAA")) === "ok");
+  await as(ADMIN, "update public.app_limits set max_beta_testers = 15 where id = 1");
+}
+
+// ---------- the owner: permanent access, decided by the server ----------
+{
+  ok("the owner (confirmed email) has access with no code, no end date", (await as(OWNER, "select public.my_access() r")).rows[0].r.status === "ok" && (await as(OWNER, "select public.my_access() r")).rows[0].r.until === null);
+  const OL = (await as(OWNER, "select public.create_link_code() c")).rows[0].c, OS = "o".repeat(40);
+  ok("...links a device like any tester", (await link(OL, "owner-pc-0001", OS)).status === "ok" && (await link(OL, "owner-pc-0001", OS)).status === "invalid");
+  ok("...and every later check says ok with no end date (the pass is then renewed daily, never expires for good)", await (async () => { const c = await chk("owner-pc-0001", OS); return c.status === "ok" && c.until === null; })());
+  // someone signing up with the owner's address but never confirming it has no admin rights
+  const FAKE = "00000000-0000-0000-0000-0000000000fe";
+  await raw("insert into auth.users (id, email, email_confirmed_at) values ($1, 'ARCUTO2978@gmail.com', null)", [FAKE]);
+  ok("an unconfirmed sign-up with the owner's email gets no admin rights", (await raw("select public.is_admin($1) a", [FAKE])).rows[0].a === false && (await tryAs(FAKE, "select public.admin_accounts()")).startsWith("denied")
+    && (await as(FAKE, "select public.my_access() r")).rows[0].r.status === "none");
+  await raw("update auth.users set email_confirmed_at = now() where id = $1", [FAKE]);
+  ok("...until that email is confirmed (by whoever really owns it)", (await raw("select public.is_admin($1) a", [FAKE])).rows[0].a === true);
+  await raw("delete from auth.users where id = $1", [FAKE]);
+}
 const passed = Object.values(R).filter(Boolean).length, total = Object.keys(R).length;
 console.log("SUMMARY:", passed + "/" + total); if (passed !== total) process.exit(1);

@@ -57,6 +57,7 @@ jobs:
       - run: npm install --no-save @electric-sql/pglite@0.5.15
       - run: node supabase/test.mjs
       - run: node supabase/licence.test.mjs
+      - run: node test/licence/invite.test.mjs   # outages and ended plans never delete your things
 
   uploads:
     # Your uploads are stored once: the same file picked again, renamed, or twice in one go is not added a second time

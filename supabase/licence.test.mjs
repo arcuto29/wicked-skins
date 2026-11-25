@@ -11,7 +11,7 @@ const invites = { "PRIISM-GOOD-0001": "ok", "PRIISM-GONE-0001": "revoked", "PRII
 // beta accounts: a stand-in for link_device / device_check / unlink_device (the real ones are tested in test.mjs)
 const SEC = "k".repeat(43), SEC2 = "q".repeat(43), SOON = new Date(Date.now() + 3 * 864e5).toISOString(), LATER = new Date(Date.now() + 60 * 864e5).toISOString();
 const links = { "ABCD-EF23": SOON, "WXYZ-2345": LATER, "FULL-FULL": "full" }, linked = {};
-let dbDown = false;
+let dbDown = false, limited = false, misses = 0;
 const memberships = {
   "AAAAAA-MONTHLY-0001": { id: "mem_1", status: "active", product: { id: "prod_priism" }, renewal_price: { amount: "14.99" }, billing_period_days: 30, current_period_end: "2026-12-04T00:00:00.000Z", manage_url: "https://whop.com/billing/manage/mem_1", metadata: {} },
   "BBBBBB-LIFETIME-001": { id: "mem_2", status: "active", product: { id: "prod_priism" }, renewal_price: { amount: "0.00" }, billing_period_days: null, metadata: {} },
@@ -25,6 +25,8 @@ const fakeFetch = async (url, o = {}) => {
   calls.push({ url, method: o.method || "GET", headers: o.headers || {}, body: o.body });
   const res = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
   if (dbDown && url.startsWith("https://db.example")) return res(503, {});
+  if (url.startsWith("https://db.example/rest/v1/rpc/licence_limited")) return res(200, limited);
+  if (url.startsWith("https://db.example/rest/v1/rpc/licence_note_miss")) { misses++; return res(200, null); }
   if (url.startsWith("https://db.example/rest/v1/rpc/link_device")) { const b = JSON.parse(o.body); const u = links[b.p_link];
     if (u === "full") return res(200, { status: "full", next: "2026-12-01T00:00:00Z" });
     if (!u) return res(200, { status: "invalid" }); linked[b.p_device + b.p_secret] = u; delete links[b.p_link]; return res(200, { status: "ok", until: u }); }
@@ -104,5 +106,36 @@ ok("database down: an invite code is offline, not invalid (no one is locked out 
   && (await handle({ key: "PRIISM-GOOD-0001", device: D1 }, { ...env, WHOP_API_KEY: "" }, fakeFetch)).status === "offline");
 ok("database down: a real Whop key still works", (await run("AAAAAA-MONTHLY-0001", D1)).status === "ok");
 dbDown = false;
+
+// ---------- rate limiting, no lock-outs, and beta never touches Whop ----------
+const RK = "k".repeat(32), renv = { ...env, LICENCE_RATE_KEY: RK };
+calls.length = 0; misses = 0;
+r = await handle({ key: "PRIISM-GOOD-0001", device: D1 }, renv, fakeFetch, Date.now(), "198.51.100.7");
+const rp = calls.find((c) => c.url.includes("redeem_invite"));
+ok("the visitor's address and the shared key go to the database (so it can count by visitor, not by device id)", rp && rp.headers["x-priism-client"] === "198.51.100.7" && rp.headers["x-priism-proof"] === RK);
+ok("...never to Whop", calls.filter((c) => c.url.includes("whop.com")).every((c) => !c.headers["x-priism-proof"]));
+calls.length = 0; await handle({ key: "PRIISM-GOOD-0001", device: D1 }, env, fakeFetch, Date.now(), "198.51.100.7");
+ok("without the shared key nothing is sent (the database then ignores any address)", !calls.find((c) => c.url.includes("redeem_invite")).headers["x-priism-client"]);
+calls.length = 0; await handle({ key: "PRIISM-GOOD-0001", device: D1 }, renv, fakeFetch, Date.now(), "<script>");
+ok("a malformed address is never forwarded", !calls.find((c) => c.url.includes("redeem_invite")).headers["x-priism-client"]);
+misses = 0; await handle({ key: "ZZZZZZ-NOSUCHKEY-01", device: D1 }, renv, fakeFetch, Date.now(), "198.51.100.7");
+ok("a key nobody knows counts as one wrong guess", misses === 1, misses);
+misses = 0; await handle({ key: "AAAAAA-MONTHLY-0001", device: D1 }, renv, fakeFetch, Date.now(), "198.51.100.7"); await handle({ key: "PRIISM-GOOD-0001", device: D1 }, renv, fakeFetch, Date.now(), "198.51.100.7");
+await handle({ key: "CCCCCC-CANCELED-001", device: D1 }, renv, fakeFetch, Date.now(), "198.51.100.7");
+ok("right keys, ended memberships and revoked codes aren't wrong guesses", misses === 0, misses);
+misses = 0; await handle({ device: D2, secret: "x".repeat(43) }, renv, fakeFetch, Date.now(), "198.51.100.7");
+ok("a wrong device secret counts as a wrong guess", misses === 1, misses);
+limited = true; calls.length = 0;
+r = await handle({ key: "AAAAAA-MONTHLY-0001", device: D1 }, renv, fakeFetch, Date.now(), "198.51.100.7");
+ok("too many guesses: limited, and Whop isn't asked at all", r.status === "limited" && !r.pass && !calls.some((c) => c.url.includes("whop.com")), r.status);
+limited = false;
+invites["PRIISM-LIMIT-001"] = "limited";
+ok("the database saying limited is passed on (invite codes)", (await run("PRIISM-LIMIT-001", D1)).status === "limited"); delete invites["PRIISM-LIMIT-001"];
+ok("...and for account checks", await (async () => { const f = async (url, o) => url.includes("device_check") ? { ok: true, status: 200, json: async () => ({ status: "limited" }) } : fakeFetch(url, o);
+  const q = await handle({ device: D2, secret: SEC2 }, renv, f); return q.status === "limited" && !q.pass; })());
+calls.length = 0; r = await run("BETA-ENDED-001", D1);
+ok("an ended beta only ever says expired: no payment system is asked, nothing is created or charged", r.status === "expired" && !calls.some((c) => c.url.includes("whop.com")) && !r.pass);
+calls.length = 0; r = await run("BETA-ACCT-0001", D1);
+ok("a beta code can't reach Whop either", r.status === "account" && !calls.some((c) => c.url.includes("whop.com")));
 console.log("SUMMARY:", Object.values(R).filter(Boolean).length + "/" + Object.keys(R).length);
 process.exit(Object.values(R).every(Boolean) ? 0 : 1);
