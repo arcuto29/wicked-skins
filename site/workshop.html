@@ -83,6 +83,7 @@
     <section id="invites" hidden>
       <h2 style="font-size:22px;margin:34px 0 6px">Invites <span class="adm">ADMIN</span></h2>
       <p class="hint">Priism is invite only. Make a code, send it to someone, and they enter it in the Priism panel. Each code works on the number of devices you choose. Turn a code off and those devices lock again within a day.</p>
+      <div class="inv-new" id="betaSpotsRow"><b id="betaSpots">Beta spots</b><label class="inv-dev">Limit <input id="betaMax" class="field" type="number" min="0" max="1000" value="15"></label><button id="betaMaxSave" class="btn" type="button">Save</button><small class="hint" id="betaSpotsMsg"></small></div>
       <div class="inv-kind seg" id="invKind">
         <button type="button" data-k="one" class="on">For one person</button>
         <button type="button" data-k="many">Several codes</button>
@@ -369,6 +370,8 @@
       const [iv, dv, ac] = await Promise.all([sb.from("invites").select("code,note,max_devices,revoked,created_at,expires_at,requires_account,claimed_by").order("created_at", { ascending: false }).range(0, 199),
         sb.from("invite_devices").select("code,device,app,first_seen,last_seen").order("last_seen", { ascending: false }).range(0, 999), sb.rpc("admin_accounts")]);
       const accts = Object.fromEntries(((ac && ac.data) || []).map((a) => [a.code, a]));
+      sb.rpc("beta_spots").then((b) => { const d = b && b.data; if (!d) { $("betaSpotsRow").hidden = true; return; }   // (not set up on the server yet: hidden)
+        $("betaSpotsRow").hidden = false; $("betaSpots").textContent = `Beta spots: ${d.used} of ${d.max} used`; if (document.activeElement !== $("betaMax")) $("betaMax").value = d.max; });
       if (iv.error) { list.innerHTML = /invites|schema cache/i.test(iv.error.message) ? "<p class='hint'>Invites aren't set up on the server yet: re-run supabase/schema.sql in Supabase (SQL Editor).</p>" : "<p class='hint'>Couldn't load invites: " + esc(iv.error.message) + "</p>"; return; }
       const devs = dv.data || [], ago = (t) => { const d = (Date.now() - new Date(t)) / 864e5; return d < 1 ? "today" : Math.round(d) + "d ago"; };
       list.innerHTML = iv.data.length ? "" : "<p class='hint'>No codes yet. Make one above.</p>";
@@ -380,9 +383,12 @@
         row.innerHTML = `<div class="mine-t"><b class="inv-code">${esc(v.code)}</b> ${v.revoked ? '<span class="st rej">Off</span>' : ended ? '<span class="st rej">Ended</span>' : !v.requires_account && mine.length >= v.max_devices ? '<span class="st rev">Full</span>' : '<span class="st live">Active</span>'}${v.requires_account ? ' <span class="st">Beta</span>' : ""}
             <small>${esc(v.note || "no note")} · ${used}${v.expires_at ? " · " + (ended ? "ended " : "ends ") + day(v.expires_at) : ""}</small>
             <small>${mine.map((d) => `${esc(d.app || "?")} (${ago(d.last_seen)}) <a href="#" data-free="${esc(d.device)}">free</a>`).join(" · ")}</small></div>
-          <button class="btn" data-a="copy" type="button">Copy</button>${v.expires_at ? '<button class="btn" data-a="ext" type="button">+7 days</button>' : ""}${a ? '<button class="btn" data-a="reset" type="button">Reset devices</button>' : ""}<button class="btn" data-a="toggle" type="button">${v.revoked ? "Turn on" : "Turn off"}</button><button class="btn" data-a="del" type="button">Delete</button>`;
+          <button class="btn" data-a="copy" type="button">Copy</button>${v.expires_at ? `<button class="btn" data-a="ext" type="button">+7 days</button><label class="inv-dev">Ends <input class="field" type="date" data-a="end" value="${new Date(v.expires_at).toLocaleDateString("sv")}"></label>` : ""}${a ? '<button class="btn" data-a="reset" type="button">Reset devices</button>' : ""}<button class="btn" data-a="toggle" type="button">${v.revoked ? "Turn on" : "Turn off"}</button><button class="btn" data-a="del" type="button">Delete</button>`;
         const ext = row.querySelector('[data-a="ext"]'), rst = row.querySelector('[data-a="reset"]');
         if (ext) ext.onclick = async () => { const from = Math.max(Date.now(), +new Date(v.expires_at)); const r = await sb.from("invites").update({ expires_at: new Date(from + 7 * 864e5).toISOString() }).eq("code", v.code); if (r.error) return alert(r.error.message); renderInvites(); };
+        const end = row.querySelector('[data-a="end"]');
+        if (end) end.onchange = async () => { if (!end.value) return; const [y, m, d] = end.value.split("-").map(Number), at = new Date(y, m - 1, d, 23, 59, 59);   // the end of that day, your time
+          const r = await sb.from("invites").update({ expires_at: at.toISOString() }).eq("code", v.code); if (r.error) return alert(r.error.message); renderInvites(); };
         if (rst) rst.onclick = async () => { if (!confirm(`Unlink every device on ${a.email || "this account"}? They can link a new one straight away.`)) return; const r = await sb.rpc("admin_reset_account", { p_user: a.user_id }); if (r.error) return alert(r.error.message); renderInvites(); };
         row.querySelector('[data-a="copy"]').onclick = async (e) => { try { await navigator.clipboard.writeText(v.code); e.target.textContent = "Copied"; } catch { prompt("Copy the code:", v.code); } };
         row.querySelector('[data-a="toggle"]').onclick = async () => { const r = await sb.from("invites").update({ revoked: !v.revoked }).eq("code", v.code); if (r.error) return alert(r.error.message); renderInvites(); };
@@ -392,6 +398,11 @@
         list.appendChild(row);
       }
     }
+    $("betaMaxSave").onclick = async () => {
+      const n = Math.max(0, Math.min(1000, Math.round(+$("betaMax").value || 0)));
+      const r = await sb.from("app_limits").update({ max_beta_testers: n }).eq("id", 1).select("id");
+      say("betaSpotsMsg", r.error ? "Couldn't save: " + r.error.message : (r.data || []).length ? "Saved." : "Not saved (admins only)."); renderInvites();
+    };
     // what to make: one code for one person, several personal codes at once, or ONE code a whole group shares
     // (a Discord, say: you set how many devices it lets in, and can turn it off any time)
     let invKind = "one";
@@ -454,7 +465,8 @@
 
     // ---------- beta access (signed in) ----------
     const BETA_SAY = { ok: "Added. Now link your copy of Priism below.", invalid: "That code isn't right. Check it and try again.", revoked: "That code has been turned off.",
-      expired: "That code has ended.", taken: "That code is already on someone else's account." };
+      expired: "That code has ended.", taken: "That code is already on someone else's account.",
+      closed: "All beta spots are taken right now. The Priism team will open more.", limited: "Too many wrong tries. Wait about 10 minutes, then try again." };
     async function renderBeta() {
       const box = $("account"); box.hidden = !user; if (!user) return;
       const r = await sb.rpc("my_access");

@@ -7,6 +7,10 @@
 // Out: { status: "ok", pass, plan, until, manage } | { status: "invalid" | "revoked" | "full" | "expired" | "offline" }
 //      account answers can also be "none" (no access on the account), "moved" (another copy took its place),
 //      "account" (a beta code: add it on the website first) and full comes with next (when a move is allowed again)
+//      "limited": too many wrong guesses from this visitor (or everyone). Priism treats it like offline for a copy that
+//      is already set up, and asks a new one to wait a few minutes. Wrong guesses are counted by the visitor's address
+//      (never by device id), in the database (schema.sql › rate limiting); this function names the visitor with the
+//      shared key LICENCE_RATE_KEY, because the database only sees this function's address.
 //
 // The pass is a signed note ({ v, plan, src, dev, iat, exp, until }), ECDSA P-256 / SHA-256, that Priism checks with
 // the public key in src/pass.js. It's only valid for this device and for PASS_DAYS; Priism asks again once a day.
@@ -18,7 +22,7 @@ export const WHOP_VERSION = "2026-07-23";          // pinned (docs.whop.com/deve
 // Whop membership states that unlock Pro. past_due: Whop is still retrying the card, so access continues meanwhile.
 export const GOOD = new Set(["active", "trialing", "completed", "past_due"]);
 const DEV_RE = /^[A-Za-z0-9-]{8,64}$/, KEY_RE = /^[A-Za-z0-9-]{6,64}$/, SECRET_RE = /^[A-Za-z0-9_-]{32,128}$/, LINK_RE = /^[A-Z2-9]{4}-?[A-Z2-9]{4}$/;
-const ACCOUNT_STATUS = new Set(["ok", "invalid", "none", "expired", "revoked", "moved", "full"]);
+const ACCOUNT_STATUS = new Set(["ok", "invalid", "none", "expired", "revoked", "moved", "full", "limited"]);
 
 const b64u = (bytes) => { let s = ""; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
 const unb64u = (s) => { const t = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)); return Uint8Array.from(t, (c) => c.charCodeAt(0)); };
@@ -52,8 +56,9 @@ export function judge(m, device, productIds) {
     until: renews ? m.current_period_end || null : null, manage: m.manage_url || null };
 }
 
-// env: { SUPABASE_URL, SUPABASE_ANON_KEY, WHOP_API_KEY, WHOP_PRODUCT_IDS ("prod_a,prod_b"), PASS_PRIVATE_JWK (JSON) }
-export async function handle(input, env, fetch, now = Date.now()) {
+// env: { SUPABASE_URL, SUPABASE_ANON_KEY, WHOP_API_KEY, WHOP_PRODUCT_IDS ("prod_a,prod_b"), PASS_PRIVATE_JWK (JSON), LICENCE_RATE_KEY }
+// client: the visitor's IP address as the edge saw it (for rate limiting; "" when unknown)
+export async function handle(input, env, fetch, now = Date.now(), client = "") {
   const key = String((input && input.key) || "").trim(), device = String((input && input.device) || "");
   const action = input && ["release", "link"].includes(input.action) ? input.action : "check";
   const secret = String((input && input.secret) || ""), app = String((input && input.app) || "").slice(0, 20);
@@ -63,12 +68,15 @@ export async function handle(input, env, fetch, now = Date.now()) {
     return { status: "ok", src, plan: j.plan, until: j.until || null, manage: j.manage || null,
       pass: await signPass(JSON.parse(env.PASS_PRIVATE_JWK), { v: 1, plan: j.plan, src, dev: device, iat: Math.floor(now / 1000), exp, until: j.until || null }) };
   };
+  // who is asking, for the database's rate limit (it only trusts this with the shared key; see schema.sql)
+  const who = env.LICENCE_RATE_KEY && /^[0-9a-fA-F:.]{3,64}$/.test(client) ? { "x-priism-client": client, "x-priism-proof": env.LICENCE_RATE_KEY } : {};
+  const miss = async () => { await rpc("licence_note_miss", {}); };   // a wrong guess: count it (best effort)
   // the database's own functions, with the public anon key (the same ones Priism could call; they check everything)
   const rpc = async (fn, body) => {
     if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return undefined;
     try {
       const r = await fetch(env.SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/rpc/" + fn, { method: "POST",
-        headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: "Bearer " + env.SUPABASE_ANON_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: "Bearer " + env.SUPABASE_ANON_KEY, "Content-Type": "application/json", ...who }, body: JSON.stringify(body) });
       return r.ok ? await r.json() : undefined;
     } catch { return undefined; }
   };
@@ -83,6 +91,7 @@ export async function handle(input, env, fetch, now = Date.now()) {
       r = await rpc("link_device", { p_link: link.includes("-") ? link : link.slice(0, 4) + "-" + link.slice(4), p_device: device, p_secret: secret, p_app: app });
     } else r = await rpc("device_check", { p_device: device, p_secret: secret });
     if (!r || typeof r !== "object" || !ACCOUNT_STATUS.has(r.status)) return { status: "offline" };
+    if (r.status === "invalid") await miss();
     if (r.status === "ok") return pass("account", { plan: "pro", until: r.until || null });
     return r.status === "full" ? { status: "full", next: r.next || null } : { status: r.status };
   }
@@ -95,19 +104,21 @@ export async function handle(input, env, fetch, now = Date.now()) {
     const inv = await rpc("redeem_invite", { p_code: key.toUpperCase(), p_device: device, p_app: app });
     dbDown = inv === undefined;
     if (inv === "ok") return pass("invite", { plan: "pro" });
-    if (["revoked", "full", "expired", "account"].includes(inv)) return { status: inv };   // account: a beta code, added on the website
+    if (["revoked", "full", "expired", "account", "limited"].includes(inv)) return { status: inv };   // account: a beta code, added on the website
   }
   // 2) a Whop licence key
-  if (!env.WHOP_API_KEY) return { status: dbDown ? "offline" : "invalid" };
+  // too many wrong guesses already? Then Whop isn't asked either (it would burn Whop's quota for nothing)
+  if (action === "check" && !dbDown && (await rpc("licence_limited", {})) === true) return { status: "limited" };
+  if (!env.WHOP_API_KEY) { if (!dbDown) await miss(); return { status: dbDown ? "offline" : "invalid" }; }
   const H = { Authorization: "Bearer " + env.WHOP_API_KEY, "Api-Version-Date": WHOP_VERSION, "Content-Type": "application/json" };
   let m;
   try {
     const r = await fetch(`${WHOP_API}/memberships/${encodeURIComponent(key)}`, { headers: H });
-    if (r.status === 404 || r.status === 400 || r.status === 422) return { status: dbDown ? "offline" : "invalid" };
+    if (r.status === 404 || r.status === 400 || r.status === 422) { if (!dbDown) await miss(); return { status: dbDown ? "offline" : "invalid" }; }
     if (!r.ok) return { status: "offline" };
     m = await r.json();
   } catch { return { status: "offline" }; }
-  if (m && m.license_key && m.license_key !== key) return { status: "invalid" };   // looked up by key: it must be this one
+  if (m && m.license_key && m.license_key !== key) { await miss(); return { status: "invalid" }; }   // looked up by key: it must be this one
   const ids = String(env.WHOP_PRODUCT_IDS || "").split(",").map((s) => s.trim()).filter(Boolean);
   const save = async (devices) => {   // the devices this key is used on live on the membership itself (Whop metadata)
     const r = await fetch(`${WHOP_API}/memberships/${encodeURIComponent(m.id)}`, { method: "PATCH", headers: H, body: JSON.stringify({ metadata: { priism_devices: devices.join(",") } }) });

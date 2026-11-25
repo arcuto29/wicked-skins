@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: safer licensing for the beta
+- **Guessing codes gets nowhere.** Wrong guesses are rate limited by address, by account and overall (never by device
+  id), in the database, so it also holds for anyone who skips the licence function. A copy that is already set up is
+  never locked out by it: it keeps its pass and checks again later.
+- **15 beta spots.** The owner's Invites section shows "Beta spots: x of 15 used" and the database refuses a 16th tester.
+  Turning off or ending a code frees its spot.
+- **Owner dashboard:** set any end date for a code (not only +7 days).
+- **Owner access is decided by the server** and needs a confirmed email address, so signing up with the owner's address
+  gives nobody admin rights.
+- **Clearer messages:** "Too many wrong tries. Wait about 10 minutes" and "All beta spots are taken right now".
+- **Launch guide** (docs/BETA_LAUNCH.md): every Supabase, Whop and Chrome Web Store step for beginners.
+- CI now fails if a private key or `service_role` key is committed, or if `PASS_REQUIRED` is on without `LICENCE_LIVE`.
+- Nothing changes for current users until the licence function is deployed and a release turns it on.
+
 ## Unreleased: the TradingView logo in your style
 - **New: TradingView logo** (Style › Bars & panels). The round TradingView logo on the chart, on TopstepX and other
   platforms built on TradingView's charts and on nq.vision, in your look's colours (your Accent, or your wallpaper's),

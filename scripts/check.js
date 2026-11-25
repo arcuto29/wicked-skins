@@ -78,5 +78,24 @@ for (const f of fs.readdirSync(path.join(ROOT, "src"))) if (f.endsWith(".js")) {
   if (!m || m[1] !== K.keyedFrom) { bad++; console.error(`✗ popup.js KEYED_FROM (${m && m[1]}) must equal keys/unpacked.json keyedFrom (${K.keyedFrom})`); }
   if ("key" in root) { bad++; console.error("✗ manifest.json must not have a key (the build adds it to the unpacked zip only)"); } }
 
+// licence switches (src/pass.js): requiring a signed pass before the licence function is live would lock everyone out
+{ const t = fs.readFileSync(path.join(ROOT, "src", "pass.js"), "utf8"), on = (n) => new RegExp("const " + n + " = true;").test(t);
+  if (on("PASS_REQUIRED") && !on("LICENCE_LIVE")) { bad++; console.error("✗ src/pass.js: PASS_REQUIRED = true needs LICENCE_LIVE = true (no pass can be issued without the licence function)"); } }
+
+// secrets never go in the repo: private signing keys, service_role / secret API keys (the licence function keeps them as
+// server secrets; the public anon key and the public pass key are meant to be in the app)
+{ let files = []; try { files = require("child_process").execFileSync("git", ["ls-files", "-z"], { cwd: ROOT, maxBuffer: 1 << 26 }).toString().split("\0").filter(Boolean); } catch {}
+  const skip = /^(vendor|site\/lib|node_modules)\/|\.(png|jpe?g|gif|webp|webm|mp4|wasm|woff2?|ttf|zip|jks|ico|bin)$|^site\/supabase\.js$/i;
+  const jwtRole = (t) => { try { return JSON.parse(Buffer.from(t.split(".")[1], "base64url").toString()).role; } catch { return ""; } };
+  for (const f of files) {
+    if (skip.test(f)) continue;
+    let t; try { const st = fs.statSync(path.join(ROOT, f)); if (st.size > 2e6) continue; t = fs.readFileSync(path.join(ROOT, f), "utf8"); } catch { continue; }
+    const hit = /-----BEGIN (?:EC |RSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----/.test(t) ? "a private key"
+      : /"kty"\s*:\s*"(?:EC|RSA)"[^}]*"d"\s*:\s*"[\w-]{20,}"/.test(t) || /"d"\s*:\s*"[\w-]{20,}"[^}]*"kty"\s*:\s*"(?:EC|RSA)"/.test(t) ? "a private JWK"
+      : /\bsb_secret_[A-Za-z0-9_-]{16,}/.test(t) ? "a Supabase secret key"
+      : (t.match(/eyJ[\w-]{10,}\.eyJ[\w-]{10,}\.[\w-]{10,}/g) || []).some((j) => jwtRole(j) === "service_role") ? "a service_role key" : "";
+    if (hit) { bad++; console.error(`✗ ${f} contains ${hit}. Remove it and rotate it (docs/BETA_LAUNCH.md).`); }
+  } }
+
 if (bad) { console.error(`\n${bad} problem(s).`); process.exit(1); }
 console.log(`✓ ${js.length} JS files parse · manifest OK · version ${root.version} everywhere (${V ? V.channel : "?"})`);

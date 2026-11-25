@@ -36,7 +36,7 @@
       return { http: r.status, body: b };
     } catch { return null; } finally { clearTimeout(t); }
   }
-  // ask the server about a code or licence key -> { status: "ok" | "invalid" | "revoked" | "full" | "expired" | "offline",
+  // ask the server about a code or licence key -> { status: "ok" | "invalid" | "revoked" | "full" | "expired" | "limited" | "offline",
   // pass?, plan?, until?, manage? }. The licence function (supabase/functions/licence) knows invites AND Whop keys and
   // answers with a signed pass; until it's deployed, invites are checked the old way (no pass).
   async function ask(code, action) {
@@ -50,11 +50,11 @@
     if (action === "release") return { status: "ok" };
     const old = await post("/rest/v1/rpc/redeem_invite", { p_code: tidy(code), p_device: dev, p_app: app() });   // no licence function yet
     if (!old || old.http !== 200) return { status: "offline" };
-    return { status: ["ok", "invalid", "revoked", "full", "expired", "account"].includes(old.body) ? old.body : "offline" };
+    return { status: ["ok", "invalid", "revoked", "full", "expired", "account", "limited"].includes(old.body) ? old.body : "offline" };
   }
   // beta accounts: link this copy with a link code, check in, or sign out -> { status, pass?, until?, next? }
-  // status: ok | invalid | none | expired | revoked | moved | full | offline
-  const ACCOUNT = ["ok", "invalid", "none", "expired", "revoked", "moved", "full"];
+  // status: ok | invalid | none | expired | revoked | moved | full | limited | offline
+  const ACCOUNT = ["ok", "invalid", "none", "expired", "revoked", "moved", "full", "limited"];
   async function askAccount(action, secret, link) {
     const dev = await deviceId(), live = !!(root.PriismPass && root.PriismPass.LICENCE_LIVE);
     if (live) {
@@ -98,7 +98,7 @@
     if (!force && Date.now() - (invite.checked || 0) < RECHECK_MS) return invite;
     const acct = invite.kind === "account", { deviceSecret } = acct ? await get({ deviceSecret: "" }) : {};
     const r = acct ? (deviceSecret ? await askAccount("check", deviceSecret) : { status: "invalid" }) : await ask(invite.code);
-    if (r.status === "offline") return invite;
+    if (r.status === "offline" || r.status === "limited") return invite;   // (limited = too many wrong guesses somewhere: not about this copy)
     const next = record(invite.code, r, invite.since, acct ? "account" : "");
     await put({ invite: next, pass: r.status === "ok" ? r.pass || "" : "" }); return next;
   }

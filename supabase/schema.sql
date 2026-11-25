@@ -54,7 +54,8 @@ stable
 security definer
 set search_path = ''
 as $$
-  select coalesce((select p.is_admin from public.profiles p where p.id = uid), false);
+  -- the account's email must be confirmed too, so nobody can sign up with the owner's address and become an admin
+  select coalesce((select p.is_admin from public.profiles p join auth.users u on u.id = p.id where p.id = uid and u.email_confirmed_at is not null), false);
 $$;
 
 drop policy if exists "profiles: read own" on public.profiles;
@@ -466,6 +467,100 @@ create policy "invite devices: admins read" on public.invite_devices for select 
 drop policy if exists "invite devices: admins remove" on public.invite_devices;
 create policy "invite devices: admins remove" on public.invite_devices for delete to authenticated using (public.is_admin((select auth.uid())));
 
+-- ---------- rate limiting: guessing codes gets nowhere ----------
+-- Only wrong guesses count (a code that doesn't exist, a wrong link code, a wrong device secret), never successes, and
+-- never by device id (a new id is free to make). Three buckets, checked before any answer is given:
+--   * the caller's IP address, 10 wrong guesses per 10 minutes
+--   * the signed-in account (website: adding a beta code), 10 wrong guesses per 10 minutes
+--   * everyone together, 500 wrong guesses per hour: with codes of about 10^12 possibilities, that makes guessing
+--     hopeless even from thousands of IP addresses. While it's tripped, only new activations wait ("limited"); copies
+--     that are already set up keep their pass (a pass lasts 14 days) and check again later.
+-- The licence function (supabase/functions/licence) sits in front of the database, so the database only sees the
+-- function's address. The function therefore sends the visitor's address along with a shared key (LICENCE_RATE_KEY,
+-- stored here only as a hash by licence_set_rate_key). Without the right key the address is ignored.
+create table if not exists public.licence_limits (
+  bucket text not null,
+  win timestamptz not null,
+  n integer not null default 0,
+  primary key (bucket, win)
+);
+alter table public.licence_limits enable row level security;   -- no policies: only the functions below
+create table if not exists public.licence_settings (key text primary key, value text not null);
+alter table public.licence_settings enable row level security;   -- no policies
+
+-- run once in the SQL Editor (see docs/BETA_LAUNCH.md): select public.licence_set_rate_key('the same long random text');
+create or replace function public.licence_set_rate_key(p_key text)
+returns text language plpgsql volatile security definer set search_path = ''
+as $$
+begin
+  if p_key is null or length(p_key) < 24 then raise exception 'use a random key of at least 24 characters'; end if;
+  insert into public.licence_settings (key, value) values ('rate_key_hash', encode(sha256(convert_to(p_key, 'UTF8')), 'hex'))
+  on conflict (key) do update set value = excluded.value;
+  return 'ok';
+end;
+$$;
+revoke execute on function public.licence_set_rate_key(text) from public, anon, authenticated;
+
+-- who is asking: { who, trusted }. Trusted = the licence function, proven by the shared key, naming the visitor.
+-- Otherwise the address the edge saw: Cloudflare's cf-connecting-ip (can't be forged from outside), else the first
+-- x-forwarded-for address. (A forged one only dodges the per-address bucket; the everyone-together cap still holds.)
+create or replace function public.licence_source()
+returns jsonb language plpgsql stable security definer set search_path = ''
+as $$
+declare h jsonb; proof text; hash text; ip text;
+begin
+  begin h := nullif(current_setting('request.headers', true), '')::jsonb; exception when others then h := null; end;
+  proof := h ->> 'x-priism-proof';
+  if proof is not null and length(proof) >= 24 and coalesce(h ->> 'x-priism-client', '') <> '' then
+    select value into hash from public.licence_settings where key = 'rate_key_hash';
+    if hash is not null and hash = encode(sha256(convert_to(proof, 'UTF8')), 'hex') then
+      return jsonb_build_object('who', 'f:' || left(h ->> 'x-priism-client', 64), 'trusted', true);
+    end if;
+  end if;
+  ip := coalesce(nullif(h ->> 'cf-connecting-ip', ''), nullif(h ->> 'x-real-ip', ''), nullif(trim(split_part(coalesce(h ->> 'x-forwarded-for', ''), ',', 1)), ''), 'unknown');
+  return jsonb_build_object('who', 'd:' || left(ip, 64), 'trusted', false);
+end;
+$$;
+revoke execute on function public.licence_source() from public, anon, authenticated;
+
+-- has this caller (or this account, p_extra) used up its wrong guesses?
+create or replace function public.licence_limited(p_extra text default null)
+returns boolean language plpgsql stable security definer set search_path = ''
+as $$
+declare who text := public.licence_source() ->> 'who'; w10 timestamptz := date_bin(interval '10 minutes', now(), timestamptz 'epoch'); w60 timestamptz := date_trunc('hour', now());
+begin
+  return exists (select 1 from public.licence_limits l where (l.bucket = 'ip:' || who and l.win = w10 and l.n >= 10)
+    or (l.bucket = 'all' and l.win = w60 and l.n >= 500)
+    or (p_extra is not null and l.bucket = 'x:' || left(p_extra, 64) and l.win = w10 and l.n >= 10));
+end;
+$$;
+revoke execute on function public.licence_limited(text) from public;
+grant execute on function public.licence_limited(text) to anon, authenticated;
+
+-- count one wrong guess. The licence function counts its own (after it has also tried Whop), so a trusted caller's
+-- guesses inside the database functions are not counted twice (p_force = the function saying "count this one").
+create or replace function public.licence_miss(p_extra text default null, p_force boolean default false)
+returns void language plpgsql volatile security definer set search_path = ''
+as $$
+declare s jsonb := public.licence_source(); w10 timestamptz := date_bin(interval '10 minutes', now(), timestamptz 'epoch'); w60 timestamptz := date_trunc('hour', now());
+begin
+  if (s ->> 'trusted')::boolean and not p_force then return; end if;
+  insert into public.licence_limits (bucket, win, n) values ('ip:' || (s ->> 'who'), w10, 1) on conflict (bucket, win) do update set n = public.licence_limits.n + 1;
+  insert into public.licence_limits (bucket, win, n) values ('all', w60, 1) on conflict (bucket, win) do update set n = public.licence_limits.n + 1;
+  if p_extra is not null then
+    insert into public.licence_limits (bucket, win, n) values ('x:' || left(p_extra, 64), w10, 1) on conflict (bucket, win) do update set n = public.licence_limits.n + 1;
+  end if;
+  delete from public.licence_limits where win < now() - interval '1 day';
+end;
+$$;
+revoke execute on function public.licence_miss(text, boolean) from public, anon, authenticated;
+-- what the licence function calls when neither an invite nor Whop knows a key
+create or replace function public.licence_note_miss()
+returns void language sql volatile security definer set search_path = ''
+as $$ select public.licence_miss(null, true); $$;
+revoke execute on function public.licence_note_miss() from public;
+grant execute on function public.licence_note_miss() to anon, authenticated;
+
 -- is this code good for this device? 'ok' | 'invalid' | 'revoked' | 'full'  (a device already on the code stays ok)
 create or replace function public.redeem_invite(p_code text, p_device text, p_app text default null)
 returns text
@@ -476,8 +571,9 @@ as $$
 declare inv public.invites; n int; c text := upper(trim(coalesce(p_code, '')));
 begin
   if p_device is null or p_device !~ '^[A-Za-z0-9-]{8,64}$' then return 'invalid'; end if;
+  if public.licence_limited() then return 'limited'; end if;
   select * into inv from public.invites where code = c;
-  if not found then return 'invalid'; end if;
+  if not found then perform public.licence_miss(); return 'invalid'; end if;
   if inv.revoked then return 'revoked'; end if;
   if inv.expires_at is not null and inv.expires_at < now() then return 'expired'; end if;
   if inv.requires_account then return 'account'; end if;     -- a beta code: added to an account on the website, not here
@@ -549,19 +645,36 @@ end;
 $$;
 revoke execute on function public.account_access(uuid) from public, anon, authenticated;
 
--- add a code to your account (website, signed in): ok | invalid | revoked | expired | taken (someone else's)
+-- how many people hold a beta spot now: accounts with a beta code that's on and not ended (the owner isn't counted)
+create or replace function public.beta_spots_used()
+returns integer language sql stable security definer set search_path = ''
+as $$
+  select count(distinct i.claimed_by)::integer from public.invites i
+  where i.requires_account and i.claimed_by is not null and not i.revoked and (i.expires_at is null or i.expires_at > now()) and not public.is_admin(i.claimed_by);
+$$;
+revoke execute on function public.beta_spots_used() from public, anon, authenticated;
+
+-- add a code to your account (website, signed in): ok | invalid | revoked | expired | taken (someone else's) |
+-- closed (all beta spots are taken: the owner sets how many, app_limits.max_beta_testers, 15 to start) | limited (too many wrong tries)
 create or replace function public.claim_invite(p_code text)
 returns text language plpgsql security definer set search_path = ''
 as $$
-declare inv public.invites; c text := upper(trim(coalesce(p_code, '')));
+declare inv public.invites; me uuid := (select auth.uid()); c text := upper(trim(coalesce(p_code, '')));
 begin
-  if (select auth.uid()) is null then return 'invalid'; end if;
+  if me is null then return 'invalid'; end if;
+  if public.licence_limited(me::text) then return 'limited'; end if;
+  perform pg_advisory_xact_lock(7001);   -- one claim at a time, so the spots can't be over-filled by two at once
   select * into inv from public.invites where code = c for update;
-  if not found then return 'invalid'; end if;
+  if not found then perform public.licence_miss(me::text); return 'invalid'; end if;
   if inv.revoked then return 'revoked'; end if;
   if inv.expires_at is not null and inv.expires_at < now() then return 'expired'; end if;
-  if inv.claimed_by is null then update public.invites set claimed_by = (select auth.uid()), claimed_at = now() where code = c; return 'ok'; end if;
-  return case when inv.claimed_by = (select auth.uid()) then 'ok' else 'taken' end;
+  if inv.claimed_by is null then
+    if inv.requires_account and not public.is_admin(me)
+       and not exists (select 1 from public.invites i where i.claimed_by = me and i.requires_account and not i.revoked and (i.expires_at is null or i.expires_at > now()))
+       and public.beta_spots_used() >= coalesce((select l.max_beta_testers from public.app_limits l where l.id = 1), 15) then return 'closed'; end if;
+    update public.invites set claimed_by = me, claimed_at = now() where code = c; return 'ok';
+  end if;
+  return case when inv.claimed_by = me then 'ok' else 'taken' end;
 end;
 $$;
 revoke execute on function public.claim_invite(text) from public, anon;
@@ -596,8 +709,9 @@ as $$
 declare lc public.link_codes; acc record; n integer; lm timestamptz; h text;
 begin
   if p_device is null or p_device !~ '^[A-Za-z0-9-]{8,64}$' or p_secret is null or p_secret !~ '^[A-Za-z0-9_-]{32,128}$' then return jsonb_build_object('status', 'invalid'); end if;
+  if public.licence_limited() then return jsonb_build_object('status', 'limited'); end if;
   select * into lc from public.link_codes where code = upper(trim(coalesce(p_link, ''))) for update;
-  if not found or lc.used or lc.expires_at < now() then return jsonb_build_object('status', 'invalid'); end if;
+  if not found or lc.used or lc.expires_at < now() then perform public.licence_miss(); return jsonb_build_object('status', 'invalid'); end if;
   select * into acc from public.account_access(lc.user_id);
   if acc.status <> 'ok' then return jsonb_build_object('status', acc.status); end if;
   -- copies used on this account in the last 7 days (still linked, or replaced / removed recently), other than this one
@@ -626,9 +740,10 @@ as $$
 declare d public.account_devices; acc record;
 begin
   if p_device is null or p_secret is null then return jsonb_build_object('status', 'invalid'); end if;
+  if public.licence_limited() then return jsonb_build_object('status', 'limited'); end if;
   select * into d from public.account_devices where device = p_device and secret_hash = encode(sha256(convert_to(p_secret, 'UTF8')), 'hex')
     order by active desc, last_seen desc limit 1;
-  if not found then return jsonb_build_object('status', 'invalid'); end if;
+  if not found then perform public.licence_miss(); return jsonb_build_object('status', 'invalid'); end if;
   if not d.active then return jsonb_build_object('status', 'moved'); end if;
   update public.account_devices set last_seen = now() where user_id = d.user_id and device = d.device;
   select * into acc from public.account_access(d.user_id);
@@ -763,6 +878,8 @@ create table if not exists public.app_limits (
   free_egress_bytes bigint not null default 10737418240,     -- Free plan: 5 GB uncached + 5 GB cached egress a month
   updated_at timestamptz not null default now()
 );
+-- how many people may hold a beta spot at once (the website's Invites section shows "x of 15 used")
+alter table public.app_limits add column if not exists max_beta_testers integer not null default 15 check (max_beta_testers between 0 and 1000);
 insert into public.app_limits (id) values (1) on conflict (id) do nothing;
 alter table public.app_limits enable row level security;
 drop policy if exists "app_limits: anyone reads" on public.app_limits;
@@ -901,3 +1018,15 @@ end;
 $$;
 revoke execute on function public.workshop_usage() from public, anon;
 grant execute on function public.workshop_usage() to authenticated;
+
+-- the owner's beta counter (website › Invites): spots in use and the limit
+create or replace function public.beta_spots()
+returns jsonb language plpgsql stable security definer set search_path = ''
+as $$
+begin
+  if not public.is_admin((select auth.uid())) then raise exception 'admins only'; end if;
+  return jsonb_build_object('used', public.beta_spots_used(), 'max', coalesce((select l.max_beta_testers from public.app_limits l where l.id = 1), 15));
+end;
+$$;
+revoke execute on function public.beta_spots() from public, anon;
+grant execute on function public.beta_spots() to authenticated;

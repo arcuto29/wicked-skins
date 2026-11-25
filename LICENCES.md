@@ -42,13 +42,14 @@ The switches are at the top of `src/pass.js`:
 5. Copy your store page link.
 
 ## 2. Supabase (the licence function)
-You need the Supabase CLI (`npm i -g supabase`) and to be logged in (`supabase login`). Run these in this repo:
+Step-by-step with screenshots-free instructions for beginners: **docs/BETA_LAUNCH.md**. In short, with the Supabase CLI (run it as `npx supabase@latest`; the CLI can't be installed with `npm i -g`) logged in, run these in this repo:
 
 ```sh
 supabase link --project-ref tsazewpipzgfwgcepcsb
 supabase secrets set WHOP_API_KEY='…your Whop API key…'
 supabase secrets set WHOP_PRODUCT_IDS='prod_…'            # several: prod_a,prod_b
 supabase secrets set PASS_PRIVATE_JWK="$(cat PRIVATE-priism-pass-key.json)"
+supabase secrets set LICENCE_RATE_KEY='…long random text, the same one you give licence_set_rate_key in the SQL Editor…'
 supabase functions deploy licence
 ```
 
@@ -94,8 +95,9 @@ codes keep working. Turn on Google sign-in (Authentication › Providers) so tes
 - After the end date, the device's check says *ended* and it locks. A pass never lasts past the end date.
 
 **Manage access (Invites list):** each row shows who claimed the code, how many devices are linked, when they were last
-seen and when the code ends.
-- **+7 days** extends it. Devices pick up the new date at their next check.
+seen and when the code ends. The line above the list shows **Beta spots: x of 15 used**; the database refuses a 16th
+tester (`app_limits.max_beta_testers`; change it in that line).
+- **+7 days** extends it, or pick any date in **Ends**. Devices pick up the new date at their next check.
 - **Reset devices** unlinks everything on that account, so the tester can link a new device straight away (for
   example, after a reinstall or a new PC).
 - **Turn off** revokes the code, and the device locks within a day.
@@ -112,7 +114,10 @@ seen and when the code ends.
 | Someone edits the extension's own code | Can't be prevented by any extension. The pass makes it a deliberate act, not a casual one. |
 | A tester goes offline or blocks the server | Pro keeps working until the pass ends: 14 days at most, and never past the beta's end. Revoking or moving takes effect at the next check (once a day when online). |
 | A tester reinstalls or clears the extension's data | It's a new device. Within 7 days of their last move they get "full" until you press **Reset devices**. This is expected support work during the beta. |
-| Guessing codes | Link codes and invite codes each have 32^8 (about 10^12) possibilities. With 15 testers that's out of reach without rate limiting (PostgREST has none). |
+| Guessing codes | Link codes and invite codes each have 32^8 (about 10^12) possibilities. **Rate limited in the database** (`schema.sql` › rate limiting), where it also covers anyone who skips the licence function: only wrong guesses count, by the caller's IP address (10 per 10 minutes), by account on the website (10 per 10 minutes), and everyone together (500 per hour). **Never by device id**, so making new ids doesn't help. While the global cap is tripped only new activations wait; copies already set up keep their pass. |
+| Many addresses (a botnet) guessing | The global cap of 500 wrong guesses an hour allows about 4 million guesses a year against 10^12 possibilities. It also means an attacker can make new activations wait ("limited") by guessing on purpose; existing copies are unaffected, and `delete from public.licence_limits;` clears it. |
+| Someone signs up with the owner's email to become an admin | Blocked: `is_admin` also needs a **confirmed** email address, so an unconfirmed sign-up has no admin rights. |
+| The owner's own access | Server side only: an account with an address in `owner_emails()` is an admin, which always has access with no end date and 5 devices. Nothing in the app can grant it. |
 
 Where the secret is stored: `chrome.storage.local` (extension), `settings.json` in the app's data folder (desktop) and
 SharedPreferences (Android), all in plain text like the rest of the settings. Other websites and extensions can't
@@ -142,9 +147,17 @@ Then release as usual (RELEASING.md). The panel's Settings › **Plan** shows ea
 ## Notes
 - **Refunds and chargebacks:** Whop ends the membership, and Priism switches back to Free (or locks, if Free isn't
   open) at the next daily check.
-- **Offline:** a pass lasts 14 days, so travelling or a server outage doesn't lock anyone out.
+- **Offline:** a pass lasts 14 days, so travelling or a server outage doesn't lock anyone out. A daily check that fails
+  (no internet, server error, or "limited") keeps the pass; only the server answering *revoked*, *expired*, *moved* or
+  *invalid* locks Pro. A beta pass never lasts past the beta's end date.
+- **An ended plan never deletes anything:** Pro settings are held back in memory while the plan is off (`gate()` in
+  content.js) and wallpapers, uploads, looks, candle styles and settings stay in storage untouched.
+- **Beta and Whop are separate:** a beta code is an invite row in the database. It never calls Whop, never creates a
+  membership and has no payment method, so an ended beta can't turn into a charge.
 - **Limits:** a determined person could still edit the app's own code on their machine. No browser extension can stop
   that. The pass stops the easy ways: copying settings, editing storage, or sharing a key with more than 3 devices.
 - **Tests:**
-  - `node supabase/licence.test.mjs`: the function against a fake Whop. It runs in CI.
+  - `node supabase/licence.test.mjs`: the function against a fake Whop and database. It runs in CI.
+  - `node supabase/test.mjs`: the database rules (rate limits, beta spots, owner access) on a real Postgres. It runs in CI.
+  - `node test/licence/invite.test.mjs`: the panel's licence client: outages and ended plans keep everything. It runs in CI.
   - `pwtest/plans.js`: Free and Pro on a real chart, with real signed passes.
