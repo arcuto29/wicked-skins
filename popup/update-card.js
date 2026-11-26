@@ -16,7 +16,7 @@
    PriismUpdateCard.update({ percent, transferred, total, speed })   // live progress, no re-render
    PriismUpdateCard.isOpen() / mode() / close()                                                                     */
 (function (root) {
-  const REPO = "arcuto29/wicked-skins";
+  const REPO = "arcuto29/priism-skins";
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const V = () => root.PriismVersion;
   const label = (v) => (V() ? V().label(v) : String(v || ""));

@@ -10,7 +10,7 @@ Purely cosmetic. It does not read orders, positions or account data and makes no
 
 ## Try the source
 1. Open `chrome://extensions`, enable **Developer mode**.
-2. **Load unpacked** and select this `wicked-skins/` folder.
+2. **Load unpacked** and select this folder (the one with `manifest.json`).
 3. Open a TradingView chart and click the Priism Skins icon.
 
 ## Layout
@@ -86,7 +86,7 @@ Note: this wraps tradingview.com; it does not modify the official TradingView De
 
 ## Mobile (planned)
 - **iOS / iPadOS / macOS Safari**: Safari Web Extension. Xcode can convert this folder
-  (`xcrun safari-web-extension-converter wicked-skins/`). Needs an Apple Developer account.
+  (`xcrun safari-web-extension-converter <this folder>/`). Needs an Apple Developer account.
 - **Android (phones + tablets)**: a native WebView app lives in **[`android/`](android/)**. It loads
   tradingview.com and injects the same `src/` code as the desktop app, with the shared `popup/` as a settings
   sheet. Build it in Android Studio (`./gradlew assembleRelease`); see `android/README.md`. The official

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased: new public repo name
+- The public repo (website and downloads) is now `priism-skins`, so the website is https://arcuto29.github.io/priism-skins/.
+  The code repo is `priism-app` (private). Update checks, download links, workflows and docs use the new names.
+- Copies installed before this change look for updates at the old address and need one manual reinstall.
+
 ## Unreleased: safer licensing for the beta
 - **Guessing codes gets nowhere.** Wrong guesses are rate limited by address, by account and overall (never by device
   id), in the database, so it also holds for anyone who skips the licence function. A copy that is already set up is
