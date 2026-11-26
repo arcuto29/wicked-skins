@@ -1,6 +1,6 @@
 # Publishes site/ (home page, Workshop, Privacy, Terms) on every push to main.
-# This code repo is private, so the website lives in the PUBLIC repo arcuto29/priism-skins: this pushes the built
-# site to its gh-pages branch, and that repo's GitHub Pages serves it at https://arcuto29.github.io/priism-skins/.
+# This code repo is private, so the website lives in the PUBLIC repo priismskins/priismskins.github.io: this pushes the built
+# site to its gh-pages branch, and that repo's GitHub Pages serves it at https://priismskins.github.io/.
 name: Website
 on:
   push:
@@ -16,16 +16,17 @@ jobs:
     steps:
       - name: Needs the PUBLIC_REPO_TOKEN secret
         env: { T: "${{ secrets.PUBLIC_REPO_TOKEN }}" }
-        run: '[ -n "$T" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (see RELEASING.md). The website is published to the public arcuto29/priism-skins repo."; exit 1; }'
+        run: '[ -n "$T" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (see RELEASING.md). The website is published to the public priismskins/priismskins.github.io repo."; exit 1; }'
       - uses: actions/checkout@v4
       # share-link previews (look.html) draw with the extension's own wallpaper + candle code
       - run: mkdir -p site/lib && cp src/skins.js src/candlelooks.js site/lib/ && touch site/.nojekyll
       - uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.PUBLIC_REPO_TOKEN }}
-          external_repository: arcuto29/priism-skins
+          external_repository: priismskins/priismskins.github.io
           publish_branch: gh-pages
           publish_dir: ./site
           force_orphan: true          # the public repo only ever holds the current site, no history
-          user_name: arcuto29
-          user_email: arcuto29@users.noreply.github.com
+          # commits on the public site carry the Actions bot's name, never the owner's account
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com

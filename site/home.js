@@ -123,7 +123,7 @@
   if (cards[want]) cards[want].classList.add("you");
   if (S.chromeStoreUrl && cards.chrome) cards.chrome.href = S.chromeStoreUrl;
   const NAMES = { chrome: "Add to your browser", win: "Download for Windows", mac: "Download for Mac", linux: "Download for Linux", android: "Download for Android" };
-  fetch("https://api.github.com/repos/arcuto29/priism-skins/releases/latest").then((r) => (r.ok ? r.json() : null)).then((rel) => {
+  fetch("https://api.github.com/repos/priismskins/priismskins.github.io/releases/latest").then((r) => (r.ok ? r.json() : null)).then((rel) => {
     if (!rel || !rel.assets) return;
     $("dlVer").textContent = "v" + String(rel.tag_name || "").replace(/^v/, "");
     const find = (re) => (rel.assets.find((a) => re.test(a.name)) || {}).browser_download_url;

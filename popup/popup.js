@@ -1615,7 +1615,7 @@ const W = () => window.Workshop;
 
 // The extension Workshop is browse + use only — no account. Sharing/liking/reporting and admin review all live
 // on the website (login there), which avoids a sign-in wall and the free-tier email limits inside the popup.
-const WS_SITE = () => (window.WORKSHOP_CONFIG && window.WORKSHOP_CONFIG.siteUrl) || "https://arcuto29.github.io/priism-skins/";
+const WS_SITE = () => (window.WORKSHOP_CONFIG && window.WORKSHOP_CONFIG.siteUrl) || "https://priismskins.github.io/";
 function wsTabs() {
   seg("wsKind", [["looks", "Community looks"], ["walls", "Wallpapers"]], () => wsKind, (v) => { wsKind = v; localStorage.setItem("wsKind", v); wsSort = "popular"; wsLoad(true); });
   $("wsSubmit").hidden = wsKind !== "walls"; $("wsShareLook").hidden = wsKind !== "looks";
@@ -3076,7 +3076,7 @@ async function siteBar() {
 //  - Desktop app: the app's own updater (desktop/main.js) reports checking / downloading (real %) / ready / error.
 //  - Android: no silent installs outside Google Play: the card links the new APK, Android asks you to confirm.
 // Beta copies follow beta releases (and stable ones after them); stable copies only stable releases.
-const REPO = "arcuto29/priism-skins";
+const REPO = "priismskins/priismskins.github.io";
 const RELEASES = `https://github.com/${REPO}/releases`;
 const STORE_URL = "https://chromewebstore.google.com/detail/priism-skins-for-tradingv/ilmoloilbeblmgkanbiekhdegagfdloa";
 const BETA_STORE_URL = "";   // the "Priism Skins Beta" listing (trusted testers), once it's approved

@@ -7,7 +7,7 @@ Do the parts in order. Each step says **what you should see**, so you know it wo
 **Nothing here costs money, and nothing is charged automatically.** The beta uses no payment system at all. Code
 changes (merging, releasing, publishing) only happen after you tell Kiro to go ahead.
 
-Project: `tsazewpipzgfwgcepcsb` · Website: https://arcuto29.github.io/priism-skins/
+Project: `tsazewpipzgfwgcepcsb` · Website: https://priismskins.github.io/
 
 ## How it fits together (read once)
 
@@ -111,9 +111,9 @@ doesn't work for them unless you add your own mail service.)
 
 **Supabase side:**
 1. **Authentication › Sign In / Providers › Google** (older dashboards: Authentication › Providers): switch on, paste the Client ID and Client secret, **Save**.
-2. **Authentication › URL Configuration**: Site URL `https://arcuto29.github.io/priism-skins/`; under Redirect URLs add
-   `https://arcuto29.github.io/priism-skins/workshop.html`. Save.
-3. Test: open https://arcuto29.github.io/priism-skins/workshop.html, sign in with Google using **your owner address**.
+2. **Authentication › URL Configuration**: Site URL `https://priismskins.github.io/`; under Redirect URLs add
+   `https://priismskins.github.io/workshop.html`. Save.
+3. Test: open https://priismskins.github.io/workshop.html, sign in with Google using **your owner address**.
    You should see the **Invites** section marked ADMIN. If you don't, your Google address isn't in `owner_emails()`:
    tell Kiro, or edit that one line in the SQL Editor and run the schema again.
 

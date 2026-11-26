@@ -26,7 +26,7 @@ jobs:
       - name: The release checker catches the 0.1.86 bug in the real published metadata
         run: |
           mkdir r && cd r
-          for f in latest.yml latest-linux.yml latest-mac.yml; do curl -fsSL -o $f https://github.com/arcuto29/priism-skins/releases/download/v0.1.86/$f; done
+          for f in latest.yml latest-linux.yml latest-mac.yml; do curl -fsSL -o $f https://github.com/priismskins/priismskins.github.io/releases/download/v0.1.86/$f; done
           # the files as GitHub actually named them (empty stand-ins: the names are what matter here)
           touch Priism.Skins.Setup.0.1.86.exe Priism.Skins.Setup.0.1.86.exe.blockmap Priism.Skins-0.1.86.AppImage Priism.Skins-0.1.86-arm64-mac.zip Priism.Skins-0.1.86-arm64-mac.zip.blockmap
           if node ../scripts/check-desktop-release.js .; then echo "::error::the checker should have failed on 0.1.86"; exit 1; fi

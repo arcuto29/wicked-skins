@@ -3,7 +3,7 @@
   "productName": "Priism Skins",
   "version": "0.1.87",
   "description": "Priism Skins desktop app: TradingView with live wallpapers (Windows, macOS, Linux)",
-  "author": "arcuto29",
+  "author": "Priism Skins",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -77,8 +77,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "arcuto29",
-        "repo": "priism-skins",
+        "owner": "priismskins",
+        "repo": "priismskins.github.io",
         "releaseType": "release"
       }
     ]

@@ -1,8 +1,8 @@
 # Changelog
 
 ## Unreleased: new public repo name
-- The public repo (website and downloads) is now `priism-skins`, so the website is https://arcuto29.github.io/priism-skins/.
-  The code repo is `priism-app` (private). Update checks, download links, workflows and docs use the new names.
+- The website and downloads live in the `priismskins` organization: https://priismskins.github.io/ (repo
+  `priismskins/priismskins.github.io`). The code repo is `priism-app` (private). Update checks, download links, workflows and docs use the new names.
 - Copies installed before this change look for updates at the old address and need one manual reinstall.
 
 ## Unreleased: safer licensing for the beta

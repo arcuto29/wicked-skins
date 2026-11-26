@@ -62,12 +62,12 @@ Per-permission justifications (one box each):
 - **optional host (any site):** `Requested only when the user explicitly taps "Turn on here" on a site that shows a TradingView chart. The user can remove it from the panel at any time.`
 - **Remote code:** No.
 Data usage: **do not collect or use user data**; certify not sold, not used for unrelated purposes, not used for creditworthiness.
-Privacy policy URL: `https://arcuto29.github.io/priism-skins/privacy.html`
+Privacy policy URL: `https://priismskins.github.io/privacy.html`
 
 ## 2b. Distribution tab
 Visibility **Unlisted** to start · All regions · Free
 
-**Website:** https://arcuto29.github.io/priism-skins/  ·  **Support:** arcuto2978@gmail.com
+**Website:** https://priismskins.github.io/  ·  **Support:** arcuto2978@gmail.com
 
 ## 3. Privacy tab
 **Single purpose:** Restyle TradingView charts (wallpapers, candle colours, glow, price-scale styling) on tradingview.com and on sites the user turns it on for.
@@ -86,7 +86,7 @@ Visibility **Unlisted** to start · All regions · Free
 computer, and browsing/using the Workshop needs no account. (Sharing a wallpaper happens on the website, not the
 extension.) So you can answer "I don't collect user data" for the extension; certify not sold, not used for unrelated
 purposes, not used for creditworthiness.
-**Privacy policy URL:** https://arcuto29.github.io/priism-skins/privacy.html
+**Privacy policy URL:** https://priismskins.github.io/privacy.html
 
 ## 4. Automatic updates afterwards
 Once published, add the `CWS_*` secrets (RELEASING.md). Every tagged release then uploads and publishes itself.

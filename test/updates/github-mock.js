@@ -13,7 +13,7 @@
 const https = require("https"), fs = require("fs"), path = require("path");
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const DIR = path.resolve(arg("dir")), TAG = arg("tag"), LOG = arg("log", "mock-log.jsonl"), MODE = arg("mode", ""), PORT = +arg("port", 443);
-const OWNER = arg("owner", "arcuto29"), REPO = arg("repo", "priism-skins"), BASE = `/${OWNER}/${REPO}/releases`;
+const OWNER = arg("owner", "priismskins"), REPO = arg("repo", "priismskins.github.io"), BASE = `/${OWNER}/${REPO}/releases`;
 // what GitHub would call each file after upload: spaces become dots (that's how 0.1.86's files ended up named)
 const ghName = (f) => f.replace(/ /g, ".");
 const files = new Map(fs.readdirSync(DIR).filter((f) => fs.statSync(path.join(DIR, f)).isFile()).map((f) => [ghName(f), path.join(DIR, f)]));

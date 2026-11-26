@@ -18,7 +18,7 @@ const path = require("path"), fs = require("fs"), os = require("os"), crypto = r
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const ROOT = path.join(__dirname, "..", "..");
 const OUT = path.join(ROOT, "test-output", "persist"); fs.mkdirSync(OUT, { recursive: true });
-const OLD_URL = "https://github.com/arcuto29/priism-skins/releases/download/v0.1.86/priism-skins-0.1.86.zip";
+const OLD_URL = "https://github.com/priismskins/priismskins.github.io/releases/download/v0.1.86/priism-skins-0.1.86.zip";
 const KEYS = JSON.parse(fs.readFileSync(path.join(ROOT, "keys", "unpacked.json"), "utf8"));
 const R = {}; const ok = (k, v, d) => { R[k] = !!v; console.log((v ? "PASS " : "FAIL ") + k + (d !== undefined ? "  " + JSON.stringify(d).slice(0, 400) : "")); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
