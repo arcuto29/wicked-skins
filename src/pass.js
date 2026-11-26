@@ -15,7 +15,7 @@
   const PASS_REQUIRED = false;
   const STORE_URL = "";
   const LICENCE_LIVE = false;
-  const PUBLIC_JWK = { kty: "EC", crv: "P-256", x: "po_7MEF1ILlVXG3EpMWwSU6P3koiNkFClC9Sry6DDYQ", y: "DPdTlvkvBkfk0rdSPOscJAxu0mH9abOX6Yag1Z_uvQY" };
+  const PUBLIC_JWK = { kty: "EC", crv: "P-256", x: "Pu92fbCM3CDVUt1X3zFHihMFvc5wFChi-kMhqMt_6-w", y: "5e4UOBHKxFivYHmy_v8ApAvmOAdqo8lG1fqQmWWa1xw" };
 
   // ---- what Free includes ----
   // 6 wallpapers, candle colours, the picture's own settings (dim, blur, speed, sharpness, layer...), shortcuts and
