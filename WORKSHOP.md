@@ -22,7 +22,7 @@ a few emails per hour — for a real launch, add custom SMTP (e.g. Resend) under
    Authorized redirect URI: `https://<your-project>.supabase.co/auth/v1/callback`
 2. Supabase → Authentication → Providers → **Google** → paste the Client ID + Secret → enable.
 3. Supabase → Authentication → URL Configuration → **Redirect URLs** → add your website URL
-   (e.g. `https://arcuto29.github.io/wicked-skins/**`), where Google returns after sign-in.
+   (e.g. `https://arcuto29.github.io/priism-skins/**`), where Google returns after sign-in.
 
 ## 3. You're the admin automatically
 The owner email is set at the top of `supabase/schema.sql` (`public.owner_emails()`, currently arcuto2978@gmail.com).

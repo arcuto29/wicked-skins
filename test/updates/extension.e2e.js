@@ -31,8 +31,8 @@ const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
   const github = async (ctx) => ctx.route("https://api.github.com/**", (r) => {
     if (offline) return r.abort("internetdisconnected");
     const u = r.request().url();
-    if (/releases\/latest$/.test(u)) return r.fulfill({ json: { tag_name: "v9.9.9", html_url: "https://github.com/arcuto29/wicked-skins/releases/tag/v9.9.9", draft: false, prerelease: false,
-      assets: [{ name: "priism-skins-9.9.9.zip", browser_download_url: "https://github.com/arcuto29/wicked-skins/releases/download/v9.9.9/priism-skins-9.9.9.zip", size: 11e6 }] } });
+    if (/releases\/latest$/.test(u)) return r.fulfill({ json: { tag_name: "v9.9.9", html_url: "https://github.com/arcuto29/priism-skins/releases/tag/v9.9.9", draft: false, prerelease: false,
+      assets: [{ name: "priism-skins-9.9.9.zip", browser_download_url: "https://github.com/arcuto29/priism-skins/releases/download/v9.9.9/priism-skins-9.9.9.zip", size: 11e6 }] } });
     if (/releases\/tags\/v9\.9\.9$/.test(u)) return r.fulfill({ json: { body: "- **Candles keep their look at every zoom**\n- **Backups**: everything in one file" } });
     return r.fulfill({ status: 404, json: {} });
   });

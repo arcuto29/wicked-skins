@@ -29,7 +29,7 @@ jobs:
     steps:
       - name: Releases go to the public repo (needs the PUBLIC_REPO_TOKEN secret)
         env: { T: "${{ secrets.PUBLIC_REPO_TOKEN }}" }
-        run: '[ -n "$T" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (see RELEASING.md). Releases are published to the public arcuto29/wicked-skins repo."; exit 1; }'
+        run: '[ -n "$T" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (see RELEASING.md). Releases are published to the public arcuto29/priism-skins repo."; exit 1; }'
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
@@ -165,7 +165,7 @@ jobs:
       CHANNEL: ${{ needs.prepare.outputs.channel }}
       PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
       # releases (downloads + the desktop apps' update files) live in the public repo; this code repo is private
-      PUBLIC_REPO: arcuto29/wicked-skins
+      PUBLIC_REPO: arcuto29/priism-skins
       GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
     steps:
       - name: Releases go to the public repo (needs the PUBLIC_REPO_TOKEN secret)
@@ -205,7 +205,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         id: rel
         with:
-          repository: arcuto29/wicked-skins
+          repository: arcuto29/priism-skins
           token: ${{ secrets.PUBLIC_REPO_TOKEN }}
           name: Priism Skins ${{ github.ref_name }}
           body_path: notes.md

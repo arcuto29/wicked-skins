@@ -11,7 +11,7 @@ cd "$(dirname "$0")/../.."
 ROOT=$PWD; OUT="$ROOT/test-output/desktop-$(node -p process.platform)"; mkdir -p "$OUT"; : > "$OUT/mock-log.jsonl"; echo ok > "$OUT/mode.txt"
 export MOCK_LOG="$OUT/mock-log.jsonl" MOCK_MODE_FILE="$OUT/mode.txt"
 WIN=0; case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) WIN=1;; esac
-REL=https://github.com/arcuto29/wicked-skins/releases/download
+REL=https://github.com/arcuto29/priism-skins/releases/download
 WORK="$ROOT/.upd"; mkdir -p "$WORK"
 
 echo "::group::Build 0.1.990 and 0.1.991 from this branch"
@@ -69,7 +69,7 @@ mock() {   # mock <dir> <tag>
   else sudo -E env "PATH=$PATH" node test/updates/github-mock.js --dir "$1" --tag "$2" --cert "$WORK/gh.crt" --key "$WORK/gh.key" --log "$MOCK_LOG" --mode "$MOCK_MODE_FILE" & MOCK=$!; fi
   # (Windows curl asks the certificate's issuer about revocation; a test certificate has nobody to ask)
   NOREV=""; [ $WIN = 1 ] && NOREV=--ssl-no-revoke
-  for i in $(seq 1 30); do curl -fsS $NOREV -o /dev/null "https://github.com/arcuto29/wicked-skins/releases/latest" --cacert "$WORK/ca.crt" && return 0; sleep 1; done
+  for i in $(seq 1 30); do curl -fsS $NOREV -o /dev/null "https://github.com/arcuto29/priism-skins/releases/latest" --cacert "$WORK/ca.crt" && return 0; sleep 1; done
   echo "mock didn't start"; exit 1
 }
 run() { if [ $WIN = 1 ]; then node test/updates/desktop-upgrade.js "$@"; else xvfb-run -a node test/updates/desktop-upgrade.js "$@"; fi; }

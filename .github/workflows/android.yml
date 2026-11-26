@@ -16,7 +16,7 @@ jobs:
       - name: Releases go to the public repo (needs the PUBLIC_REPO_TOKEN secret)
         if: startsWith(github.ref, 'refs/tags/v')
         env: { T: "${{ secrets.PUBLIC_REPO_TOKEN }}" }
-        run: '[ -n "$T" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (see RELEASING.md). Releases are published to the public arcuto29/wicked-skins repo."; exit 1; }'
+        run: '[ -n "$T" ] || { echo "::error::Add the PUBLIC_REPO_TOKEN secret (see RELEASING.md). Releases are published to the public arcuto29/priism-skins repo."; exit 1; }'
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:

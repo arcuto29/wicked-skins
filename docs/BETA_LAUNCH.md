@@ -7,7 +7,7 @@ Do the parts in order. Each step says **what you should see**, so you know it wo
 **Nothing here costs money, and nothing is charged automatically.** The beta uses no payment system at all. Code
 changes (merging, releasing, publishing) only happen after you tell Kiro to go ahead.
 
-Project: `tsazewpipzgfwgcepcsb` · Website: https://arcuto29.github.io/wicked-skins/
+Project: `tsazewpipzgfwgcepcsb` · Website: https://arcuto29.github.io/priism-skins/
 
 ## How it fits together (read once)
 
@@ -41,9 +41,9 @@ the app only believes a signed pass, and a pass is only made by the server. CI r
    open a terminal (Windows: press the Windows key, type `PowerShell`, Enter. Mac: Spotlight, type `Terminal`) and run
    `node --version`. You should see `v20…` or higher.
 3. **A copy of the repository on your computer.** The code is private, so use GitHub Desktop (https://desktop.github.com),
-   sign in, **File › Clone repository** › `arcuto29/wicked-skins` (or `priism-app` after the rename). Note the folder it
+   sign in, **File › Clone repository** › `arcuto29/priism-app`. Note the folder it
    puts the files in; the terminal commands below start with `cd` into that folder.
-   (`cd` means "go into this folder", for example `cd Documents/GitHub/wicked-skins`.)
+   (`cd` means "go into this folder", for example `cd Documents/GitHub/priism-app`.)
 4. **Supabase billing check.** Dashboard › your organization › **Billing** must say **Free**. Don't add a card.
    On Free, going over a limit pauses or restricts the service. You're never billed.
 5. **API keys.** Dashboard › Project Settings › **API Keys**. Keep the legacy `anon` key active: every installed copy
@@ -58,7 +58,7 @@ private key leaks, anyone could make passes, so it is made on your computer and 
 
 1. In the terminal, go to a folder **outside** the repository, for example `cd Documents`.
 2. Run (replace the path with where your repository is):
-   `node path/to/wicked-skins/supabase/functions/licence/newkeys.mjs`
+   `node path/to/priism-app/supabase/functions/licence/newkeys.mjs`
 3. You should see `Private key written to PRIVATE-priism-pass-key.json (secret).` and a line starting
    `const PUBLIC_JWK = {…}`.
 4. **Open `PRIVATE-priism-pass-key.json` and copy the whole thing into your password manager** as a secure note
@@ -111,16 +111,16 @@ doesn't work for them unless you add your own mail service.)
 
 **Supabase side:**
 1. **Authentication › Sign In / Providers › Google** (older dashboards: Authentication › Providers): switch on, paste the Client ID and Client secret, **Save**.
-2. **Authentication › URL Configuration**: Site URL `https://arcuto29.github.io/wicked-skins/`; under Redirect URLs add
-   `https://arcuto29.github.io/wicked-skins/workshop.html`. Save.
-3. Test: open https://arcuto29.github.io/wicked-skins/workshop.html, sign in with Google using **your owner address**.
+2. **Authentication › URL Configuration**: Site URL `https://arcuto29.github.io/priism-skins/`; under Redirect URLs add
+   `https://arcuto29.github.io/priism-skins/workshop.html`. Save.
+3. Test: open https://arcuto29.github.io/priism-skins/workshop.html, sign in with Google using **your owner address**.
    You should see the **Invites** section marked ADMIN. If you don't, your Google address isn't in `owner_emails()`:
    tell Kiro, or edit that one line in the SQL Editor and run the schema again.
 
 ## Part 4: The licence function (15 minutes)
 This is the server that issues signed passes. You run three commands. `npx` comes with Node.
 
-1. In the terminal, go **into the repository folder** (`cd …/wicked-skins`).
+1. In the terminal, go **into the repository folder** (`cd …/priism-app`).
 2. Log in and link (a browser window opens to approve the login):
    ```sh
    npx supabase@latest login
